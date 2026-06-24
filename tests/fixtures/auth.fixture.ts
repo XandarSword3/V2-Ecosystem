@@ -42,7 +42,7 @@ const ROLE_CREDENTIALS: Record<Exclude<AuthRole, 'guest'>, RoleCredentials> = {
     password: process.env.E2E_ADMIN_PASSWORD || 'admin123',
   },
   staff: {
-    email: process.env.E2E_STAFF_EMAIL || 'restaurant.staff@v2ecosystem.com',
+    email: process.env.E2E_STAFF_EMAIL || 'menu.service.staff@v2ecosystem.com',
     password: process.env.E2E_STAFF_PASSWORD || 'staff123',
   },
 };

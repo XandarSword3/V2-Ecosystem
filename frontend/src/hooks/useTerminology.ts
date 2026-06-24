@@ -14,12 +14,12 @@ export interface Terminology {
 }
 
 const DEFAULT_TERMS: Terminology = {
-    unit_singular: 'Chalet',
-    unit_plural: 'Chalets',
-    facility_singular: 'Pool',
-    facility_plural: 'Pools',
-    dining_singular: 'Restaurant',
-    dining_plural: 'Restaurants',
+    unit_singular: 'Accommodation',
+    unit_plural: 'Accommodations',
+    facility_singular: 'Facility',
+    facility_plural: 'Facilities',
+    dining_singular: 'Dining',
+    dining_plural: 'Dining Venues',
 };
 
 export function useTerminology() {
@@ -29,9 +29,9 @@ export function useTerminology() {
     useEffect(() => {
         const loadTerminology = async () => {
             try {
-                // Get business type from storage or default to 'resort'
+                // Get business type from storage or default to 'hotel'
                 const storedType = localStorage.getItem('v2-business-type');
-                const businessType = storedType || 'resort';
+                const businessType = storedType || 'hotel';
 
                 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
                 const response = await api.get(`/terminology?business_type=${businessType}`);
@@ -55,7 +55,7 @@ export function useTerminology() {
 
     /**
      * Helper to replace placeholders in strings
-     * Example: t('Book a {unit_singular}') -> 'Book a Chalet'
+     * Example: t('Book a {unit_singular}') -> 'Book a Unit'
      */
     const t = (text: string): string => {
         return text.replace(/{(\w+)}/g, (match, key) => {

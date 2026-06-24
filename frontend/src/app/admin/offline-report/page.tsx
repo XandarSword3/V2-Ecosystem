@@ -147,10 +147,10 @@ export default function OfflineActivityReport() {
                 className="p-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-primary bg-white text-sm"
               >
                 <option value="all">All Modules</option>
-                <option value="order">Restaurant Orders</option>
+                <option value="order">Orders</option>
                 <option value="payment">Cash Payments</option>
-                <option value="booking">Chalet Bookings</option>
-                <option value="pool_ticket">Pool Tickets</option>
+                <option value="booking">Accommodation Bookings</option>
+                <option value="pool_ticket">Access Tickets</option>
                 <option value="housekeeping_task">Housekeeping</option>
                 <option value="maintenance">Maintenance</option>
               </select>

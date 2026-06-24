@@ -217,7 +217,7 @@ describe('MobileCheckinService', () => {
         guest_id: 'guest-1',
         booking_id: 'booking-1',
         bookings: { confirmation_number: 'CONF123', check_in: '2026-03-01', check_out: '2026-03-05' },
-        properties: { name: 'Test Resort', address: '123 Beach Rd' }
+        properties: { name: 'Test Property', address: '123 Beach Rd' }
       }];
       mockDocuments = [{ id: 'doc-1', document_type: 'passport' }];
       mockSignatures = [{ id: 'sig-1', signature_type: 'registration_form' }];
@@ -721,7 +721,7 @@ describe('MobileCheckinService', () => {
       mockMobileKeys = [{
         id: 'key-1',
         status: 'active',
-        access_areas: ['room', 'gym', 'pool'],
+        access_areas: ['room', 'gym', 'capacity'],
         room_access_starts: accessStarts.toISOString(),
         room_access_ends: accessEnds.toISOString(),
         rooms: { room_number: '101' }
@@ -1028,7 +1028,7 @@ describe('MobileCheckinService', () => {
         id: 'booking-1',
         guest_id: 'guest-1',
         property_id: 'prop-1',
-        properties: { name: 'Beach Resort' }
+        properties: { name: 'Beach Property' }
       }];
       mockPushRegistrations = [
         { id: 'reg-1', guest_id: 'guest-1', is_active: true }

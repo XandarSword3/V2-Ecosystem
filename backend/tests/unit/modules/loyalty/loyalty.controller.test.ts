@@ -369,8 +369,10 @@ describe('LoyaltyController', () => {
     it('should return loyalty statistics', async () => {
       resolveQueue = [
         { count: 10, error: null }, // totalMembers count
-        { data: [{ tier_id: 't1', loyalty_tiers: { name: 'Bronze' } }], error: null }, // tierStats
-        { data: [{ available_points: 1000, lifetime_points: 2000 }], error: null }, // pointsData
+        { data: [{ available_points: 100, lifetime_points: 200 }, { available_points: 200, lifetime_points: 300 }], error: null }, // pointsData
+        { data: [{ tier_id: 't1', tier: { name: 'Bronze', color: '#CD7F32' } }, { tier_id: 't2', tier: { name: 'Silver', color: '#C0C0C0' } }], error: null }, // tier distribution
+        { data: [{ id: 'm1' }, { id: 'm2' }], error: null }, // member IDs
+        { data: [{ type: 'earn', points: 100, created_at: new Date().toISOString() }], error: null }, // transactions
       ];
       const req = createReq();
       const res = createRes();
@@ -381,7 +383,8 @@ describe('LoyaltyController', () => {
         data: expect.objectContaining({
           summary: expect.objectContaining({
             total_members: 10,
-            total_outstanding_points: 1000
+            total_outstanding_points: 300,
+            total_lifetime_points: 500
           })
         })
       }));

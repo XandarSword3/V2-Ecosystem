@@ -9,7 +9,7 @@ import { logger } from '../../../utils/logger.js';
  * Shows all affected/related data that would be impacted
  */
 
-type EntityType = 'user' | 'booking' | 'staff' | 'chalet' | 'menu_item' | 'module';
+type EntityType = 'user' | 'booking' | 'staff' | 'unit' | 'catalog_item' | 'module';
 
 interface RelatedEntity {
   table: string;
@@ -45,7 +45,7 @@ export const getDeletePreview = asyncHandler(async (req: Request, res: Response)
     const supabase = getSupabase();
 
     // Validate entity type
-    const validTypes: EntityType[] = ['user', 'booking', 'staff', 'chalet', 'menu_item', 'module'];
+    const validTypes: EntityType[] = ['user', 'booking', 'staff', 'unit', 'catalog_item', 'module'];
     if (!validTypes.includes(entityType as EntityType)) {
       res.status(400).json({
         success: false,
@@ -66,11 +66,11 @@ export const getDeletePreview = asyncHandler(async (req: Request, res: Response)
       case 'staff':
         result = await getStaffDeletePreview(supabase, entityId, propertyId);
         break;
-      case 'chalet':
-        result = await getChaletDeletePreview(supabase, entityId, propertyId);
+      case 'unit':
+        result = await getUnitDeletePreview(supabase, entityId, propertyId);
         break;
-      case 'menu_item':
-        result = await getMenuItemDeletePreview(supabase, entityId, propertyId);
+      case 'catalog_item':
+        result = await getCatalogItemDeletePreview(supabase, entityId, propertyId);
         break;
       case 'module':
         result = await getModuleDeletePreview(supabase, entityId, propertyId);
@@ -385,26 +385,26 @@ async function getStaffDeletePreview(supabase: any, staffId: string, propertyId?
 }
 
 /**
- * Chalet delete preview
+ * Unit delete preview
  */
-async function getChaletDeletePreview(supabase: any, chaletId: string, propertyId?: string): Promise<DeletePreviewResult> {
+async function getUnitDeletePreview(supabase: any, unitId: string, propertyId?: string): Promise<DeletePreviewResult> {
   let query = supabase
     .from('accommodation_units')
     .select('id, name, created_at, property_id')
-    .eq('id', chaletId);
+    .eq('id', unitId);
 
   if (propertyId) {
     query = query.eq('property_id', propertyId);
   }
 
-  const { data: chalet, error } = await query.single();
+  const { data: unit, error } = await query.single();
 
-  if (error || !chalet) {
-    throw new Error('Chalet not found');
+  if (error || !unit) {
+    throw new Error('Unit not found');
   }
 
-  let bookingsQuery = supabase.from('transactions').select('id, booking_number, status', { count: 'exact' }).eq('reference_id', chaletId).eq('reference_table', 'accommodation_units').limit(10);
-  let imagesQuery = supabase.from('accommodation_unit_images').select('id', { count: 'exact' }).eq('unit_id', chaletId);
+  let bookingsQuery = supabase.from('transactions').select('id, booking_number, status', { count: 'exact' }).eq('reference_id', unitId).eq('reference_table', 'accommodation_units').limit(10);
+  let imagesQuery = supabase.from('accommodation_unit_images').select('id', { count: 'exact' }).eq('unit_id', unitId);
 
   if (propertyId) {
     bookingsQuery = bookingsQuery.eq('property_id', propertyId);
@@ -430,24 +430,24 @@ async function getChaletDeletePreview(supabase: any, chaletId: string, propertyI
 
   if (activeBookings > 0) {
     severity = 'critical';
-    warnings.push(`Chalet has ${activeBookings} active booking(s)`);
+    warnings.push(`Unit has ${activeBookings} active booking(s)`);
     recommendations.push('Complete or cancel all active bookings first');
   } else if (bookingsResult.count && bookingsResult.count > 0) {
     severity = 'high';
-    warnings.push(`Chalet has ${bookingsResult.count} historical booking(s)`);
+    warnings.push(`Unit has ${bookingsResult.count} historical booking(s)`);
     recommendations.push('Consider deactivating instead of deleting to preserve history');
   }
 
   return {
     entity: {
-      type: 'chalet',
-      id: chaletId,
-      identifier: chalet.name,
-      created_at: chalet.created_at,
+      type: 'unit',
+      id: unitId,
+      identifier: unit.name,
+      created_at: unit.created_at,
     },
     impact: {
       severity,
-      message: `Deleting chalet will affect all associated bookings and add-ons`,
+      message: `Deleting unit will affect all associated bookings and add-ons`,
       warnings,
     },
     relatedEntities,
@@ -458,22 +458,22 @@ async function getChaletDeletePreview(supabase: any, chaletId: string, propertyI
 }
 
 /**
- * Menu item delete preview
+ * Catalog item delete preview
  */
-async function getMenuItemDeletePreview(supabase: any, itemId: string, propertyId?: string): Promise<DeletePreviewResult> {
+async function getCatalogItemDeletePreview(supabase: any, itemId: string, propertyId?: string): Promise<DeletePreviewResult> {
   const { data: item, error } = await supabase
-    .from('menu_items')
+    .from('catalog_items')
     .select('id, name, created_at, category_id')
     .eq('id', itemId)
     .single();
 
   if (error || !item) {
-    throw new Error('Menu item not found');
+    throw new Error('Catalog item not found');
   }
 
   if (propertyId) {
     const { data: category } = await supabase
-      .from('menu_categories')
+      .from('catalog_categories')
       .select('property_id, module_id')
       .eq('id', item.category_id)
       .single();
@@ -494,8 +494,8 @@ async function getMenuItemDeletePreview(supabase: any, itemId: string, propertyI
     }
   }
 
-  let orderItemsQuery = supabase.from('transactions').select('id', { count: 'exact' }).filter('metadata->items', 'cs', `[{"menu_item_id": "${itemId}"}]`);
-  let inventoryQuery = supabase.from('inventory_recipes').select('id', { count: 'exact' }).eq('menu_item_id', itemId);
+  let orderItemsQuery = supabase.from('transactions').select('id', { count: 'exact' }).filter('metadata->items', 'cs', `[{"catalog_item_id": "${itemId}"}]`);
+  let inventoryQuery = supabase.from('inventory_recipes').select('id', { count: 'exact' }).eq('catalog_item_id', itemId);
 
   if (propertyId) {
     orderItemsQuery = orderItemsQuery.eq('property_id', propertyId);
@@ -518,7 +518,7 @@ async function getMenuItemDeletePreview(supabase: any, itemId: string, propertyI
 
   if (orderItemsResult.count && orderItemsResult.count > 0) {
     severity = 'high';
-    warnings.push(`Menu item appears in ${orderItemsResult.count} order(s)`);
+    warnings.push(`Catalog item appears in ${orderItemsResult.count} order(s)`);
     recommendations.push('Mark as unavailable instead of deleting to preserve order history');
   }
 
@@ -526,14 +526,14 @@ async function getMenuItemDeletePreview(supabase: any, itemId: string, propertyI
 
   return {
     entity: {
-      type: 'menu_item',
+      type: 'catalog_item',
       id: itemId,
       identifier: item.name,
       created_at: item.created_at,
     },
     impact: {
       severity,
-      message: `Menu item appears in historical orders`,
+      message: `Catalog item appears in historical orders`,
       warnings,
     },
     relatedEntities,
@@ -549,7 +549,7 @@ async function getMenuItemDeletePreview(supabase: any, itemId: string, propertyI
 async function getModuleDeletePreview(supabase: any, moduleId: string, propertyId?: string): Promise<DeletePreviewResult> {
   let moduleQuery = supabase
     .from('modules')
-    .select('id, name, type, created_at, property_id')
+    .select('id, name, template_type, created_at, property_id')
     .eq('id', moduleId);
 
   if (propertyId) {
@@ -569,7 +569,7 @@ async function getModuleDeletePreview(supabase: any, moduleId: string, propertyI
   let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
   let canDelete = true;
 
-  if (module.type === 'multi_day') {
+  if (module.template_type === 'time_exclusive_reservation') {
     let bookingsQuery = supabase
       .from('transactions')
       .select('id', { count: 'exact' })
@@ -603,22 +603,22 @@ async function getModuleDeletePreview(supabase: any, moduleId: string, propertyI
       warnings.push(`Module has ${bookingsCount} booking(s)`);
       canDelete = false;
     }
-  } else if (module.type === 'restaurant') {
+  } else if (module.template_type === 'instant_transaction') {
     let ordersQuery = supabase.from('transactions').select('id', { count: 'exact' }).eq('module_id', moduleId);
-    let menuQuery = supabase.from('menu_items').select('id', { count: 'exact' }).eq('module_id', moduleId);
+    let catalogQuery = supabase.from('catalog_items').select('id', { count: 'exact' }).eq('module_id', moduleId);
 
     if (propertyId) {
       ordersQuery = ordersQuery.eq('property_id', propertyId);
     }
 
-    const [ordersResult, menuResult] = await Promise.all([
+    const [ordersResult, catalogResult] = await Promise.all([
       ordersQuery,
-      menuQuery,
+      catalogQuery,
     ]);
 
     relatedEntities = [
       { table: 'orders', count: ordersResult.count || 0 },
-      { table: 'menu_items', count: menuResult.count || 0 },
+      { table: 'catalog_items', count: catalogResult.count || 0 },
     ].filter(e => e.count > 0);
 
     if (ordersResult.count && ordersResult.count > 0) {

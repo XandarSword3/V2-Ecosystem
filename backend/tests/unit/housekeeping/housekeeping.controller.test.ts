@@ -66,9 +66,9 @@ describe('Housekeeping Controller', () => {
   // ---- getTasks ----
   describe('getTasks', () => {
     it('should return paginated tasks', async () => {
-      mockBuilder.queueResponse([{ id: 't1', status: 'pending', chalet_id: 'c1', task_type_id: 'tt1', assigned_to: 'u1' }]);
+      mockBuilder.queueResponse([{ id: 't1', status: 'pending', unit_id: 'c1', task_type_id: 'tt1', assigned_to: 'u1' }]);
       mockBuilder.queueResponse([{ id: 'tt1', name: 'Deep Clean' }]); // task types
-      mockBuilder.queueResponse([{ id: 'c1', name: 'Chalet A', number: '101' }]); // chalets
+      mockBuilder.queueResponse([{ id: 'c1', name: 'AccommodationUnit A', number: '101' }]); // accommodation_units
       mockBuilder.queueResponse([{ id: 'u1', full_name: 'John', email: 'john@test.com' }]); // users
       const mocks = createMockReqRes({ query: { page: '1', limit: '10', status: 'pending' } });
       await controller.getTasks(mocks.req as Request, mocks.res as Response);
@@ -78,7 +78,7 @@ describe('Housekeeping Controller', () => {
     it('should filter by priority and assignedTo', async () => {
       mockBuilder.queueResponse([]);
       mockBuilder.queueResponse([]); mockBuilder.queueResponse([]); mockBuilder.queueResponse([]);
-      const mocks = createMockReqRes({ query: { priority: 'high', assignedTo: 'u1', chaletId: 'c1', date: '2024-01-15' } });
+      const mocks = createMockReqRes({ query: { priority: 'high', assignedTo: 'u1', unitId: 'c1', date: '2024-01-15' } });
       await controller.getTasks(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     });
@@ -102,9 +102,9 @@ describe('Housekeeping Controller', () => {
   // ---- getMyTasks ----
   describe('getMyTasks', () => {
     it('should return tasks for current user', async () => {
-      mockBuilder.queueResponse([{ id: 't1', task_type_id: 'tt1', chalet_id: 'c1' }]);
+      mockBuilder.queueResponse([{ id: 't1', task_type_id: 'tt1', unit_id: 'c1' }]);
       mockBuilder.queueResponse([{ id: 'tt1', name: 'Clean' }]);
-      mockBuilder.queueResponse([{ id: 'c1', name: 'Chalet A', number: '101' }]);
+      mockBuilder.queueResponse([{ id: 'c1', name: 'AccommodationUnit A', number: '101' }]);
       const mocks = createMockReqRes({ query: {} });
       (mocks.req as any).user = { id: 'u1' };
       await controller.getMyTasks(mocks.req as Request, mocks.res as Response);
@@ -132,9 +132,9 @@ describe('Housekeeping Controller', () => {
   // ---- getTask ----
   describe('getTask', () => {
     it('should return a single task with enrichment', async () => {
-      mockBuilder.queueResponse({ id: 't1', task_type_id: 'tt1', chalet_id: 'c1', assigned_to: 'u1', created_by: 'u2' }); // task (single)
+      mockBuilder.queueResponse({ id: 't1', task_type_id: 'tt1', unit_id: 'c1', assigned_to: 'u1', created_by: 'u2' }); // task (single)
       mockBuilder.queueResponse({ id: 'tt1', name: 'Deep Clean', estimated_duration: 60, checklist: ['mop'] }); // type (single)
-      mockBuilder.queueResponse({ id: 'c1', name: 'Chalet A', number: '101' }); // chalet (single)
+      mockBuilder.queueResponse({ id: 'c1', name: 'AccommodationUnit A', number: '101' }); // accommodation unit (single)
       mockBuilder.queueResponse({ id: 'u1', full_name: 'John' }); // assignee (single)
       mockBuilder.queueResponse({ id: 'u2', full_name: 'Admin' }); // creator (single)
       mockBuilder.queueResponse([{ id: 'l1', action: 'created', performed_by: 'u2', created_at: '2024-01-15T10:00:00Z' }]); // logs
@@ -159,7 +159,7 @@ describe('Housekeeping Controller', () => {
       mockBuilder.queueResponse({ id: 't1', status: 'pending' }); // insert (single)
       mockBuilder.queueResponse(null); // log insert
       const mocks = createMockReqRes({
-        body: { taskTypeId: '00000000-0000-0000-0000-000000000001', chaletId: '00000000-0000-0000-0000-000000000002', priority: 'normal', notes: 'Test' },
+        body: { taskTypeId: '00000000-0000-0000-0000-000000000001', unitId: '00000000-0000-0000-0000-000000000002', priority: 'normal', notes: 'Test' },
       });
       (mocks.req as any).user = { id: 'u1' };
       await controller.createTask(mocks.req as Request, mocks.res as Response);
@@ -336,19 +336,19 @@ describe('Housekeeping Controller', () => {
   // ---- getSchedules ----
   describe('getSchedules', () => {
     it('should return schedules with enrichment', async () => {
-      mockBuilder.queueResponse([{ id: 's1', task_type_id: 'tt1', chalet_id: 'c1', assigned_to: 'u1' }]);
+      mockBuilder.queueResponse([{ id: 's1', task_type_id: 'tt1', unit_id: 'c1', assigned_to: 'u1' }]);
       mockBuilder.queueResponse([{ id: 'tt1', name: 'Clean' }]);
-      mockBuilder.queueResponse([{ id: 'c1', name: 'Chalet A' }]);
+      mockBuilder.queueResponse([{ id: 'c1', name: 'AccommodationUnit A' }]);
       mockBuilder.queueResponse([{ id: 'u1', full_name: 'John' }]);
       const mocks = createMockReqRes({ query: {} });
       await controller.getSchedules(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     });
 
-    it('should filter by chaletId and dayOfWeek', async () => {
+    it('should filter by unitId and dayOfWeek', async () => {
       mockBuilder.queueResponse([]);
       mockBuilder.queueResponse([]); mockBuilder.queueResponse([]); mockBuilder.queueResponse([]);
-      const mocks = createMockReqRes({ query: { chaletId: 'c1', dayOfWeek: '1', isActive: 'true' } });
+      const mocks = createMockReqRes({ query: { unitId: 'c1', dayOfWeek: '1', isActive: 'true' } });
       await controller.getSchedules(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     });
@@ -424,7 +424,7 @@ describe('Housekeeping Controller', () => {
   // ---- generateScheduledTasks ----
   describe('generateScheduledTasks', () => {
     it('should generate tasks from schedules', async () => {
-      mockBuilder.queueResponse([{ id: 's1', chalet_id: 'c1', task_type_id: 'tt1', assigned_to: 'u1', day_of_week: 1, time_slot: '09:00' }]);
+      mockBuilder.queueResponse([{ id: 's1', unit_id: 'c1', task_type_id: 'tt1', assigned_to: 'u1', day_of_week: 1, time_slot: '09:00' }]);
       mockBuilder.queueResponse([]); // existing tasks (empty = no dups)
       mockBuilder.queueResponse({ id: 't1' }); // insert (single)
       const mocks = createMockReqRes();

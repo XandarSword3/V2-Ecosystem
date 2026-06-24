@@ -76,7 +76,7 @@ describe('SettingsService', () => {
   describe('getSetting', () => {
     it('should return a single setting value', async () => {
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(createChainableMock({ value: 'My Resort' }))
+        from: vi.fn().mockReturnValue(createChainableMock({ value: 'My Property' }))
       } as any);
 
       const { SettingsService } = await import('../../src/modules/admin/services/settings.service.js');
@@ -84,7 +84,7 @@ describe('SettingsService', () => {
       
       const result = await service.getSetting('site_name');
       
-      expect(result).toBe('My Resort');
+      expect(result).toBe('My Property');
     });
 
     it('should return undefined for missing setting', async () => {
@@ -111,7 +111,7 @@ describe('SettingsService', () => {
       const { SettingsService } = await import('../../src/modules/admin/services/settings.service.js');
       const service = new SettingsService();
       
-      await service.updateSetting('site_name', 'New Resort');
+      await service.updateSetting('site_name', 'New Property');
       
       expect(mockBuilder.upsert).toHaveBeenCalled();
     });
@@ -128,7 +128,7 @@ describe('SettingsService', () => {
       const service = new SettingsService();
       
       await service.updateMultipleSettings({
-        site_name: 'Resort A',
+        site_name: 'Property A',
         contact_email: 'new@example.com'
       });
       
@@ -282,7 +282,7 @@ describe('DashboardService', () => {
       const mockOrders = [
         { 
           id: 'o-1', 
-          reference_table: 'restaurant_orders',
+          reference_table: 'menu_service_orders',
           status: 'pending',
           amount: 50,
           created_at: '2024-01-01',

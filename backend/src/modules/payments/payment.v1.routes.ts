@@ -176,7 +176,7 @@ router.get(
       if (paymentIntent.metadata.userId !== req.user!.userId) {
         // Check if user has admin permission
         const isAdmin = req.user!.roles?.some(r => 
-          ['super_admin', 'manager', 'restaurant_admin'].includes(r)
+          ['super_admin', 'manager', 'admin'].includes(r)
         );
 
         if (!isAdmin) {

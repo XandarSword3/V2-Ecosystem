@@ -1,14 +1,14 @@
 -- Add proper type and notified_at columns to waitlist_entries
-ALTER TABLE waitlist_entries ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'restaurant';
+ALTER TABLE waitlist_entries ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'menu_service';
 ALTER TABLE waitlist_entries ADD COLUMN IF NOT EXISTS notified_at TIMESTAMPTZ;
 
 -- Backfill type from notes field where it was previously stored
 UPDATE waitlist_entries
 SET type = CASE
-    WHEN notes LIKE 'type:pool%' THEN 'pool'
-    ELSE 'restaurant'
+    WHEN notes LIKE 'type:shared_capacity_access%' THEN 'shared_capacity_access'
+    ELSE 'menu_service'
 END
-WHERE type IS NULL OR type = 'restaurant';
+WHERE type IS NULL OR type = 'menu_service';
 
 -- Clean notes field: remove the type prefix that was stored there
 UPDATE waitlist_entries

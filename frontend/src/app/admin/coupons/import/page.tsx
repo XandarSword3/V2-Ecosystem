@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { ImportWizard } from '@/components/admin/ImportWizard';
 import { Input } from '@/components/ui/Input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 import { Badge } from '@/components/ui/Badge';
 import { Percent, DollarSign } from 'lucide-react';
 
@@ -16,16 +15,8 @@ interface Coupon extends Record<string, unknown> {
   maxDiscountAmount?: number;
   usageLimit?: number;
   expiresAt?: string;
-  appliesTo?: 'all' | 'restaurant' | 'pool' | 'chalets' | 'snack';
+  appliesTo?: string;
 }
-
-const appliesToOptions = [
-  { value: 'all', label: 'All Services' },
-  { value: 'restaurant', label: 'Restaurant' },
-  { value: 'pool', label: 'Pool' },
-  { value: 'chalets', label: 'Chalets' },
-  { value: 'snack', label: 'Snack Bar' },
-];
 
 export default function CouponImportPage() {
   const router = useRouter();
@@ -38,7 +29,7 @@ export default function CouponImportPage() {
       llmPlaceholder={`Paste your coupon definitions here. Examples:
 • Summer Sale 2024: 15% off, min order $50, expires 2024-08-31
 • Welcome Discount: $10 off first purchase, applies to all
-• Weekend Special: 20% off restaurant orders, valid weekends only`}
+• Weekend Special: 20% off all module orders, valid weekends only`}
       onBack={() => router.push('/admin/coupons')}
       renderPreviewItem={(item, onChange) => (
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center">
@@ -75,19 +66,13 @@ export default function CouponImportPage() {
             {item.discountType === 'percentage' && <span>%</span>}
           </div>
           <div>
-            <Select
+            <Input
               value={item.appliesTo || 'all'}
-              onValueChange={(v) => onChange('appliesTo', v)}
-            >
-              <SelectTrigger className="h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {appliesToOptions.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(e) => onChange('appliesTo', e.target.value)}
+              className="h-8"
+              placeholder="all"
+              aria-label="Applies To (module slug or 'all')"
+            />
           </div>
           <div className="flex gap-1">
             {item.minOrderAmount && <Badge variant="outline">min ${item.minOrderAmount}</Badge>}
@@ -101,7 +86,7 @@ export default function CouponImportPage() {
         exampleRows: [
           ['Summer Sale', 'percentage', '15', '50', '', '100', 'all'],
           ['Welcome Discount', 'fixed', '10', '0', '', '', 'all'],
-          ['Restaurant Special', 'percentage', '20', '30', '50', '50', 'restaurant'],
+          ['Module Special', 'percentage', '20', '30', '50', '50', 'all'],
         ],
       }}
     />

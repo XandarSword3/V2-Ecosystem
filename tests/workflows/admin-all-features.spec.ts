@@ -7,9 +7,9 @@
  * Features Tested:
  * - Dashboard & Analytics
  * - User Management (Customers, Staff, Admins, Roles)
- * - Restaurant (Menu, Categories, Orders, Tables)
+ * - MenuService (Menu, Categories, Orders, Tables)
  * - Pool (Sessions, Tickets, Capacity)
- * - Chalets (Listings, Bookings)
+ * - AccommodationUnits (Listings, Bookings)
  * - Reviews Management
  * - Reports & Analytics
  * - Settings (General, Appearance, Navbar, Footer, Homepage, Payments)
@@ -49,8 +49,8 @@ const TEST_DATA = {
     subject: 'Test Subject',
     body: 'Hello {{name}}, this is a test.',
   },
-  chalet: {
-    name: `Test Chalet ${Date.now()}`,
+  accommodation unit: {
+    name: `Test AccommodationUnit ${Date.now()}`,
     price: '250',
   },
 };
@@ -202,7 +202,7 @@ let adminPage: Page;
 
   test('1.2 View revenue breakdown', async () => {
     // Look for revenue breakdown section
-    const revenueSection = adminPage.locator('text=/Revenue by Business Unit|Restaurant|Chalets|Pool/i').first();
+    const revenueSection = adminPage.locator('text=/Revenue by Business Unit|MenuService|AccommodationUnits|Pool/i').first();
     const visible = await revenueSection.isVisible().catch(() => false);
     expect(visible).toBeTruthy();
   });
@@ -326,7 +326,7 @@ let adminPage: Page;
 // ============================================
 // SECTION 3: RESTAURANT MANAGEMENT
 // ============================================
-test.describe('3. Restaurant Management Features', () => {
+test.describe('3. MenuService Management Features', () => {
 let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
@@ -342,7 +342,7 @@ let adminPage: Page;
 
   // --- MENU ---
   test('3.1 View menu items', async () => {
-    await navigateTo(adminPage, '/admin/restaurant/menu');
+    await navigateTo(adminPage, '/admin/${slug}/menu');
     await expect(adminPage.getByRole('heading', { name: /Menu/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -389,7 +389,7 @@ let adminPage: Page;
 
   // --- CATEGORIES ---
   test('3.5 View categories', async () => {
-    await navigateTo(adminPage, '/admin/restaurant/categories');
+    await navigateTo(adminPage, '/admin/${slug}/categories');
     await expect(adminPage.getByRole('heading', { name: /Categor/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -413,7 +413,7 @@ let adminPage: Page;
 
   // --- ORDERS ---
   test('3.8 View orders', async () => {
-    await navigateTo(adminPage, '/admin/restaurant/orders');
+    await navigateTo(adminPage, '/admin/${slug}/orders');
     await expect(adminPage.getByRole('heading', { name: /Order/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -447,7 +447,7 @@ let adminPage: Page;
 
   // --- TABLES ---
   test('3.12 View tables', async () => {
-    await navigateTo(adminPage, '/admin/restaurant/tables');
+    await navigateTo(adminPage, '/admin/${slug}/tables');
     const tableContent = adminPage.locator('text=/table|seating|floor/i');
     await expect(tableContent.first()).toBeVisible({ timeout: 10000 });
   });
@@ -540,7 +540,7 @@ let adminPage: Page;
 // ============================================
 // SECTION 5: CHALET MANAGEMENT
 // ============================================
-test.describe('5. Chalet Management Features', () => {
+test.describe('5. AccommodationUnit Management Features', () => {
 let adminPage: Page;
   
   test.beforeAll(async ({ browser }) => {
@@ -554,29 +554,29 @@ let adminPage: Page;
     await adminPage.close();
   });
 
-  test('5.1 View chalets list', async () => {
-    await navigateTo(adminPage, '/admin/chalets');
-    await expect(adminPage.getByRole('heading', { name: /Chalet/i }).first()).toBeVisible({ timeout: 10000 });
+  test('5.1 View accommodation_units list', async () => {
+    await navigateTo(adminPage, '/admin/accommodation_units');
+    await expect(adminPage.getByRole('heading', { name: /AccommodationUnit/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('5.2 View chalet stats', async () => {
+  test('5.2 View accommodation unit stats', async () => {
     await waitForStableUI(adminPage);
     await expect(adminPage.locator('main').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('5.3 Open add chalet modal', async () => {
+  test('5.3 Open add accommodation unit modal', async () => {
     const addButton = adminPage.locator('button:has-text("Add"), button:has-text("Create")').first();
     if (await addButton.isVisible()) {
       await addButton.click();
       await waitForStableUI(adminPage);
-      await fillInput(adminPage, 'input[name="name"], input[placeholder*="name" i]', TEST_DATA.chalet.name);
-      await fillInput(adminPage, 'input[name="price"], input[placeholder*="price" i]', TEST_DATA.chalet.price);
+      await fillInput(adminPage, 'input[name="name"], input[placeholder*="name" i]', TEST_DATA.accommodation unit.name);
+      await fillInput(adminPage, 'input[name="price"], input[placeholder*="price" i]', TEST_DATA.accommodation unit.price);
       
       await clickButton(adminPage, 'Cancel');
     }
   });
 
-  test('5.4 View chalet bookings', async () => {
+  test('5.4 View accommodation unit bookings', async () => {
     const bookingsTab = adminPage.locator('button:has-text("Booking"), [data-testid="bookings-tab"]').first();
     if (await bookingsTab.isVisible()) {
       await bookingsTab.click();

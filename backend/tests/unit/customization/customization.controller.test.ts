@@ -437,13 +437,13 @@ describe('CustomizationController', () => {
       vi.mocked(customizationService.getOrderCustomizations).mockResolvedValue(mockCustomizations);
 
       const { req, res, next } = createMockReqRes({
-        params: { orderType: 'restaurant', orderId: 'order-1' },
+        params: { orderType: 'menu_service', orderId: 'order-1' },
         query: { orderItemId: 'item-1' },
       });
 
       await customizationController.getOrderCustomizations(req as any, res as any, next);
 
-      expect(customizationService.getOrderCustomizations).toHaveBeenCalledWith('restaurant', 'order-1', 'item-1');
+      expect(customizationService.getOrderCustomizations).toHaveBeenCalledWith('menu_service', 'order-1', 'item-1');
       expect(res.json).toHaveBeenCalledWith(mockCustomizations);
     });
   });
@@ -455,7 +455,7 @@ describe('CustomizationController', () => {
 
       const { req, res, next } = createMockReqRes({
         body: {
-          orderType: 'restaurant',
+          orderType: 'menu_service',
           orderId: 'order-1',
           orderItemId: 'item-1',
           entityType: 'menu_item',
@@ -514,12 +514,12 @@ describe('CustomizationController', () => {
       vi.mocked(customizationService.getReversibleOrderCustomizations).mockResolvedValue(mockResult);
 
       const { req, res, next } = createMockReqRes({
-        params: { orderType: 'restaurant', orderId: 'order-1' },
+        params: { orderType: 'menu_service', orderId: 'order-1' },
       });
 
       await customizationController.getReversibleCustomizations(req as any, res as any, next);
 
-      expect(customizationService.getReversibleOrderCustomizations).toHaveBeenCalledWith('restaurant', 'order-1');
+      expect(customizationService.getReversibleOrderCustomizations).toHaveBeenCalledWith('menu_service', 'order-1');
       expect(res.json).toHaveBeenCalledWith(mockResult);
     });
   });
@@ -532,7 +532,7 @@ describe('CustomizationController', () => {
       const { req, res, next } = createMockReqRes({
         query: {
           eventType: 'snapshot_created',
-          orderType: 'restaurant',
+          orderType: 'menu_service',
           orderId: 'order-1',
           limit: '10',
         },
@@ -542,7 +542,7 @@ describe('CustomizationController', () => {
 
       expect(customizationService.getEvents).toHaveBeenCalledWith({
         eventType: 'snapshot_created',
-        orderType: 'restaurant',
+        orderType: 'menu_service',
         orderId: 'order-1',
         limit: 10,
         since: undefined,

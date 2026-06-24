@@ -45,12 +45,12 @@ const PHASES = [
 ];
 
 const STEPS: Step[] = [
-  { id: 'welcome', title: 'Welcome', description: 'Start your resort setup journey', phase: 1 },
-  { id: 'resort_details', title: 'Resort Profile', description: 'Configure basic contact information', phase: 1 },
+  { id: 'welcome', title: 'Welcome', description: 'Start your business setup journey', phase: 1 },
+  { id: 'resort_details', title: 'Business Profile', description: 'Configure basic contact information', phase: 1 },
   { id: 'visual_design', title: 'Visual Branding', description: 'Accent color extraction and logo setup', phase: 1 },
   { id: 'modules', title: 'Active Modules', description: 'Select engine templates to deploy', phase: 2 },
   { id: 'menu_import', title: 'Menu CSV Import', description: 'Import F&B options dynamically', phase: 2 },
-  { id: 'accommodation_import', title: 'Units CSV Import', description: 'Provision chalets and rooms', phase: 2 },
+  { id: 'accommodation_import', title: 'Units CSV Import', description: 'Provision accommodation units and rooms', phase: 2 },
   { id: 'inventory_import', title: 'Inventory CSV Import', description: 'Populate starting stock catalogs', phase: 2 },
   { id: 'payment_gateway', title: 'Stripe Gateway', description: 'Connect Stripe for live charges', phase: 3 },
   { id: 'taxes', title: 'Tax Rates', description: 'Establish regional tax calculations', phase: 3 },
@@ -82,7 +82,7 @@ export default function SetupWizardPage() {
     accentColor: '#4f46e5'
   });
 
-  const [selectedModules, setSelectedModules] = useState<string[]>(['restaurant', 'accommodation', 'inventory']);
+  const [selectedModules, setSelectedModules] = useState<string[]>(['food_beverage', 'accommodation', 'inventory']);
   
   // CSV Import mapping states
   const [menuCsv, setMenuCsv] = useState<{ headers: string[]; rows: string[][]; filename: string } | null>(null);
@@ -105,7 +105,7 @@ export default function SetupWizardPage() {
   const [cmsConfig, setCmsConfig] = useState({
     heroTitle: 'A Sanctuary of Refined Comfort',
     heroSubtitle: 'Enjoy unparalleled luxury and tailored hospitality services at your fingertips.',
-    welcomeMessage: 'Welcome to your premium resort escape.'
+    welcomeMessage: 'Welcome to your premium experience escape.'
   });
 
   // SMTP Mail Server
@@ -572,7 +572,7 @@ export default function SetupWizardPage() {
           </div>
           <div>
             <h1 className="font-bold text-lg leading-tight">V2 Ecosystem</h1>
-            <p className="text-xs text-slate-400">Resort Setup Wizard</p>
+            <p className="text-xs text-slate-400">Business Setup Wizard</p>
           </div>
         </div>
 
@@ -697,10 +697,10 @@ export default function SetupWizardPage() {
                     <Sparkles className="h-10 w-10" />
                   </div>
                   <h2 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-                    Welcome to your resort launchpad
+                    Welcome to your business launchpad
                   </h2>
                   <p className="mx-auto max-w-md text-base text-slate-400">
-                    Deploy, brand, configure, and orchestrate all aspects of your resort operations through this interactive wizard.
+                    Deploy, brand, configure, and orchestrate all aspects of your business operations through this interactive wizard.
                   </p>
                   <div className="pt-4">
                     <button 
@@ -713,16 +713,16 @@ export default function SetupWizardPage() {
                 </div>
               )}
 
-              {/* Render Resort Details */}
+              {/* Render Business Details */}
               {currentStep.id === 'resort_details' && (
                 <div className="space-y-6">
                   <div className="border-b border-slate-800/80 pb-4">
-                    <h3 className="text-xl font-bold">Resort Profile Info</h3>
+                    <h3 className="text-xl font-bold">Business Profile Info</h3>
                     <p className="text-xs text-slate-400">Basic contact profile details for invoices, guests, and branding</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-400">Resort Name</label>
+                      <label className="text-xs font-semibold text-slate-400">Business Name</label>
                       <input 
                         type="text" 
                         value={resortDetails.name}
@@ -731,12 +731,12 @@ export default function SetupWizardPage() {
                           const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                           setResortDetails(prev => ({ ...prev, name, slug }));
                         }}
-                        placeholder="e.g. Grand Val Thorens Resort" 
+                        placeholder="e.g. Grand Valley Hotel" 
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:border-indigo-500 outline-none"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-400">Resort Slug (URL prefix)</label>
+                      <label className="text-xs font-semibold text-slate-400">Property Slug (URL prefix)</label>
                       <input 
                         type="text" 
                         value={resortDetails.slug}
@@ -761,7 +761,7 @@ export default function SetupWizardPage() {
                         type="email" 
                         value={resortDetails.email}
                         onChange={(e) => setResortDetails(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="info@grandvalthorens.com" 
+                        placeholder="info@yourbusiness.com" 
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:border-indigo-500 outline-none"
                       />
                     </div>
@@ -770,7 +770,7 @@ export default function SetupWizardPage() {
                       <textarea 
                         value={resortDetails.address}
                         onChange={(e) => setResortDetails(prev => ({ ...prev, address: e.target.value }))}
-                        placeholder="Rue du Soleil, 73440 Val Thorens, France" 
+                        placeholder="123 Main Street, City, Country" 
                         rows={2}
                         className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:border-indigo-500 outline-none resize-none"
                       />
@@ -848,15 +848,15 @@ export default function SetupWizardPage() {
               {currentStep.id === 'modules' && (
                 <div className="space-y-6">
                   <div className="border-b border-slate-800/80 pb-4">
-                    <h3 className="text-xl font-bold">Resort Modules Setup</h3>
+                    <h3 className="text-xl font-bold">Business Modules Setup</h3>
                     <p className="text-xs text-slate-400">Choose which operational engines/modules to enable on your system</p>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     {[
-                      { id: 'restaurant', name: 'Food & Beverage', desc: 'Menu ordering, table management, POS hardware, kitchen ticket flows' },
-                      { id: 'accommodation', name: 'Stay & Lodging', desc: 'Resort chalets, hotel rooms, seasonal booking modifications, check-ins' },
-                      { id: 'pool', name: 'Day Pool Passes', desc: 'Shared capacity access, pool tickets, cabana bookings' },
+                      { id: 'food_beverage', name: 'Food & Beverage', desc: 'Menu ordering, table management, POS hardware, kitchen ticket flows' },
+                      { id: 'accommodation', name: 'Stay & Lodging', desc: 'Property units, rooms, seasonal booking modifications, check-ins' },
+                      { id: 'day_passes', name: 'Day Passes', desc: 'Shared capacity access, day passes, cabana bookings' },
                       { id: 'inventory', name: 'Materials & Stock', desc: 'Unified inventory catalogs, alerts, low-stock checks' }
                     ].map((mod) => {
                       const isSelected = selectedModules.includes(mod.id);
@@ -1019,7 +1019,7 @@ export default function SetupWizardPage() {
                 <div className="space-y-6">
                   <div className="border-b border-slate-800/80 pb-4">
                     <h3 className="text-xl font-bold">Stay & Accommodation Bulk Ingestion</h3>
-                    <p className="text-xs text-slate-400">Bulk upload your rooms, suites, and chalet units catalog</p>
+                    <p className="text-xs text-slate-400">Bulk upload your rooms, suites, and accommodation unit catalog</p>
                   </div>
 
                   {!accommodationCsv ? (
@@ -1140,7 +1140,7 @@ export default function SetupWizardPage() {
                 <div className="space-y-6">
                   <div className="border-b border-slate-800/80 pb-4">
                     <h3 className="text-xl font-bold">Inventory Catalog Bulk Ingestion</h3>
-                    <p className="text-xs text-slate-400">Import starting counts for resort assets, linens, and supplies</p>
+                    <p className="text-xs text-slate-400">Import starting counts for property assets, linens, and supplies</p>
                   </div>
 
                   {!inventoryCsv ? (
@@ -1349,7 +1349,7 @@ export default function SetupWizardPage() {
                   <div className="border-b border-slate-800/80 pb-4 flex justify-between items-end">
                     <div>
                       <h3 className="text-xl font-bold">Configure Operators Roster</h3>
-                      <p className="text-xs text-slate-400">Create login credentials or email invitations for resort staff</p>
+                      <p className="text-xs text-slate-400">Create login credentials or email invitations for property staff</p>
                     </div>
                     <button 
                       onClick={() => setStaffList([...staffList, { name: '', email: '', role: 'staff' }])}
@@ -1395,7 +1395,7 @@ export default function SetupWizardPage() {
                             className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-indigo-500 text-slate-300"
                           >
                             <option value="staff">Staff Operator</option>
-                            <option value="manager">Resort Manager</option>
+                            <option value="manager">Property Manager</option>
                             <option value="admin">System Admin</option>
                           </select>
                         </div>
@@ -1587,9 +1587,9 @@ export default function SetupWizardPage() {
                       <div className="inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mb-2">
                         <Check className="h-10 w-10" />
                       </div>
-                      <h2 className="text-3xl font-extrabold text-white">Your Resort is Live!</h2>
+                      <h2 className="text-3xl font-extrabold text-white">Your Business is Live!</h2>
                       <p className="mx-auto max-w-md text-sm text-slate-400">
-                        Property, roles, variables, and selected modules have been provisioned successfully! Download your Resort Operations Manual to keep a local record.
+                        Property, roles, variables, and selected modules have been provisioned successfully! Download your Business Operations Manual to keep a local record.
                       </p>
                       
                       <div className="pt-4 flex flex-col gap-3 max-w-xs mx-auto">
@@ -1616,7 +1616,7 @@ export default function SetupWizardPage() {
                       </div>
                       <h2 className="text-3xl font-extrabold text-white">Provisioning Ready</h2>
                       <p className="mx-auto max-w-md text-sm text-slate-400">
-                        We have accumulated all configurations from color palettes to API credentials. Press the button below to initialize database structures and provision your resort ecosystem.
+                        We have accumulated all configurations from color palettes to API credentials. Press the button below to initialize database structures and provision your business ecosystem.
                       </p>
                       
                       <div className="pt-6">
@@ -1631,7 +1631,7 @@ export default function SetupWizardPage() {
                             </>
                           ) : (
                             <>
-                              Launch Resort Operations <Sparkles className="h-5 w-5" />
+                              Launch Business Operations <Sparkles className="h-5 w-5" />
                             </>
                           )}
                         </button>

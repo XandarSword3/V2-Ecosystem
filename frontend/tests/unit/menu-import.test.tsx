@@ -17,8 +17,8 @@ vi.mock('sonner', () => ({
 }));
 
 describe('MenuImportPage', () => {
-  const mockSlug = 'test-restaurant';
-  const mockModule = { id: 'mod-123', slug: mockSlug, name: 'Test Restaurant' };
+  const mockSlug = 'test-menu service';
+  const mockModule = { id: 'mod-123', slug: mockSlug, name: 'Test MenuService' };
 
   beforeEach(() => {
     vi.clearAllMocks();

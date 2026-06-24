@@ -1,53 +1,63 @@
 import axios from 'axios';
+import { getStoredPropertyId } from './property-id';
+
+// ---------------------------------------------------------------------------
+// Tenant/property slug extraction (mirrors frontend/src/middleware.ts's
+// extractHostSegments). That middleware computes the correct tenant/property
+// from the Host header but only ever attaches the result to the *response*
+// sent back to the browser — it never reaches these axios calls, which go
+// to a separate fixed-origin API host (NEXT_PUBLIC_API_URL) and therefore
+// carry no subdomain context of their own. Without this, the backend's
+// tenantAccess/propertyResolution middleware has nothing to resolve from on
+// public storefront requests and silently falls back to system-wide
+// defaults. Computed once per request from window.location.host so it stays
+// correct as the user navigates between tenant/property subdomains.
+// ---------------------------------------------------------------------------
+export interface HostSegments {
+  tenant: string | null;
+  property: string | null;
+}
+
+export function extractHostSegments(host: string | null | undefined): HostSegments {
+  const none: HostSegments = { tenant: null, property: null };
+  if (!host) return none;
+
+  const hostname = host.split(':')[0]; // strip port
+
+  if (hostname.endsWith('.vercel.app')) return none;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return none;
+
+  // Dev: acme.localhost or resort-a.acme.localhost
+  if (hostname.endsWith('.localhost')) {
+    const sub = hostname.slice(0, hostname.lastIndexOf('.localhost'));
+    if (!sub) return none;
+    const parts = sub.split('.');
+    if (parts.length === 1) return { tenant: parts[0], property: null };
+    return { tenant: parts[1], property: parts[0] };
+  }
+
+  // tenant.v2platform.com, property.tenant.v2platform.com (or .local in dev)
+  const parts = hostname.split('.');
+  if (parts.length <= 2) return none; // bare domain, no subdomain
+  if (parts.length === 3) return { tenant: parts[0], property: null };
+  return { tenant: parts[1], property: parts[0] };
+}
 
 // Types for API requests
 interface CreateOrderData {
   customerName?: string;
   customerPhone?: string;
-  items: Array<{ menuItemId: string; quantity: number; notes?: string }>;
+  items: Array<{ catalogItemId: string; quantity: number; notes?: string }>;
   orderType?: string;
   paymentMethod?: string;
   specialInstructions?: string;
   tableNumber?: string;
-  chaletNumber?: string;
+  unitNumber?: string;
   // Discount integration fields
   couponCode?: string;
   giftCardRedemptions?: Array<{ code: string; amount: number }>;
   loyaltyPointsToRedeem?: number;
   loyaltyPointsDollarValue?: number;
-}
-
-interface CreateSnackOrderData {
-  customerName?: string;
-  customerPhone?: string;
-  items: Array<{ itemId: string; quantity: number; notes?: string }>;
-  paymentMethod: 'cash' | 'card';
-  notes?: string;
-}
-
-interface CreateBookingData {
-  chaletId: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone?: string;
-  checkInDate: string;
-  checkOutDate: string;
-  numberOfGuests: number;
-  addOns?: Array<{ addOnId: string; quantity: number }>;
-  specialRequests?: string;
-  paymentMethod: 'cash' | 'card' | 'online';
-}
-
-interface PurchaseTicketData {
-  sessionId: string;
-  ticketDate: string;
-  customerName: string;
-  customerEmail?: string;
-  customerPhone?: string;
-  numberOfGuests: number;
-  numberOfAdults?: number;
-  numberOfChildren?: number;
-  paymentMethod: 'cash' | 'card' | 'online';
 }
 
 interface CreateMembershipData {
@@ -59,7 +69,7 @@ interface CreateMembershipData {
 }
 
 interface CreateModuleData {
-  template_type: string;
+  engine_type: string;
   name: string;
   slug?: string;
   description?: string;
@@ -229,10 +239,43 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
 
-      // Add x-property-id header if present in localStorage
-      const activePropertyId = localStorage.getItem('activePropertyId');
-      if (activePropertyId) {
-        config.headers['x-property-id'] = activePropertyId;
+      // Inject X-Tenant-Slug / X-Property-Slug from the current subdomain on
+      // every request — this is how the backend's tenantAccess/
+      // propertyResolution middleware identifies which tenant/property a
+      // request belongs to, since this axios client talks to a fixed,
+      // tenant-agnostic API origin (NEXT_PUBLIC_API_URL) and the backend's
+      // own Host header never carries subdomain context. Applies to public
+      // storefront requests too, not just admin/staff — unlike x-property-id
+      // below, which is purely for authenticated multi-property switching.
+      const { tenant: tenantSlug, property: propertySlug } = extractHostSegments(window.location.host);
+      if (tenantSlug) {
+        config.headers['X-Tenant-Slug'] = tenantSlug;
+      }
+      if (propertySlug) {
+        config.headers['X-Property-Slug'] = propertySlug;
+      }
+
+      // Only send x-property-id when localStorage holds a valid UUID, AND
+      // only on admin/staff routes. This header drives authenticated
+      // multi-property switching (validatePropertyAccess checks ownership
+      // before honoring it) — it has no legitimate use on the public
+      // storefront. The guard is route-topology-based rather than relying
+      // solely on PropertyProvider/PropertySwitcher never being mounted on
+      // public routes, since api.ts is imported broadly and a future public
+      // page could otherwise pick up a stale admin-set value by accident.
+      // See CONTEXT.md "Public/Admin Property Context Contamination"
+      // (session 7-9).
+      const isAdminOrStaffRoute =
+        typeof window !== 'undefined' &&
+        (window.location.pathname.startsWith('/admin') ||
+          window.location.pathname.startsWith('/staff') ||
+          window.location.pathname.startsWith('/platform-admin'));
+
+      if (isAdminOrStaffRoute) {
+        const activePropertyId = getStoredPropertyId();
+        if (activePropertyId) {
+          config.headers['x-property-id'] = activePropertyId;
+        }
       }
 
       // Add CSRF token for non-GET requests (Double Submit Cookie pattern)
@@ -369,58 +412,6 @@ export const authApi = {
     api.post('/auth/2fa/backup-codes', { code }),
 };
 
-// Restaurant API
-export const restaurantApi = {
-  getMenu: (moduleId?: string) => api.get('/restaurant/menu', { params: { moduleId } }),
-  getMenuByCategory: (categoryId: string, moduleId?: string) =>
-    api.get(`/restaurant/menu/category/${categoryId}`, { params: { moduleId } }),
-  createOrder: (data: CreateOrderData) => api.post('/restaurant/orders', data),
-  getMyOrders: () => api.get('/restaurant/my-orders'),
-  getOrderStatus: (orderId: string) => api.get(`/restaurant/orders/${orderId}`),
-};
-
-// Snack Bar API
-export const snackApi = {
-  getItems: (moduleId?: string) => api.get('/snack/items', { params: { moduleId } }),
-  createOrder: (data: CreateSnackOrderData) => api.post('/snack/orders', data),
-  getMyOrders: () => api.get('/snack/orders/my'),
-  getOrder: (orderId: string) => api.get(`/snack/orders/${orderId}`),
-};
-
-// Chalets API
-export const chaletsApi = {
-  getChalets: (moduleId?: string) => api.get('/chalets', { params: { moduleId } }),
-  getChalet: (id: string) => api.get(`/chalets/${id}`),
-  getAvailability: (chaletId: string, checkIn: string, checkOut: string) =>
-    api.get(`/chalets/${chaletId}/availability`, { params: { checkIn, checkOut } }),
-  getDailyPrices: (chaletId: string, startDate: string, endDate: string) =>
-    api.get(`/chalets/${chaletId}/daily-prices`, { params: { startDate, endDate } }),
-  getAddOns: (moduleId?: string) => api.get('/chalets/add-ons', { params: { moduleId } }),
-  createBooking: (data: CreateBookingData) => api.post('/chalets/bookings', data),
-  getMyBookings: () => api.get('/chalets/my-bookings'),
-  getBookingDetails: (bookingId: string) => api.get(`/chalets/bookings/${bookingId}`),
-};
-
-// Pool API
-export const poolApi = {
-  getSessions: (date?: string, moduleId?: string) =>
-    api.get('/pool/sessions', { params: { date, moduleId } }),
-  getSession: (id: string) => api.get(`/pool/sessions/${id}`),
-  getSessionAvailability: (sessionId: string, date: string) =>
-    api.get(`/pool/sessions/${sessionId}/availability`, { params: { date } }),
-  // FIX: Iteration 6 - Add bulk availability endpoint (returns sessions with live sold/available counts)
-  getAvailability: (date: string, moduleId?: string) =>
-    api.get('/pool/availability', { params: { date, moduleId } }),
-  purchaseTicket: (data: PurchaseTicketData) => api.post('/pool/tickets', data),
-  getMyTickets: () => api.get('/pool/my-tickets'),
-  getTicket: (id: string) => api.get(`/pool/tickets/${id}`),
-  getMembershipPlans: () => api.get('/pool/memberships/plans'),
-  getMyMembership: () => api.get('/pool/memberships/my-membership'),
-  createMembership: (data: CreateMembershipData) => api.post('/pool/memberships', data),
-  cancelMembership: (membershipId: string, data?: { reason?: string; immediate?: boolean }) =>
-    api.delete(`/pool/memberships/${membershipId}`, { data }),
-};
-
 // Modules API
 export const modulesApi = {
   getAll: (activeOnly = false) => api.get(`/admin/modules${activeOnly ? '?activeOnly=true' : ''}`),
@@ -433,9 +424,9 @@ export const modulesApi = {
 // Inventory API
 export const inventoryApi = {
   getItems: (params?: any) => api.get('/inventory/items', { params }),
-  getRecipe: (menuItemId: string) => api.get(`/inventory/items/recipe/${menuItemId}`),
-  updateRecipe: (menuItemId: string, ingredients: any[]) =>
-    api.post(`/inventory/items/recipe/${menuItemId}`, { ingredients }),
+  getRecipe: (catalogItemId: string) => api.get(`/inventory/items/recipe/${catalogItemId}`),
+  updateRecipe: (catalogItemId: string, ingredients: any[]) =>
+    api.post(`/inventory/items/recipe/${catalogItemId}`, { ingredients }),
   getSessionRecipe: (sessionId: string) => api.get(`/inventory/sessions/recipe/${sessionId}`),
   updateSessionRecipe: (sessionId: string, ingredients: any[]) =>
     api.post(`/inventory/sessions/recipe/${sessionId}`, { ingredients }),

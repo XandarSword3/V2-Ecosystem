@@ -80,7 +80,7 @@ export const inventoryAlerts = pgTable('inventory_alerts', {
 // ============================================
 export const inventoryRecipes = pgTable('inventory_recipes', {
   id: uuid('id').primaryKey().defaultRandom(),
-  menuItemId: uuid('menu_item_id').notNull(),
+  catalogItemId: uuid('catalog_item_id').notNull(),
   name: varchar('name', { length: 255 }),
   yields: integer('yields').default(1),
   prepTimeMinutes: integer('prep_time_minutes'),
@@ -225,7 +225,7 @@ export const inventoryConsumption = pgTable('inventory_consumption', {
 // ============================================
 export const inventoryBom = pgTable('inventory_bom', {
   id: uuid('id').primaryKey().defaultRandom(),
-  menuItemId: uuid('menu_item_id').notNull(),
+  catalogItemId: uuid('catalog_item_id').notNull(),
   inventoryItemId: uuid('inventory_item_id').references(() => inventoryItems.id).notNull(),
   quantity: decimal('quantity', { precision: 10, scale: 4 }).notNull(),
   createdAt: timestamp('created_at').defaultNow(),

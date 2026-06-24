@@ -85,7 +85,7 @@ export default function AnalyticsDashboard() {
       'live_occupancy_rate': 'Live Occupancy',
       'today_revenue': "Today's Revenue",
       'active_orders': 'Active Orders',
-      'active_pool_sessions': 'Pool Sessions',
+      'active_capacity_sessions': 'Active Sessions',
       'todays_checkins': "Today's Check-ins",
       'todays_checkouts': "Today's Check-outs",
       'housekeeping_completion': 'Housekeeping %',

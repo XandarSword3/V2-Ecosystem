@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import Stripe from 'stripe';
 import { getSupabase } from "../../database/connection.js";
-import { config } from "../../config/index.js";
+import { config } from "../../config/index";
 import { logger } from "../../utils/logger.js";
 import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPaymentSchema, validateBody } from "../../validation/schemas.js";
 import { awardLoyaltyPointsForPayment } from './loyalty-integration.js';

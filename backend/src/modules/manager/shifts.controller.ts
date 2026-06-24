@@ -576,16 +576,13 @@ export class ShiftsController {
         .eq('property_id', propertyId);
       const staffIds = (staffMembers || []).map(sm => sm.user_id).filter(Boolean);
 
-      const [transactionsResult, activeShifts, modulesList] = await Promise.all([
+      const [transactionsResult, activeShifts] = await Promise.all([
         supabase.from('transactions').select('id, amount, status, created_at, engine_type, module_id').eq('property_id', propertyId),
         supabase.from('staff_shifts').select('id, status, department').eq('status', 'active').in('staff_id', staffIds),
-        supabase.from('modules').select('id, slug').eq('property_id', propertyId),
       ]);
 
       const transactions = transactionsResult.data || [];
-      const modulesMap = new Map((modulesList.data || []).map(m => [m.slug, m.id]));
-      const restaurantModuleId = modulesMap.get('restaurant');
-      const snackModuleId = modulesMap.get('snack-bar');
+      const totalActiveStaff = (activeShifts.data || []).length;
 
       const withinToday = (createdAt?: string | null) => {
         if (!createdAt) return false;
@@ -596,10 +593,10 @@ export class ShiftsController {
       const activeStatuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'checked_in', 'valid', 'active']);
 
       const modules = [
-        { name: 'restaurant', rows: transactions.filter(t => t.module_id === restaurantModuleId) },
-        { name: 'snack', rows: transactions.filter(t => t.module_id === snackModuleId) },
-        { name: 'chalets', rows: transactions.filter(t => t.engine_type === 'time_exclusive_reservation') },
-        { name: 'pool', rows: transactions.filter(t => t.engine_type === 'shared_capacity_access') },
+        { name: 'instant_transaction',        rows: transactions.filter(t => t.engine_type === 'instant_transaction') },
+        { name: 'time_exclusive_reservation',  rows: transactions.filter(t => t.engine_type === 'time_exclusive_reservation') },
+        { name: 'shared_capacity_access',      rows: transactions.filter(t => t.engine_type === 'shared_capacity_access') },
+        { name: 'ongoing_entitlement',         rows: transactions.filter(t => t.engine_type === 'ongoing_entitlement') },
       ].map((module) => {
         const todays = module.rows.filter((row: any) => withinToday(row.created_at));
         return {
@@ -607,7 +604,7 @@ export class ShiftsController {
           todays_order_count: todays.length,
           todays_revenue: Number(sumAmount(todays).toFixed(2)),
           active_orders_count: module.rows.filter((row: any) => activeStatuses.has(String(row.status))).length,
-          staff_on_shift: (activeShifts.data || []).filter((s: any) => !s.department || String(s.department).toLowerCase().includes(module.name)).length,
+          staff_on_shift: totalActiveStaff,
         };
       });
 

@@ -21,12 +21,12 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ slug: 'restaurant' }),
+  useParams: () => ({ slug: 'menu_service' }),
 }));
 
 vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => ({
-    modules: [{ id: 'rest-1', slug: 'restaurant', name: 'Restaurant' }],
+    modules: [{ id: 'rest-1', slug: 'menu_service', name: 'MenuService' }],
   }),
 }));
 
@@ -170,7 +170,7 @@ describe('Admin reservations route behavior', () => {
     const user = userEvent.setup();
     const { rerender } = render(<DynamicReservationsPage />);
 
-    expect(screen.getByText('Restaurant Reservations')).toBeInTheDocument();
+    expect(screen.getByText('MenuService Reservations')).toBeInTheDocument();
     expect(screen.getByText('Nora Guest')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Confirm' }));

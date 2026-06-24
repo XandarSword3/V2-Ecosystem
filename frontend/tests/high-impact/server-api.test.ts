@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  getChaletById,
-  getChalets,
-  getMenuItems,
-  getPoolSessions,
+  getAccommodationUnitById,
+  getAccommodationUnits,
+  getCatalogItems,
+  getCapacityWindows,
   getSiteSettings,
-  getSnackItems,
+  getKioskItems,
 } from '../../src/lib/server-api';
 
 describe('server-api helpers', () => {
@@ -54,8 +54,8 @@ describe('server-api helpers', () => {
         }),
       });
 
-    const first = await getMenuItems();
-    const second = await getMenuItems();
+    const first = await getCatalogItems();
+    const second = await getCatalogItems();
 
     expect(first).toHaveLength(1);
     expect(first[0].id).toBe('item-1');
@@ -63,7 +63,7 @@ describe('server-api helpers', () => {
     expect(second[0].id).toBe('item-2');
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/restaurant/menu'),
+      expect.stringContaining('/api/menu'),
       expect.objectContaining({
         headers: { 'Content-Type': 'application/json' },
         next: expect.objectContaining({
@@ -74,11 +74,11 @@ describe('server-api helpers', () => {
     );
   });
 
-  it('maps list endpoints and object-wrapped endpoints for chalets, pool, and snacks', async () => {
+  it('maps list endpoints and object-wrapped endpoints for accommodation_units, pool, and kiosk items', async () => {
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
-        json: vi.fn().mockResolvedValue({ data: [{ id: 'ch-1', name: 'Chalet A', capacity: 4 }] }),
+        json: vi.fn().mockResolvedValue({ data: [{ id: 'ch-1', name: 'AccommodationUnit A', capacity: 4 }] }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -86,16 +86,16 @@ describe('server-api helpers', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: vi.fn().mockResolvedValue({ data: { items: [{ id: 'sn-1', name: 'Nachos', price: 9, category: 'Snacks' }] } }),
+        json: vi.fn().mockResolvedValue({ data: { items: [{ id: 'sn-1', name: 'Nachos', price: 9, category: 'KioskItems' }] } }),
       });
 
-    const chalets = await getChalets();
-    const sessions = await getPoolSessions();
-    const snacks = await getSnackItems();
+    const accommodation_units = await getAccommodationUnits();
+    const sessions = await getCapacityWindows();
+    const kioskItems = await getKioskItems();
 
-    expect(chalets[0].id).toBe('ch-1');
+    expect(accommodation_units[0].id).toBe('ch-1');
     expect(sessions[0].id).toBe('s1');
-    expect(snacks[0].id).toBe('sn-1');
+    expect(kioskItems[0].id).toBe('sn-1');
   });
 
   it('returns safe fallbacks when fetch fails or returns non-ok responses', async () => {
@@ -104,13 +104,13 @@ describe('server-api helpers', () => {
       .mockRejectedValueOnce(new Error('network error'))
       .mockResolvedValueOnce({ ok: false, status: 404, json: vi.fn() });
 
-    const chalets = await getChalets();
+    const accommodation_units = await getAccommodationUnits();
     const settings = await getSiteSettings();
-    const chalet = await getChaletById('missing-id');
+    const accommodationUnit = await getAccommodationUnitById('missing-id');
 
-    expect(chalets).toEqual([]);
+    expect(accommodation_units).toEqual([]);
     expect(settings).toEqual({});
-    expect(chalet).toBeNull();
+    expect(accommodationUnit).toBeNull();
     expect(console.error).toHaveBeenCalled();
   });
 });

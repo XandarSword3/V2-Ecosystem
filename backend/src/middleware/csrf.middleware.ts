@@ -9,7 +9,7 @@
  * 2. Client must include the same token in the X-CSRF-Token header
  * 3. Server validates that cookie value === header value
  * 
- * The attacker cannot read the cookie due to SameSite policy,
+ * The attacker cannot read the cookie due to browser Same-Origin Policy (SOP),
  * so they cannot forge a valid request with matching header.
  */
 
@@ -26,8 +26,16 @@ const configuredSameSite = (process.env.CSRF_COOKIE_SAMESITE || '').toLowerCase(
 const CSRF_COOKIE_SAME_SITE: CookieSameSite =
   configuredSameSite === 'none' || configuredSameSite === 'lax' || configuredSameSite === 'strict'
     ? configuredSameSite
-    : (process.env.NODE_ENV === 'production' ? 'none' : 'strict');
+    : (process.env.NODE_ENV === 'production' ? 'none' : 'lax');
 const CSRF_COOKIE_SECURE = process.env.NODE_ENV === 'production' || CSRF_COOKIE_SAME_SITE === 'none';
+
+// Get cookie domain for cross-subdomain cookie sharing
+const getCookieDomain = (): string | undefined => {
+  if (process.env.NODE_ENV === 'production') {
+    return '.v2platform.com';
+  }
+  return '.v2platform.local';
+};
 
 // Methods that don't require CSRF protection (safe methods)
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
@@ -43,6 +51,7 @@ const EXEMPT_PATHS = [
   '/api/v1/auth/refresh',
   '/api/v1/auth/forgot-password',
   '/api/v1/auth/reset-password',
+  '/api/v1/auth/2fa/verify', // Called during login before Bearer token is issued
   // Stripe webhooks have their own HMAC signature — CSRF does not apply
   '/api/v1/payments/webhook',
   // Kiosk: device-authenticated with hardware token, not browser cookies
@@ -69,6 +78,7 @@ export function setCsrfCookie(res: Response, token: string): void {
     httpOnly: false, // Must be readable by JavaScript to include in header
     secure: CSRF_COOKIE_SECURE,
     sameSite: CSRF_COOKIE_SAME_SITE,
+    domain: getCookieDomain(), // Share cookie across subdomains
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
   });

@@ -5,10 +5,26 @@ import { translateText, getTranslationStatus } from "../../services/translation.
 import { logActivity } from "../../utils/activityLogger";
 import { logger } from "../../utils/logger.js";
 
-// Tables that have translatable fields
-const TRANSLATABLE_TABLES = [
+// Tables that have entity-level translatable fields (_ar / _fr column pairs).
+// NOTE: DE/IT entity-column translations are not tracked here — those columns
+// do not exist on the underlying tables. DE/IT coverage is handled via
+// compareFrontendTranslations (JSON files) and the translations table (UI strings).
+interface TranslatableTableConfig {
+  table: string;
+  fields: { field: string; ar: string; fr: string }[];
+  displayName: string;
+  labelField: string;
+  /**
+   * Matches modules.template_type for the module that owns this table.
+   * null = core table, always included regardless of active modules.
+   */
+  templateType: string | null;
+}
+
+const TRANSLATABLE_TABLE_CONFIGS: TranslatableTableConfig[] = [
   {
     table: 'modules',
+    templateType: null, // Core — always included
     fields: [
       { field: 'name', ar: 'name_ar', fr: 'name_fr' },
       { field: 'description', ar: 'description_ar', fr: 'description_fr' }
@@ -17,24 +33,27 @@ const TRANSLATABLE_TABLES = [
     labelField: 'name',
   },
   {
-    table: 'menu_categories',
+    table: 'catalog_categories',
+    templateType: 'menu_service',
     fields: [
       { field: 'name', ar: 'name_ar', fr: 'name_fr' }
     ],
-    displayName: 'Menu Categories',
+    displayName: 'Catalog Categories',
     labelField: 'name',
   },
   {
-    table: 'menu_items',
+    table: 'catalog_items',
+    templateType: 'menu_service',
     fields: [
       { field: 'name', ar: 'name_ar', fr: 'name_fr' },
       { field: 'description', ar: 'description_ar', fr: 'description_fr' }
     ],
-    displayName: 'Menu Items',
+    displayName: 'Catalog Items',
     labelField: 'name',
   },
   {
     table: 'accommodation_units',
+    templateType: 'multi_day_booking',
     fields: [
       { field: 'name', ar: 'name_ar', fr: 'name_fr' }
     ],
@@ -43,6 +62,7 @@ const TRANSLATABLE_TABLES = [
   },
   {
     table: 'accommodation_add_ons',
+    templateType: 'multi_day_booking',
     fields: [
       { field: 'name', ar: 'name_ar', fr: 'name_fr' }
     ],
@@ -50,14 +70,61 @@ const TRANSLATABLE_TABLES = [
     labelField: 'name',
   },
   {
-    table: 'pool_sessions',
+    table: 'capacity_windows',
+    templateType: 'session_access',
     fields: [
       { field: 'name', ar: 'name_ar', fr: 'name_fr' }
     ],
-    displayName: 'Pool Sessions',
+    displayName: 'Capacity Windows',
     labelField: 'name',
   },
 ];
+
+/**
+ * Returns the subset of TRANSLATABLE_TABLE_CONFIGS whose owning module is
+ * currently active for the given property/tenant scope, plus any core tables
+ * (templateType === null). Also returns the active module IDs for use in
+ * child-table queries.
+ *
+ * Mirrors the same property/tenant scoping logic used by getModules().
+ * Falls back to all configs if the modules query fails (preserves old behaviour).
+ */
+async function getActiveTranslatableTables(
+  supabase: ReturnType<typeof getSupabase>,
+  propertyId?: string,
+  tenantId?: string
+): Promise<{ configs: TranslatableTableConfig[]; moduleIds: string[] }> {
+  let query = supabase
+    .from('modules')
+    .select('id, template_type')
+    .eq('is_active', true);
+
+  if (propertyId) {
+    query = query.or(`property_id.eq.${propertyId},property_id.is.null`);
+  }
+  if (tenantId) {
+    query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+  }
+
+  const { data: activeModules, error } = await query;
+
+  if (error || !activeModules) {
+    logger.warn('[Translations] Could not fetch active modules; falling back to all translatable tables');
+    return { configs: TRANSLATABLE_TABLE_CONFIGS, moduleIds: [] };
+  }
+
+  const activeTemplateTypes = new Set(
+    activeModules.map((m: { id: string; template_type: string }) => m.template_type)
+  );
+  const moduleIds = activeModules.map((m: { id: string; template_type: string }) => m.id);
+
+  const configs = TRANSLATABLE_TABLE_CONFIGS.filter(config =>
+    config.templateType === null ||
+    activeTemplateTypes.has(config.templateType)
+  );
+
+  return { configs, moduleIds };
+}
 
 interface MissingTranslation {
   table: string;
@@ -74,9 +141,13 @@ interface MissingTranslation {
  */
 export const getMissingTranslations = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
+    const propertyId = req.headers?.['x-property-id'] as string | undefined;
+    const tenantId = req.headers?.['x-tenant-id'] as string | undefined;
     const missing: MissingTranslation[] = [];
 
-    for (const tableConfig of TRANSLATABLE_TABLES) {
+    const { configs: tableConfigs, moduleIds } = await getActiveTranslatableTables(supabase, propertyId, tenantId);
+
+    for (const tableConfig of tableConfigs) {
       try {
         // Build select fields - we need id, the source field, and all translation fields
         const selectFields = [
@@ -85,9 +156,21 @@ export const getMissingTranslations = asyncHandler(async (req: Request, res: Res
           ...tableConfig.fields.flatMap(f => [f.field, f.ar, f.fr])
         ].filter((v, i, a) => a.indexOf(v) === i); // Remove duplicates
 
-        const { data, error } = await supabase
+        let tableQuery = supabase
           .from(tableConfig.table)
           .select(selectFields.join(','));
+
+        // Scope module-owned tables to active modules in this property/tenant
+        if (tableConfig.templateType !== null && moduleIds.length > 0) {
+          tableQuery = tableQuery.in('module_id', moduleIds);
+        }
+        // Scope the modules table itself by property/tenant directly
+        if (tableConfig.table === 'modules') {
+          if (propertyId) tableQuery = tableQuery.eq('property_id', propertyId);
+          if (tenantId) tableQuery = tableQuery.eq('tenant_id', tenantId);
+        }
+
+        const { data, error } = await tableQuery;
 
         if (error) {
           logger.warn(`[Translations] Could not fetch ${tableConfig.table}:`, error.message);
@@ -151,13 +234,29 @@ export const getMissingTranslations = asyncHandler(async (req: Request, res: Res
  */
 export const getTranslationStats = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
+    const propertyId = req.headers?.['x-property-id'] as string | undefined;
+    const tenantId = req.headers?.['x-tenant-id'] as string | undefined;
     const stats: Record<string, { total: number; translated: number; missing: number }> = {};
 
-    for (const tableConfig of TRANSLATABLE_TABLES) {
+    const { configs: tableConfigs, moduleIds } = await getActiveTranslatableTables(supabase, propertyId, tenantId);
+
+    for (const tableConfig of tableConfigs) {
       try {
-        const { data, error } = await supabase
+        let tableQuery = supabase
           .from(tableConfig.table)
           .select('*');
+
+        // Scope module-owned tables to active modules in this property/tenant
+        if (tableConfig.templateType !== null && moduleIds.length > 0) {
+          tableQuery = tableQuery.in('module_id', moduleIds);
+        }
+        // Scope the modules table itself by property/tenant directly
+        if (tableConfig.table === 'modules') {
+          if (propertyId) tableQuery = tableQuery.eq('property_id', propertyId);
+          if (tenantId) tableQuery = tableQuery.eq('tenant_id', tenantId);
+        }
+
+        const { data, error } = await tableQuery;
 
         if (error || !data) continue;
 
@@ -218,7 +317,7 @@ export const updateTranslation = asyncHandler(async (req: Request, res: Response
     }
 
     // Find table config
-    const tableConfig = TRANSLATABLE_TABLES.find(t => t.table === table);
+    const tableConfig = TRANSLATABLE_TABLE_CONFIGS.find(t => t.table === table);
     if (!tableConfig) {
       return res.status(400).json({
         success: false,
@@ -287,7 +386,7 @@ export const autoTranslate = asyncHandler(async (req: Request, res: Response) =>
     }
 
     // Find table config
-    const tableConfig = TRANSLATABLE_TABLES.find(t => t.table === table);
+    const tableConfig = TRANSLATABLE_TABLE_CONFIGS.find(t => t.table === table);
     if (!tableConfig) {
       return res.status(400).json({
         success: false,
@@ -392,7 +491,7 @@ export const batchAutoTranslate = asyncHandler(async (req: Request, res: Respons
     }
 
     // Find table config
-    const tableConfig = TRANSLATABLE_TABLES.find(t => t.table === table);
+    const tableConfig = TRANSLATABLE_TABLE_CONFIGS.find(t => t.table === table);
     if (!tableConfig) {
       return res.status(400).json({
         success: false,

@@ -48,11 +48,17 @@ vi.mock('stripe', () => ({
   },
 }));
 
-vi.mock('net', () => ({
-  Socket: function Socket() {
+vi.mock('net', () => {
+  const SocketClass = function Socket() {
     return mockSocket;
-  },
-}));
+  };
+  return {
+    Socket: SocketClass,
+    default: {
+      Socket: SocketClass,
+    },
+  };
+});
 
 vi.mock('../../../../src/database/connection.js', () => ({
   getSupabase: vi.fn(() => mockSupabaseClient),
@@ -733,7 +739,7 @@ describe('POS Hardware Controller', () => {
       });
       mockStripe.terminal.locations.create.mockResolvedValue({
         id: 'tml_new',
-        display_name: 'New Resort',
+        display_name: 'New Property',
         address: {
           line1: '456 Ocean Drive',
           city: 'Los Angeles',
@@ -745,7 +751,7 @@ describe('POS Hardware Controller', () => {
 
       const { req, res, next } = createMockReqRes({
         body: {
-          displayName: 'New Resort',
+          displayName: 'New Property',
           address: {
             line1: '456 Ocean Drive',
             city: 'Los Angeles',
@@ -759,7 +765,7 @@ describe('POS Hardware Controller', () => {
       await posController.getOrCreateLocation(req, res, next);
 
       expect(mockStripe.terminal.locations.create).toHaveBeenCalledWith({
-        display_name: 'New Resort',
+        display_name: 'New Property',
         address: {
           line1: '456 Ocean Drive',
           city: 'Los Angeles',
@@ -771,7 +777,7 @@ describe('POS Hardware Controller', () => {
       expect(res.json).toHaveBeenCalledWith({
         location: {
           id: 'tml_new',
-          displayName: 'New Resort',
+          displayName: 'New Property',
           address: {
             line1: '456 Ocean Drive',
             city: 'Los Angeles',
@@ -866,17 +872,74 @@ describe('POS Hardware Controller', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'Printer address and data required' });
     });
 
-    // Socket tests skipped - complex async behavior difficult to mock in unit tests
-    it.skip('should print successfully to network printer', async () => {
-      // Requires real socket implementation or integration test
+    it('should print successfully to network printer', async () => {
+      const posController = await import('../../../../src/modules/pos/pos-hardware.controller');
+      
+      mockSocket.connect.mockImplementation((port, address, callback) => {
+        if (callback) callback();
+        return mockSocket;
+      });
+      mockSocket.write.mockImplementation((data, callback) => {
+        if (callback) callback(null);
+        return true;
+      });
+
+      const { req, res, next } = createMockReqRes({
+        body: { printerAddress: '192.168.1.50', printerPort: 9100, data: 'test data' }
+      });
+
+      await posController.printToNetworkPrinter(req, res, next);
+
+      expect(mockSocket.connect).toHaveBeenCalledWith(9100, '192.168.1.50', expect.any(Function));
+      expect(mockSocket.write).toHaveBeenCalledWith(expect.any(Buffer), expect.any(Function));
+      expect(res.json).toHaveBeenCalledWith({ success: true });
     });
 
-    it.skip('should use default port 9100 when not specified', async () => {
-      // Requires real socket implementation or integration test
+    it('should use default port 9100 when not specified', async () => {
+      const posController = await import('../../../../src/modules/pos/pos-hardware.controller');
+      
+      mockSocket.connect.mockImplementation((port, address, callback) => {
+        if (callback) callback();
+        return mockSocket;
+      });
+      mockSocket.write.mockImplementation((data, callback) => {
+        if (callback) callback(null);
+        return true;
+      });
+
+      const { req, res, next } = createMockReqRes({
+        body: { printerAddress: '192.168.1.50', data: 'test data' }
+      });
+
+      await posController.printToNetworkPrinter(req, res, next);
+
+      expect(mockSocket.connect).toHaveBeenCalledWith(9100, '192.168.1.50', expect.any(Function));
     });
 
-    it.skip('should return 500 on print error', async () => {
-      // Requires real socket implementation or integration test
+    it('should return 500 on print error', async () => {
+      const posController = await import('../../../../src/modules/pos/pos-hardware.controller');
+      
+      const eventListeners = new Map<string, Function>();
+      mockSocket.on.mockImplementation((event, callback) => {
+        eventListeners.set(event, callback);
+        return mockSocket;
+      });
+      mockSocket.connect.mockImplementation((port, address, callback) => {
+        setTimeout(() => {
+          const errorCb = eventListeners.get('error');
+          if (errorCb) errorCb(new Error('Connection failed'));
+        }, 0);
+        return mockSocket;
+      });
+
+      const { req, res, next } = createMockReqRes({
+        body: { printerAddress: '192.168.1.50', data: 'test data' }
+      });
+
+      await posController.printToNetworkPrinter(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Print failed' }));
     });
   });
 
@@ -897,13 +960,56 @@ describe('POS Hardware Controller', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'Printer address required' });
     });
 
-    // Socket tests skipped - complex async behavior difficult to mock in unit tests
-    it.skip('should send cash drawer kick command', async () => {
-      // Requires real socket implementation or integration test
+    it('should send cash drawer kick command', async () => {
+      const posController = await import('../../../../src/modules/pos/pos-hardware.controller');
+      
+      mockSocket.connect.mockImplementation((port, address, callback) => {
+        if (callback) callback();
+        return mockSocket;
+      });
+      mockSocket.write.mockImplementation((data, callback) => {
+        if (callback) callback(null);
+        return true;
+      });
+
+      const { req, res, next } = createMockReqRes({
+        body: { printerAddress: '192.168.1.50' }
+      });
+
+      await posController.openCashDrawer(req, res, next);
+
+      expect(mockSocket.connect).toHaveBeenCalledWith(9100, '192.168.1.50', expect.any(Function));
+      expect(mockSocket.write).toHaveBeenCalledWith(
+        Buffer.from([0x1B, 0x70, 0x00, 0x19, 0xFA]),
+        expect.any(Function)
+      );
+      expect(res.json).toHaveBeenCalledWith({ success: true, message: 'Cash drawer triggered' });
     });
 
-    it.skip('should return 500 on drawer open error', async () => {
-      // Requires real socket implementation or integration test
+    it('should return 500 on drawer open error', async () => {
+      const posController = await import('../../../../src/modules/pos/pos-hardware.controller');
+      
+      const eventListeners = new Map<string, Function>();
+      mockSocket.on.mockImplementation((event, callback) => {
+        eventListeners.set(event, callback);
+        return mockSocket;
+      });
+      mockSocket.connect.mockImplementation((port, address, callback) => {
+        setTimeout(() => {
+          const errorCb = eventListeners.get('error');
+          if (errorCb) errorCb(new Error('Drawer open error'));
+        }, 0);
+        return mockSocket;
+      });
+
+      const { req, res, next } = createMockReqRes({
+        body: { printerAddress: '192.168.1.50' }
+      });
+
+      await posController.openCashDrawer(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Failed to open cash drawer' }));
     });
   });
 
@@ -924,19 +1030,80 @@ describe('POS Hardware Controller', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'Printer address required' });
     });
 
-    // Socket tests skipped - complex async behavior difficult to mock in unit tests
-    it.skip('should return online status when printer responds', async () => {
-      // Requires real socket implementation or integration test
+    it('should return online status when printer responds', async () => {
+      const posController = await import('../../../../src/modules/pos/pos-hardware.controller');
+      
+      mockSocket.connect.mockImplementation((port, address, callback) => {
+        if (callback) callback();
+        return mockSocket;
+      });
+
+      const { req, res, next } = createMockReqRes({
+        query: { printerAddress: '192.168.1.50' }
+      });
+
+      await posController.getPrinterStatus(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'online',
+        address: '192.168.1.50',
+      }));
     });
 
-    // Socket tests skipped - complex async behavior difficult to mock in unit tests
-    it.skip('should return offline status when printer does not respond', async () => {
-      // Requires real socket implementation or integration test
+    it('should return offline status when printer does not respond', async () => {
+      const posController = await import('../../../../src/modules/pos/pos-hardware.controller');
+      
+      const eventListeners = new Map<string, Function>();
+      mockSocket.on.mockImplementation((event, callback) => {
+        eventListeners.set(event, callback);
+        return mockSocket;
+      });
+      mockSocket.connect.mockImplementation((port, address, callback) => {
+        setTimeout(() => {
+          const errorCb = eventListeners.get('error');
+          if (errorCb) errorCb(new Error('Connection refused'));
+        }, 0);
+        return mockSocket;
+      });
+
+      const { req, res, next } = createMockReqRes({
+        query: { printerAddress: '192.168.1.50' }
+      });
+
+      await posController.getPrinterStatus(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'offline',
+        address: '192.168.1.50',
+      }));
     });
 
-    // Socket tests skipped - complex async behavior difficult to mock in unit tests
-    it.skip('should handle timeout gracefully', async () => {
-      // Requires real socket implementation or integration test
+    it('should handle timeout gracefully', async () => {
+      const posController = await import('../../../../src/modules/pos/pos-hardware.controller');
+      
+      const eventListeners = new Map<string, Function>();
+      mockSocket.on.mockImplementation((event, callback) => {
+        eventListeners.set(event, callback);
+        return mockSocket;
+      });
+      mockSocket.connect.mockImplementation((port, address, callback) => {
+        setTimeout(() => {
+          const timeoutCb = eventListeners.get('timeout');
+          if (timeoutCb) timeoutCb();
+        }, 0);
+        return mockSocket;
+      });
+
+      const { req, res, next } = createMockReqRes({
+        query: { printerAddress: '192.168.1.50' }
+      });
+
+      await posController.getPrinterStatus(req, res, next);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'offline',
+        address: '192.168.1.50',
+      }));
     });
   });
 

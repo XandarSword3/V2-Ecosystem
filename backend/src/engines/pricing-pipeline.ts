@@ -2,11 +2,8 @@
  * Unified Pricing Pipeline
  * 
  * ONE universal pricing calculation that ALL engines route through.
- * This replaces the four independent financial calculators:
- *   - order.service.ts L131-556 (restaurant)
- *   - snack.controller.ts L93-149 (snack bar)
- *   - bookings.service.ts L167-258 (chalets)
- *   - pool.controller.ts L148-261 (pool)
+ * This replaces the four legacy per-module financial calculators
+ * (instant-transaction.engine, time-exclusive-reservation.engine, shared-capacity-access.engine, ongoing-entitlement.engine).
  * 
  * FINANCIAL INVARIANTS:
  *   1. totalAmount = subtotal + taxAmount + serviceCharge + deliveryFee - totalDiscount

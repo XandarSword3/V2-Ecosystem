@@ -55,7 +55,7 @@ test.describe('Unified Customization System - Public API', () => {
   test('3. Get order customizations endpoint exists', async ({ request }) => {
     const dummyUUID = '00000000-0000-0000-0000-000000000000';
     const response = await request.get(
-      `${API_URL}/customizations/orders/restaurant/${dummyUUID}`
+      `${API_URL}/customizations/orders/${slug}/${dummyUUID}`
     );
     
     console.log('Order customizations API - status:', response.status());
@@ -69,7 +69,7 @@ test.describe('Unified Customization System - Public API', () => {
     const entityTypes = [
       'menu_item', 
       'snack_bar_item', 
-      'chalet', 
+      'accommodation unit', 
       'pool_session', 
       'spa_service',
       'activity',
@@ -170,9 +170,9 @@ test.describe('Unified Customization System - E2E Browser Tests', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('Admin can access restaurant management', async ({ page }) => {
-    // Navigate to restaurant management or menu management
-    await page.goto(`${FRONTEND_URL}/admin/restaurant`);
+  test('Admin can access menu service management', async ({ page }) => {
+    // Navigate to menu service management or menu management
+    await page.goto(`${FRONTEND_URL}/admin/menu service`);
     
     // Wait for page to load
     await page.waitForLoadState('networkidle');
@@ -182,12 +182,12 @@ test.describe('Unified Customization System - E2E Browser Tests', () => {
     console.log('Page title:', pageTitle);
     
     // Take a screenshot for debugging
-    await page.screenshot({ path: 'test-results/admin-restaurant.png' });
+    await page.screenshot({ path: 'test-results/admin-menu service.png' });
     
     // Check for admin panel elements - the page should have these visible elements
     const hasAdminPanel = await page.locator('text=Admin Panel').count() > 0 ||
                           await page.locator('text=Dashboard').count() > 0 ||
-                          await page.locator('text=Restaurant').count() > 0;
+                          await page.locator('text=MenuService').count() > 0;
     
     // Verify admin-specific elements are present
     expect(hasAdminPanel, 'Admin panel elements should be present').toBe(true);
@@ -197,21 +197,21 @@ test.describe('Unified Customization System - E2E Browser Tests', () => {
     console.log('Current URL:', currentUrl);
   });
   
-  test('Customer can view restaurant menu', async ({ page }) => {
-    // Navigate to public restaurant menu
-    await page.goto(`${FRONTEND_URL}/restaurant`);
+  test('Customer can view menu service menu', async ({ page }) => {
+    // Navigate to public menu service menu
+    await page.goto(`${FRONTEND_URL}/menu service`);
     
     // Wait for menu to load
     await page.waitForLoadState('networkidle');
     
     // Take screenshot
-    await page.screenshot({ path: 'test-results/customer-restaurant.png' });
+    await page.screenshot({ path: 'test-results/customer-menu service.png' });
     
     // Check page loaded
     const bodyText = await page.textContent('body');
     expect(bodyText).not.toContain('Server Error');
     
-    console.log('Restaurant menu page loaded successfully');
+    console.log('MenuService menu page loaded successfully');
   });
 });
 

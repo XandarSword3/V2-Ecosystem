@@ -4,9 +4,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createFeedbackService, FeedbackServiceError } from '../../src/lib/services/feedback.service';
-import { InMemoryFeedbackRepository } from '../../src/lib/repositories/feedback.repository.memory';
-import type { Container } from '../../src/lib/container/types';
+import { createFeedbackService, FeedbackServiceError } from '../../../src/lib/services/feedback.service';
+import { InMemoryFeedbackRepository } from '../../../src/lib/repositories/feedback.repository.memory';
+import type { Container } from '../../../src/lib/container/types';
 
 const GUEST_1 = '11111111-1111-1111-1111-111111111111';
 const STAFF_1 = '22222222-2222-2222-2222-222222222222';
@@ -30,7 +30,7 @@ describe('FeedbackService', () => {
 
   describe('submitFeedback', () => {
     it('should submit feedback with required fields', async () => {
-      const feedback = await service.submitFeedback({ guestName: 'John Doe', guestEmail: 'john@example.com', type: 'general', subject: 'Great Stay', message: 'We had a wonderful time at your resort!' });
+      const feedback = await service.submitFeedback({ guestName: 'John Doe', guestEmail: 'john@example.com', type: 'general', subject: 'Great Stay', message: 'We had a wonderful time at your property!' });
       expect(feedback).toBeDefined();
       expect(feedback.guestName).toBe('John Doe');
       expect(feedback.type).toBe('general');

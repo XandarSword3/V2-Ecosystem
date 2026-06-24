@@ -80,7 +80,7 @@ vi.mock('@/lib/translate', () => ({
   }),
 }));
 
-vi.mock('@/components/restaurant/ModifierSelectionModal', () => ({
+vi.mock('@/components/modules/ModifierSelectionModal', () => ({
   ModifierSelectionModal: ({ isOpen, onAddToCart, menuItem, onClose }: any) =>
     isOpen ? (
       <div data-testid="modifier-modal">
@@ -135,8 +135,8 @@ import { MenuService } from '../../src/components/modules/MenuService';
 
 const restaurantModule = {
   id: 'mod-1',
-  slug: 'restaurant',
-  name: 'Restaurant',
+  slug: 'menu_service',
+  name: 'MenuService',
   description: 'All-day menu',
   settings: {
     header_color: '#0ea5e9',
@@ -146,8 +146,8 @@ const restaurantModule = {
 
 const snackModule = {
   ...restaurantModule,
-  slug: 'snack-bar',
-  name: 'Snack Bar',
+  slug: 'kiosk',
+  name: 'KioskItem Bar',
 };
 
 const menuResponse = {
@@ -211,7 +211,7 @@ describe('MenuService behavior', () => {
     expect(screen.getByText('error')).toBeInTheDocument();
   });
 
-  it('opens customization flow and adds quantity items for snack-bar modules', async () => {
+  it('opens customization flow and adds quantity items for kiosk modules', async () => {
     const user = userEvent.setup();
 
     useQueryMock.mockReturnValue({ data: menuResponse, isLoading: false, error: null });
@@ -219,7 +219,8 @@ describe('MenuService behavior', () => {
 
     render(<MenuService module={snackModule as any} />);
 
-    await user.click(screen.getAllByRole('button', { name: /addtocart/i })[0]);
+    await user.click(screen.getAllByRole('button', { name: /add to cart/i })[0]);
+
     expect(await screen.findByTestId('customization-modal')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'confirm-custom' }));
@@ -229,7 +230,7 @@ describe('MenuService behavior', () => {
     });
 
     const firstCall = addItemMock.mock.calls[0][0];
-    expect(firstCall.type).toBe('snack');
+    expect(firstCall.moduleSlug).toBe('kiosk');
     expect(firstCall.selectedModifiers).toEqual(
       expect.arrayContaining([expect.objectContaining({ optionId: 'opt-cheese' })])
     );
@@ -244,7 +245,8 @@ describe('MenuService behavior', () => {
 
     render(<MenuService module={restaurantModule as any} />);
 
-    await user.click(screen.getAllByRole('button', { name: /addtocart/i })[0]);
+    await user.click(screen.getAllByRole('button', { name: /add to cart/i })[0]);
+
     expect(await screen.findByTestId('modifier-modal')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'legacy-add' }));
@@ -252,7 +254,7 @@ describe('MenuService behavior', () => {
     expect(addItemMock).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'item-1',
-        type: 'restaurant',
+        moduleSlug: 'menu_service',
         moduleId: 'mod-1',
       })
     );
@@ -277,6 +279,6 @@ describe('MenuService behavior', () => {
     expect(screen.getAllByText('Fries').length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole('button', { name: /\$\d+\.\d+/ }));
-    expect(pushMock).toHaveBeenCalledWith('/restaurant/cart');
+    expect(pushMock).toHaveBeenCalledWith('/menu_service/cart');
   });
 });

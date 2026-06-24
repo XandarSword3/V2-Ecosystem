@@ -19,6 +19,12 @@ export function BentoCard({ children, className = '', style }: Props) {
   return <div className={className} style={style}>{children}</div>;
 }
 
-export function BentoFeatureCard({ children, className = '', style }: Props) {
-  return <div className={className} style={style}>{children}</div>;
+export function BentoFeatureCard({ children, className = '', style, title, description }: Props & { title?: string; description?: string }) {
+  return (
+    <div className={className} style={style}>
+      {title && <h3>{title}</h3>}
+      {description && <p>{description}</p>}
+      {children}
+    </div>
+  );
 }

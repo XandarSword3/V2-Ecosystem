@@ -45,6 +45,18 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'resort' },
+    properties: [],
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+  PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 import CouponsAdminPage from '../../src/app/admin/coupons/page';
 
 const couponSeed = [
@@ -118,7 +130,7 @@ describe('Admin coupons route coverage', () => {
     await user.click(screen.getByTitle('Deactivate'));
 
     await waitFor(() => {
-      expect(apiPutMock).toHaveBeenCalledWith('/coupons/coupon-1', { isActive: false });
+      expect(apiPutMock).toHaveBeenCalledWith('/coupons/coupon-1', { isActive: false }, expect.any(Object));
     });
 
     expect(toastSuccessMock).toHaveBeenCalledWith('Coupon deactivated');

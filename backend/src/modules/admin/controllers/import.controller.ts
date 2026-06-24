@@ -6,14 +6,15 @@ import { logActivity } from '../../../utils/activityLogger.js';
 
 /**
  * Import Controller
- * Handles bulk data imports (F&B menu, Accommodations, Inventory items)
+ * Handles bulk data imports (catalog items, accommodation units, inventory items)
  */
 
 /**
- * POST /api/v1/admin/import/menu
- * Import food and beverage menu items from parsed CSV
+ * POST /api/v1/admin/import/catalog-items
+ * Import catalog items (instant_transaction engine) from parsed CSV.
+ * Writes to catalog_items — the unified replacement for the legacy item tables.
  */
-export const importMenuItems = asyncHandler(async (req: Request, res: Response) => {
+export const importCatalogItems = asyncHandler(async (req: Request, res: Response) => {
   const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
   const { items, moduleId } = req.body;
   const userId = req.user?.userId;
@@ -24,103 +25,60 @@ export const importMenuItems = asyncHandler(async (req: Request, res: Response) 
   }
 
   if (!Array.isArray(items) || items.length === 0) {
-    res.status(400).json({ success: false, error: 'No menu items provided for import' });
+    res.status(400).json({ success: false, error: 'No catalog items provided for import' });
     return;
   }
 
   const supabase = getSupabase();
 
-  // Find or create category maps (skip items that already provide category_id)
-  const categoriesSet = new Set<string>(
-    items
-      .filter((item) => !item.category_id)
-      .map((item) => item.category || 'General')
-      .filter(Boolean),
-  );
-  const categoryMap: Record<string, string> = {};
-
-  // Resolve categories
-  for (const catName of categoriesSet) {
-    // Check if category exists for this module/property
-    let selectQuery = supabase
-      .from('menu_categories')
-      .select('id')
-      .eq('name', catName);
-    
-    if (moduleId) {
-      selectQuery = selectQuery.eq('module_id', moduleId);
-    } else if (propertyId) {
-      selectQuery = selectQuery.eq('property_id', propertyId);
-    }
-
-    const { data: existing } = await selectQuery.maybeSingle();
-
-    if (existing) {
-      categoryMap[catName] = existing.id;
-    } else {
-      // Create new category
-      const { data: newCat, error: catErr } = await supabase
-        .from('menu_categories')
-        .insert({
-          name: catName,
-          module_id: moduleId || null,
-          property_id: propertyId,
-        })
-        .select()
-        .single();
-
-      if (catErr) {
-        logger.error(`Failed to create category ${catName} during import`, { error: catErr.message });
-        continue;
-      }
-      categoryMap[catName] = newCat.id;
-    }
-  }
-
-  // Bulk insert menu items
-  const menuItemsToInsert = items
+  // catalog_items uses a flat `category` text column — no separate categories table.
+  const catalogItemsToInsert = items
+    .filter((item) => item.name)
     .map((item) => ({
       name: item.name,
       description: item.description || '',
       price: Number(item.price) || 0,
-      category_id: item.category_id || categoryMap[item.category || 'General'],
+      category: item.category || null,
       is_available: item.is_available !== false,
-      image_url: item.imageUrl || null,
-    }))
-    .filter((item) => item.category_id);
+      module_id: moduleId || null,
+      metadata: {
+        image_url: item.imageUrl || null,
+      },
+    }));
 
-  if (menuItemsToInsert.length === 0) {
-    res.status(400).json({ success: false, error: 'Failed to map any items to valid categories' });
+  if (catalogItemsToInsert.length === 0) {
+    res.status(400).json({ success: false, error: 'No valid items to import' });
     return;
   }
 
   const { data, error } = await supabase
-    .from('menu_items')
-    .insert(menuItemsToInsert)
+    .from('catalog_items')
+    .insert(catalogItemsToInsert)
     .select();
 
   if (error) throw error;
 
   await logActivity({
     user_id: userId || 'system',
-    action: 'IMPORT_MENU_ITEMS',
-    resource: 'menu_items',
+    action: 'IMPORT_CATALOG_ITEMS',
+    resource: 'catalog_items',
     details: { count: data.length },
     property_id: propertyId,
   });
 
   res.json({
     success: true,
-    message: `Successfully imported ${data.length} menu items`,
+    message: `Successfully imported ${data.length} catalog items`,
     data,
   });
 });
 
 /**
- * POST /api/v1/admin/import/accommodations
- * Import chalet units from parsed CSV
+ * POST /api/v1/admin/import/units
+ * Import bookable units (time_exclusive_reservation engine) from parsed CSV.
+ * Writes to accommodation_units (the physical table behind the bookable_units view).
  */
-export const importAccommodations = asyncHandler(async (req: Request, res: Response) => {
+export const importUnits = asyncHandler(async (req: Request, res: Response) => {
   const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
   const { items, moduleId } = req.body;
   const userId = req.user?.userId;
@@ -131,13 +89,13 @@ export const importAccommodations = asyncHandler(async (req: Request, res: Respo
   }
 
   if (!Array.isArray(items) || items.length === 0) {
-    res.status(400).json({ success: false, error: 'No accommodations provided for import' });
+    res.status(400).json({ success: false, error: 'No units provided for import' });
     return;
   }
 
   const supabase = getSupabase();
 
-  const chaletsToInsert = items.map(item => ({
+  const unitsToInsert = items.map(item => ({
     name: item.name || `Unit ${item.number || Math.random().toString(36).substr(2, 5)}`,
     type: item.type || 'Standard',
     base_price: Number(item.base_price || item.price) || 100,
@@ -150,14 +108,14 @@ export const importAccommodations = asyncHandler(async (req: Request, res: Respo
 
   const { data, error } = await supabase
     .from('accommodation_units')
-    .insert(chaletsToInsert)
+    .insert(unitsToInsert)
     .select();
 
   if (error) throw error;
 
   await logActivity({
     user_id: userId || 'system',
-    action: 'IMPORT_ACCOMMODATIONS',
+    action: 'IMPORT_UNITS',
     resource: 'accommodation_units',
     details: { count: data.length },
     property_id: propertyId,

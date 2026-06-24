@@ -10,7 +10,6 @@ import {
   positiveNumberSchema,
   positiveIntSchema,
   paginationSchema,
-  purchasePoolTicketSchema,
   createTransactionSchema,
   createPaymentIntentSchema,
   recordCashPaymentSchema,
@@ -153,31 +152,6 @@ describe('Validation Schemas (Source)', () => {
       const result = paginationSchema.parse({ page: '5', limit: '50' });
       expect(result.page).toBe(5);
       expect(result.limit).toBe(50);
-    });
-  });
-
-  describe('purchasePoolTicketSchema', () => {
-    it('should accept valid pool ticket purchase', () => {
-      const validTicket = {
-        sessionId: '123e4567-e89b-12d3-a456-426614174000',
-        ticketDate: '2024-07-15',
-        customerName: 'John Doe',
-        customerPhone: '+1234567890',
-        numberOfGuests: 4,
-        paymentMethod: 'card',
-      };
-      expect(purchasePoolTicketSchema.safeParse(validTicket).success).toBe(true);
-    });
-
-    it('should reject more than 20 guests', () => {
-      const invalidTicket = {
-        sessionId: '123e4567-e89b-12d3-a456-426614174000',
-        ticketDate: '2024-07-15',
-        customerName: 'John Doe',
-        numberOfGuests: 21,
-        paymentMethod: 'cash',
-      };
-      expect(purchasePoolTicketSchema.safeParse(invalidTicket).success).toBe(false);
     });
   });
 

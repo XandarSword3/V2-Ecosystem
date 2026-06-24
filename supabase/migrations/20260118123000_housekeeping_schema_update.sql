@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS housekeeping_task_types (
     estimated_duration INTEGER DEFAULT 30,
     checklist JSONB DEFAULT '[]',
     priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
-    applies_to VARCHAR(50) DEFAULT 'chalet' CHECK (applies_to IN ('chalet', 'pool', 'restaurant', 'common_area', 'other')),
+    applies_to VARCHAR(50) DEFAULT 'accommodation_unit' CHECK (applies_to IN ('accommodation_unit', 'service_area', 'dining_area', 'common_area', 'other')),
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -33,16 +33,16 @@ CREATE TABLE IF NOT EXISTS housekeeping_tasks (
     task_type_id UUID REFERENCES housekeeping_task_types(id),
     title VARCHAR(200) NOT NULL,
     description TEXT,
-    chalet_id UUID REFERENCES chalets(id),
+    unit_id UUID, -- FK to accommodation_units added by later migration
     priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
     status VARCHAR(30) DEFAULT 'pending' CHECK (status IN ('pending', 'assigned', 'in_progress', 'completed', 'verified', 'cancelled')),
-    assigned_to UUID REFERENCES users(id),
-    created_by UUID REFERENCES users(id),
+    assigned_to UUID,
+    created_by UUID,
     scheduled_for TIMESTAMP WITH TIME ZONE,
     due_date TIMESTAMP WITH TIME ZONE,
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
-    verified_by UUID REFERENCES users(id),
+    verified_by UUID,
     verified_at TIMESTAMP WITH TIME ZONE,
     checklist_completed JSONB DEFAULT '[]',
     notes TEXT,
@@ -56,14 +56,14 @@ CREATE TABLE IF NOT EXISTS housekeeping_tasks (
 CREATE TABLE IF NOT EXISTS housekeeping_schedules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_type_id UUID REFERENCES housekeeping_task_types(id),
-    chalet_id UUID REFERENCES chalets(id),
+    unit_id UUID, -- FK to accommodation_units added by later migration
     repeat_pattern VARCHAR(30) NOT NULL CHECK (repeat_pattern IN ('daily', 'weekly', 'biweekly', 'monthly', 'on_checkout', 'inventory_check', 'checkout')),
     day_of_week INTEGER, -- 0=Sunday, 1=Monday, etc.
     time_slot VARCHAR(10) DEFAULT '09:00',
-    assigned_to UUID REFERENCES users(id),
+    assigned_to UUID,
     is_active BOOLEAN DEFAULT true,
     last_generated TIMESTAMP WITH TIME ZONE,
-    created_by UUID REFERENCES users(id),
+    created_by UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS housekeeping_logs (
     old_status VARCHAR(30),
     new_status VARCHAR(30),
     notes TEXT,
-    performed_by UUID REFERENCES users(id),
+    performed_by UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS housekeeping_logs (
 CREATE INDEX IF NOT EXISTS idx_housekeeping_tasks_status ON housekeeping_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_housekeeping_tasks_assigned ON housekeeping_tasks(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_housekeeping_tasks_scheduled ON housekeeping_tasks(scheduled_for);
-CREATE INDEX IF NOT EXISTS idx_housekeeping_tasks_chalet ON housekeeping_tasks(chalet_id);
+CREATE INDEX IF NOT EXISTS idx_housekeeping_tasks_unit ON housekeeping_tasks(unit_id);
 CREATE INDEX IF NOT EXISTS idx_housekeeping_logs_task ON housekeeping_logs(task_id);
 
 -- Inventory Section Removed to avoid conflicts

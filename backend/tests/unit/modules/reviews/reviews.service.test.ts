@@ -149,7 +149,7 @@ describe('ReviewsService', () => {
           id: 'review-2',
           rating: 4,
           text: 'Great experience',
-          service_type: 'restaurant',
+          service_type: 'menu_service',
           is_approved: true,
           created_at: '2026-01-14T10:00:00Z',
           users: { full_name: 'Jane Smith', profile_image_url: 'http://example.com/img.jpg' }
@@ -170,17 +170,17 @@ describe('ReviewsService', () => {
           id: 'review-1',
           rating: 5,
           text: 'Great food!',
-          service_type: 'restaurant',
+          service_type: 'menu_service',
           is_approved: true,
           created_at: '2026-01-15T10:00:00Z',
           users: { full_name: 'John Doe' }
         }
       ];
 
-      const result = await getApprovedReviews({ service_type: 'restaurant' });
+      const result = await getApprovedReviews({ service_type: 'menu_service' });
 
       expect(result.reviews).toHaveLength(1);
-      expect(result.reviews[0].service_type).toBe('restaurant');
+      expect(result.reviews[0].service_type).toBe('menu_service');
     });
 
     it('should apply limit when provided', async () => {
@@ -221,7 +221,7 @@ describe('ReviewsService', () => {
     it('should not filter when service_type is "all"', async () => {
       mockReviews = [
         { id: 'review-1', service_type: 'general', rating: 5 },
-        { id: 'review-2', service_type: 'restaurant', rating: 4 }
+        { id: 'review-2', service_type: 'menu_service', rating: 4 }
       ];
 
       const result = await getApprovedReviews({ service_type: 'all' });
@@ -270,11 +270,11 @@ describe('ReviewsService', () => {
 
       const result = await createReview('user-123', {
         rating: 5,
-        text: 'The restaurant food was delicious!',
-        service_type: 'restaurant'
+        text: 'The menu service food was delicious!',
+        service_type: 'menu_service'
       });
 
-      expect(result.service_type).toBe('restaurant');
+      expect(result.service_type).toBe('menu_service');
     });
 
     it('should throw error if user already has a review for this service', async () => {
@@ -297,11 +297,11 @@ describe('ReviewsService', () => {
       const result = await createReview('user-123', {
         rating: 4,
         text: 'Great pool facilities!',
-        service_type: 'pool'
+        service_type: 'capacity'
       });
 
       expect(result).toBeDefined();
-      expect(result.service_type).toBe('pool');
+      expect(result.service_type).toBe('capacity');
     });
 
     it('should set is_approved to false for new reviews', async () => {
@@ -337,7 +337,7 @@ describe('ReviewsService', () => {
           rating: 3,
           text: 'Average',
           is_approved: false,
-          service_type: 'restaurant',
+          service_type: 'menu_service',
           created_at: '2026-01-14T10:00:00Z',
           users: { id: 'user-2', full_name: 'Jane', email: 'jane@example.com' }
         }
@@ -374,21 +374,21 @@ describe('ReviewsService', () => {
 
     it('should filter by service type', async () => {
       mockReviews = [
-        { id: 'review-1', service_type: 'chalets' }
+        { id: 'review-1', service_type: 'accommodation_units' }
       ];
 
-      const result = await getAllReviews({ service_type: 'chalets' });
+      const result = await getAllReviews({ service_type: 'accommodation_units' });
 
       expect(result).toHaveLength(1);
-      expect(result[0].service_type).toBe('chalets');
+      expect(result[0].service_type).toBe('accommodation_units');
     });
 
     it('should combine status and service_type filters', async () => {
       mockReviews = [
-        { id: 'review-1', is_approved: false, service_type: 'pool' }
+        { id: 'review-1', is_approved: false, service_type: 'capacity' }
       ];
 
-      const result = await getAllReviews({ status: 'pending', service_type: 'pool' });
+      const result = await getAllReviews({ status: 'pending', service_type: 'capacity' });
 
       expect(result).toHaveLength(1);
     });
@@ -404,7 +404,7 @@ describe('ReviewsService', () => {
     it('should not filter when service_type is "all"', async () => {
       mockReviews = [
         { id: 'review-1', service_type: 'general' },
-        { id: 'review-2', service_type: 'snack_bar' }
+        { id: 'review-2', service_type: 'kiosk' }
       ];
 
       const result = await getAllReviews({ service_type: 'all' });
@@ -569,7 +569,7 @@ describe('ReviewsService', () => {
     it('should return all reviews by a specific user', async () => {
       mockReviews = [
         { id: 'review-1', user_id: 'user-123', service_type: 'general' },
-        { id: 'review-2', user_id: 'user-123', service_type: 'restaurant' }
+        { id: 'review-2', user_id: 'user-123', service_type: 'menu_service' }
       ];
 
       const result = await getReviewsByUser('user-123');
@@ -618,11 +618,11 @@ describe('ReviewsService', () => {
 
     it('should return stats filtered by service type', async () => {
       mockReviews = [
-        { id: 'review-1', rating: 5, service_type: 'restaurant', is_approved: true },
-        { id: 'review-2', rating: 5, service_type: 'restaurant', is_approved: true }
+        { id: 'review-1', rating: 5, service_type: 'menu_service', is_approved: true },
+        { id: 'review-2', rating: 5, service_type: 'menu_service', is_approved: true }
       ];
 
-      const result = await getReviewStatsByServiceType('restaurant');
+      const result = await getReviewStatsByServiceType('menu_service');
 
       expect(result.totalReviews).toBe(2);
       expect(result.averageRating).toBe(5);
@@ -640,7 +640,7 @@ describe('ReviewsService', () => {
     it('should not filter when service_type is "all"', async () => {
       mockReviews = [
         { id: 'review-1', rating: 5, service_type: 'general' },
-        { id: 'review-2', rating: 4, service_type: 'pool' }
+        { id: 'review-2', rating: 4, service_type: 'capacity' }
       ];
 
       const result = await getReviewStatsByServiceType('all');
@@ -685,7 +685,7 @@ describe('ReviewsService', () => {
     });
 
     it('should handle all service types', async () => {
-      const serviceTypes = ['general', 'restaurant', 'chalets', 'pool', 'snack_bar'];
+      const serviceTypes = ['general', 'menu_service', 'accommodation_units', 'capacity', 'kiosk'];
       
       for (const serviceType of serviceTypes) {
         mockReviews = [{ id: `review-${serviceType}`, service_type: serviceType }];

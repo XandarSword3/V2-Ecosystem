@@ -76,7 +76,7 @@ const payments = [
     amount: 80,
     payment_method: 'cash',
     status: 'pending',
-    reference_type: 'pool_ticket',
+    reference_type: 'capacity_ticket',
     reference_id: 'pt-001',
     created_at: '2026-08-10T13:00:00Z',
     users: {

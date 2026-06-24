@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
 import { toast } from 'sonner';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { CardSkeleton } from '@/components/ui/Skeleton';
@@ -18,7 +18,6 @@ import {
   Trash2,
   FolderOpen,
   RefreshCw,
-  GripVertical,
   X,
   Save,
 } from 'lucide-react';
@@ -49,7 +48,7 @@ export default function DynamicCategoriesPage() {
   const fetchCategories = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/restaurant/categories', {
+      const response = await api.get(`/${slug}/categories`, {
         params: { moduleId: currentModule.id }
       });
       setCategories(response.data.data || []);
@@ -58,7 +57,7 @@ export default function DynamicCategoriesPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentModule]);
+  }, [currentModule, slug]);
 
   useEffect(() => {
     if (currentModule) {
@@ -78,10 +77,10 @@ export default function DynamicCategoriesPage() {
       const payload = { ...formData, moduleId: currentModule.id };
       
       if (editingCategory) {
-        await api.put(`/restaurant/admin/categories/${editingCategory.id}`, payload);
+        await api.put(`/${slug}/admin/categories/${editingCategory.id}`, payload);
         toast.success('Category updated');
       } else {
-        await api.post('/restaurant/admin/categories', payload);
+        await api.post(`/${slug}/admin/categories`, payload);
         toast.success('Category created');
       }
       setShowModal(false);
@@ -97,7 +96,7 @@ export default function DynamicCategoriesPage() {
     if (!confirm('Are you sure you want to delete this category?')) return;
     
     try {
-      await api.delete(`/restaurant/admin/categories/${id}`);
+      await api.delete(`/${slug}/admin/categories/${id}`);
       toast.success('Category deleted');
       fetchCategories();
     } catch (error) {
@@ -129,7 +128,7 @@ export default function DynamicCategoriesPage() {
             {currentModule.name} Categories
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-2">
-            Organize menu items into categories
+            Organize items into categories
           </p>
         </motion.div>
 

@@ -36,7 +36,7 @@ async function fixRecipe() {
   const { error: insertError } = await supabase
     .from('menu_item_ingredients')
     .insert({
-      menu_item_id: menuItems.id,
+      catalog_item_id: menuItems.id,
       inventory_item_id: inventoryItems.id,
       quantity: 0.2, // 200g
       unit: 'kg'

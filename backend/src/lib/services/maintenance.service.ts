@@ -22,7 +22,7 @@ export class MaintenanceServiceError extends Error {
 
 const VALID_CATEGORIES: MaintenanceCategory[] = ['plumbing','electrical','hvac','carpentry','painting','cleaning','landscaping','appliance','structural','safety','it','general'];
 const VALID_PRIORITIES: MaintenancePriority[] = ['low','medium','high','critical'];
-const VALID_LOCATION_TYPES: LocationType[] = ['room','lobby','pool','gym','restaurant','parking','exterior','common_area','office','other'];
+const VALID_LOCATION_TYPES: LocationType[] = ['room','lobby','aquatic_area','gym','dining_area','parking','exterior','common_area','office','other'];
 
 function isUUID(id: string) { return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id); }
 

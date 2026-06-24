@@ -5,7 +5,7 @@
  * then verifies each rebrand as Customer, Admin, and Staff.
  * 
  * Rebrand Themes:
- * 1. Azure Bay Resort — Beach Paradise
+ * 1. Azure Bay Property — Beach Paradise
  * 2. Alpine Peak Lodge — Mountain Retreat
  * 3. Golden Sunset Spa — Golden Sunset
  * 4. Emerald Forest Retreat — Cedar Forest
@@ -27,7 +27,7 @@ const API_BASE = 'http://localhost:3005';
 const FRONTEND = 'http://localhost:3000';
 
 const ADMIN_CREDS = { email: 'admin@v2ecosystem.com', password: 'admin123' };
-const STAFF_CREDS = { email: 'restaurant.staff@v2ecosystem.com', password: 'staff123' };
+const STAFF_CREDS = { email: 'menu.service.staff@v2ecosystem.com', password: 'staff123' };
 
 interface BrandConfig {
   name: string;
@@ -51,9 +51,9 @@ interface BrandConfig {
 
 const BRANDS: BrandConfig[] = [
   {
-    name: 'Azure Bay Resort',
+    name: 'Azure Bay Property',
     tagline: 'Where the Ocean Meets Paradise',
-    description: 'Azure Bay Resort is a premier oceanfront destination offering world-class dining, luxurious beachside chalets, stunning infinity pools, and exceptional service.',
+    description: 'Azure Bay Property is a premier oceanfront destination offering world-class dining, luxurious beachside accommodation_units, stunning infinity pools, and exceptional service.',
     themeName: 'Beach Paradise',
     themeId: 'beach',
     weatherLocation: 'Miami Beach, USA',
@@ -61,9 +61,9 @@ const BRANDS: BrandConfig[] = [
     phone: '+1 (555) 289-2929',
     email: 'reservations@azurebayresort.com',
     address: '1 Azure Bay Drive, Crystal Cove, FL 33101',
-    footerDescription: 'Your premier oceanfront paradise with world-class dining, beachside chalets, and crystal-clear pools.',
-    copyright: '© {year} Azure Bay Resort. All rights reserved.',
-    heroTitle: 'Welcome to Azure Bay Resort',
+    footerDescription: 'Your premier oceanfront paradise with world-class dining, beachside accommodation_units, and crystal-clear pools.',
+    copyright: '© {year} Azure Bay Property. All rights reserved.',
+    heroTitle: 'Welcome to Azure Bay Property',
     heroSubtitle: 'Where the Ocean Meets Paradise',
     ctaTitle: 'Ready to Experience Paradise?',
     ctaSubtitle: 'Book your oceanfront escape today and discover pristine beaches, world-class dining, and unforgettable sunsets.',
@@ -72,7 +72,7 @@ const BRANDS: BrandConfig[] = [
   {
     name: 'Alpine Peak Lodge',
     tagline: 'Summit of Luxury',
-    description: 'Alpine Peak Lodge is an exclusive mountain retreat offering fine dining, cozy alpine chalets, heated pools, and breathtaking panoramic views of snow-capped peaks.',
+    description: 'Alpine Peak Lodge is an exclusive mountain retreat offering fine dining, cozy alpine accommodation_units, heated pools, and breathtaking panoramic views of snow-capped peaks.',
     themeName: 'Mountain Retreat',
     themeId: 'mountain',
     weatherLocation: 'Zermatt, Switzerland',
@@ -509,7 +509,7 @@ async function step1_GeneralAndContact(page: Page, b: BrandConfig, n: number, au
   await adminNav(page, '/admin/settings', auth.tokens, auth.user, 'Resort Name');
   await page.waitForLoadState('networkidle');
 
-  const nameField = page.getByPlaceholder('Enter your resort name');
+  const nameField = page.getByPlaceholder('Enter your property name');
   await nameField.fill(b.name);
   log.push(`  - Resort Name: "${b.name}"`);
 
@@ -832,8 +832,8 @@ async function step5_Terminology(page: Page, b: BrandConfig, n: number, auth: an
   log.push(`  - [DEBUG] Has "Unit": ${bodyText.includes('Unit')}`);
 
   const brandTerms: Record<number, string[]> = {
-    1: ['Cabana', 'Cabanas', 'Pool', 'Pools', 'Restaurant', 'Restaurants'],
-    2: ['Chalet', 'Chalets', 'Spa', 'Spas', 'Lodge Dining', 'Lodge Dining'],
+    1: ['Cabana', 'Cabanas', 'Pool', 'Pools', 'MenuService', 'MenuServices'],
+    2: ['AccommodationUnit', 'AccommodationUnits', 'Spa', 'Spas', 'Lodge Dining', 'Lodge Dining'],
     3: ['Suite', 'Suites', 'Spa', 'Spas', 'Bistro', 'Bistros'],
     4: ['Treehouse', 'Treehouses', 'Lagoon', 'Lagoons', 'Garden Kitchen', 'Garden Kitchens'],
     5: ['Penthouse', 'Penthouses', 'Rooftop Pool', 'Rooftop Pools', 'Fine Dining', 'Fine Dining'],
@@ -902,8 +902,8 @@ async function verifyCustomer(page: Page, b: BrandConfig, n: number): Promise<st
 
   // Navigate through main pages
   const pages = [
-    { url: '/restaurant', name: 'Restaurant', pattern: /menu|categor|food|dish|order/i },
-    { url: '/chalets', name: 'Chalets', pattern: /chalet|room|suite|book|cabana|treehouse|penthouse/i },
+    { url: '/menu service', name: 'MenuService', pattern: /menu|categor|food|dish|order/i },
+    { url: '/accommodation_units', name: 'AccommodationUnits', pattern: /accommodation unit|room|suite|book|cabana|treehouse|penthouse/i },
     { url: '/pool', name: 'Pool', pattern: /pool|ticket|swim|spa|lagoon|session/i },
     { url: '/giftcards', name: 'Gift Cards', pattern: /gift|card|purchase|amount/i },
     { url: '/login', name: 'Login', pattern: /sign|log|email|password/i },
@@ -942,7 +942,7 @@ async function verifyAdmin(page: Page, b: BrandConfig, n: number): Promise<strin
 
   // Verify settings match
   try {
-    const nameVal = await page.getByPlaceholder('Enter your resort name').inputValue();
+    const nameVal = await page.getByPlaceholder('Enter your property name').inputValue();
     log.push(`  - Settings Name: "${nameVal}" ${nameVal === b.name ? '✅' : '❌'}`);
   } catch {
     log.push(`  - Settings: ⚠️ Could not read name`);
@@ -954,7 +954,7 @@ async function verifyAdmin(page: Page, b: BrandConfig, n: number): Promise<strin
   const adminPages = [
     { url: '/admin/orders', name: 'Orders', pattern: /order|status/i },
     { url: '/admin/users/customers', name: 'Users', pattern: /user|customer|name/i },
-    { url: '/admin/modules', name: 'Modules', pattern: /module|restaurant|active/i },
+    { url: '/admin/modules', name: 'Modules', pattern: /module|menu service|active/i },
     { url: '/admin/reports', name: 'Reports', pattern: /report|revenue|analytic/i },
     { url: '/admin/audit', name: 'Audit', pattern: /audit|log|activity/i },
   ];
@@ -981,8 +981,8 @@ async function verifyStaff(page: Page, b: BrandConfig, n: number): Promise<strin
   await apiLogin(page, STAFF_CREDS.email, STAFF_CREDS.password);
 
   const staffPages = [
-    { url: '/staff', name: 'Dashboard', pattern: /staff|kitchen|scanner|restaurant/i },
-    { url: '/staff/restaurant', name: 'Kitchen', pattern: /kitchen|order|pending|display/i },
+    { url: '/staff', name: 'Dashboard', pattern: /staff|kitchen|scanner|menu service/i },
+    { url: '/staff/menu service', name: 'Kitchen', pattern: /kitchen|order|pending|display/i },
     { url: '/staff/scanner', name: 'Scanner', pattern: /scan|code|ticket|validate/i },
   ];
 

@@ -106,7 +106,7 @@ describe('RolesController', () => {
           name: 'manager',
           displayName: 'Manager',
           description: 'Management role',
-          businessUnit: 'resort'
+          businessUnit: 'property'
         },
         user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
       });
@@ -207,8 +207,20 @@ describe('RolesController', () => {
             })
           };
         }
+        if (table === 'app_role_permissions') {
+          return {
+            delete: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null })
+            })
+          };
+        }
         if (table === 'roles') {
           return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: { name: 'admin' }, error: null })
+              })
+            }),
             delete: vi.fn().mockReturnValue({
               eq: vi.fn().mockResolvedValue({ error: null })
             })

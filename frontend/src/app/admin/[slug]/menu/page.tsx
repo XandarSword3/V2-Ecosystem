@@ -135,10 +135,10 @@ export default function DynamicMenuPage() {
     try {
       setLoading(true);
       const [menuRes, catRes, ingredientsRes, groupsRes] = await Promise.all([
-        api.get('/restaurant/items', { params: { moduleId: currentModule.id } }),
-        api.get('/restaurant/categories', { params: { moduleId: currentModule.id } }),
+        api.get(`/${slug}/items`, { params: { moduleId: currentModule.id } }),
+        api.get(`/${slug}/categories`, { params: { moduleId: currentModule.id } }),
         api.get('/inventory/items', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
-        api.get('/restaurant/modifiers', { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
+        api.get(`/${slug}/modifiers`, { params: { moduleId: currentModule.id } }).catch(() => ({ data: { data: [] } })),
       ]);
       setItems(menuRes.data.data || []);
       setCategories(catRes.data.data || []);
@@ -233,10 +233,10 @@ export default function DynamicMenuPage() {
       };
       
       if (editingItem) {
-        await api.put(`/restaurant/admin/items/${editingItem.id}`, payload);
+        await api.put(`/${slug}/admin/items/${editingItem.id}`, payload);
         toast.success('Menu item updated successfully');
       } else {
-        await api.post('/restaurant/admin/items', payload);
+        await api.post(`/${slug}/admin/items`, payload);
         toast.success('Menu item created successfully');
       }
       fetchData();
@@ -253,7 +253,7 @@ export default function DynamicMenuPage() {
     if (!confirm('Are you sure you want to delete this menu item?')) return;
 
     try {
-      await api.delete(`/restaurant/admin/items/${id}`);
+      await api.delete(`/${slug}/admin/items/${id}`);
       toast.success('Menu item deleted');
       fetchData();
     } catch (error) {
@@ -263,7 +263,7 @@ export default function DynamicMenuPage() {
 
   const toggleAvailability = async (item: MenuItem) => {
     try {
-      await api.put(`/restaurant/admin/items/${item.id}`, {
+      await api.put(`/${slug}/admin/items/${item.id}`, {
         is_available: !item.is_available,
       });
       fetchData();

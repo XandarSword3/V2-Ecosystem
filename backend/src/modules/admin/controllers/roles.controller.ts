@@ -72,6 +72,13 @@ export const createRole = asyncHandler(async (req: Request, res: Response) => {
 
     if (error) throw error;
 
+    try {
+      const { permissionCache } = await import('../../../security/permission-cache.service.js');
+      await permissionCache.refreshCache();
+    } catch (cacheError) {
+      console.warn('Failed to refresh permission cache:', cacheError);
+    }
+
     await logActivity({
       user_id: req.user!.userId,
       action: 'CREATE_ROLE',
@@ -103,6 +110,13 @@ export const updateRole = asyncHandler(async (req: Request, res: Response) => {
 
     if (error) throw error;
 
+    try {
+      const { permissionCache } = await import('../../../security/permission-cache.service.js');
+      await permissionCache.refreshCache();
+    } catch (cacheError) {
+      console.warn('Failed to refresh permission cache:', cacheError);
+    }
+
     await logActivity({
       user_id: req.user!.userId,
       action: 'UPDATE_ROLE',
@@ -131,6 +145,20 @@ export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
+    // Get role name to clean up app_role_permissions
+    const { data: roleData } = await supabase
+      .from('roles')
+      .select('name')
+      .eq('id', id)
+      .single();
+
+    if (roleData?.name) {
+      await supabase
+        .from('app_role_permissions')
+        .delete()
+        .eq('role_name', roleData.name);
+    }
+
     // Delete role permissions first
     await supabase
       .from('role_permissions')
@@ -144,6 +172,13 @@ export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
       .eq('id', id);
 
     if (error) throw error;
+
+    try {
+      const { permissionCache } = await import('../../../security/permission-cache.service.js');
+      await permissionCache.refreshCache();
+    } catch (cacheError) {
+      console.warn('Failed to refresh permission cache:', cacheError);
+    }
 
     await logActivity({
       user_id: req.user!.userId,

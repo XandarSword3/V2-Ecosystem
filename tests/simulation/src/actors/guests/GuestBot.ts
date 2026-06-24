@@ -89,7 +89,7 @@ export class GuestBot extends Actor {
       execute: async () => this.performCheckIn(),
     });
 
-    // Go to restaurant
+    // Go to menu service
     this.registerAction({
       name: 'go_to_restaurant',
       weight: 5,
@@ -105,9 +105,9 @@ export class GuestBot extends Actor {
       name: 'place_order',
       weight: 8,
       preconditions: () => 
-        this.guestState.currentLocation === 'restaurant' ||
+        this.guestState.currentLocation === 'menu_service' ||
         this.guestState.currentLocation === 'pool_bar' ||
-        this.guestState.currentLocation === 'snack_bar',
+        this.guestState.currentLocation === 'kiosk',
       execute: async () => this.placeOrder(),
     });
 
@@ -129,7 +129,7 @@ export class GuestBot extends Actor {
       cooldown: 2 * 60 * 60 * 1000,
       preconditions: () => 
         this.guestState.isCheckedIn &&
-        this.guestState.currentLocation !== 'pool',
+        this.guestState.currentLocation !== 'capacity',
       execute: async () => this.goToPool(),
     });
 
@@ -270,7 +270,7 @@ export class GuestBot extends Actor {
       weight: 2,
       cooldown: 30 * 60 * 1000,
       preconditions: () => 
-        this.guestState.currentLocation === 'restaurant' &&
+        this.guestState.currentLocation === 'menu_service' &&
         this.guestState.hungerLevel > 70,
       execute: async () => this.joinWaitlist(),
     });
@@ -305,7 +305,7 @@ export class GuestBot extends Actor {
       cooldown: 24 * 60 * 60 * 1000,
       preconditions: () => 
         this.guestState.isCheckedIn &&
-        this.profile.preferredActivities.includes('pool'),
+        this.profile.preferredActivities.includes('capacity'),
       execute: async () => this.buyPoolTicket(),
     });
 
@@ -323,7 +323,7 @@ export class GuestBot extends Actor {
       weight: 3,
       preconditions: () => 
         this.getState('hasPoolBracelet') &&
-        this.guestState.currentLocation !== 'pool',
+        this.guestState.currentLocation !== 'capacity',
       execute: async () => this.returnPoolBracelet(),
     });
 
@@ -520,7 +520,7 @@ export class GuestBot extends Actor {
     });
 
     // =============================================
-    // SNACK BAR ACTIONS
+    // kiosk ACTIONS
     // =============================================
 
     this.registerAction({
@@ -536,7 +536,7 @@ export class GuestBot extends Actor {
       weight: 3,
       cooldown: 60 * 60 * 1000,
       preconditions: () => 
-        (this.guestState.currentLocation === 'pool' ||
+        (this.guestState.currentLocation === 'capacity' ||
          this.guestState.currentLocation === 'beach') &&
         this.guestState.hungerLevel > 40,
       execute: async () => this.orderFromSnackBar(),
@@ -671,12 +671,12 @@ export class GuestBot extends Actor {
   }
 
   protected async goToRestaurant(): Promise<ActionResult> {
-    this.guestState.currentLocation = 'restaurant';
+    this.guestState.currentLocation = 'menu_service';
     
     return {
       success: true,
       action: 'go_to_restaurant',
-      data: { location: 'restaurant' },
+      data: { location: 'menu_service' },
     };
   }
 
@@ -690,7 +690,7 @@ export class GuestBot extends Actor {
       {
         items: orderItems,
         roomNumber: this.guestState.roomNumber,
-        tableNumber: this.guestState.currentLocation === 'restaurant' ? 'T1' : undefined,
+        tableNumber: this.guestState.currentLocation === 'menu_service' ? 'T1' : undefined,
         notes: this.profile.dietaryRestrictions?.join(', '),
       }
     );
@@ -771,13 +771,13 @@ export class GuestBot extends Actor {
   }
 
   protected async goToPool(): Promise<ActionResult> {
-    this.guestState.currentLocation = 'pool';
+    this.guestState.currentLocation = 'capacity';
     this.guestState.tirednessLevel += 10;
 
     return {
       success: true,
       action: 'go_to_pool',
-      data: { location: 'pool' },
+      data: { location: 'capacity' },
     };
   }
 
@@ -836,7 +836,7 @@ export class GuestBot extends Actor {
     const reasons = [
       { category: 'cleanliness', description: 'Room not properly cleaned', severity: 'medium' },
       { category: 'noise', description: 'Noise from adjacent room', severity: 'low' },
-      { category: 'service', description: 'Slow service at restaurant', severity: 'low' },
+      { category: 'service', description: 'Slow service at menu service', severity: 'low' },
       { category: 'amenities', description: 'Pool towels not available', severity: 'low' },
       { category: 'billing', description: 'Incorrect charge on folio', severity: 'medium' },
     ];
@@ -1083,7 +1083,7 @@ export class GuestBot extends Actor {
 
     const result = await this.apiCall<{ reservationId: string; confirmationCode: string }>(
       'POST',
-      '/api/v1/restaurant/reservations',
+      '/api/v1/${slug}/reservations',
       {
         guestId: this.id,
         partySize: this.partySize,
@@ -1096,7 +1096,7 @@ export class GuestBot extends Actor {
       this.setState('hasRestaurantReservation', true);
       this.setState('restaurantReservationId', result.data.reservationId);
 
-      this.emitEvent(EventTypes.RESTAURANT_RESERVATION_MADE, 'restaurant', {
+      this.emitEvent(EventTypes.MENU_RESERVATION_MADE, 'menu_service', {
         guestId: this.id,
         reservationId: result.data.reservationId,
         partySize: this.partySize,
@@ -1107,7 +1107,7 @@ export class GuestBot extends Actor {
         success: true,
         action: 'make_restaurant_reservation',
         data: result.data,
-        cascades: [EventTypes.RESTAURANT_RESERVATION_MADE],
+        cascades: [EventTypes.MENU_RESERVATION_MADE],
       };
     }
 
@@ -1123,14 +1123,14 @@ export class GuestBot extends Actor {
 
     const result = await this.apiCall<{ cancelled: boolean }>(
       'DELETE',
-      `/api/v1/restaurant/reservations/${reservationId}`
+      `/api/v1/${slug}/reservations/${reservationId}`
     );
 
     if (result.success) {
       this.setState('hasRestaurantReservation', false);
       this.setState('restaurantReservationId', null);
 
-      this.emitEvent(EventTypes.RESTAURANT_RESERVATION_CANCELLED, 'restaurant', {
+      this.emitEvent(EventTypes.RESTAURANT_RESERVATION_CANCELLED, 'menu_service', {
         guestId: this.id,
         reservationId,
       });
@@ -1153,7 +1153,7 @@ export class GuestBot extends Actor {
   protected async joinWaitlist(): Promise<ActionResult> {
     const result = await this.apiCall<{ waitlistId: string; position: number; estimatedWait: number }>(
       'POST',
-      '/api/v1/restaurant/waitlist',
+      '/api/v1/${slug}/waitlist',
       {
         guestId: this.id,
         partySize: this.partySize,
@@ -1165,7 +1165,7 @@ export class GuestBot extends Actor {
       this.setState('onWaitlist', true);
       this.setState('waitlistPosition', result.data.position);
 
-      this.emitEvent(EventTypes.WAITLIST_JOINED, 'restaurant', {
+      this.emitEvent(EventTypes.WAITLIST_JOINED, 'menu_service', {
         guestId: this.id,
         waitlistId: result.data.waitlistId,
         position: result.data.position,
@@ -1280,9 +1280,9 @@ export class GuestBot extends Actor {
 
     if (result.success && result.data) {
       this.setState('hasPoolTicket', true);
-      this.setState('poolTicketId', result.data.ticketId);
+      this.setState('capacityTicketId', result.data.ticketId);
 
-      this.emitEvent(EventTypes.POOL_TICKET_PURCHASED, 'pool', {
+      this.emitEvent(EventTypes.POOL_TICKET_PURCHASED, 'capacity', {
         guestId: this.id,
         ticketId: result.data.ticketId,
         ticketType,
@@ -1304,7 +1304,7 @@ export class GuestBot extends Actor {
   }
 
   protected async getPoolBracelet(): Promise<ActionResult> {
-    const ticketId = this.getState('poolTicketId');
+    const ticketId = this.getState('capacityTicketId');
 
     const result = await this.apiCall<{ braceletId: string; lockerNumber: number }>(
       'POST',
@@ -1320,7 +1320,7 @@ export class GuestBot extends Actor {
       this.setState('braceletId', result.data.braceletId);
       this.setState('lockerNumber', result.data.lockerNumber);
 
-      this.emitEvent(EventTypes.POOL_BRACELET_ISSUED, 'pool', {
+      this.emitEvent(EventTypes.CAPACITY_ACCESS_ISSUED, 'capacity', {
         guestId: this.id,
         braceletId: result.data.braceletId,
         lockerNumber: result.data.lockerNumber,
@@ -1330,7 +1330,7 @@ export class GuestBot extends Actor {
         success: true,
         action: 'get_pool_bracelet',
         data: result.data,
-        cascades: [EventTypes.POOL_BRACELET_ISSUED],
+        cascades: [EventTypes.CAPACITY_ACCESS_ISSUED],
       };
     }
 
@@ -1353,7 +1353,7 @@ export class GuestBot extends Actor {
       this.setState('hasPoolBracelet', false);
       this.setState('braceletId', null);
 
-      this.emitEvent(EventTypes.POOL_BRACELET_RETURNED, 'pool', {
+      this.emitEvent(EventTypes.POOL_BRACELET_RETURNED, 'capacity', {
         guestId: this.id,
         braceletId,
       });
@@ -1887,31 +1887,31 @@ export class GuestBot extends Actor {
   // =============================================
 
   protected async browseChalets(): Promise<ActionResult> {
-    const result = await this.apiCall<{ chalets: Array<{ id: string; name: string; type: string; capacity: number; pricePerDay: number }> }>(
+    const result = await this.apiCall<{ accommodation_units: Array<{ id: string; name: string; type: string; capacity: number; pricePerDay: number }> }>(
       'GET',
       '/api/v1/units?available=true'
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.CHALET_BROWSED, 'chalet', {
+      this.emitEvent(EventTypes.CHALET_BROWSED, 'accommodation unit', {
         guestId: this.id,
-        chaletCount: result.data.chalets.length,
+        chaletCount: result.data.accommodation_units.length,
       });
 
-      // Store available chalets for potential booking
-      this.setState('availableChalets', result.data.chalets);
+      // Store available accommodation_units for potential booking
+      this.setState('availableChalets', result.data.accommodation_units);
 
       return {
         success: true,
         action: 'browse_chalets',
-        data: { chaletCount: result.data.chalets.length },
+        data: { chaletCount: result.data.accommodation_units.length },
       };
     }
 
     return {
       success: false,
       action: 'browse_chalets',
-      error: result.error || 'Failed to browse chalets',
+      error: result.error || 'Failed to browse accommodation_units',
     };
   }
 
@@ -1921,7 +1921,7 @@ export class GuestBot extends Actor {
     const checkOut = new Date(checkIn);
     checkOut.setDate(checkOut.getDate() + Math.floor(Math.random() * 3) + 1);
 
-    const result = await this.apiCall<{ available: boolean; chalets: Array<{ id: string; pricePerDay: number }> }>(
+    const result = await this.apiCall<{ available: boolean; accommodation_units: Array<{ id: string; pricePerDay: number }> }>(
       'GET',
       `/api/v1/units/availability?checkIn=${checkIn.toISOString()}&checkOut=${checkOut.toISOString()}`
     );
@@ -1932,7 +1932,7 @@ export class GuestBot extends Actor {
         action: 'check_chalet_availability',
         data: {
           available: result.data.available,
-          chaletCount: result.data.chalets?.length || 0,
+          chaletCount: result.data.accommodation_units?.length || 0,
         },
       };
     }
@@ -1951,11 +1951,11 @@ export class GuestBot extends Actor {
       return {
         success: false,
         action: 'book_chalet',
-        error: 'No chalets available to book',
+        error: 'No accommodation_units available to book',
       };
     }
 
-    const chalet = availableChalets[Math.floor(Math.random() * availableChalets.length)];
+    const accommodation unit = availableChalets[Math.floor(Math.random() * availableChalets.length)];
     const checkIn = new Date();
     checkIn.setDate(checkIn.getDate() + 1);
     const checkOut = new Date(checkIn);
@@ -1965,7 +1965,7 @@ export class GuestBot extends Actor {
       'POST',
       '/api/v1/units/bookings',
       {
-        chaletId: chalet.id,
+        unitId: accommodation unit.id,
         guestId: this.id,
         checkInDate: checkIn.toISOString(),
         checkOutDate: checkOut.toISOString(),
@@ -1976,12 +1976,12 @@ export class GuestBot extends Actor {
 
     if (result.success && result.data) {
       this.setState('hasChaletBooking', true);
-      this.setState('chaletBookingId', result.data.bookingId);
+      this.setState('unitBookingId', result.data.bookingId);
 
-      this.emitEvent(EventTypes.CHALET_BOOKED, 'chalet', {
+      this.emitEvent(EventTypes.ACCOMMODATION_UNIT_BOOKED, 'accommodation unit', {
         guestId: this.id,
         bookingId: result.data.bookingId,
-        chaletId: chalet.id,
+        unitId: accommodation unit.id,
         totalAmount: result.data.totalAmount,
       });
 
@@ -1989,25 +1989,25 @@ export class GuestBot extends Actor {
         success: true,
         action: 'book_chalet',
         data: result.data,
-        cascades: [EventTypes.CHALET_BOOKED],
+        cascades: [EventTypes.ACCOMMODATION_UNIT_BOOKED],
       };
     }
 
     return {
       success: false,
       action: 'book_chalet',
-      error: result.error || 'Failed to book chalet',
+      error: result.error || 'Failed to book accommodation unit',
     };
   }
 
   protected async cancelChaletBooking(): Promise<ActionResult> {
-    const bookingId = this.getState('chaletBookingId');
+    const bookingId = this.getState('unitBookingId');
 
     if (!bookingId) {
       return {
         success: false,
         action: 'cancel_chalet_booking',
-        error: 'No chalet booking to cancel',
+        error: 'No accommodation unit booking to cancel',
       };
     }
 
@@ -2018,9 +2018,9 @@ export class GuestBot extends Actor {
 
     if (result.success && result.data) {
       this.setState('hasChaletBooking', false);
-      this.setState('chaletBookingId', null);
+      this.setState('unitBookingId', null);
 
-      this.emitEvent(EventTypes.CHALET_BOOKING_CANCELLED, 'chalet', {
+      this.emitEvent(EventTypes.CHALET_BOOKING_CANCELLED, 'accommodation unit', {
         guestId: this.id,
         bookingId: bookingId,
         refundAmount: result.data.refundAmount,
@@ -2065,17 +2065,17 @@ export class GuestBot extends Actor {
   }
 
   // =============================================
-  // SNACK BAR IMPLEMENTATIONS
+  // kiosk IMPLEMENTATIONS
   // =============================================
 
   protected async browseSnackMenu(): Promise<ActionResult> {
     const result = await this.apiCall<{ categories: Array<{ id: string; name: string; items: Array<{ id: string; name: string; price: number }> }> }>(
       'GET',
-      '/api/v1/snack/categories'
+      '/api/v1/kiosk item/categories'
     );
 
     if (result.success && result.data) {
-      this.emitEvent(EventTypes.SNACK_MENU_BROWSED, 'snack', {
+      this.emitEvent(EventTypes.SNACK_MENU_BROWSED, 'kiosk item', {
         guestId: this.id,
         categoryCount: result.data.categories.length,
       });
@@ -2092,7 +2092,7 @@ export class GuestBot extends Actor {
     return {
       success: false,
       action: 'browse_snack_menu',
-      error: result.error || 'Failed to browse snack menu',
+      error: result.error || 'Failed to browse kiosk item menu',
     };
   }
 
@@ -2103,14 +2103,14 @@ export class GuestBot extends Actor {
     if (!snackMenu || snackMenu.length === 0) {
       const itemsResult = await this.apiCall<{ items: Array<{ id: string; name: string; price: number }> }>(
         'GET',
-        '/api/v1/snack/items?available=true'
+        '/api/v1/kiosk item/items?available=true'
       );
 
       if (!itemsResult.success || !itemsResult.data?.items.length) {
         return {
           success: false,
           action: 'order_from_snack_bar',
-          error: 'No snack items available',
+          error: 'No kiosk item items available',
         };
       }
 
@@ -2129,20 +2129,20 @@ export class GuestBot extends Actor {
 
       const result = await this.apiCall<{ orderId: string; totalAmount: number; estimatedWaitMinutes: number }>(
         'POST',
-        '/api/v1/snack/orders',
+        '/api/v1/kiosk item/orders',
         {
           guestId: this.id,
           items: orderItems,
-          deliveryLocation: this.guestState.currentLocation || 'pool',
+          deliveryLocation: this.guestState.currentLocation || 'capacity',
           notes: null,
         }
       );
 
       if (result.success && result.data) {
         this.setState('hasSnackOrder', true);
-        this.setState('snackOrderId', result.data.orderId);
+        this.setState('kioskOrderId', result.data.orderId);
 
-        this.emitEvent(EventTypes.SNACK_ORDER_PLACED, 'snack', {
+        this.emitEvent(EventTypes.KIOSK_ORDER_PLACED, 'kiosk item', {
           guestId: this.id,
           orderId: result.data.orderId,
           totalAmount: result.data.totalAmount,
@@ -2156,14 +2156,14 @@ export class GuestBot extends Actor {
           success: true,
           action: 'order_from_snack_bar',
           data: result.data,
-          cascades: [EventTypes.SNACK_ORDER_PLACED],
+          cascades: [EventTypes.KIOSK_ORDER_PLACED],
         };
       }
 
       return {
         success: false,
         action: 'order_from_snack_bar',
-        error: result.error || 'Failed to place snack order',
+        error: result.error || 'Failed to place kiosk item order',
       };
     }
 
@@ -2182,20 +2182,20 @@ export class GuestBot extends Actor {
 
     const result = await this.apiCall<{ orderId: string; totalAmount: number; estimatedWaitMinutes: number }>(
       'POST',
-      '/api/v1/snack/orders',
+      '/api/v1/kiosk item/orders',
       {
         guestId: this.id,
         items: orderItems,
-        deliveryLocation: this.guestState.currentLocation || 'pool',
+        deliveryLocation: this.guestState.currentLocation || 'capacity',
         notes: null,
       }
     );
 
     if (result.success && result.data) {
       this.setState('hasSnackOrder', true);
-      this.setState('snackOrderId', result.data.orderId);
+      this.setState('kioskOrderId', result.data.orderId);
 
-      this.emitEvent(EventTypes.SNACK_ORDER_PLACED, 'snack', {
+      this.emitEvent(EventTypes.KIOSK_ORDER_PLACED, 'kiosk item', {
         guestId: this.id,
         orderId: result.data.orderId,
         totalAmount: result.data.totalAmount,
@@ -2208,41 +2208,41 @@ export class GuestBot extends Actor {
         success: true,
         action: 'order_from_snack_bar',
         data: result.data,
-        cascades: [EventTypes.SNACK_ORDER_PLACED],
+        cascades: [EventTypes.KIOSK_ORDER_PLACED],
       };
     }
 
     return {
       success: false,
       action: 'order_from_snack_bar',
-      error: result.error || 'Failed to place snack order',
+      error: result.error || 'Failed to place kiosk item order',
     };
   }
 
   protected async checkSnackOrderStatus(): Promise<ActionResult> {
-    const orderId = this.getState('snackOrderId');
+    const orderId = this.getState('kioskOrderId');
 
     if (!orderId) {
       return {
         success: false,
         action: 'check_snack_order_status',
-        error: 'No active snack order',
+        error: 'No active kiosk item order',
       };
     }
 
     const result = await this.apiCall<{ status: string; estimatedReadyTime?: string }>(
       'GET',
-      `/api/v1/snack/orders/${orderId}/status`
+      `/api/v1/kiosk item/orders/${orderId}/status`
     );
 
     if (result.success && result.data) {
       // If delivered, clear the order state
       if (result.data.status === 'delivered' || result.data.status === 'completed') {
         this.setState('hasSnackOrder', false);
-        this.setState('snackOrderId', null);
+        this.setState('kioskOrderId', null);
         this.guestState.hungerLevel = Math.max(0, this.guestState.hungerLevel - 40);
 
-        this.emitEvent(EventTypes.SNACK_ORDER_DELIVERED, 'snack', {
+        this.emitEvent(EventTypes.KIOSK_ORDER_DELIVERED, 'kiosk item', {
           guestId: this.id,
           orderId: orderId,
         });
@@ -2251,7 +2251,7 @@ export class GuestBot extends Actor {
           success: true,
           action: 'check_snack_order_status',
           data: result.data,
-          cascades: [EventTypes.SNACK_ORDER_DELIVERED],
+          cascades: [EventTypes.KIOSK_ORDER_DELIVERED],
         };
       }
 

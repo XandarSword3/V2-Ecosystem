@@ -65,7 +65,7 @@ export function clearModuleCache(slug?: string): void {
 /**
  * Middleware factory that creates a guard for a specific module.
  * SECURITY: Fails CLOSED on any error — DB errors do not grant access.
- * @param moduleSlug - The slug of the module to check (e.g., 'restaurant', 'pool', 'chalets')
+ * @param moduleSlug - The slug of the module to check (e.g., 'bar', 'spa', 'accommodation')
  */
 export function requireModule(moduleSlug: string) {
   return async (req: Request, res: Response, next: NextFunction) => {

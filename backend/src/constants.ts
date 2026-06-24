@@ -151,7 +151,7 @@ export const MONITORING = {
 // ============================================
 
 export const BUSINESS = {
-  /** Maximum guests per chalet booking */
+  /** Maximum guests per booking */
   MAX_GUESTS_PER_BOOKING: 10,
   /** Maximum items per order */
   MAX_ITEMS_PER_ORDER: 50,

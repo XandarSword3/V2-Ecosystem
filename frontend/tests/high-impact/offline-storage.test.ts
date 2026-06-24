@@ -12,7 +12,7 @@ describe('offline storage', () => {
     const mod = await loadModule();
 
     const db1 = await mod.initDatabase();
-    expect(db1.objectStoreNames.contains('menu_items')).toBe(true);
+    expect(db1.objectStoreNames.contains('catalog_items')).toBe(true);
     expect(db1.objectStoreNames.contains('sync_queue')).toBe(true);
     expect(db1.objectStoreNames.contains('cache_metadata')).toBe(true);
 
@@ -24,27 +24,27 @@ describe('offline storage', () => {
   it('supports offline store CRUD, indexes, and counts', async () => {
     const mod = await loadModule();
     await mod.getDatabase();
-    await mod.menuItemsStore.clear();
+    await mod.catalogItemsStore.clear();
 
-    await mod.menuItemsStore.putMany([
+    await mod.catalogItemsStore.putMany([
       { id: 'item-1', name: 'Espresso', category_id: 'c-1', is_available: true, updated_at: 'now' },
       { id: 'item-2', name: 'Tea', category_id: 'c-1', is_available: false, updated_at: 'now' },
       { id: 'item-3', name: 'Cake', category_id: 'c-2', is_available: true, updated_at: 'now' },
     ]);
 
-    const byId = await mod.menuItemsStore.getById('item-1');
+    const byId = await mod.catalogItemsStore.getById('item-1');
     expect(byId?.id).toBe('item-1');
 
-    const byCategory = await mod.menuItemsStore.getByIndex('category_id', 'c-1');
+    const byCategory = await mod.catalogItemsStore.getByIndex('category_id', 'c-1');
     expect(byCategory).toHaveLength(2);
 
-    expect(await mod.menuItemsStore.count()).toBe(3);
+    expect(await mod.catalogItemsStore.count()).toBe(3);
 
-    await mod.menuItemsStore.delete('item-2');
-    expect(await mod.menuItemsStore.count()).toBe(2);
+    await mod.catalogItemsStore.delete('item-2');
+    expect(await mod.catalogItemsStore.count()).toBe(2);
 
-    await mod.menuItemsStore.clear();
-    expect(await mod.menuItemsStore.count()).toBe(0);
+    await mod.catalogItemsStore.clear();
+    expect(await mod.catalogItemsStore.count()).toBe(0);
   });
 
   it('manages sync queue lifecycle and aggregates stats', async () => {
@@ -90,19 +90,19 @@ describe('offline storage', () => {
   it('updates cache metadata and stale checks', async () => {
     const mod = await loadModule();
     await mod.getDatabase();
-    await mod.menuItemsStore.clear();
+    await mod.catalogItemsStore.clear();
 
-    await mod.cacheManager.updateMetadata('menu_items', 12);
-    const metadata = await mod.cacheManager.getMetadata('menu_items');
+    await mod.cacheManager.updateMetadata('catalog_items', 12);
+    const metadata = await mod.cacheManager.getMetadata('catalog_items');
     expect(metadata?.recordCount).toBe(12);
 
     const all = await mod.cacheManager.getAllMetadata();
     expect(all.length).toBeGreaterThanOrEqual(1);
 
-    const fresh = await mod.cacheManager.isStale('menu_items', 60);
+    const fresh = await mod.cacheManager.isStale('catalog_items', 60);
     expect(fresh).toBe(false);
 
-    const stale = await mod.cacheManager.isStale('menu_items', -1);
+    const stale = await mod.cacheManager.isStale('catalog_items', -1);
     expect(stale).toBe(true);
 
     const missing = await mod.cacheManager.isStale('missing_store', 60);

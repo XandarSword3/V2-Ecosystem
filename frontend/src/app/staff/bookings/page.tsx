@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useSiteSettings } from '@/lib/settings-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
@@ -36,7 +37,7 @@ interface Booking {
   total_amount: number;
   guests: number;
   notes?: string;
-  chalets?: {
+  unit?: {
     id: string;
     name: string;
     capacity: number;
@@ -58,11 +59,14 @@ const statusConfigBase: Record<string, { color: string; icon: React.ElementType 
 };
 
 export default function StaffBookingsPage() {
-  const t = useTranslations('staff');
   const tc = useTranslations('adminCommon');
   const tb = useTranslations('staff.bookings');
   const tst = useTranslations('staff.statuses');
-  const tch = useTranslations('staff.chalets');
+
+  const { modules } = useSiteSettings();
+  // resolve the active reservation module slug dynamically; fall back to empty string
+  const bookingModule = modules.find((m) => m.template_type === 'time_exclusive_reservation');
+  const moduleSlug = bookingModule?.slug ?? '';
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
     pending: { ...statusConfigBase.pending, label: tst('pending') },
@@ -78,30 +82,31 @@ export default function StaffBookingsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
 
-  const fetchBookings = useCallback(async (signal?: AbortSignal) => { // FIX Iter-23: AbortController support
+  const fetchBookings = useCallback(async (signal?: AbortSignal) => {
+    if (!moduleSlug) return;
     try {
       setLoading(true);
-      const response = await api.get('/chalets/staff/bookings', { signal }); // FIX Iter-23: pass signal
-      if (!signal?.aborted) setBookings(response.data.data || []); // FIX Iter-23: guard setState
+      const response = await api.get(`/${moduleSlug}/staff/bookings`, { signal });
+      if (!signal?.aborted) setBookings(response.data.data || []);
     } catch (error: any) {
-      if (error?.name === 'CanceledError') return; // FIX Iter-23: ignore abort
+      if (error?.name === 'CanceledError') return;
       console.error('Failed to fetch bookings:', error);
       toast.error(tc('errors.failedToLoad'));
       setBookings([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [moduleSlug]);
 
   useEffect(() => {
-    const controller = new AbortController(); // FIX Iter-23: cleanup on unmount
+    const controller = new AbortController();
     fetchBookings(controller.signal);
     return () => controller.abort();
   }, [fetchBookings]);
 
   const handleCheckIn = async (bookingId: string) => {
     try {
-      await api.patch(`/chalets/staff/bookings/${bookingId}/check-in`);
+      await api.patch(`/${moduleSlug}/staff/bookings/${bookingId}/check-in`);
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'checked_in' as const } : b)));
       toast.success(tc('success.updated'));
     } catch (error) {
@@ -111,7 +116,7 @@ export default function StaffBookingsPage() {
 
   const handleCheckOut = async (bookingId: string) => {
     try {
-      await api.patch(`/chalets/staff/bookings/${bookingId}/check-out`);
+      await api.patch(`/${moduleSlug}/staff/bookings/${bookingId}/check-out`);
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'checked_out' as const } : b)));
       toast.success(tc('success.updated'));
     } catch (error) {
@@ -272,12 +277,12 @@ export default function StaffBookingsPage() {
                           </span>
                           {isCheckInDate && booking.status === 'confirmed' && (
                             <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                              {tch('checkInToday')}
+                              Check-in today
                             </span>
                           )}
                           {isCheckOutDate && booking.status === 'checked_in' && (
                             <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
-                              {tch('checkOutToday')}
+                              Check-out today
                             </span>
                           )}
                         </div>
@@ -285,7 +290,7 @@ export default function StaffBookingsPage() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                             <Home className="w-4 h-4" />
-                            <span>{booking.chalets?.name || tch('unknownChalet')}</span>
+                            <span>{booking.unit?.name || 'Unknown unit'}</span>
                           </div>
                           <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                             <Users className="w-4 h-4" />
@@ -321,13 +326,13 @@ export default function StaffBookingsPage() {
                         {booking.status === 'confirmed' && (
                           <Button size="sm" onClick={() => handleCheckIn(booking.id)}>
                             <LogIn className="w-4 h-4 mr-1" />
-                            {tch('checkIn')}
+                            Check in
                           </Button>
                         )}
                         {booking.status === 'checked_in' && (
                           <Button size="sm" variant="outline" onClick={() => handleCheckOut(booking.id)}>
                             <LogOut className="w-4 h-4 mr-1" />
-                            {tch('checkOut')}
+                            Check out
                           </Button>
                         )}
                       </div>

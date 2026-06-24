@@ -16,7 +16,6 @@ export * from './reviews.js';
 export * from './modules.js';
 export * from './marketing.js';
 export * from './gdpr.js';
-export * from './kiosk.js';
 export * from './multi-property.js';
 export * from './settings.js';
 export * from './staff.js';

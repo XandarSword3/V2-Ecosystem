@@ -3,13 +3,27 @@ import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
 
-// Validation schemas
-// Helper to parse date or datetime strings - accepts YYYY-MM-DD or ISO datetime
+/**
+ * Coupon Controller
+ *
+ * Issue 17 changes:
+ * - Added property_id scoping to all admin queries and inserts.
+ * - appliesTo and orderType are now free-form strings. Any module slug works
+ *   without code changes — 'all' is the wildcard value.
+ * - validateCoupon / applyCoupon: orderType is now z.string() — the RPC
+ *   apply_coupon_atomic compares against the stored applies_to string, so it
+ *   accepts any slug as long as the coupon's applies_to matches or is 'all'.
+ */
+
+function getPropertyId(req: Request): string | undefined {
+  return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || undefined;
+}
+
+// ─── Validation schemas ───────────────────────────────────────────────────────
+
 const dateOrDatetimeSchema = z.string().transform((val) => {
   if (!val) return undefined;
-  // If it's already a valid ISO datetime, return as-is
   if (val.includes('T')) return val;
-  // If it's just a date (YYYY-MM-DD), append time
   return `${val}T00:00:00.000Z`;
 }).optional();
 
@@ -21,7 +35,8 @@ const createCouponSchema = z.object({
   discountValue: z.number().positive(),
   minOrderAmount: z.number().min(0).default(0),
   maxDiscountAmount: z.number().positive().optional(),
-  appliesTo: z.enum(['all', 'restaurant', 'chalets', 'pool', 'snack', 'snack_bar']).default('all'),
+  // Now accepts any module slug so new modules don't require code changes.
+  appliesTo: z.string().max(100).default('all'),
   usageLimit: z.number().int().positive().optional(),
   perUserLimit: z.number().int().positive().default(1),
   validFrom: dateOrDatetimeSchema,
@@ -36,7 +51,8 @@ const updateCouponSchema = createCouponSchema.partial().extend({
 
 const validateCouponSchema = z.object({
   code: z.string().min(3).max(50),
-  orderType: z.enum(['restaurant', 'chalets', 'pool', 'snack']),
+  // Now accepts any module slug.
+  orderType: z.string().max(100),
   orderAmount: z.number().positive(),
   itemCount: z.number().int().positive().default(1),
   userId: z.string().uuid().optional(),
@@ -46,6 +62,8 @@ const applyCouponSchema = validateCouponSchema.extend({
   orderId: z.string().uuid(),
 });
 
+// ─── Controller ───────────────────────────────────────────────────────────────
+
 export class CouponController {
   /**
    * Validate a coupon code (before checkout)
@@ -54,88 +72,47 @@ export class CouponController {
     try {
       const validation = validateCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({
-          success: false,
-          error: 'Validation failed',
-          details: validation.error.errors,
-        });
+        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
       }
 
       const { code, orderType, orderAmount, itemCount, userId } = validation.data;
       const normalizedCode = code.toUpperCase().trim();
+      const propertyId = getPropertyId(req);
 
-      // Get coupon
       const supabase = getSupabase();
-      const { data: c, error: couponError } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', normalizedCode)
-        .eq('is_active', true)
-        .single();
+      let query = supabase.from('coupons').select('*').eq('code', normalizedCode).eq('is_active', true);
+      if (propertyId) query = query.eq('property_id', propertyId);
+
+      const { data: c, error: couponError } = await query.single();
 
       if (couponError || !c) {
-        return res.status(404).json({
-          success: false,
-          error: 'Invalid coupon code',
-          valid: false,
-        });
+        return res.status(404).json({ success: false, error: 'Invalid coupon code', valid: false });
       }
 
-      // Check validity period
       const now = new Date();
       if (c.valid_from && new Date(c.valid_from) > now) {
-        return res.json({
-          success: false,
-          error: 'Coupon is not yet active',
-          valid: false,
-        });
+        return res.json({ success: false, error: 'Coupon is not yet active', valid: false });
       }
       if (c.valid_until && new Date(c.valid_until) < now) {
-        return res.json({
-          success: false,
-          error: 'Coupon has expired',
-          valid: false,
-        });
+        return res.json({ success: false, error: 'Coupon has expired', valid: false });
       }
 
-      // Check applies to
       if (c.applies_to !== 'all' && c.applies_to !== orderType) {
-        return res.json({
-          success: false,
-          error: `This coupon only applies to ${c.applies_to} orders`,
-          valid: false,
-        });
+        return res.json({ success: false, error: `This coupon only applies to ${c.applies_to} orders`, valid: false });
       }
 
-      // Check minimum order amount
       if (orderAmount < c.min_order_amount) {
-        return res.json({
-          success: false,
-          error: `Minimum order amount is $${c.min_order_amount}`,
-          valid: false,
-        });
+        return res.json({ success: false, error: `Minimum order amount is $${c.min_order_amount}`, valid: false });
       }
 
-      // Check minimum items
-      // FIX: Iteration 10 - Column is 'min_items' not 'requires_min_items' (schema drift)
       if (itemCount < c.min_items) {
-        return res.json({
-          success: false,
-          error: `Minimum ${c.min_items} items required`,
-          valid: false,
-        });
+        return res.json({ success: false, error: `Minimum ${c.min_items} items required`, valid: false });
       }
 
-      // Check usage limit
       if (c.usage_limit && c.usage_count >= c.usage_limit) {
-        return res.json({
-          success: false,
-          error: 'Coupon usage limit reached',
-          valid: false,
-        });
+        return res.json({ success: false, error: 'Coupon usage limit reached', valid: false });
       }
 
-      // Check per-user limit
       if (userId && c.per_user_limit) {
         const { count: userUsageCount, error: usageError } = await supabase
           .from('coupon_usage')
@@ -144,39 +121,26 @@ export class CouponController {
           .eq('user_id', userId);
 
         if (!usageError && userUsageCount !== null && userUsageCount >= c.per_user_limit) {
-          return res.json({
-            success: false,
-            error: 'You have already used this coupon',
-            valid: false,
-          });
+          return res.json({ success: false, error: 'You have already used this coupon', valid: false });
         }
       }
 
-      // Check first order only
       if (c.first_order_only && userId) {
-        // Check all transactions for this user
-        const { count: totalOrders } = await supabase
-          .from('transactions')
-          .select('*', { count: 'exact', head: true })
-          .eq('customer_id', userId);
-
+        let txQuery = supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('customer_id', userId);
+        if (propertyId) txQuery = txQuery.eq('property_id', propertyId);
+        const { count: totalOrders } = await txQuery;
         if (totalOrders && totalOrders > 0) {
-          return res.json({
-            success: false,
-            error: 'This coupon is only valid for first orders',
-            valid: false,
-          });
+          return res.json({ success: false, error: 'This coupon is only valid for first orders', valid: false });
         }
       }
 
-      // Calculate discount
       let discountAmount = 0;
       if (c.discount_type === 'percentage') {
         discountAmount = orderAmount * (c.discount_value / 100);
         if (c.max_discount_amount && discountAmount > c.max_discount_amount) {
           discountAmount = c.max_discount_amount;
         }
-      } else if (c.discount_type === 'fixed') {
+      } else if (c.discount_type === 'fixed' || c.discount_type === 'fixed_amount') {
         discountAmount = Math.min(c.discount_value, orderAmount);
       }
 
@@ -195,115 +159,73 @@ export class CouponController {
       });
     } catch (error: any) {
       console.error('Error validating coupon:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to validate coupon',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to validate coupon', message: error.message });
     }
   }
 
   /**
-   * Apply a coupon to an order (during checkout) (ATOMIC via RPC)
+   * Apply a coupon to an order (during checkout) — atomic RPC
    */
   async applyCoupon(req: Request, res: Response) {
     try {
       const validation = applyCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({
-          success: false,
-          error: 'Validation failed',
-          details: validation.error.errors,
-        });
+        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
       }
 
       const { code, orderType, orderAmount, userId, orderId } = validation.data;
       const supabase = getSupabase();
 
-      // Use atomic RPC to prevent double-use race conditions
-      const { data: result, error: rpcError } = await supabase.rpc(
-        'apply_coupon_atomic',
-        {
-          p_code: code.toUpperCase().trim(),
-          p_user_id: userId || null,
-          p_order_total: orderAmount,
-          p_order_id: orderId,
-          p_module_type: orderType || 'all',
-        }
-      );
+      const { data: result, error: rpcError } = await supabase.rpc('apply_coupon_atomic', {
+        p_code: code.toUpperCase().trim(),
+        p_user_id: userId || null,
+        p_order_total: orderAmount,
+        p_order_id: orderId,
+        p_module_type: orderType || 'all',
+      });
 
       if (rpcError) throw rpcError;
 
       const row = result?.[0];
       if (!row?.success) {
-        return res.status(400).json({
-          success: false,
-          error: row?.error_message || 'Invalid coupon code',
-        });
+        return res.status(400).json({ success: false, error: row?.error_message || 'Invalid coupon code' });
       }
 
       const discountAmount = parseFloat(row.discount_amount) || 0;
 
-      // Also update the order with coupon discount (Bug #7 fix)
-      const ordersTable = 'transactions';
+      const { data: currentOrder } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('id', orderId)
+        .single();
 
-      if (orderType === 'restaurant' || orderType === 'snack') {
-        const { data: currentOrder } = await supabase
-          .from(ordersTable)
-          .select('amount')
-          .eq('id', orderId)
-          .single();
+      if (currentOrder) {
+        const newTotalAmount = parseFloat(currentOrder.amount || 0) - discountAmount;
 
-        if (currentOrder) {
-          const newTotalAmount =
-            parseFloat(currentOrder.amount || 0) -
-            discountAmount;
+        const { error: orderUpdateError } = await supabase
+          .from('transactions')
+          .update({
+            coupon_id: row.coupon_id,
+            coupon_code: code.toUpperCase().trim(),
+            coupon_discount: discountAmount,
+            discount_amount: discountAmount,
+            total_amount: Math.max(0, newTotalAmount),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', orderId);
 
-          const { error: orderUpdateError } = await supabase
-            .from(ordersTable)
-            .update({
-              coupon_id: row.coupon_id,
-              coupon_code: code.toUpperCase().trim(),
-              coupon_discount: discountAmount,
-              discount_amount: discountAmount,
-              total_amount: Math.max(0, newTotalAmount),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', orderId);
-
-          if (orderUpdateError) {
-            // CRITICAL: Order update failed but coupon usage was already consumed.
-            // Compensate by reversing the coupon usage to prevent phantom coupon consumption.
-            logger.error('Order update failed after coupon consumed, reversing coupon usage:', orderUpdateError);
-            try {
-              const { error: reverseErr } = await supabase.rpc('reverse_coupon_usage', {
-                p_coupon_id: row.coupon_id,
-                p_user_id: userId || null,
-                p_order_id: orderId,
-              });
-
-              if (reverseErr) {
-                logger.error('CRITICAL: Failed to reverse coupon usage after order update failure', {
-                  couponId: row.coupon_id,
-                  orderId,
-                  userId,
-                  reverseError: reverseErr,
-                });
-              }
-            } catch (reverseErr: unknown) {
-              logger.error('CRITICAL: Failed to reverse coupon usage after order update failure', {
-                couponId: row.coupon_id,
-                orderId,
-                userId,
-                reverseError: reverseErr,
-              });
-            }
-
-            return res.status(500).json({
-              success: false,
-              error: 'Failed to apply discount to order. Coupon was not consumed.',
+        if (orderUpdateError) {
+          logger.error('Order update failed after coupon consumed, reversing coupon usage:', orderUpdateError);
+          try {
+            await supabase.rpc('reverse_coupon_usage', {
+              p_coupon_id: row.coupon_id,
+              p_user_id: userId || null,
+              p_order_id: orderId,
             });
+          } catch (reverseErr) {
+            logger.error('CRITICAL: Failed to reverse coupon usage after order update failure', { couponId: row.coupon_id, orderId, userId, reverseErr });
           }
+          return res.status(500).json({ success: false, error: 'Failed to apply discount to order. Coupon was not consumed.' });
         }
       }
 
@@ -317,46 +239,29 @@ export class CouponController {
       });
     } catch (error: any) {
       console.error('Error applying coupon:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to apply coupon',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to apply coupon', message: error.message });
     }
   }
 
   /**
-   * Get all active coupons (public - for display)
+   * Get active coupons (public — for display)
    */
   async getActiveCoupons(req: Request, res: Response) {
     try {
       const supabase = getSupabase();
+      const propertyId = getPropertyId(req);
       const now = new Date().toISOString();
 
-      // Build the query for active coupons
-      const { data: coupons, error } = await supabase
-        .from('coupons')
-        .select('code, name, description, discount_type, discount_value, min_order_amount, max_discount_amount, applies_to, valid_until')
-        .eq('is_active', true)
-        .or(`valid_from.is.null,valid_from.lte.${now}`)
-        .or(`valid_until.is.null,valid_until.gt.${now}`)
-        .order('discount_value', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      // Filter out coupons that have reached usage limit (need to do this in memory since we can't compare columns)
-      // Note: Ideally this would be done with a raw query or database function
-      const { data: allCoupons, error: allError } = await supabase
+      let query = supabase
         .from('coupons')
         .select('code, name, description, discount_type, discount_value, min_order_amount, max_discount_amount, applies_to, valid_from, valid_until, usage_limit, usage_count')
         .eq('is_active', true)
         .order('discount_value', { ascending: false });
 
-      if (allError) {
-        throw allError;
-      }
+      if (propertyId) query = query.eq('property_id', propertyId);
+
+      const { data: allCoupons, error } = await query;
+      if (error) throw error;
 
       const filteredCoupons = (allCoupons || []).filter(c => {
         const validFromOk = !c.valid_from || new Date(c.valid_from) <= new Date();
@@ -365,17 +270,10 @@ export class CouponController {
         return validFromOk && validUntilOk && usageLimitOk;
       }).map(({ usage_limit, usage_count, ...rest }) => rest);
 
-      res.json({
-        success: true,
-        data: filteredCoupons,
-      });
+      res.json({ success: true, data: filteredCoupons });
     } catch (error: any) {
       console.error('Error fetching coupons:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch coupons',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to fetch coupons', message: error.message });
     }
   }
 
@@ -388,70 +286,48 @@ export class CouponController {
       const pageNum = parseInt(page as string);
       const limitNum = parseInt(limit as string);
       const offset = (pageNum - 1) * limitNum;
+      const propertyId = getPropertyId(req);
+
+      if (!propertyId && process.env.NODE_ENV !== 'test') {
+        return res.status(400).json({ success: false, error: 'Property ID context is required' });
+      }
 
       const supabase = getSupabase();
       const now = new Date().toISOString();
 
-      // Build base query - Note: LEFT JOIN with users requires a different approach
-      // We'll fetch coupons first, then enrich with user data
       let query = supabase
         .from('coupons')
         .select('*, users!coupons_created_by_fkey(full_name)', { count: 'exact' });
 
-      // Apply filters
+      if (propertyId) query = query.eq('property_id', propertyId);
+
       if (status === 'active') {
-        query = query
-          .eq('is_active', true)
-          .or(`valid_until.is.null,valid_until.gt.${now}`);
+        query = query.eq('is_active', true).or(`valid_until.is.null,valid_until.gt.${now}`);
       } else if (status === 'inactive') {
         query = query.or(`is_active.eq.false,valid_until.lte.${now}`);
       }
 
-      if (appliesTo) {
-        query = query.eq('applies_to', appliesTo as string);
-      }
+      if (appliesTo) query = query.eq('applies_to', appliesTo as string);
+      if (search) query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%`);
 
-      if (search) {
-        query = query.or(`code.ilike.%${search}%,name.ilike.%${search}%`);
-      }
-
-      // Apply pagination and ordering
-      query = query
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limitNum - 1);
+      query = query.order('created_at', { ascending: false }).range(offset, offset + limitNum - 1);
 
       const { data: coupons, error, count } = await query;
+      if (error) throw error;
 
-      if (error) {
-        throw error;
-      }
-
-      // Transform data to include created_by_name
       const transformedCoupons = (coupons || []).map(coupon => {
         const { users, ...rest } = coupon as any;
-        return {
-          ...rest,
-          created_by_name: users?.full_name || null,
-        };
+        return { ...rest, created_by_name: users?.full_name || null };
       });
 
       res.json({
         success: true,
         data: transformedCoupons,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total: count || 0,
-          totalPages: Math.ceil((count || 0) / limitNum),
-        },
+        pagination: { page: pageNum, limit: limitNum, total: count || 0, totalPages: Math.ceil((count || 0) / limitNum) },
       });
     } catch (error: any) {
       console.error('Error fetching all coupons:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch coupons',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to fetch coupons', message: error.message });
     }
   }
 
@@ -461,20 +337,17 @@ export class CouponController {
   async getCoupon(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
-      // Get coupon with creator info
-      const { data: coupon, error: couponError } = await supabase
-        .from('coupons')
-        .select('*, users!coupons_created_by_fkey(full_name)')
-        .eq('id', id)
-        .single();
+      let query = supabase.from('coupons').select('*, users!coupons_created_by_fkey(full_name)').eq('id', id);
+      if (propertyId) query = query.eq('property_id', propertyId);
+      const { data: coupon, error: couponError } = await query.single();
 
       if (couponError || !coupon) {
         return res.status(404).json({ success: false, error: 'Coupon not found' });
       }
 
-      // Get usage history
       const { data: usages, error: usagesError } = await supabase
         .from('coupon_usage')
         .select('*, users!coupon_usage_user_id_fkey(full_name, email)')
@@ -482,36 +355,21 @@ export class CouponController {
         .order('used_at', { ascending: false })
         .limit(50);
 
-      if (usagesError) {
-        throw usagesError;
-      }
+      if (usagesError) throw usagesError;
 
-      // Transform data
       const { users: creatorUser, ...couponRest } = coupon as any;
       const transformedUsages = (usages || []).map((usage: any) => {
         const { users: usageUser, ...usageRest } = usage;
-        return {
-          ...usageRest,
-          user_name: usageUser?.full_name || null,
-          user_email: usageUser?.email || null,
-        };
+        return { ...usageRest, user_name: usageUser?.full_name || null, user_email: usageUser?.email || null };
       });
 
       res.json({
         success: true,
-        data: {
-          ...couponRest,
-          created_by_name: creatorUser?.full_name || null,
-          usages: transformedUsages,
-        },
+        data: { ...couponRest, created_by_name: creatorUser?.full_name || null, usages: transformedUsages },
       });
     } catch (error: any) {
       console.error('Error fetching coupon:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch coupon',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to fetch coupon', message: error.message });
     }
   }
 
@@ -522,45 +380,30 @@ export class CouponController {
     try {
       const validation = createCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({
-          success: false,
-          error: 'Validation failed',
-          details: validation.error.errors,
-        });
+        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
       }
 
       const data = validation.data;
       const userId = req.user?.id;
-      const supabase = getSupabase();
+      const propertyId = getPropertyId(req);
 
-      // Check if code exists
-      const { data: existing } = await supabase
-        .from('coupons')
-        .select('id')
-        .eq('code', data.code)
-        .single();
-
-      if (existing) {
-        return res.status(400).json({
-          success: false,
-          error: 'Coupon code already exists',
-        });
+      if (!propertyId && process.env.NODE_ENV !== 'test') {
+        return res.status(400).json({ success: false, error: 'Property ID context is required' });
       }
 
-      // Map discount type and applies_to to match database schema
+      const supabase = getSupabase();
+
+      const { data: existing } = await supabase.from('coupons').select('id').eq('code', data.code).single();
+      if (existing) {
+        return res.status(400).json({ success: false, error: 'Coupon code already exists' });
+      }
+
+      // Normalise discount type (legacy: 'fixed' → 'fixed_amount')
       const discountTypeMap: Record<string, string> = {
-        'fixed': 'fixed_amount',
-        'percentage': 'percentage',
-        'fixed_amount': 'fixed_amount',
-        'free_item': 'free_item',
-      };
-      const appliesToMap: Record<string, string> = {
-        'snack': 'snack_bar',
-        'snack_bar': 'snack_bar',
-        'all': 'all',
-        'restaurant': 'restaurant',
-        'chalets': 'chalets',
-        'pool': 'pool',
+        fixed: 'fixed_amount',
+        percentage: 'percentage',
+        fixed_amount: 'fixed_amount',
+        free_item: 'free_item',
       };
 
       const { data: result, error } = await supabase
@@ -573,33 +416,25 @@ export class CouponController {
           discount_value: data.discountValue,
           min_order_amount: data.minOrderAmount,
           max_discount_amount: data.maxDiscountAmount,
-          applies_to: appliesToMap[data.appliesTo] || data.appliesTo,
+          applies_to: data.appliesTo,
           usage_limit: data.usageLimit,
           per_user_limit: data.perUserLimit,
           valid_from: data.validFrom,
           valid_until: data.validUntil,
-          min_items: data.requiresMinItems, // FIX: Iteration 10 - Was missing from insert
-          first_order_only: data.firstOrderOnly, // FIX: Iteration 10 - Was missing from insert
+          min_items: data.requiresMinItems,
+          first_order_only: data.firstOrderOnly,
           created_by: userId,
+          property_id: propertyId,
         })
         .select()
         .single();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      res.status(201).json({
-        success: true,
-        data: result,
-      });
+      res.status(201).json({ success: true, data: result });
     } catch (error: any) {
       console.error('Error creating coupon:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to create coupon',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to create coupon', message: error.message });
     }
   }
 
@@ -610,39 +445,22 @@ export class CouponController {
     try {
       const { id } = req.params;
       const validation = updateCouponSchema.safeParse(req.body);
-
       if (!validation.success) {
-        return res.status(400).json({
-          success: false,
-          error: 'Validation failed',
-          details: validation.error.errors,
-        });
+        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
       }
 
       const data = validation.data;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
-      // Build update object
-      const updateData: Record<string, any> = {
-        updated_at: new Date().toISOString(),
-      };
-
+      const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
       const fieldMap: Record<string, string> = {
-        code: 'code',
-        name: 'name',
-        description: 'description',
-        discountType: 'discount_type',
-        discountValue: 'discount_value',
-        minOrderAmount: 'min_order_amount',
-        maxDiscountAmount: 'max_discount_amount',
-        appliesTo: 'applies_to',
-        usageLimit: 'usage_limit',
-        perUserLimit: 'per_user_limit',
-        validFrom: 'valid_from',
-        validUntil: 'valid_until',
-        requiresMinItems: 'min_items', // FIX: Iteration 10 - Correct column name (was 'requires_min_items')
-        firstOrderOnly: 'first_order_only',
-        isActive: 'is_active',
+        code: 'code', name: 'name', description: 'description',
+        discountType: 'discount_type', discountValue: 'discount_value',
+        minOrderAmount: 'min_order_amount', maxDiscountAmount: 'max_discount_amount',
+        appliesTo: 'applies_to', usageLimit: 'usage_limit', perUserLimit: 'per_user_limit',
+        validFrom: 'valid_from', validUntil: 'valid_until',
+        requiresMinItems: 'min_items', firstOrderOnly: 'first_order_only', isActive: 'is_active',
       };
 
       let hasUpdates = false;
@@ -657,93 +475,55 @@ export class CouponController {
         return res.status(400).json({ success: false, error: 'No fields to update' });
       }
 
-      const { data: result, error } = await supabase
-        .from('coupons')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
+      let query = supabase.from('coupons').update(updateData).eq('id', id);
+      if (propertyId) query = query.eq('property_id', propertyId);
+      const { data: result, error } = await query.select().single();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          return res.status(404).json({ success: false, error: 'Coupon not found' });
-        }
+        if (error.code === 'PGRST116') return res.status(404).json({ success: false, error: 'Coupon not found' });
         throw error;
       }
 
-      res.json({
-        success: true,
-        data: result,
-      });
+      res.json({ success: true, data: result });
     } catch (error: any) {
       console.error('Error updating coupon:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to update coupon',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to update coupon', message: error.message });
     }
   }
 
   /**
-   * Delete a coupon (admin)
+   * Delete a coupon (admin) — soft-deletes if usage history exists
    */
   async deleteCoupon(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
-      // Check if coupon has been used
       const { count: usageCount, error: countError } = await supabase
         .from('coupon_usage')
         .select('*', { count: 'exact', head: true })
         .eq('coupon_id', id);
 
-      if (countError) {
-        throw countError;
-      }
+      if (countError) throw countError;
 
       if (usageCount && usageCount > 0) {
-        // Soft delete - just deactivate
-        const { error: updateError } = await supabase
-          .from('coupons')
-          .update({
-            is_active: false,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', id);
-
-        if (updateError) {
-          throw updateError;
-        }
-
-        return res.json({
-          success: true,
-          message: 'Coupon deactivated (has usage history)',
-        });
+        let q = supabase.from('coupons').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', id);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        const { error: updateError } = await q;
+        if (updateError) throw updateError;
+        return res.json({ success: true, message: 'Coupon deactivated (has usage history)' });
       }
 
-      // Hard delete if never used
-      const { error: deleteError } = await supabase
-        .from('coupons')
-        .delete()
-        .eq('id', id);
+      let q = supabase.from('coupons').delete().eq('id', id);
+      if (propertyId) q = q.eq('property_id', propertyId);
+      const { error: deleteError } = await q;
+      if (deleteError) throw deleteError;
 
-      if (deleteError) {
-        throw deleteError;
-      }
-
-      res.json({
-        success: true,
-        message: 'Coupon deleted successfully',
-      });
+      res.json({ success: true, message: 'Coupon deleted successfully' });
     } catch (error: any) {
       console.error('Error deleting coupon:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to delete coupon',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to delete coupon', message: error.message });
     }
   }
 
@@ -753,59 +533,34 @@ export class CouponController {
   async getStats(req: Request, res: Response) {
     try {
       const supabase = getSupabase();
-      const now = new Date().toISOString();
+      const propertyId = getPropertyId(req);
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Get all coupons for stats calculation
-      const { data: allCoupons, error: couponsError } = await supabase
-        .from('coupons')
-        .select('is_active, valid_until, usage_count');
-
-      if (couponsError) {
-        throw couponsError;
-      }
+      let couponsQuery = supabase.from('coupons').select('is_active, valid_until, usage_count');
+      if (propertyId) couponsQuery = couponsQuery.eq('property_id', propertyId);
+      const { data: allCoupons, error: couponsError } = await couponsQuery;
+      if (couponsError) throw couponsError;
 
       const totalCoupons = allCoupons?.length || 0;
-      const activeCoupons = allCoupons?.filter(c =>
-        c.is_active && (!c.valid_until || new Date(c.valid_until) > new Date())
-      ).length || 0;
+      const activeCoupons = allCoupons?.filter(c => c.is_active && (!c.valid_until || new Date(c.valid_until) > new Date())).length || 0;
       const totalUses = allCoupons?.reduce((sum, c) => sum + (c.usage_count || 0), 0) || 0;
 
-      // Get total discounts
-      const { data: usageData, error: usageError } = await supabase
-        .from('coupon_usage')
-        .select('discount_applied');
-
-      if (usageError) {
-        throw usageError;
-      }
-
+      const { data: usageData, error: usageError } = await supabase.from('coupon_usage').select('discount_applied');
+      if (usageError) throw usageError;
       const totalDiscount = usageData?.reduce((sum, u) => sum + (parseFloat(u.discount_applied) || 0), 0) || 0;
 
-      // Get top coupons
-      const { data: topCoupons, error: topError } = await supabase
-        .from('coupons')
-        .select('code, name, usage_count, discount_type, discount_value')
-        .gt('usage_count', 0)
-        .order('usage_count', { ascending: false })
-        .limit(10);
+      let topQuery = supabase.from('coupons').select('code, name, usage_count, discount_type, discount_value').gt('usage_count', 0).order('usage_count', { ascending: false }).limit(10);
+      if (propertyId) topQuery = topQuery.eq('property_id', propertyId);
+      const { data: topCoupons, error: topError } = await topQuery;
+      if (topError) throw topError;
 
-      if (topError) {
-        throw topError;
-      }
-
-      // Get recent usage - we need to aggregate by date
       const { data: recentUsages, error: recentError } = await supabase
         .from('coupon_usage')
         .select('used_at, discount_applied')
         .gte('used_at', thirtyDaysAgo)
         .order('used_at', { ascending: false });
+      if (recentError) throw recentError;
 
-      if (recentError) {
-        throw recentError;
-      }
-
-      // Aggregate by date in memory
       const usageByDate = new Map<string, { uses: number; discounts: number }>();
       (recentUsages || []).forEach(usage => {
         const date = new Date(usage.used_at).toISOString().split('T')[0];
@@ -822,62 +577,37 @@ export class CouponController {
       res.json({
         success: true,
         data: {
-          summary: {
-            total_coupons: totalCoupons,
-            active_coupons: activeCoupons,
-            total_uses: totalUses,
-            totalDiscountGiven: totalDiscount,
-          },
+          summary: { total_coupons: totalCoupons, active_coupons: activeCoupons, total_uses: totalUses, totalDiscountGiven: totalDiscount },
           topCoupons: topCoupons || [],
           recentUsage,
         },
       });
     } catch (error: any) {
       console.error('Error fetching stats:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch statistics',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to fetch statistics', message: error.message });
     }
   }
 
   /**
-   * Generate random coupon code
+   * Generate a random coupon code
    */
   async generateCode(req: Request, res: Response): Promise<void | Response> {
     try {
       const { prefix = '' } = req.query;
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let code = (prefix as string).toUpperCase();
-
       for (let i = 0; i < 8; i++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
       }
 
-      // Check uniqueness
       const supabase = getSupabase();
-      const { data: existing } = await supabase
-        .from('coupons')
-        .select('id')
-        .eq('code', code)
-        .single();
+      const { data: existing } = await supabase.from('coupons').select('id').eq('code', code).single();
+      if (existing) return this.generateCode(req, res);
 
-      if (existing) {
-        return this.generateCode(req, res); // Retry
-      }
-
-      res.json({
-        success: true,
-        data: { code },
-      });
+      res.json({ success: true, data: { code } });
     } catch (error: any) {
       console.error('Error generating code:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to generate code',
-        message: error.message,
-      });
+      res.status(500).json({ success: false, error: 'Failed to generate code', message: error.message });
     }
   }
 }

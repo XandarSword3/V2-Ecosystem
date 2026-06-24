@@ -2,7 +2,7 @@
  * Offline Data Hydration Service
  * 
  * Dynamic module-based hydration - supports any engine type without hardcoded endpoints.
- * Fetches active modules first, then hydrates based on template_type.
+ * Fetches active modules first, then hydrates based on engine_type.
  * 
  * Template Types:
  * - menu_service: /items, /orders, /modifiers
@@ -23,7 +23,7 @@ interface ActiveModule {
   id: string;
   slug: string;
   name: string;
-  template_type: 'menu_service' | 'multi_day_booking' | 'session_access' | 'subscription' | 'membership_access';
+  engine_type: 'menu_service' | 'multi_day_booking' | 'session_access' | 'subscription' | 'membership_access';
   is_active: boolean;
 }
 
@@ -61,7 +61,7 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Hydrate all critical offline stores for the current shift.
- * Dynamically discovers active modules and hydrates based on template_type.
+ * Dynamically discovers active modules and hydrates based on engine_type.
  * @param force If true, bypasses TTL checks and refreshes all stores
  */
 export async function hydrateOfflineStores(force: boolean = false): Promise<void> {
@@ -111,9 +111,9 @@ export async function hydrateOfflineStores(force: boolean = false): Promise<void
  * Hydrate data for a specific module based on its template type
  */
 async function hydrateModule(module: ActiveModule, force: boolean): Promise<void> {
-  const config = TEMPLATE_HYDRATION[module.template_type];
+  const config = TEMPLATE_HYDRATION[module.engine_type];
   if (!config) {
-    console.log(`[Offline] No hydration config for template type: ${module.template_type}`);
+    console.log(`[Offline] No hydration config for template type: ${module.engine_type}`);
     return;
   }
 
@@ -125,7 +125,7 @@ async function hydrateModule(module: ActiveModule, force: boolean): Promise<void
     return;
   }
 
-  console.log(`[Offline] Hydrating ${module.slug} (${module.template_type})...`);
+  console.log(`[Offline] Hydrating ${module.slug} (${module.engine_type})...`);
 
   // Hydrate each endpoint for this template type
   for (const endpoint of config.endpoints) {
@@ -150,7 +150,7 @@ async function hydrateModule(module: ActiveModule, force: boolean): Promise<void
 
   await moduleCacheStore.updateMetadata(cacheKey, { 
     lastSyncAt: new Date().toISOString(),
-    templateType: module.template_type,
+    templateType: module.engine_type,
   });
 }
 

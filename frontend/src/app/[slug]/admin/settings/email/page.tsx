@@ -95,7 +95,7 @@ export default function EmailConfigurationPage() {
       smtpPassword: '',
       apiKey: '',
       fromEmail: '',
-      fromName: 'Your Resort',
+      fromName: 'Your Business',
       replyToEmail: '',
     },
   });
@@ -369,7 +369,7 @@ export default function EmailConfigurationPage() {
                       <FormControl>
                         <Input
                           type="email"
-                          placeholder="noreply@resort.com"
+                          placeholder="noreply@example.com"
                           {...field}
                         />
                       </FormControl>
@@ -384,7 +384,7 @@ export default function EmailConfigurationPage() {
                     <FormItem>
                       <FormLabel>From Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your Resort" {...field} />
+                        <Input placeholder="Your Business" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -401,7 +401,7 @@ export default function EmailConfigurationPage() {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="support@resort.com"
+                        placeholder="support@example.com"
                         {...field}
                       />
                     </FormControl>

@@ -45,52 +45,54 @@ export const Permissions = {
   USER_UPDATE_ANY: 'user:update:any',
   USER_DELETE_ANY: 'user:delete:any',
   USER_MANAGE_ROLES: 'user:manage:roles',
-  
-  // Restaurant permissions
-  RESTAURANT_MENU_READ: 'restaurant:menu:read',
-  RESTAURANT_MENU_WRITE: 'restaurant:menu:write',
-  RESTAURANT_ORDER_CREATE: 'restaurant:order:create',
-  RESTAURANT_ORDER_READ_OWN: 'restaurant:order:read:own',
-  RESTAURANT_ORDER_READ_ALL: 'restaurant:order:read:all',
-  RESTAURANT_ORDER_UPDATE: 'restaurant:order:update',
-  RESTAURANT_CATEGORY_MANAGE: 'restaurant:category:manage',
-  RESTAURANT_TABLE_MANAGE: 'restaurant:table:manage',
-  RESTAURANT_STATS: 'restaurant:stats:read',
-  
-  // Chalet permissions
-  CHALET_READ: 'chalet:read',
-  CHALET_WRITE: 'chalet:write',
-  CHALET_BOOKING_CREATE: 'chalet:booking:create',
-  CHALET_BOOKING_READ_OWN: 'chalet:booking:read:own',
-  CHALET_BOOKING_READ_ALL: 'chalet:booking:read:all',
-  CHALET_BOOKING_UPDATE: 'chalet:booking:update',
-  CHALET_BOOKING_CANCEL: 'chalet:booking:cancel',
-  CHALET_PRICING_MANAGE: 'chalet:pricing:manage',
-  CHALET_STATS: 'chalet:stats:read',
-  
-  // Pool permissions
-  POOL_SESSION_READ: 'pool:session:read',
-  POOL_SESSION_MANAGE: 'pool:session:manage',
-  POOL_TICKET_CREATE: 'pool:ticket:create',
-  POOL_TICKET_READ_OWN: 'pool:ticket:read:own',
-  POOL_TICKET_READ_ALL: 'pool:ticket:read:all',
-  POOL_TICKET_VALIDATE: 'pool:ticket:validate',
-  POOL_STATS: 'pool:stats:read',
-  
-  // Snack bar permissions
-  SNACK_MENU_READ: 'snack:menu:read',
-  SNACK_MENU_WRITE: 'snack:menu:write',
-  SNACK_ORDER_CREATE: 'snack:order:create',
-  SNACK_ORDER_READ_ALL: 'snack:order:read:all',
-  SNACK_ORDER_UPDATE: 'snack:order:update',
-  
+
+  // Catalog permissions (engine A — instant_transaction: F&B, retail, any item-based sale)
+  CATALOG_READ: 'catalog:read',
+  CATALOG_WRITE: 'catalog:write',
+  CATALOG_CATEGORY_MANAGE: 'catalog:category:manage',
+  CATALOG_SEATING_MANAGE: 'catalog:seating:manage', // generic seating/table layout config
+  CATALOG_STATS: 'catalog:stats:read',
+
+  // Order permissions (engine A — instant_transaction)
+  ORDER_CREATE: 'order:create',
+  ORDER_READ_OWN: 'order:read:own',
+  ORDER_READ_ALL: 'order:read:all',
+  ORDER_UPDATE: 'order:update',
+
+  // Reservation permissions (engine B — time_exclusive_reservation)
+  RESERVATION_CREATE: 'reservation:create',
+  RESERVATION_READ_OWN: 'reservation:read:own',
+  RESERVATION_READ_ALL: 'reservation:read:all',
+  RESERVATION_UPDATE: 'reservation:update',
+  RESERVATION_CANCEL: 'reservation:cancel',
+  RESERVATION_STATS: 'reservation:stats:read',
+
+  // Unit permissions (engine B — bookable units backing time_exclusive_reservation)
+  UNIT_READ: 'unit:read',
+  UNIT_WRITE: 'unit:write',
+  UNIT_PRICING_MANAGE: 'unit:pricing:manage',
+
+  // Access permissions (engine C — shared_capacity_access: pool, venue access, timed entry)
+  ACCESS_CREATE: 'access:create',
+  ACCESS_READ_OWN: 'access:read:own',
+  ACCESS_READ_ALL: 'access:read:all',
+  ACCESS_VALIDATE: 'access:validate',
+  ACCESS_SESSION_READ: 'access:session:read',
+  ACCESS_SESSION_MANAGE: 'access:session:manage',
+  ACCESS_STATS: 'access:stats:read',
+
+  // Entitlement permissions (engine D — ongoing_entitlement: memberships, subscriptions)
+  ENTITLEMENT_READ_OWN: 'entitlement:read:own',
+  ENTITLEMENT_READ_ALL: 'entitlement:read:all',
+  ENTITLEMENT_MANAGE: 'entitlement:manage',
+
   // Payment permissions
   PAYMENT_CREATE: 'payment:create',
   PAYMENT_READ_OWN: 'payment:read:own',
   PAYMENT_READ_ALL: 'payment:read:all',
   PAYMENT_REFUND: 'payment:refund',
   PAYMENT_RECORD_CASH: 'payment:record:cash',
-  
+
   // Loyalty permissions
   LOYALTY_READ_SELF: 'loyalty:read:self',
   LOYALTY_READ_ANY: 'loyalty:read:any',
@@ -98,37 +100,37 @@ export const Permissions = {
   LOYALTY_REDEEM: 'loyalty:redeem',
   LOYALTY_ADJUST: 'loyalty:adjust',
   LOYALTY_SETTINGS: 'loyalty:settings:manage',
-  
+
   // Gift card permissions
   GIFTCARD_PURCHASE: 'giftcard:purchase',
   GIFTCARD_REDEEM: 'giftcard:redeem',
   GIFTCARD_MANAGE: 'giftcard:manage',
-  
+
   // Coupon permissions
   COUPON_USE: 'coupon:use',
   COUPON_MANAGE: 'coupon:manage',
-  
+
   // Support permissions
   SUPPORT_TICKET_CREATE: 'support:ticket:create',
   SUPPORT_TICKET_READ_OWN: 'support:ticket:read:own',
   SUPPORT_TICKET_READ_ALL: 'support:ticket:read:all',
   SUPPORT_TICKET_RESPOND: 'support:ticket:respond',
-  
+
   // Review permissions
   REVIEW_CREATE: 'review:create',
   REVIEW_READ: 'review:read',
   REVIEW_MODERATE: 'review:moderate',
-  
+
   // Housekeeping permissions
   HOUSEKEEPING_TASK_READ: 'housekeeping:task:read',
   HOUSEKEEPING_TASK_UPDATE: 'housekeeping:task:update',
   HOUSEKEEPING_TASK_MANAGE: 'housekeeping:task:manage',
-  
+
   // Inventory permissions
   INVENTORY_READ: 'inventory:read',
   INVENTORY_UPDATE: 'inventory:update',
   INVENTORY_MANAGE: 'inventory:manage',
-  
+
   // Admin permissions
   ADMIN_DASHBOARD: 'admin:dashboard:read',
   ADMIN_SETTINGS: 'admin:settings:manage',
@@ -136,7 +138,7 @@ export const Permissions = {
   ADMIN_CMS: 'admin:cms:manage',
   ADMIN_REPORTS: 'admin:reports:read',
   ADMIN_AUDIT_LOG: 'admin:audit:read',
-  
+
   // Device/notification permissions
   DEVICE_REGISTER: 'device:register',
   NOTIFICATION_SEND: 'notification:send',
@@ -158,7 +160,7 @@ export const RolePermissions: Record<Role, (Permission | '*')[]> = {
   [Roles.CUSTOMER]: [
     Permissions.USER_READ_SELF,
     Permissions.USER_UPDATE_SELF,
-    Permissions.RESTAURANT_ORDER_CREATE,
+    Permissions.ORDER_CREATE,
     Permissions.PAYMENT_CREATE,
     Permissions.PAYMENT_READ_OWN,
     Permissions.LOYALTY_READ_SELF,
@@ -338,6 +340,51 @@ export function isStaff(roles: string[]): boolean {
 }
 
 // ============================================
+// USER SCOPE MODEL
+// ============================================
+
+export type UserScope = 
+  | 'super_admin'
+  | 'platform_admin'
+  | 'tenant_owner'
+  | 'tenant_admin'
+  | 'property_manager'
+  | 'property_staff'
+  | 'customer';
+
+/**
+ * Map user scope to derived roles[] for backward compatibility
+ * with existing route guards that check roles.
+ */
+export function scopeToRoles(scope: UserScope): string[] {
+  switch (scope) {
+    case 'super_admin':
+      return ['super_admin'];
+    case 'platform_admin':
+      return ['platform_admin'];
+    case 'tenant_owner':
+      return ['tenant_owner', 'admin'];
+    case 'tenant_admin':
+      return ['admin'];
+    case 'property_manager':
+      return ['manager', 'staff'];
+    case 'property_staff':
+      return ['staff'];
+    case 'customer':
+      return ['customer'];
+    default:
+      return ['customer'];
+  }
+}
+
+/**
+ * Derive isPlatformAdmin flag from scope
+ */
+export function scopeIsPlatformAdmin(scope: UserScope): boolean {
+  return scope === 'super_admin' || scope === 'platform_admin';
+}
+
+// ============================================
 // ENDPOINT PERMISSION MAPPING
 // ============================================
 /**
@@ -359,35 +406,35 @@ export const EndpointPermissions: Record<string, { method: string; permission: P
     { method: 'POST', permission: Permissions.DEVICE_REGISTER, description: 'Register device' },
   ],
   
-  // Restaurant endpoints
-  '/api/v1/restaurant/menu': [
-    { method: 'GET', permission: null, description: 'Public menu read' },
+  // Dynamic module endpoints (engine-based, all modules share these paths)
+  '/api/v1/{moduleSlug}/items': [
+    { method: 'GET', permission: null, description: 'Public catalog items list' },
   ],
-  '/api/v1/restaurant/orders': [
-    { method: 'POST', permission: Permissions.RESTAURANT_ORDER_CREATE, description: 'Create order' },
-    { method: 'GET', permission: Permissions.RESTAURANT_ORDER_READ_ALL, description: 'List all orders (staff)' },
+  '/api/v1/{moduleSlug}/orders': [
+    { method: 'POST', permission: Permissions.ORDER_CREATE, description: 'Create instant_transaction order' },
+    { method: 'GET', permission: Permissions.ORDER_READ_ALL, description: 'List all orders (staff)' },
   ],
-  '/api/v1/restaurant/orders/:id/status': [
-    { method: 'PATCH', permission: Permissions.RESTAURANT_ORDER_UPDATE, description: 'Update order status' },
+  '/api/v1/{moduleSlug}/staff/orders/:id/status': [
+    { method: 'PATCH', permission: Permissions.ORDER_UPDATE, description: 'Update order status (staff)' },
   ],
-  
-  // Chalet endpoints
-  '/api/v1/chalets': [
-    { method: 'GET', permission: null, description: 'Public chalet list' },
+
+  // time_exclusive_reservation endpoints
+  '/api/v1/{moduleSlug}/units': [
+    { method: 'GET', permission: null, description: 'Public bookable unit list' },
   ],
-  '/api/v1/chalets/bookings': [
-    { method: 'POST', permission: Permissions.CHALET_BOOKING_CREATE, description: 'Create booking' },
+  '/api/v1/{moduleSlug}/bookings': [
+    { method: 'POST', permission: Permissions.RESERVATION_CREATE, description: 'Create booking' },
   ],
-  
-  // Pool endpoints
-  '/api/v1/pool/sessions': [
-    { method: 'GET', permission: null, description: 'Public session list' },
+
+  // shared_capacity_access endpoints
+  '/api/v1/{moduleSlug}/capacity-windows': [
+    { method: 'GET', permission: null, description: 'Public capacity window list' },
   ],
-  '/api/v1/pool/tickets': [
-    { method: 'POST', permission: Permissions.POOL_TICKET_CREATE, description: 'Purchase ticket' },
+  '/api/v1/{moduleSlug}/access-tickets': [
+    { method: 'POST', permission: Permissions.ACCESS_CREATE, description: 'Purchase access ticket' },
   ],
-  '/api/v1/pool/tickets/:id/validate': [
-    { method: 'POST', permission: Permissions.POOL_TICKET_VALIDATE, description: 'Validate ticket (staff)' },
+  '/api/v1/{moduleSlug}/access-tickets/:id/validate': [
+    { method: 'POST', permission: Permissions.ACCESS_VALIDATE, description: 'Validate ticket (staff)' },
   ],
   
   // Payment endpoints

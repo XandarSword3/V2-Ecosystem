@@ -6,5 +6,5 @@ UPDATE waitlist_entries SET notes = TRIM(REGEXP_REPLACE(notes, '^type:\w+\s*\|\s
 WHERE notes ~ '^type:\w+\s*\|';
 
 -- Ensure type column is properly set from notes before we clear them
-UPDATE waitlist_entries SET type = 'pool'
-WHERE notes IS NOT NULL AND notes LIKE '%type:pool%' AND (type IS NULL OR type = 'restaurant');
+UPDATE waitlist_entries SET type = 'shared_capacity_access'
+WHERE notes IS NOT NULL AND notes LIKE '%type:shared_capacity_access%' AND (type IS NULL OR type = 'menu_service');

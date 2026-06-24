@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
-import { poolApi } from '@/lib/api';
+import { api } from '@/lib/api';
 import { Loader2, AlertCircle, Clock, Users, X, Calendar, Ticket, Waves, Sparkles, ChevronRight, Sun, Umbrella, Droplets } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useContentTranslation } from '@/lib/translate';
@@ -98,20 +98,33 @@ export function SessionService({ module }: SessionServiceProps) {
   // Use availability endpoint to get live ticket counts
   const { data, isLoading, error } = useQuery({
     queryKey: ['pool-availability', module.id, selectedDate],
-    queryFn: () => poolApi.getAvailability(selectedDate, module.id),
+    queryFn: () => api.get(`/${module.slug}/sessions`, { params: { date: selectedDate } }),
   });
 
   // Fetch user's tickets if logged in
   const { data: myTicketsData } = useQuery({
     queryKey: ['my-pool-tickets'],
-    queryFn: () => poolApi.getMyTickets(),
+    queryFn: () => api.get('/capacity-access/me'),
     enabled: !!user,
   });
 
   const myTickets = myTicketsData?.data?.data || [];
 
   const purchaseMutation = useMutation({
-    mutationFn: (ticketData: PurchaseTicketData) => poolApi.purchaseTicket(ticketData),
+    mutationFn: (ticketData: PurchaseTicketData) => 
+      api.post(`/${module.slug}/tickets`, {
+        session_id: ticketData.sessionId,
+        quantity: ticketData.numberOfGuests,
+        unit_price: Number(selectedSession?.adult_price) || Number(selectedSession?.price) || 0,
+        payment_method: ticketData.paymentMethod,
+        ticket_date: ticketData.ticketDate,
+        metadata: {
+          customer_name: ticketData.customerName,
+          customer_phone: ticketData.customerPhone,
+          number_of_adults: ticketData.numberOfAdults,
+          number_of_children: ticketData.numberOfChildren,
+        }
+      }),
     onSuccess: (response) => {
       toast.success(t('ticketPurchased'));
       const ticket = response.data.data;
@@ -176,7 +189,7 @@ export function SessionService({ module }: SessionServiceProps) {
         >
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full blur-xl opacity-30 animate-pulse" />
-            <Loader2 className="w-12 h-12 animate-spin text-blue-600 relative" />
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 relative" data-testid="icon-loader2" />
           </div>
           <p className="mt-4 text-slate-600 dark:text-slate-400 font-medium">{tCommon('loading')}</p>
         </motion.div>

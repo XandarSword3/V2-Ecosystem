@@ -33,7 +33,7 @@ export default function BookingsImportPage() {
       commitEndpoint={`/${slug}/import/commit`}
       llmPlaceholder={`Paste your accommodation data here. Examples:
 
-Chalet Name: Ocean View Villa
+Unit Name: Ocean View Villa
 Capacity: 6 guests
 Bedrooms: 3, Bathrooms: 2
 Base Price: $200/night

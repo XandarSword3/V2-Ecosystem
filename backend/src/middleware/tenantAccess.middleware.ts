@@ -14,7 +14,8 @@
  *
  * Billing gate rules:
  *   active / trialing          → allow through, no header added
- *   past_due                   → allow through, attach X-Billing-Warning header
+ *   past_due                   → allow reads (GET/HEAD/OPTIONS) with X-Billing-Warning header;
+ *                                 block writes with 402 Payment Required
  *   suspended / cancelled      → 402 Payment Required, request blocked
  *   tenant not found           → pass through (legacy single-tenant mode)
  *
@@ -49,10 +50,29 @@ export interface TenantRecord {
   feature_limits: Record<string, unknown>;
   trial_ends_at: string | null;
   created_at: string;
+  /**
+   * FK to plans.id. When set, feature_limits above is resolved LIVE off
+   * this plan on every lookup (see lookupTenant() below) — editing the
+   * plan's feature_limits in the admin Plans CRUD takes effect immediately
+   * for every tenant on that plan, within CACHE_TTL_MS. When null (legacy
+   * tenant with no matching plan row), feature_limits falls back to
+   * whatever snapshot is stored directly on this tenant row.
+   */
+  plan_id: string | null;
+  /**
+   * True for exactly one tenant — the platform operator's own tenant
+   * (seeded in 20260621000000_seed_platform_tenant.sql, flagged in
+   * 20260621170000_add_platform_root_tenant_flag.sql). DB-enforced
+   * uniqueness via a partial unique index. This is the gate for
+   * provision_tenant_on_activate — see modules.controller.ts createModule
+   * and saas-webhook.controller.ts checkout.session.completed.
+   */
+  is_platform_root: boolean;
 }
 
 // Augment Express Request with tenant context
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       tenant?: TenantRecord;
@@ -82,14 +102,26 @@ function extractSubdomain(host: string | undefined): string | null {
 
   // Localhost — support subdomain in dev: "acme.localhost"
   if (hostname === 'localhost' || hostname === '127.0.0.1') return null;
+
+  let sub: string | null = null;
   if (hostname.endsWith('.localhost')) {
-    const sub = hostname.slice(0, hostname.lastIndexOf('.localhost'));
-    return sub || null;
+    sub = hostname.slice(0, hostname.lastIndexOf('.localhost'));
+  } else {
+    const parts = hostname.split('.');
+    if (parts.length > 2) {
+      sub = parts[0];
+    }
   }
 
-  const parts = hostname.split('.');
-  if (parts.length <= 2) return null; // bare domain, no subdomain
-  return parts[0];
+  if (sub) {
+    const reserved = ['api', 'admin', 'app', 'assets', 'www'];
+    if (reserved.includes(sub.toLowerCase())) {
+      return null;
+    }
+    return sub;
+  }
+
+  return null;
 }
 
 // ============================================
@@ -112,9 +144,13 @@ async function lookupTenant(key: string, field: 'id' | 'subdomain'): Promise<Ten
 
   try {
     const supabase = getSupabase();
+    // Embed the linked plan's feature_limits via the plan_id FK — this is
+    // what makes editing a plan's limits in the admin CRUD apply live to
+    // every tenant on that plan, instead of relying on the one-time
+    // snapshot copied onto tenants.feature_limits at provisioning time.
     const { data, error } = await supabase
       .from('tenants')
-      .select('*')
+      .select('*, plan:plans(feature_limits)')
       .eq(field, key)
       .maybeSingle();
 
@@ -123,7 +159,19 @@ async function lookupTenant(key: string, field: 'id' | 'subdomain'): Promise<Ten
       return null;
     }
 
-    const tenant = (data as TenantRecord) ?? null;
+    let tenant: TenantRecord | null = null;
+    if (data) {
+      const { plan, ...tenantFields } = data as TenantRecord & {
+        plan?: { feature_limits: Record<string, unknown> } | null;
+      };
+      tenant = {
+        ...tenantFields,
+        // Live plan limits win when a plan is linked; otherwise keep
+        // whatever snapshot is on the tenant row (legacy / no plan_id).
+        feature_limits: plan?.feature_limits ?? tenantFields.feature_limits,
+      };
+    }
+
     tenantCache.set(cacheKey, { tenant, fetchedAt: Date.now() });
     return tenant;
   } catch (err) {
@@ -152,14 +200,18 @@ export function invalidateTenantCache(tenantId: string, subdomain?: string): voi
  *
  * Does NOT gate access — use validateTenantBilling for that.
  */
-export async function resolveTenant(req: Request, _res: Response, next: NextFunction): Promise<void> {
+export async function resolveTenant(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (req.skipTenantGate) return next();
 
   // Priority 1: explicit ID header (internal API callers)
   const tenantIdHeader = req.headers['x-tenant-id'] as string | undefined;
   if (tenantIdHeader) {
     const tenant = await lookupTenant(tenantIdHeader, 'id');
-    if (tenant) req.tenant = tenant;
+    if (!tenant) {
+      res.status(404).json({ success: false, error: 'Tenant not found' });
+      return;
+    }
+    req.tenant = tenant;
     return next();
   }
 
@@ -167,18 +219,29 @@ export async function resolveTenant(req: Request, _res: Response, next: NextFunc
   // This is how path-based multi-tenancy works without a custom domain:
   // frontend reads the slug from the URL, sends it as X-Tenant-Slug,
   // and the backend resolves the tenant without subdomain routing.
+  // If a slug was explicitly provided but resolves to nothing, that is NOT
+  // "legacy single-tenant mode" — it is an unknown tenant. Hard 404.
   const tenantSlugHeader = req.headers['x-tenant-slug'] as string | undefined;
   if (tenantSlugHeader) {
     const tenant = await lookupTenant(tenantSlugHeader, 'subdomain');
-    if (tenant) req.tenant = tenant;
+    if (!tenant) {
+      res.status(404).json({ success: false, error: 'Tenant not found' });
+      return;
+    }
+    req.tenant = tenant;
     return next();
   }
 
   // Priority 3: subdomain (future — no-op until wildcard domain is configured)
+  // Same rule: if a subdomain is extracted but resolves to nothing, 404.
   const subdomain = extractSubdomain(req.headers.host);
   if (subdomain) {
     const tenant = await lookupTenant(subdomain, 'subdomain');
-    if (tenant) req.tenant = tenant;
+    if (!tenant) {
+      res.status(404).json({ success: false, error: 'Tenant not found' });
+      return;
+    }
+    req.tenant = tenant;
   }
 
   next();
@@ -189,7 +252,9 @@ export async function resolveTenant(req: Request, _res: Response, next: NextFunc
  * Must run after resolveTenant.
  *
  * Returns 402 for suspended/cancelled tenants.
- * Attaches X-Billing-Warning for past_due tenants and continues.
+ * For past_due tenants: GET/HEAD/OPTIONS pass through with an
+ * X-Billing-Warning header; all write methods (POST/PUT/PATCH/DELETE/etc.)
+ * are blocked with 402 — this is the doc's "PASS reads / BLOCK writes" rule.
  * Passes through if no tenant is resolved (single-tenant legacy mode).
  */
 export async function validateTenantBilling(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -224,7 +289,26 @@ export async function validateTenantBilling(req: Request, res: Response, next: N
 
   if (billing_status === 'past_due') {
     res.setHeader('X-Billing-Warning', 'payment_overdue');
-    logger.info('[TENANT] Past-due tenant allowed through with warning', { tenantId: id, subdomain });
+
+    const isWriteMethod = req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS';
+    if (isWriteMethod) {
+      logger.warn('[TENANT] Blocked write — past_due grace period is read-only', {
+        tenantId: id,
+        subdomain,
+        path: req.path,
+        method: req.method,
+      });
+
+      res.status(402).json({
+        success: false,
+        error: 'Your subscription payment is overdue. Read access remains available, but changes are blocked until payment is updated.',
+        billing_status,
+        tenantId: id,
+      });
+      return;
+    }
+
+    logger.info('[TENANT] Past-due tenant allowed read access with warning', { tenantId: id, subdomain });
   }
 
   next();

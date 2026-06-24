@@ -3,7 +3,7 @@
 -- Recipes table - links menu items to inventory ingredients
 CREATE TABLE IF NOT EXISTS inventory_recipes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  catalog_item_id UUID NOT NULL REFERENCES catalog_items(id) ON DELETE CASCADE,
   name VARCHAR(255),
   yields INTEGER DEFAULT 1, -- How many portions this recipe makes
   prep_time_minutes INTEGER,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS inventory_recipes (
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(menu_item_id)
+  UNIQUE(catalog_item_id)
 );
 
 -- Recipe ingredients - each ingredient required for a recipe
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS inventory_recipe_ingredients (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_recipes_menu_item ON inventory_recipes(menu_item_id);
+CREATE INDEX IF NOT EXISTS idx_recipes_menu_item ON inventory_recipes(catalog_item_id);
 CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe ON inventory_recipe_ingredients(recipe_id);
 CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_item ON inventory_recipe_ingredients(inventory_item_id);
 

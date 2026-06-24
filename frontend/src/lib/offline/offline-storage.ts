@@ -1,7 +1,7 @@
 /**
  * Offline POS Service
  * 
- * Provides offline-first capabilities for restaurant POS operations:
+ * Provides offline-first capabilities for POS operations:
  * - IndexedDB storage for offline data
  * - Sync queue management
  * - Conflict resolution
@@ -10,12 +10,12 @@
 
 // IndexedDB Database Schema
 const DB_NAME = 'v2-offline-pos';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // Store names
 const STORES = {
-  MENU_ITEMS: 'menu_items',
-  MENU_CATEGORIES: 'menu_categories',
+  CATALOG_ITEMS: 'catalog_items',
+  CATALOG_CATEGORIES: 'catalog_categories',
   MODIFIERS: 'modifiers',
   CUSTOMERS: 'customers',
   ORDERS: 'orders',
@@ -23,9 +23,9 @@ const STORES = {
   SYNC_QUEUE: 'sync_queue',
   SETTINGS: 'settings',
   CACHE_METADATA: 'cache_metadata',
-  CHALETS: 'chalets',
+  BOOKABLE_UNITS: 'bookable_units',
   BOOKINGS: 'bookings',
-  POOL_SESSIONS: 'pool_sessions',
+  CAPACITY_WINDOWS: 'capacity_windows',
   TICKETS: 'tickets',
   HOUSEKEEPING_TASKS: 'housekeeping_tasks',
   CONFLICTS: 'conflicts',
@@ -83,10 +83,13 @@ interface OfflineOrder extends OfflineEntity {
   customerId?: string;
   notes?: string;
   items?: Array<{
-    menuItemId: string;
+    catalogItemId?: string;
+    menuItemId?: string;
     quantity: number;
     notes?: string;
-    modifiers?: string[];
+    modifiers?: any[];
+    name?: string;
+    id?: string;
   }>;
 }
 
@@ -109,24 +112,32 @@ export function initDatabase(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
 
-      // Menu Items Store
-      if (!db.objectStoreNames.contains(STORES.MENU_ITEMS)) {
-        const menuStore = db.createObjectStore(STORES.MENU_ITEMS, { keyPath: 'id' });
-        menuStore.createIndex('category_id', 'category_id', { unique: false });
-        menuStore.createIndex('is_available', 'is_available', { unique: false });
-        menuStore.createIndex('updated_at', 'updated_at', { unique: false });
+      // Version 2→3: rename chalet_id index to unit_id in housekeeping tasks
+      if (event.oldVersion < 3 && db.objectStoreNames.contains(STORES.HOUSEKEEPING_TASKS)) {
+        const upgradeTx = (event.target as IDBOpenDBRequest).transaction!;
+        const hkUpgrade = upgradeTx.objectStore(STORES.HOUSEKEEPING_TASKS);
+        if (hkUpgrade.indexNames.contains('chalet_id')) hkUpgrade.deleteIndex('chalet_id');
+        if (!hkUpgrade.indexNames.contains('unit_id')) hkUpgrade.createIndex('unit_id', 'unit_id', { unique: false });
       }
 
-      // Menu Categories Store
-      if (!db.objectStoreNames.contains(STORES.MENU_CATEGORIES)) {
-        const categoryStore = db.createObjectStore(STORES.MENU_CATEGORIES, { keyPath: 'id' });
+      // Catalog Items Store
+      if (!db.objectStoreNames.contains(STORES.CATALOG_ITEMS)) {
+        const catalogItemsStore = db.createObjectStore(STORES.CATALOG_ITEMS, { keyPath: 'id' });
+        catalogItemsStore.createIndex('category_id', 'category_id', { unique: false });
+        catalogItemsStore.createIndex('is_available', 'is_available', { unique: false });
+        catalogItemsStore.createIndex('updated_at', 'updated_at', { unique: false });
+      }
+
+      // Catalog Categories Store
+      if (!db.objectStoreNames.contains(STORES.CATALOG_CATEGORIES)) {
+        const categoryStore = db.createObjectStore(STORES.CATALOG_CATEGORIES, { keyPath: 'id' });
         categoryStore.createIndex('sort_order', 'sort_order', { unique: false });
       }
 
       // Modifiers Store
       if (!db.objectStoreNames.contains(STORES.MODIFIERS)) {
         const modifierStore = db.createObjectStore(STORES.MODIFIERS, { keyPath: 'id' });
-        modifierStore.createIndex('menu_item_id', 'menu_item_id', { unique: false });
+        modifierStore.createIndex('catalog_item_id', 'catalog_item_id', { unique: false });
       }
 
       // Customers Store
@@ -171,10 +182,10 @@ export function initDatabase(): Promise<IDBDatabase> {
         db.createObjectStore(STORES.CACHE_METADATA, { keyPath: 'storeName' });
       }
 
-      // Chalets Store
-      if (!db.objectStoreNames.contains(STORES.CHALETS)) {
-        const chaletStore = db.createObjectStore(STORES.CHALETS, { keyPath: 'id' });
-        chaletStore.createIndex('status', 'status', { unique: false });
+      // Bookable Units Store
+      if (!db.objectStoreNames.contains(STORES.BOOKABLE_UNITS)) {
+        const unitStore = db.createObjectStore(STORES.BOOKABLE_UNITS, { keyPath: 'id' });
+        unitStore.createIndex('status', 'status', { unique: false });
       }
 
       // Bookings Store
@@ -185,10 +196,10 @@ export function initDatabase(): Promise<IDBDatabase> {
         bookingStore.createIndex('synced', 'synced', { unique: false });
       }
 
-      // Pool Sessions Store
-      if (!db.objectStoreNames.contains(STORES.POOL_SESSIONS)) {
-        const poolStore = db.createObjectStore(STORES.POOL_SESSIONS, { keyPath: 'id' });
-        poolStore.createIndex('date', 'date', { unique: false });
+      // Capacity Windows Store
+      if (!db.objectStoreNames.contains(STORES.CAPACITY_WINDOWS)) {
+        const windowStore = db.createObjectStore(STORES.CAPACITY_WINDOWS, { keyPath: 'id' });
+        windowStore.createIndex('date', 'date', { unique: false });
       }
 
       // Tickets Store
@@ -202,7 +213,7 @@ export function initDatabase(): Promise<IDBDatabase> {
       // Housekeeping Tasks Store
       if (!db.objectStoreNames.contains(STORES.HOUSEKEEPING_TASKS)) {
         const hkStore = db.createObjectStore(STORES.HOUSEKEEPING_TASKS, { keyPath: 'id' });
-        hkStore.createIndex('chalet_id', 'chalet_id', { unique: false });
+        hkStore.createIndex('unit_id', 'unit_id', { unique: false });
         hkStore.createIndex('status', 'status', { unique: false });
       }
 
@@ -382,15 +393,15 @@ export class OfflineStore<T extends { id: string }> {
 }
 
 // Export store instances
-export const menuItemsStore = new OfflineStore<OfflineEntity>(STORES.MENU_ITEMS);
-export const menuCategoriesStore = new OfflineStore<OfflineEntity>(STORES.MENU_CATEGORIES);
+export const catalogItemsStore = new OfflineStore<OfflineEntity>(STORES.CATALOG_ITEMS);
+export const catalogCategoriesStore = new OfflineStore<OfflineEntity>(STORES.CATALOG_CATEGORIES);
 export const modifiersStore = new OfflineStore<OfflineEntity>(STORES.MODIFIERS);
 export const customersStore = new OfflineStore<OfflineEntity>(STORES.CUSTOMERS);
 export const ordersStore = new OfflineStore<OfflineOrder>(STORES.ORDERS);
 export const paymentsStore = new OfflineStore<OfflineEntity>(STORES.PAYMENTS);
-export const chaletsStore = new OfflineStore<OfflineEntity>(STORES.CHALETS);
+export const bookableUnitsStore = new OfflineStore<OfflineEntity>(STORES.BOOKABLE_UNITS);
 export const bookingsStore = new OfflineStore<OfflineEntity>(STORES.BOOKINGS);
-export const poolSessionsStore = new OfflineStore<OfflineEntity>(STORES.POOL_SESSIONS);
+export const capacityWindowsStore = new OfflineStore<OfflineEntity>(STORES.CAPACITY_WINDOWS);
 export const ticketsStore = new OfflineStore<OfflineEntity>(STORES.TICKETS);
 export const housekeepingTasksStore = new OfflineStore<OfflineEntity>(STORES.HOUSEKEEPING_TASKS);
 export const conflictsStore = new OfflineStore<SyncConflict>(STORES.CONFLICTS);

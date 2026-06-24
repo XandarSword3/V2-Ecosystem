@@ -31,6 +31,11 @@ vi.mock('../../src/lib/offline/offline-sync', () => ({
   clearOfflineData: clearOfflineDataMock,
 }));
 
+vi.mock('../../src/lib/offline/offline-hydration', () => ({
+  startBackgroundRefresh: vi.fn(),
+  stopBackgroundRefresh: vi.fn(),
+}));
+
 import { useOfflineSync, useOnlineStatus } from '../../src/lib/offline/use-offline-sync';
 
 describe('offline sync hooks', () => {
@@ -68,7 +73,9 @@ describe('offline sync hooks', () => {
       return unsubscribeMock;
     });
 
+    localStorage.setItem('auth_token', 'test-token');
     const { result, unmount } = renderHook(() => useOfflineSync());
+    localStorage.removeItem('auth_token');
 
     expect(initOfflineSyncMock).toHaveBeenCalledTimes(1);
     expect(subscribeToSyncStatusMock).toHaveBeenCalledTimes(1);

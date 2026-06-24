@@ -50,7 +50,7 @@ vi.mock('@/lib/socket', () => ({
 import StaffPOSTemplate from '../../src/components/pos-templates/StaffPOSTemplate';
 
 const MODULE_ID = 'mod-pos-1';
-const MODULE_SLUG = 'restaurant';
+const MODULE_SLUG = 'menu_service';
 
 const buildTables = () => [
   {
@@ -315,7 +315,7 @@ describe('StaffPOSTemplate behavior', () => {
     setupNoShiftApi();
 
     const firstRender = render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
     await screen.findByText('Start Your Shift');
@@ -332,19 +332,19 @@ describe('StaffPOSTemplate behavior', () => {
     });
 
     expect(toastSuccessMock).toHaveBeenCalledWith('Shift started');
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
   });
 
   it('subscribes to socket updates for staff order events', async () => {
     setupActiveShiftApi();
 
     const { unmount } = render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
 
-    expect(socketMock.emit).toHaveBeenCalledWith('join:unit', 'restaurant');
+    expect(socketMock.emit).toHaveBeenCalledWith('join:unit', 'menu_service');
     expect(socketMock.on).toHaveBeenCalledWith('order:new', expect.any(Function));
     expect(socketMock.on).toHaveBeenCalledWith('order:updated', expect.any(Function));
     expect(socketMock.on).toHaveBeenCalledWith('table:update', expect.any(Function));
@@ -361,10 +361,10 @@ describe('StaffPOSTemplate behavior', () => {
     setupActiveShiftApi();
 
     const firstRender = render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
 
     await user.click(screen.getByRole('button', { name: /orders/i }));
     await screen.findByText('#1002');
@@ -386,10 +386,10 @@ describe('StaffPOSTemplate behavior', () => {
     setupActiveShiftApi();
 
     const firstRender = render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
 
     await user.click(screen.getByText('T1'));
     await screen.findByText('Table T1');
@@ -427,7 +427,7 @@ describe('StaffPOSTemplate behavior', () => {
     });
 
     const firstRender = render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
     await screen.findByText('Start Your Shift');
@@ -442,7 +442,7 @@ describe('StaffPOSTemplate behavior', () => {
 
     apiGetMock.mockRejectedValueOnce(new Error('load failed'));
     render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
     await screen.findByText('Start Your Shift');
     expect(consoleErrorSpy).toHaveBeenCalled();
@@ -453,10 +453,10 @@ describe('StaffPOSTemplate behavior', () => {
     setupActiveShiftApiWithData(buildKitchenHeavyOrders());
 
     const firstRender = render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
 
     await user.click(screen.getByRole('button', { name: /orders/i }));
     await screen.findByText('#1002');
@@ -539,10 +539,10 @@ describe('StaffPOSTemplate behavior', () => {
     });
 
     render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
     await user.click(screen.getByRole('button', { name: /orders/i }));
     await screen.findByText('#1001');
 
@@ -564,10 +564,10 @@ describe('StaffPOSTemplate behavior', () => {
     setupActiveShiftApiWithData(buildKitchenHeavyOrders());
 
     const firstRender = render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
 
     await user.click(screen.getByRole('button', { name: /cashier/i }));
     await screen.findAllByRole('button', { name: /settle/i });
@@ -604,10 +604,10 @@ describe('StaffPOSTemplate behavior', () => {
     });
 
     render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
     await user.click(screen.getByRole('button', { name: /end shift/i }));
     const secondShiftDialog = await screen.findByRole('dialog');
     await user.type(within(secondShiftDialog).getByPlaceholderText('0.00'), '180');
@@ -623,10 +623,10 @@ describe('StaffPOSTemplate behavior', () => {
     setupActiveShiftApiWithData(buildOrders() as Array<Record<string, unknown>>);
 
     render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
 
     const newOrderHandler = socketMock.on.mock.calls.find(call => call[0] === 'order:new')?.[1] as
       | ((order: {
@@ -712,10 +712,10 @@ describe('StaffPOSTemplate behavior', () => {
     setupActiveShiftApiWithData([]);
 
     render(
-      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Floor" />
+      <StaffPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Floor" />
     );
 
-    await screen.findByText('Restaurant Floor');
+    await screen.findByText('MenuService Floor');
     await user.click(screen.getByRole('button', { name: /kitchen/i }));
     expect(screen.getByText('No active orders')).toBeInTheDocument();
   });

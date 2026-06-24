@@ -31,12 +31,12 @@ CREATE POLICY "Allow admin write access to terminology"
 
 -- Insert some default terminology for reference
 INSERT INTO terminology_overrides (business_type, term_key, term_value, language) VALUES
-    ('resort', 'unit_singular', 'Chalet', 'en'),
-    ('resort', 'unit_plural', 'Chalets', 'en'),
-    ('resort', 'facility_singular', 'Pool', 'en'),
-    ('resort', 'facility_plural', 'Pools', 'en'),
-    ('resort', 'dining_singular', 'Restaurant', 'en'),
-    ('resort', 'dining_plural', 'Restaurants', 'en'),
+    ('resort', 'unit_singular', 'Unit', 'en'),
+    ('resort', 'unit_plural', 'Units', 'en'),
+    ('resort', 'facility_singular', 'Facility', 'en'),
+    ('resort', 'facility_plural', 'Facilities', 'en'),
+    ('resort', 'dining_singular', 'Dining Venue', 'en'),
+    ('resort', 'dining_plural', 'Dining Venues', 'en'),
     ('hotel', 'unit_singular', 'Room', 'en'),
     ('hotel', 'unit_plural', 'Rooms', 'en'),
     ('hotel', 'facility_singular', 'Spa', 'en'),

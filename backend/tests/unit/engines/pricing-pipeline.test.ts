@@ -235,7 +235,7 @@ describe('PricingPipeline - Time-Exclusive Reservation (Engine B)', () => {
 
   it('should calculate multi-night booking with add-ons', async () => {
     const items = [
-      createLineItem({ itemId: 'chalet-1', name: 'Chalet A (3 nights)', unitPrice: 200, quantity: 3 }),
+      createLineItem({ itemId: 'accommodation unit-1', name: 'AccommodationUnit A (3 nights)', unitPrice: 200, quantity: 3 }),
       createLineItem({ itemId: 'addon-bbq', name: 'BBQ Package', unitPrice: 25, quantity: 3, metadata: { type: 'per_night' } }),
       createLineItem({ itemId: 'addon-bedding', name: 'Extra Bedding', unitPrice: 15, quantity: 1, metadata: { type: 'one_time' } }),
     ];

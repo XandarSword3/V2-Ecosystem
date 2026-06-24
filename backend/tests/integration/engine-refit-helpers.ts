@@ -7,10 +7,10 @@ import { trackResource } from './setup';
 
 /** Dead per ARCHITECTURE_LAW — must never appear in cleanup tracking or queries. */
 export const DEAD_LEGACY_TABLES = new Set([
-  'restaurant_orders',
-  'pool_tickets',
-  'chalet_bookings',
-  'snack_orders',
+  'menu_service_orders',
+  'capacity_access_tickets',
+  'unit_bookings',
+  'kiosk_orders',
   'tickets',
   'bookings',
   'orders',
@@ -24,10 +24,11 @@ export const EngineType = {
 } as const;
 
 export const ModuleSlug = {
-  RESTAURANT: 'restaurant',
-  CHALETS: 'chalets',
-  POOL: 'pool',
-  SNACK_BAR: 'snack-bar',
+  RESTAURANT: 'menu_service',
+  CHALETS: 'accommodation_units',
+  ACCOMMODATION_UNITS: 'accommodation_units',
+  POOL: 'capacity',
+  kiosk: 'kiosk',
 } as const;
 
 /** Register a created engine record for teardown (always `transactions`). */

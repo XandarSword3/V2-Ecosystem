@@ -97,7 +97,7 @@ export interface OrderItemRow {
     quantity: number;
   }> | null;
   modifier_total?: string | null;
-  menu_items?: {
+  catalog_items?: {
     id: string;
     name: string;
     image_url?: string | null;
@@ -118,7 +118,7 @@ export interface RestaurantOrderRow {
   customer_name?: string | null;
   customer_phone?: string | null;
   table_number?: string | null;
-  chalet_number?: string | null;
+  unit_number?: string | null;
   special_instructions?: string | null;
   estimated_ready_time?: string | null;
   created_at: string;
@@ -179,7 +179,7 @@ export interface PoolSessionRow {
 }
 
 // ============================================
-// Chalet Types
+// Accommodation Unit Types
 // ============================================
 
 export interface ChaletRow {

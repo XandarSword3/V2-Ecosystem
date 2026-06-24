@@ -71,7 +71,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       userAgent: req.get('user-agent'),
     });
 
-    // Check if 2FA is required
+    // Check if 2FA is required (existing enrolled 2FA)
     if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
       return res.json({
         success: true,
@@ -81,6 +81,20 @@ export async function login(req: Request, res: Response, next: NextFunction) {
           email: result.email,
         },
         message: 'Two-factor authentication required',
+      });
+    }
+
+    // Check if 2FA enrollment is required (privileged accounts without 2FA set up)
+    if ('requiresTwoFactorSetup' in result && result.requiresTwoFactorSetup) {
+      return res.status(403).json({
+        success: false,
+        data: {
+          requiresTwoFactorSetup: true,
+          userId: result.userId,
+          email: result.email,
+        },
+        message: result.message || 'Two-factor authentication is mandatory for admin accounts. Please enrol in 2FA before logging in.',
+        code: 'TWO_FACTOR_SETUP_REQUIRED',
       });
     }
 

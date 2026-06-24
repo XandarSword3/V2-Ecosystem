@@ -2,13 +2,13 @@
 
 /**
  * TranslatedText Component
- * 
+ *
  * A component that automatically displays translated content for dynamic items.
- * Supports menu items, chalets, and any other translatable content from the database.
- * 
+ * Supports catalog items, accommodation units, and any other translatable content from the database.
+ *
  * Usage:
- * <TranslatedText item={menuItem} field="name" />
- * <TranslatedText item={chalet} field="description" as="p" className="text-gray-600" />
+ * <TranslatedText item={catalogItem} field="name" />
+ * <TranslatedText item={unit} field="description" as="p" className="text-gray-600" />
  */
 
 import React from 'react';

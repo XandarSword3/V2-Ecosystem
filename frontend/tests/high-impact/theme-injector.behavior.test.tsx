@@ -18,7 +18,7 @@ vi.mock('@/lib/settings-context', () => ({
 }));
 
 vi.mock('@/lib/theme-config', () => ({
-  resortThemes: {
+  siteThemes: {
     beach: {
       colors: {
         primary: '#2563eb',

@@ -33,7 +33,7 @@ vi.mock('sonner', () => ({
 import AdminPOSTemplate from '../../src/components/pos-templates/AdminPOSTemplate';
 
 const MODULE_ID = 'mod-pos-1';
-const MODULE_SLUG = 'restaurant';
+const MODULE_SLUG = 'menu_service';
 
 const baseCategories = [
   { id: 'cat-1', name: 'Main Dishes', sort_order: 1, is_active: true },
@@ -222,7 +222,7 @@ describe('AdminPOSTemplate behavior', () => {
 
   it('loads categories, menu items, and policies on first render', async () => {
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -239,7 +239,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -278,7 +278,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -296,7 +296,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -328,7 +328,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -360,7 +360,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -385,7 +385,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -402,7 +402,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -441,7 +441,7 @@ describe('AdminPOSTemplate behavior', () => {
     });
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -463,7 +463,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -497,7 +497,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -525,7 +525,7 @@ describe('AdminPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -561,7 +561,7 @@ describe('AdminPOSTemplate behavior', () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -607,7 +607,7 @@ describe('AdminPOSTemplate behavior', () => {
     });
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');
@@ -631,7 +631,7 @@ describe('AdminPOSTemplate behavior', () => {
     apiGetMock.mockRejectedValueOnce(new Error('initial load failed'));
 
     render(
-      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant POS" />
+      <AdminPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService POS" />
     );
 
     await screen.findByText('Menu Management');

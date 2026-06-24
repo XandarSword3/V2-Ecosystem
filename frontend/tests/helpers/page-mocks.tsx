@@ -104,9 +104,9 @@ vi.mock('sonner', () => ({
 
 // ─── @/lib/settings-context ─────────────────────────────
 const mockSettings = {
-  resortName: 'Test Resort',
+  propertyName: 'Test Property',
   phone: '+1-555-0100',
-  email: 'test@resort.com',
+  email: 'test@v2-hub.com',
   address: '123 Resort Rd',
   receptionHours: '24/7',
   currency: 'USD',
@@ -162,7 +162,7 @@ vi.mock('@/lib/api', () => ({
     getCategories: vi.fn().mockResolvedValue({ data: { data: [] } }),
   },
   chaletsApi: {
-    getChalets: vi.fn().mockResolvedValue({ data: { data: [] } }),
+    getAccommodationUnits: vi.fn().mockResolvedValue({ data: { data: [] } }),
     getAvailability: vi.fn().mockResolvedValue({ data: { data: [] } }),
   },
   poolApi: {

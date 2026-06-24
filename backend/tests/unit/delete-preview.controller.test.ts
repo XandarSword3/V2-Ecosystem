@@ -20,14 +20,14 @@ const createMockSupabase = () => {
           return builder;
         }
         
-        if (table === 'chalet_bookings') {
+        if (table === 'unit_bookings') {
           return {
             ...builder,
             limit: vi.fn().mockResolvedValue({ data: [], count: bookings, error: null }),
           };
         }
         
-        if (table === 'restaurant_orders') {
+        if (table === 'menu_service_orders') {
           return {
             ...builder,
             limit: vi.fn().mockResolvedValue({ data: [], count: orders, error: null }),
@@ -125,11 +125,11 @@ describe('Delete Preview Controller', () => {
   });
 
   describe('Supported entity types', () => {
-    const entityTypes = ['user', 'booking', 'staff', 'chalet', 'menu_item', 'table', 'module'];
+    const entityTypes = ['user', 'booking', 'staff', 'accommodation unit', 'menu_item', 'table', 'module'];
 
     it('should accept all valid entity types', () => {
       entityTypes.forEach(type => {
-        expect(['user', 'booking', 'staff', 'chalet', 'menu_item', 'table', 'module']).toContain(type);
+        expect(['user', 'booking', 'staff', 'accommodation unit', 'menu_item', 'table', 'module']).toContain(type);
       });
     });
   });

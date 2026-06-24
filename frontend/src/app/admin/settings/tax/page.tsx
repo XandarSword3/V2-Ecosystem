@@ -96,7 +96,7 @@ const defaultConfig: TaxConfiguration = {
       applies_to: ['food_beverage'],
       is_default: false,
       is_compound: false,
-      description: 'Restaurant service charge',
+      description: 'Food & Beverage service charge',
       created_at: new Date().toISOString()
     }
   ]
@@ -261,7 +261,7 @@ export default function TaxConfigurationPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Tax Configuration</h1>
-          <p className="text-slate-600 dark:text-slate-400">Configure tax rates for your resort</p>
+          <p className="text-slate-600 dark:text-slate-400">Configure tax rates for your business</p>
         </div>
         <button
           onClick={handleSave}

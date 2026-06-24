@@ -32,6 +32,6 @@ test.describe('V2 Ecosystem Critical Flows', () => {
   test('Module Navigation', async ({ page }) => {
     await page.goto('http://localhost:3000');
     // Verify modules are present - use first() to handle multiple matches
-    await expect(page.getByRole('link', { name: /Restaurant/i }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /MenuService/i }).first()).toBeVisible();
   });
 });

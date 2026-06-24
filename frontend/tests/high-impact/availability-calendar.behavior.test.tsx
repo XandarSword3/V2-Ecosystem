@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import AvailabilityCalendar from '../../src/components/chalets/AvailabilityCalendar';
+import AvailabilityCalendar from '../../src/components/booking/AvailabilityCalendar';
 
 function toDateKey(date: Date): string {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString().split('T')[0];

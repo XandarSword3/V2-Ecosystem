@@ -576,7 +576,7 @@ describe('InventoryController', () => {
       };
       // Per txn: 1. get item  2. insert tx  3. update stock
       resolveQueue.push(
-        { data: { id: 'i1', current_stock: '10' }, error: null },
+        { data: [{ id: '22222222-2222-2222-2222-222222222222', current_stock: '10' }], error: null },
         { data: null, error: null },
         { data: null, error: null },
       );

@@ -1,10 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { config } from '../../config/index.js';
+import { config } from '../../config/index';
 
 interface TokenPayload {
   userId:          string;
   email:           string;
+  scope?:          string;
   roles:           string[];
   tokenVersion?:   number;
   tenantId?:       string;
@@ -48,6 +49,7 @@ export function generateTokens(payload: TokenPayload): {
     {
       userId:          payload.userId,
       email:           payload.email,
+      scope:           payload.scope,
       roles:           payload.roles,
       tokenVersion,
       jti,
@@ -96,6 +98,7 @@ export function verifyRefreshToken(token: string): {
 export function verifyToken(token: string): {
   userId:          string;
   email:           string;
+  scope?:          string;
   roles:           string[];
   tokenVersion?:   number;
   jti?:            string;
@@ -107,6 +110,7 @@ export function verifyToken(token: string): {
   return jwt.verify(token, config.jwt.secret) as {
     userId:          string;
     email:           string;
+    scope?:          string;
     roles:           string[];
     tokenVersion?:   number;
     jti?:            string;

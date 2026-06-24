@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -37,7 +36,7 @@ interface SocketOrderEvent {
 
 interface OrderItem {
   id: string;
-  menu_item_id?: string;
+  catalog_item_id?: string;
   quantity: number;
   unit_price?: number;
   unitPrice?: number;
@@ -45,7 +44,7 @@ interface OrderItem {
   special_instructions?: string;
   specialInstructions?: string;
   name?: string;
-  menu_items?: {
+  catalog_items?: {
     name: string;
   };
 }
@@ -98,7 +97,7 @@ export default function DynamicOrdersPage() {
   const fetchOrders = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/restaurant/staff/orders', {
+      const response = await api.get(`/${slug}/staff/orders`, {
         params: { moduleId: currentModule.id }
       });
       setOrders(response.data.data || []);
@@ -107,7 +106,7 @@ export default function DynamicOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentModule]);
+  }, [currentModule, slug]);
 
   useEffect(() => {
     if (currentModule) {
@@ -141,7 +140,7 @@ export default function DynamicOrdersPage() {
 
   const updateStatus = async (orderId: string, status: string) => {
     try {
-      await api.put(`/restaurant/staff/orders/${orderId}/status`, { status });
+      await api.put(`/${slug}/staff/orders/${orderId}/status`, { status });
       toast.success(`Order status updated to ${status}`);
       fetchOrders();
       if (selectedOrder?.id === orderId) {
@@ -288,7 +287,7 @@ export default function DynamicOrdersPage() {
                                 {item.quantity}x
                               </span>
                               <span className="text-slate-600 dark:text-slate-400">
-                                {item.menu_items?.name || item.name}
+                                {item.catalog_items?.name || item.name}
                               </span>
                             </div>
                             <span className="text-slate-500">

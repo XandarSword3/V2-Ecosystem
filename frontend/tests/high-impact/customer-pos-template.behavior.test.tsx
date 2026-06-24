@@ -48,7 +48,7 @@ vi.mock('@/lib/socket', () => ({
 import CustomerPOSTemplate from '../../src/components/pos-templates/CustomerPOSTemplate';
 
 const MODULE_ID = 'mod-pos-1';
-const MODULE_SLUG = 'restaurant';
+const MODULE_SLUG = 'menu_service';
 
 const categories = [
   { id: 'cat-food', name: 'Food' },
@@ -203,7 +203,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -222,7 +222,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -253,7 +253,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -274,7 +274,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -311,7 +311,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -331,7 +331,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -377,7 +377,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -401,7 +401,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -428,7 +428,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -460,7 +460,7 @@ describe('CustomerPOSTemplate behavior', () => {
     const user = userEvent.setup();
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Burger');
@@ -515,7 +515,7 @@ describe('CustomerPOSTemplate behavior', () => {
     });
 
     const { unmount } = render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
     await screen.findByText('Active Orders (1)');
@@ -553,10 +553,10 @@ describe('CustomerPOSTemplate behavior', () => {
     });
 
     render(
-      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="Restaurant Menu" />
+      <CustomerPOSTemplate moduleId={MODULE_ID} moduleSlug={MODULE_SLUG} moduleName="MenuService Menu" />
     );
 
-    await screen.findByText('Restaurant Menu');
+    await screen.findByText('MenuService Menu');
     expect(toastErrorMock).toHaveBeenCalledWith('Failed to load menu');
   });
 });

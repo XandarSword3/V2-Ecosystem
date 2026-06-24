@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { getStoredPropertyId, isValidPropertyId, setStoredPropertyId } from '@/lib/property-id';
 
 interface Property {
   id: string;
@@ -47,21 +48,25 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
       })));
 
       if (data.length > 0) {
-        const storedId = localStorage.getItem('activePropertyId');
-              const hasAccessToStored = data.find((p: any) => p.id === storedId);
-        
-        if (storedId && hasAccessToStored) {
+        const storedId = getStoredPropertyId();
+        const hasAccessToStored = storedId && data.find((p: any) => p.id === storedId);
+
+        if (hasAccessToStored) {
           setActivePropertyIdState(storedId);
         } else {
-          // Fall back to primary or first available
           const primary = data.find((p: any) => p.is_primary) || data[0];
           const primaryId = primary?.id;
-          setActivePropertyIdState(primaryId);
-          localStorage.setItem('activePropertyId', primaryId);
+          if (isValidPropertyId(primaryId)) {
+            setActivePropertyIdState(primaryId);
+            setStoredPropertyId(primaryId);
+          } else {
+            setActivePropertyIdState(null);
+            setStoredPropertyId(null);
+          }
         }
       } else {
         setActivePropertyIdState(null);
-        localStorage.removeItem('activePropertyId');
+        setStoredPropertyId(null);
       }
     } catch (error) {
       console.error('Failed to fetch properties:', error);
@@ -76,8 +81,9 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setActiveProperty = (id: string) => {
+    if (!isValidPropertyId(id)) return;
     setActivePropertyIdState(id);
-    localStorage.setItem('activePropertyId', id);
+    setStoredPropertyId(id);
     // Optionally we can force a page reload to refresh all data, 
     // or rely on components listening to this context.
     // window.location.reload(); 

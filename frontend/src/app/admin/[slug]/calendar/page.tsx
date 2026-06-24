@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react';
 
-interface ChaletOption {
+interface BookableUnit {
   id: string;
   name: string;
   base_price: number;
@@ -41,7 +41,7 @@ interface Booking {
 
 interface BlockedDate {
   id: string;
-  chalet_id: string;
+  unit_id: string;
   blocked_date: string;
   reason: string | null;
 }
@@ -58,8 +58,8 @@ export default function AdminCalendarPage() {
   const slug = rawSlug ? decodeURIComponent(rawSlug).toLowerCase() : '';
   const currentModule = modules.find(m => m.slug.toLowerCase() === slug);
 
-  const [chalets, setChalets] = useState<ChaletOption[]>([]);
-  const [selectedChaletId, setSelectedChaletId] = useState<string>('');
+  const [units, setUnits] = useState<BookableUnit[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
@@ -68,29 +68,28 @@ export default function AdminCalendarPage() {
   const [loading, setLoading] = useState(false);
   const [viewBooking, setViewBooking] = useState<Booking | null>(null);
 
-  // Fetch chalets for this module
+  // Fetch bookable units for this module
   useEffect(() => {
-    const fetchChalets = async () => {
+    const fetchUnits = async () => {
       try {
-        const moduleId = currentModule?.id;
-        const response = await api.get('/chalets', { params: { moduleId } });
+        const response = await api.get(`/admin/modules/${slug}/units`, { params: { moduleId: currentModule?.id } });
         const data = response.data?.data || [];
-        setChalets(data);
-        if (data.length > 0 && !selectedChaletId) {
-          setSelectedChaletId(data[0].id);
+        setUnits(data);
+        if (data.length > 0 && !selectedUnitId) {
+          setSelectedUnitId(data[0].id);
         }
       } catch (error) {
-        console.error('Failed to fetch chalets:', error);
+        console.error('Failed to fetch units:', error);
       }
     };
-    if (currentModule) fetchChalets();
+    if (currentModule) fetchUnits();
   }, [currentModule]);
 
-  // Fetch calendar data when chalet or month changes
+  // Fetch calendar data when unit or month changes
   useEffect(() => {
-    if (!selectedChaletId) return;
+    if (!selectedUnitId) return;
     fetchCalendarData();
-  }, [selectedChaletId, currentMonth]);
+  }, [selectedUnitId, currentMonth]);
 
   const fetchCalendarData = async () => {
     setLoading(true);
@@ -100,7 +99,7 @@ export default function AdminCalendarPage() {
       const startDate = formatDateStr(new Date(year, month, 1));
       const endDate = formatDateStr(new Date(year, month + 1, 0));
       
-      const response = await api.get(`/chalets/admin/chalets/${selectedChaletId}/calendar`, {
+      const response = await api.get(`/admin/modules/${slug}/units/${selectedUnitId}/calendar`, {
         params: { startDate, endDate },
       });
       
@@ -192,7 +191,7 @@ export default function AdminCalendarPage() {
   const handleBlockDates = async () => {
     if (selectedDates.size === 0) return;
     try {
-      await api.post(`/chalets/admin/chalets/${selectedChaletId}/block-dates`, {
+      await api.post(`/admin/modules/${slug}/units/${selectedUnitId}/block-dates`, {
         dates: Array.from(selectedDates),
         reason: blockReason || undefined,
       });
@@ -208,7 +207,7 @@ export default function AdminCalendarPage() {
   const handleUnblockDates = async () => {
     if (selectedDates.size === 0) return;
     try {
-      await api.post(`/chalets/admin/chalets/${selectedChaletId}/unblock-dates`, {
+      await api.post(`/admin/modules/${slug}/units/${selectedUnitId}/unblock-dates`, {
         dates: Array.from(selectedDates),
       });
       toast.success(`${selectedDates.size} date(s) unblocked`);
@@ -233,7 +232,7 @@ export default function AdminCalendarPage() {
   });
 
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const selectedChalet = chalets.find(c => c.id === selectedChaletId);
+  const selectedUnit = units.find(u => u.id === selectedUnitId);
 
   const statusColors: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -257,16 +256,16 @@ export default function AdminCalendarPage() {
         </div>
       </div>
 
-      {/* Chalet Selector */}
+      {/* Unit Selector */}
       <div className="flex items-center gap-4">
-        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Chalet:</label>
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Unit:</label>
         <select
-          value={selectedChaletId}
-          onChange={e => setSelectedChaletId(e.target.value)}
+          value={selectedUnitId}
+          onChange={e => setSelectedUnitId(e.target.value)}
           className="input max-w-xs"
         >
-          {chalets.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+          {units.map(u => (
+            <option key={u.id} value={u.id}>{u.name}</option>
           ))}
         </select>
       </div>

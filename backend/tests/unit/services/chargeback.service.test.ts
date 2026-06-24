@@ -12,11 +12,14 @@ vi.mock('stripe', () => {
 });
 
 // Mock supabase
-vi.mock('../../../src/lib/supabase', () => ({
-  supabase: {
-    from: vi.fn(),
-  },
-}));
+vi.mock('../../../src/lib/supabase', () => {
+  const mockClient = { from: vi.fn() };
+  return {
+    supabase: mockClient,
+    getSupabase: vi.fn().mockReturnValue(mockClient),
+    getSupabaseAdmin: vi.fn(),
+  };
+});
 
 vi.mock('../../../src/services/email.service', () => ({
   emailService: {

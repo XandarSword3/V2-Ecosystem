@@ -67,23 +67,23 @@ describe('EngineService — Integration', () => {
   // ============================================
 
   describe('template type resolution', () => {
-    it('should resolve menu_service → instant_transaction', () => {
-      const engine = service.getEngineForTemplate('menu_service');
+    it('should resolve instant_transaction canonical type', () => {
+      const engine = service.getEngineForTemplate('instant_transaction');
       expect(engine.type).toBe('instant_transaction');
     });
 
-    it('should resolve multi_day_booking → time_exclusive_reservation', () => {
-      const engine = service.getEngineForTemplate('multi_day_booking');
+    it('should resolve time_exclusive_reservation canonical type', () => {
+      const engine = service.getEngineForTemplate('time_exclusive_reservation');
       expect(engine.type).toBe('time_exclusive_reservation');
     });
 
-    it('should resolve session_access → shared_capacity_access', () => {
-      const engine = service.getEngineForTemplate('session_access');
+    it('should resolve shared_capacity_access canonical type', () => {
+      const engine = service.getEngineForTemplate('shared_capacity_access');
       expect(engine.type).toBe('shared_capacity_access');
     });
 
-    it('should resolve subscription → ongoing_entitlement', () => {
-      const engine = service.getEngineForTemplate('subscription');
+    it('should resolve ongoing_entitlement canonical type', () => {
+      const engine = service.getEngineForTemplate('ongoing_entitlement');
       expect(engine.type).toBe('ongoing_entitlement');
     });
 
@@ -93,11 +93,11 @@ describe('EngineService — Integration', () => {
   });
 
   // ============================================
-  // Snack Bar Wiring (Engine A: instant_transaction, menu_service)
+  // KioskItem Bar Wiring (Engine A: instant_transaction, menu_service)
   // ============================================
 
-  describe('snack bar wiring (menu_service → Engine A)', () => {
-    it('should calculate pricing with tax for snack orders', async () => {
+  describe('instant_transaction wiring (Engine A)', () => {
+    it('should calculate pricing with tax for kiosk item orders', async () => {
       const lineItems: PricingLineItem[] = [
         { name: 'Burger', unitPrice: 8.00, quantity: 2 },
         { name: 'Fries', unitPrice: 3.50, quantity: 1 },
@@ -106,7 +106,7 @@ describe('EngineService — Integration', () => {
         conditions: { orderType: 'takeaway' },
       };
 
-      const result = await service.calculatePricing('menu_service', lineItems, context);
+      const result = await service.calculatePricing('instant_transaction', lineItems, context);
 
       // subtotal = (8*2) + 3.5 = 19.50
       expect(result.subtotal).toBe(19.50);
@@ -124,7 +124,7 @@ describe('EngineService — Integration', () => {
         { name: 'Coffee', unitPrice: 4.00, quantity: 1 },
       ];
 
-      const result = await service.calculatePricing('menu_service', lineItems, {
+      const result = await service.calculatePricing('instant_transaction', lineItems, {
         conditions: { orderType: 'takeaway' },
       });
 
@@ -136,7 +136,7 @@ describe('EngineService — Integration', () => {
         { name: 'Steak', unitPrice: 25.00, quantity: 1 },
       ];
 
-      const result = await service.calculatePricing('menu_service', lineItems, {
+      const result = await service.calculatePricing('instant_transaction', lineItems, {
         conditions: { orderType: 'dine_in' },
       });
 
@@ -145,48 +145,48 @@ describe('EngineService — Integration', () => {
     });
 
     it('should get initial state as pending', () => {
-      const state = service.getInitialState('menu_service');
+      const state = service.getInitialState('instant_transaction');
       expect(state).toBe('pending');
     });
 
     it('should validate pending → confirm transition', async () => {
-      const result = await service.transitionState('menu_service', 'pending', 'confirm', 'staff');
+      const result = await service.transitionState('instant_transaction', 'pending', 'confirm', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('confirmed');
     });
 
     it('should reject invalid transition (pending → deliver)', async () => {
-      const result = await service.transitionState('menu_service', 'pending', 'deliver', 'staff');
+      const result = await service.transitionState('instant_transaction', 'pending', 'deliver', 'staff');
       expect(result.allowed).toBe(false);
       expect(result.error).toBeDefined();
     });
 
     it('should allow cancel from pending', async () => {
-      const result = await service.transitionState('menu_service', 'pending', 'cancel', 'staff');
+      const result = await service.transitionState('instant_transaction', 'pending', 'cancel', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('cancelled');
     });
 
     it('should get available actions for staff from pending', () => {
-      const actions = service.getAvailableActions('menu_service', 'pending', 'staff');
+      const actions = service.getAvailableActions('instant_transaction', 'pending', 'staff');
       const actionNames = actions.map(a => a.action);
       expect(actionNames).toContain('confirm');
       expect(actionNames).toContain('cancel');
     });
 
     it('should mark completed as terminal', () => {
-      expect(service.isTerminalState('menu_service', 'completed')).toBe(true);
-      expect(service.isTerminalState('menu_service', 'cancelled')).toBe(true);
-      expect(service.isTerminalState('menu_service', 'pending')).toBe(false);
+      expect(service.isTerminalState('instant_transaction', 'completed')).toBe(true);
+      expect(service.isTerminalState('instant_transaction', 'cancelled')).toBe(true);
+      expect(service.isTerminalState('instant_transaction', 'pending')).toBe(false);
     });
   });
 
   // ============================================
-  // Restaurant Order Wiring (Engine A with discounts)
+  // MenuService Order Wiring (Engine A with discounts)
   // ============================================
 
-  describe('restaurant order wiring (menu_service + discounts)', () => {
-    it('should apply coupon discount to restaurant order', async () => {
+  describe('instant_transaction wiring with discounts', () => {
+    it('should apply coupon discount to menu service order', async () => {
       mockCouponResolver.apply.mockResolvedValue({
         discountAmount: 5.00,
         taxSavings: 0.55,
@@ -203,7 +203,7 @@ describe('EngineService — Integration', () => {
         moduleId: 'mod-1',
       };
 
-      const result = await service.calculatePricing('menu_service', lineItems, context);
+      const result = await service.calculatePricing('instant_transaction', lineItems, context);
 
       // subtotal = (15+2)*2 = 34
       expect(result.subtotal).toBe(34);
@@ -237,7 +237,7 @@ describe('EngineService — Integration', () => {
         customerId: 'cust-1',
       };
 
-      const result = await service.calculatePricing('menu_service', lineItems, context);
+      const result = await service.calculatePricing('instant_transaction', lineItems, context);
 
       const giftCardDiscount = result.discounts.find(d => d.type === 'gift_card');
       expect(giftCardDiscount).toBeDefined();
@@ -259,7 +259,7 @@ describe('EngineService — Integration', () => {
         customerId: 'cust-1',
       };
 
-      const result = await service.calculatePricing('menu_service', lineItems, context);
+      const result = await service.calculatePricing('instant_transaction', lineItems, context);
 
       const loyaltyDiscount = result.discounts.find(d => d.type === 'loyalty');
       expect(loyaltyDiscount).toBeDefined();
@@ -272,7 +272,7 @@ describe('EngineService — Integration', () => {
         { name: 'Soup', unitPrice: 8.00, quantity: 1 },
       ];
 
-      const result = await service.calculatePricing('menu_service', lineItems, {
+      const result = await service.calculatePricing('instant_transaction', lineItems, {
         conditions: { orderType: 'delivery' },
       });
 
@@ -284,14 +284,14 @@ describe('EngineService — Integration', () => {
   // Pool Wiring (Engine C: shared_capacity_access, session_access)
   // ============================================
 
-  describe('pool wiring (session_access → Engine C)', () => {
+  describe('shared_capacity_access wiring (Engine C)', () => {
     it('should calculate pool ticket pricing with tax', async () => {
       const lineItems: PricingLineItem[] = [
         { name: 'Adult Ticket', unitPrice: 25.00, quantity: 2 },
         { name: 'Child Ticket', unitPrice: 15.00, quantity: 1 },
       ];
 
-      const result = await service.calculatePricing('session_access', lineItems, {});
+      const result = await service.calculatePricing('shared_capacity_access', lineItems, {});
 
       // subtotal = 50 + 15 = 65
       expect(result.subtotal).toBe(65);
@@ -305,42 +305,42 @@ describe('EngineService — Integration', () => {
     });
 
     it('should get initial state as valid', () => {
-      expect(service.getInitialState('session_access')).toBe('valid');
+      expect(service.getInitialState('shared_capacity_access')).toBe('valid');
     });
 
     it('should allow validate_entry transition (valid → active)', async () => {
-      const result = await service.transitionState('session_access', 'valid', 'validate_entry', 'staff');
+      const result = await service.transitionState('shared_capacity_access', 'valid', 'validate_entry', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('active');
     });
 
     it('should allow record_exit from active (active → used)', async () => {
-      const result = await service.transitionState('session_access', 'active', 'record_exit', 'staff');
+      const result = await service.transitionState('shared_capacity_access', 'active', 'record_exit', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('used');
     });
 
     it('should reject record_exit from valid (must enter first)', async () => {
-      const result = await service.transitionState('session_access', 'valid', 'record_exit', 'staff');
+      const result = await service.transitionState('shared_capacity_access', 'valid', 'record_exit', 'staff');
       expect(result.allowed).toBe(false);
     });
 
     it('should allow cancel from valid', async () => {
-      const result = await service.transitionState('session_access', 'valid', 'cancel', 'staff');
+      const result = await service.transitionState('shared_capacity_access', 'valid', 'cancel', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('cancelled');
     });
 
     it('should reject cancel from used (terminal)', async () => {
-      const result = await service.transitionState('session_access', 'used', 'cancel', 'staff');
+      const result = await service.transitionState('shared_capacity_access', 'used', 'cancel', 'staff');
       expect(result.allowed).toBe(false);
     });
 
     it('should mark used and cancelled as terminal', () => {
-      expect(service.isTerminalState('session_access', 'used')).toBe(true);
-      expect(service.isTerminalState('session_access', 'cancelled')).toBe(true);
-      expect(service.isTerminalState('session_access', 'valid')).toBe(false);
-      expect(service.isTerminalState('session_access', 'active')).toBe(false);
+      expect(service.isTerminalState('shared_capacity_access', 'used')).toBe(true);
+      expect(service.isTerminalState('shared_capacity_access', 'cancelled')).toBe(true);
+      expect(service.isTerminalState('shared_capacity_access', 'valid')).toBe(false);
+      expect(service.isTerminalState('shared_capacity_access', 'active')).toBe(false);
     });
   });
 
@@ -348,54 +348,54 @@ describe('EngineService — Integration', () => {
   // Booking Wiring (Engine B: time_exclusive_reservation, multi_day_booking)
   // ============================================
 
-  describe('booking wiring (multi_day_booking → Engine B)', () => {
+  describe('time_exclusive_reservation wiring (Engine B)', () => {
     it('should get initial state as pending', () => {
-      expect(service.getInitialState('multi_day_booking')).toBe('pending');
+      expect(service.getInitialState('time_exclusive_reservation')).toBe('pending');
     });
 
     it('should allow confirm from pending', async () => {
-      const result = await service.transitionState('multi_day_booking', 'pending', 'confirm', 'staff');
+      const result = await service.transitionState('time_exclusive_reservation', 'pending', 'confirm', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('confirmed');
     });
 
     it('should allow check_in from confirmed', async () => {
-      const result = await service.transitionState('multi_day_booking', 'confirmed', 'check_in', 'staff');
+      const result = await service.transitionState('time_exclusive_reservation', 'confirmed', 'check_in', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('checked_in');
     });
 
     it('should allow walk-in check_in from pending (shortcut)', async () => {
-      const result = await service.transitionState('multi_day_booking', 'pending', 'check_in', 'staff');
+      const result = await service.transitionState('time_exclusive_reservation', 'pending', 'check_in', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('checked_in');
     });
 
     it('should allow check_out from checked_in', async () => {
-      const result = await service.transitionState('multi_day_booking', 'checked_in', 'check_out', 'staff');
+      const result = await service.transitionState('time_exclusive_reservation', 'checked_in', 'check_out', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('checked_out');
     });
 
     it('should reject check_out from confirmed (must check in first)', async () => {
-      const result = await service.transitionState('multi_day_booking', 'confirmed', 'check_out', 'staff');
+      const result = await service.transitionState('time_exclusive_reservation', 'confirmed', 'check_out', 'staff');
       expect(result.allowed).toBe(false);
     });
 
     it('should allow cancel from pending', async () => {
-      const result = await service.transitionState('multi_day_booking', 'pending', 'cancel', 'staff');
+      const result = await service.transitionState('time_exclusive_reservation', 'pending', 'cancel', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('cancelled');
     });
 
     it('should allow cancel from confirmed', async () => {
-      const result = await service.transitionState('multi_day_booking', 'confirmed', 'cancel', 'staff');
+      const result = await service.transitionState('time_exclusive_reservation', 'confirmed', 'cancel', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('cancelled');
     });
 
     it('should reject cancel from checked_out (terminal)', async () => {
-      const result = await service.transitionState('multi_day_booking', 'checked_out', 'cancel', 'staff');
+      const result = await service.transitionState('time_exclusive_reservation', 'checked_out', 'cancel', 'staff');
       expect(result.allowed).toBe(false);
     });
 
@@ -405,7 +405,7 @@ describe('EngineService — Integration', () => {
         { name: 'Extra Bed', unitPrice: 30.00, quantity: 3 },
       ];
 
-      const result = await service.calculatePricing('multi_day_booking', lineItems, {});
+      const result = await service.calculatePricing('time_exclusive_reservation', lineItems, {});
 
       // subtotal = (120*3) + (30*3) = 360 + 90 = 450
       expect(result.subtotal).toBe(450);
@@ -417,9 +417,9 @@ describe('EngineService — Integration', () => {
     });
 
     it('should mark checked_out and cancelled as terminal', () => {
-      expect(service.isTerminalState('multi_day_booking', 'checked_out')).toBe(true);
-      expect(service.isTerminalState('multi_day_booking', 'cancelled')).toBe(true);
-      expect(service.isTerminalState('multi_day_booking', 'pending')).toBe(false);
+      expect(service.isTerminalState('time_exclusive_reservation', 'checked_out')).toBe(true);
+      expect(service.isTerminalState('time_exclusive_reservation', 'cancelled')).toBe(true);
+      expect(service.isTerminalState('time_exclusive_reservation', 'pending')).toBe(false);
     });
   });
 
@@ -427,40 +427,40 @@ describe('EngineService — Integration', () => {
   // Subscription Wiring (Engine D: ongoing_entitlement, subscription)
   // ============================================
 
-  describe('subscription wiring (subscription → Engine D)', () => {
+  describe('ongoing_entitlement wiring (Engine D)', () => {
     it('should get initial state as pending', () => {
-      expect(service.getInitialState('subscription')).toBe('pending');
+      expect(service.getInitialState('ongoing_entitlement')).toBe('pending');
     });
 
     it('should allow activate from pending', async () => {
-      const result = await service.transitionState('subscription', 'pending', 'activate', 'staff');
+      const result = await service.transitionState('ongoing_entitlement', 'pending', 'activate', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('active');
     });
 
     it('should allow renew from active', async () => {
-      const result = await service.transitionState('subscription', 'active', 'renew', 'system');
+      const result = await service.transitionState('ongoing_entitlement', 'active', 'renew', 'system');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('active');
     });
 
     it('should allow pause from active', async () => {
-      const result = await service.transitionState('subscription', 'active', 'pause', 'staff');
+      const result = await service.transitionState('ongoing_entitlement', 'active', 'pause', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('paused');
     });
 
     it('should allow resume from paused', async () => {
-      const result = await service.transitionState('subscription', 'paused', 'resume', 'staff');
+      const result = await service.transitionState('ongoing_entitlement', 'paused', 'resume', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('active');
     });
 
     it('should mark cancelled as terminal, expired is NOT terminal', () => {
-      expect(service.isTerminalState('subscription', 'cancelled')).toBe(true);
+      expect(service.isTerminalState('ongoing_entitlement', 'cancelled')).toBe(true);
       // expired is NOT terminal — can reactivate or cancel from expired
-      expect(service.isTerminalState('subscription', 'expired')).toBe(false);
-      expect(service.isTerminalState('subscription', 'active')).toBe(false);
+      expect(service.isTerminalState('ongoing_entitlement', 'expired')).toBe(false);
+      expect(service.isTerminalState('ongoing_entitlement', 'active')).toBe(false);
     });
   });
 
@@ -481,7 +481,7 @@ describe('EngineService — Integration', () => {
         couponId: 'big-coupon',
       });
 
-      const result = await service.calculatePricing('menu_service', lineItems, {
+      const result = await service.calculatePricing('instant_transaction', lineItems, {
         conditions: { orderType: 'takeaway' },
         couponCode: 'BIG',
       });
@@ -490,7 +490,7 @@ describe('EngineService — Integration', () => {
     });
 
     it('should handle empty line items gracefully', async () => {
-      const result = await service.calculatePricing('menu_service', [], {
+      const result = await service.calculatePricing('instant_transaction', [], {
         conditions: { orderType: 'takeaway' },
       });
 
@@ -500,7 +500,7 @@ describe('EngineService — Integration', () => {
 
     it('should handle optional PricingContext fields', async () => {
       // Minimal context — all fields optional
-      const result = await service.calculatePricing('session_access', [
+      const result = await service.calculatePricing('shared_capacity_access', [
         { name: 'Ticket', unitPrice: 10, quantity: 1 },
       ], {});
 
@@ -509,7 +509,7 @@ describe('EngineService — Integration', () => {
     });
 
     it('should auto-generate line item IDs when not provided', async () => {
-      const result = await service.calculatePricing('menu_service', [
+      const result = await service.calculatePricing('instant_transaction', [
         { name: 'A', unitPrice: 5, quantity: 1 },
         { name: 'B', unitPrice: 3, quantity: 2 },
       ], { conditions: { orderType: 'takeaway' } });
@@ -519,7 +519,7 @@ describe('EngineService — Integration', () => {
     });
 
     it('should preserve provided line item IDs', async () => {
-      const result = await service.calculatePricing('menu_service', [
+      const result = await service.calculatePricing('instant_transaction', [
         { itemId: 'custom-id', name: 'A', unitPrice: 5, quantity: 1 },
       ], { conditions: { orderType: 'takeaway' } });
 
@@ -533,7 +533,7 @@ describe('EngineService — Integration', () => {
 
   describe('error handling', () => {
     it('should return error for invalid state in transition', async () => {
-      const result = await service.transitionState('menu_service', 'nonexistent_state', 'confirm', 'staff');
+      const result = await service.transitionState('instant_transaction', 'nonexistent_state', 'confirm', 'staff');
       expect(result.allowed).toBe(false);
       expect(result.error).toBeDefined();
     });

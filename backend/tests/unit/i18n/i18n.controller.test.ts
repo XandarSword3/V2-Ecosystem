@@ -278,7 +278,7 @@ describe('i18n Controller', () => {
   describe('translateContent', () => {
     it('should translate entity content', async () => {
       const { req, res, next } = createMockReqRes({
-        params: { entityType: 'menu_items', entityId: 'item-1', fieldName: 'name', languageCode: 'ar' },
+        params: { entityType: 'catalog_items', entityId: 'item-1', fieldName: 'name', languageCode: 'ar' },
         body: { value: 'مقبلات', status: 'pending' },
         user: { id: 'user-1' },
       });
@@ -286,7 +286,7 @@ describe('i18n Controller', () => {
       await i18nController.translateContent(req, res, next);
 
       expect(i18nService.translateContent).toHaveBeenCalledWith(
-        'menu_items', 'item-1', 'name', 'ar', 'مقبلات',
+        'catalog_items', 'item-1', 'name', 'ar', 'مقبلات',
         expect.objectContaining({ status: 'pending' })
       );
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
@@ -296,7 +296,7 @@ describe('i18n Controller', () => {
   describe('getContentTranslation', () => {
     it('should return content translation', async () => {
       const { req, res, next } = createMockReqRes({
-        params: { entityType: 'menu_items', entityId: 'item-1', locale: 'ar', field: 'name' },
+        params: { entityType: 'catalog_items', entityId: 'item-1', locale: 'ar', field: 'name' },
       });
 
       await i18nController.getContentTranslation(req, res, next);
@@ -309,12 +309,12 @@ describe('i18n Controller', () => {
   describe('getEntityTranslations', () => {
     it('should return all translations for an entity', async () => {
       const { req, res, next } = createMockReqRes({
-        params: { entityType: 'chalets', entityId: 'chalet-1', languageCode: 'ar' },
+        params: { entityType: 'accommodation_units', entityId: 'accommodation unit-1', languageCode: 'ar' },
       });
 
       await i18nController.getEntityTranslations(req, res, next);
 
-      expect(i18nService.getEntityTranslations).toHaveBeenCalledWith('chalets', 'chalet-1', 'ar');
+      expect(i18nService.getEntityTranslations).toHaveBeenCalledWith('accommodation_units', 'accommodation unit-1', 'ar');
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     });
   });
@@ -322,12 +322,12 @@ describe('i18n Controller', () => {
   describe('publishContentTranslation', () => {
     it('should publish content translation', async () => {
       const { req, res, next } = createMockReqRes({
-        params: { entityType: 'menu_items', entityId: 'item-1', languageCode: 'ar' },
+        params: { entityType: 'catalog_items', entityId: 'item-1', languageCode: 'ar' },
       });
 
       await i18nController.publishContentTranslation(req, res, next);
 
-      expect(i18nService.publishContentTranslation).toHaveBeenCalledWith('menu_items', 'item-1', 'ar');
+      expect(i18nService.publishContentTranslation).toHaveBeenCalledWith('catalog_items', 'item-1', 'ar');
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     });
   });

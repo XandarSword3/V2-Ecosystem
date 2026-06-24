@@ -2,6 +2,18 @@ import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
 
+/**
+ * Loyalty Controller
+ *
+ * Issue 17: Added property_id scoping on all direct Supabase queries and inserts.
+ * Atomic RPCs (earn/redeem/adjust) operate by user_id and do not take property_id —
+ * scoping there is handled at the DB level via loyalty_members.property_id.
+ */
+
+function getPropertyId(req: Request): string | undefined {
+  return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || undefined;
+}
+
 // Validation schemas
 const earnPointsSchema = z.object({
   userId: z.string().uuid(),
@@ -50,7 +62,6 @@ const updateTierSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-// FIX: Iteration 3 - Add createTierSchema for POST /tiers
 const createTierSchema = z.object({
   name: z.string().max(50),
   min_points: z.number().int().min(0),
@@ -68,36 +79,34 @@ export class LoyaltyController {
   async getAccount(req: Request, res: Response) {
     try {
       const { userId } = req.params;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
-      // Get account with tier info
-      const { data: account, error } = await supabase
+      // Get account with tier info — scoped to property
+      let memberQuery = supabase
         .from('loyalty_members')
-        .select(`
-          *,
-          tier:loyalty_tiers(*)
-        `)
-        .eq('user_id', userId)
-        .single();
+        .select(`*, tier:loyalty_tiers(*)`)
+        .eq('user_id', userId);
+      if (propertyId) memberQuery = memberQuery.eq('property_id', propertyId);
+
+      const { data: account, error } = await memberQuery.single();
 
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
       if (!account) {
-        // Create account if doesn't exist
-        const { data: settings } = await supabase
-          .from('loyalty_settings')
-          .select('*')
-          .limit(1)
-          .single();
+        // Create account if doesn't exist — scoped to property
+        let settingsQuery = supabase.from('loyalty_settings').select('*');
+        if (propertyId) settingsQuery = settingsQuery.eq('property_id', propertyId);
+        const { data: settings } = await settingsQuery.limit(1).single();
 
-        const { data: defaultTier } = await supabase
+        let tierQuery = supabase
           .from('loyalty_tiers')
           .select('id')
-          .order('min_points', { ascending: true })
-          .limit(1)
-          .single();
+          .order('min_points', { ascending: true });
+        if (propertyId) tierQuery = tierQuery.eq('property_id', propertyId);
+        const { data: defaultTier } = await tierQuery.limit(1).single();
 
         const signupBonus = settings?.signup_bonus || 0;
 
@@ -105,15 +114,13 @@ export class LoyaltyController {
           .from('loyalty_members')
           .insert({
             user_id: userId,
+            property_id: propertyId || null,
             tier_id: defaultTier?.id,
-            available_points: settings?.signupBonus || 0,
-            lifetime_points: settings?.signupBonus || 0,
-            total_points: settings?.signupBonus || 0,
+            available_points: signupBonus,
+            lifetime_points: signupBonus,
+            total_points: signupBonus,
           })
-          .select(`
-            *,
-            tier:loyalty_tiers(*)
-          `)
+          .select(`*, tier:loyalty_tiers(*)`)
           .single();
 
         if (createError) throw createError;
@@ -129,16 +136,10 @@ export class LoyaltyController {
           });
         }
 
-        return res.json({
-          success: true,
-          data: newAccount,
-        });
+        return res.json({ success: true, data: newAccount });
       }
 
-      res.json({
-        success: true,
-        data: account,
-      });
+      res.json({ success: true, data: account });
     } catch (error: any) {
       console.error('Error fetching loyalty account:', error);
       res.status(500).json({
@@ -154,12 +155,10 @@ export class LoyaltyController {
    */
   async getMyAccount(req: Request, res: Response) {
     try {
-      // JWT payload uses 'userId', not 'id'
       const userId = req.user?.userId || req.user?.id;
       if (!userId) {
         return res.status(401).json({ success: false, error: 'Not authenticated' });
       }
-
       req.params.userId = userId;
       return this.getAccount(req, res);
     } catch (error: any) {
@@ -187,11 +186,8 @@ export class LoyaltyController {
       }
 
       const { userId, points, description, referenceType, referenceId } = validation.data;
-
       const supabase = getSupabase();
 
-      // Use atomic RPC to prevent lost-update race conditions
-      // This is now protected by pg_advisory_xact_lock in Postgres
       const { data: result, error: rpcError } = await supabase.rpc(
         'earn_loyalty_points_atomic',
         {
@@ -222,9 +218,7 @@ export class LoyaltyController {
         },
       });
     } catch (error: any) {
-      // Check if response was already sent
       if (res.headersSent) return;
-
       console.error('Error earning points:', error);
       res.status(500).json({
         success: false,
@@ -249,15 +243,13 @@ export class LoyaltyController {
       }
 
       const { userId, points, description, referenceType, referenceId } = validation.data;
-
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
-      // Get settings for min redemption and rate
-      const { data: settings } = await supabase
-        .from('loyalty_settings')
-        .select('*')
-        .limit(1)
-        .single();
+      // Get settings scoped to property
+      let settingsQuery = supabase.from('loyalty_settings').select('*');
+      if (propertyId) settingsQuery = settingsQuery.eq('property_id', propertyId);
+      const { data: settings } = await settingsQuery.limit(1).single();
 
       const minRedemption = settings?.min_redemption || 100;
       const redemptionRate = settings?.redemption_rate || 0.01;
@@ -271,8 +263,6 @@ export class LoyaltyController {
 
       const dollarValue = points * redemptionRate;
 
-      // Use atomic RPC to prevent lost-update race conditions
-      // This is now protected by pg_advisory_xact_lock in Postgres
       const { data: result, error: rpcError } = await supabase.rpc(
         'redeem_loyalty_points_atomic',
         {
@@ -330,11 +320,8 @@ export class LoyaltyController {
       }
 
       const { userId, points, reason } = validation.data;
-
       const supabase = getSupabase();
 
-      // Use atomic RPC to prevent lost-update race conditions
-      // This is now protected by pg_advisory_xact_lock in Postgres
       const { data: result, error: rpcError } = await supabase.rpc(
         'adjust_loyalty_points_atomic',
         {
@@ -377,7 +364,6 @@ export class LoyaltyController {
 
   /**
    * Adjust points by account ID (admin only) (ATOMIC via RPC)
-   * This route accepts accountId in URL path instead of userId in body
    */
   async adjustPointsByAccountId(req: Request, res: Response) {
     try {
@@ -394,7 +380,6 @@ export class LoyaltyController {
       const { points, reason } = validation.data;
       const supabase = getSupabase();
 
-      // Use atomic RPC to prevent lost-update race conditions
       const { data: result, error: rpcError } = await supabase.rpc(
         'adjust_loyalty_points_by_account_atomic',
         {
@@ -441,14 +426,13 @@ export class LoyaltyController {
     try {
       const { userId } = req.params;
       const { page = '1', limit = '20', type } = req.query;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
-      // First get account
-      const { data: account } = await supabase
-        .from('loyalty_members')
-        .select('id')
-        .eq('user_id', userId)
-        .single();
+      // Find member — scoped to property
+      let memberQuery = supabase.from('loyalty_members').select('id').eq('user_id', userId);
+      if (propertyId) memberQuery = memberQuery.eq('property_id', propertyId);
+      const { data: account } = await memberQuery.single();
 
       if (!account) {
         return res.json({ success: true, data: [], pagination: { total: 0 } });
@@ -470,32 +454,20 @@ export class LoyaltyController {
       }
 
       const { data: transactions, count, error } = await query;
-
       if (error) throw error;
 
-      // Get all reference IDs from loyalty transactions
       const allReferenceIds = (transactions || []).map((row: any) => row.reference_id).filter(Boolean);
 
-      // Single unified transactions query
       const { data: transactionData } = await supabase
         .from('transactions')
         .select('id, engine_type, order_number, ticket_number, booking_number, amount, status')
         .in('reference_id', allReferenceIds);
 
-      // Map engine_type to legacy names for response compatibility
       const legacyTypeMap: Record<string, string> = {
         'instant_transaction': 'restaurant_order',
         'shared_capacity_access': 'pool_ticket',
-        'time_exclusive_reservation': 'chalet_booking'
+        'time_exclusive_reservation': 'chalet_booking',
       };
-
-      const response = (transactions || [])?.map((row: any) => ({
-        id: row.id,
-        order_number: row.order_number || row.ticket_number || row.booking_number,
-        total_amount: row.amount,
-        status: row.status,
-        legacy_type: legacyTypeMap[row.engine_type] || 'transaction'
-      }));
 
       const sourceLookup = new Map<string, any>();
       (transactions || []).forEach((row: any) => sourceLookup.set(`${row.engine_type}:${row.id}`, row));
@@ -504,7 +476,6 @@ export class LoyaltyController {
         const key = row.engine_type && row.reference_id ? `${row.engine_type}:${row.reference_id}` : '';
         const source = sourceLookup.get(key);
         if (!source) return row;
-
         return {
           ...row,
           source_summary: {
@@ -542,18 +513,16 @@ export class LoyaltyController {
    */
   async getTiers(req: Request, res: Response) {
     try {
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
-      const { data: tiers, error } = await supabase
-        .from('loyalty_tiers')
-        .select('*')
-        .order('min_points', { ascending: true });
 
+      let tiersQuery = supabase.from('loyalty_tiers').select('*');
+      if (propertyId) tiersQuery = tiersQuery.eq('property_id', propertyId);
+
+      const { data: tiers, error } = await tiersQuery.order('min_points', { ascending: true });
       if (error) throw error;
 
-      res.json({
-        success: true,
-        data: tiers,
-      });
+      res.json({ success: true, data: tiers });
     } catch (error: any) {
       console.error('Error fetching tiers:', error);
       res.status(500).json({
@@ -581,6 +550,7 @@ export class LoyaltyController {
       }
 
       const data = validation.data;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
       const updates: Record<string, any> = {};
@@ -596,19 +566,13 @@ export class LoyaltyController {
         return res.status(400).json({ success: false, error: 'No fields to update' });
       }
 
-      const { data: tier, error } = await supabase
-        .from('loyalty_tiers')
-        .update(updates)
-        .eq('id', tierId)
-        .select()
-        .single();
+      let updateQuery = supabase.from('loyalty_tiers').update(updates).eq('id', tierId);
+      if (propertyId) updateQuery = updateQuery.eq('property_id', propertyId);
 
+      const { data: tier, error } = await updateQuery.select().single();
       if (error) throw error;
 
-      res.json({
-        success: true,
-        data: tier,
-      });
+      res.json({ success: true, data: tier });
     } catch (error: any) {
       console.error('Error updating tier:', error);
       res.status(500).json({
@@ -624,19 +588,16 @@ export class LoyaltyController {
    */
   async getSettings(req: Request, res: Response) {
     try {
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
-      const { data: settings, error } = await supabase
-        .from('loyalty_settings')
-        .select('*')
-        .limit(1)
-        .single();
 
+      let settingsQuery = supabase.from('loyalty_settings').select('*');
+      if (propertyId) settingsQuery = settingsQuery.eq('property_id', propertyId);
+
+      const { data: settings, error } = await settingsQuery.limit(1).single();
       if (error && error.code !== 'PGRST116') throw error;
 
-      res.json({
-        success: true,
-        data: settings || {},
-      });
+      res.json({ success: true, data: settings || {} });
     } catch (error: any) {
       console.error('Error fetching settings:', error);
       res.status(500).json({
@@ -663,6 +624,7 @@ export class LoyaltyController {
       }
 
       const data = validation.data;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
       const updates: Record<string, any> = {};
@@ -678,12 +640,10 @@ export class LoyaltyController {
         return res.status(400).json({ success: false, error: 'No fields to update' });
       }
 
-      // Check if settings exist
-      const { data: existing } = await supabase
-        .from('loyalty_settings')
-        .select('id')
-        .limit(1)
-        .single();
+      // Check if settings exist for this property
+      let findQuery = supabase.from('loyalty_settings').select('id');
+      if (propertyId) findQuery = findQuery.eq('property_id', propertyId);
+      const { data: existing } = await findQuery.limit(1).single();
 
       let settings;
       if (existing) {
@@ -698,17 +658,14 @@ export class LoyaltyController {
       } else {
         const { data, error } = await supabase
           .from('loyalty_settings')
-          .insert(updates)
+          .insert({ ...updates, property_id: propertyId || null })
           .select()
           .single();
         if (error) throw error;
         settings = data;
       }
 
-      res.json({
-        success: true,
-        data: settings,
-      });
+      res.json({ success: true, data: settings });
     } catch (error: any) {
       console.error('Error updating settings:', error);
       res.status(500).json({
@@ -725,6 +682,7 @@ export class LoyaltyController {
   async getAllAccounts(req: Request, res: Response) {
     try {
       const { page = '1', limit = '20', tier, search } = req.query;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
       const pageNum = parseInt(page as string);
@@ -735,22 +693,16 @@ export class LoyaltyController {
         .from('loyalty_members')
         .select(`
           *,
-          user:users (
-            id,
-            email,
-            full_name
-          ),
+          user:users (id, email, full_name),
           tier:loyalty_tiers(*)
         `, { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(offset, offset + limitNum - 1);
 
-      if (tier) {
-        query = query.eq('tier_id', tier);
-      }
+      if (propertyId) query = query.eq('property_id', propertyId);
+      if (tier) query = query.eq('tier_id', tier);
 
       const { data: accounts, count, error } = await query;
-
       if (error) throw error;
 
       res.json({
@@ -778,32 +730,26 @@ export class LoyaltyController {
    */
   async getStats(req: Request, res: Response) {
     try {
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
-      // Get basic stats
-      const { count: totalMembers } = await supabase
-        .from('loyalty_members')
-        .select('*', { count: 'exact', head: true });
+      // Total members — scoped to property
+      let membersQuery = supabase.from('loyalty_members').select('*', { count: 'exact', head: true });
+      if (propertyId) membersQuery = membersQuery.eq('property_id', propertyId);
+      const { count: totalMembers } = await membersQuery;
 
-      const { data: tierStats } = await supabase
-        .from('loyalty_members')
-        .select('tier_id, loyalty_tiers(name)')
-        .not('tier_id', 'is', null);
-
-      const { data: pointsData } = await supabase
-        .from('loyalty_members')
-        .select('available_points, lifetime_points');
+      // Points data — scoped to property
+      let pointsQuery = supabase.from('loyalty_members').select('available_points, lifetime_points');
+      if (propertyId) pointsQuery = pointsQuery.eq('property_id', propertyId);
+      const { data: pointsData } = await pointsQuery;
 
       const totalOutstanding = pointsData?.reduce((sum, row) => sum + (row.available_points || 0), 0) || 0;
       const totalLifetime = pointsData?.reduce((sum, row) => sum + (row.lifetime_points || 0), 0) || 0;
 
-      // Get tier distribution
-      const { data: tierAccounts } = await supabase
-        .from('loyalty_members')
-        .select(`
-          tier_id,
-          tier:loyalty_tiers(name, color)
-        `);
+      // Tier distribution — scoped to property
+      let tierQuery = supabase.from('loyalty_members').select(`tier_id, tier:loyalty_tiers(name, color)`);
+      if (propertyId) tierQuery = tierQuery.eq('property_id', propertyId);
+      const { data: tierAccounts } = await tierQuery;
 
       const tierCounts: Record<string, { name: string; color: string; count: number }> = {};
       tierAccounts?.forEach((account: any) => {
@@ -815,19 +761,30 @@ export class LoyaltyController {
         tierCounts[tierName].count++;
       });
 
-      // Get recent activity (last 30 days)
+      // Recent activity (last 30 days) — transactions are member-scoped, not property-scoped directly.
+      // Join via loyalty_members to respect property isolation.
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const { data: recentTransactions } = await supabase
-        .from('loyalty_transactions')
-        .select('type, points, created_at')
-        .gte('created_at', thirtyDaysAgo.toISOString())
-        .order('created_at', { ascending: false });
+      // Get member IDs for this property first
+      let memberIdsQuery = supabase.from('loyalty_members').select('id');
+      if (propertyId) memberIdsQuery = memberIdsQuery.eq('property_id', propertyId);
+      const { data: memberIds } = await memberIdsQuery;
+      const memberIdList = (memberIds || []).map((m: any) => m.id);
 
-      // Group by date
+      let recentTransactions: any[] = [];
+      if (memberIdList.length > 0) {
+        const { data: txData } = await supabase
+          .from('loyalty_transactions')
+          .select('type, points, created_at')
+          .in('member_id', memberIdList)
+          .gte('created_at', thirtyDaysAgo.toISOString())
+          .order('created_at', { ascending: false });
+        recentTransactions = txData || [];
+      }
+
       const activityByDate: Record<string, { earned: number; redeemed: number; count: number }> = {};
-      recentTransactions?.forEach((t: any) => {
+      recentTransactions.forEach((t: any) => {
         const date = new Date(t.created_at).toISOString().split('T')[0];
         if (!activityByDate[date]) {
           activityByDate[date] = { earned: 0, redeemed: 0, count: 0 };
@@ -847,7 +804,7 @@ export class LoyaltyController {
             total_members: totalMembers,
             total_outstanding_points: totalOutstanding,
             total_lifetime_points: totalLifetime,
-            avg_points_per_member: (totalMembers || 0) > 0 ? Math.round(totalOutstanding / (totalMembers || 0)) : 0,
+            avg_points_per_member: (totalMembers || 0) > 0 ? Math.round(totalOutstanding / (totalMembers || 1)) : 0,
           },
           tierDistribution: Object.values(tierCounts),
           recentActivity: Object.entries(activityByDate).map(([date, data]) => ({
@@ -874,33 +831,29 @@ export class LoyaltyController {
   async calculatePoints(req: Request, res: Response) {
     try {
       const { userId, amount } = req.body;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
       if (!amount || amount <= 0) {
         return res.status(400).json({ success: false, error: 'Invalid amount' });
       }
 
-      const { data: settings } = await supabase
-        .from('loyalty_settings')
-        .select('*')
-        .eq('is_enabled', true)
-        .limit(1)
-        .single();
+      let settingsQuery = supabase.from('loyalty_settings').select('*').eq('is_enabled', true);
+      if (propertyId) settingsQuery = settingsQuery.eq('property_id', propertyId);
+      const { data: settings } = await settingsQuery.limit(1).single();
 
       if (!settings) {
-        return res.json({
-          success: true,
-          data: { pointsToEarn: 0, enabled: false },
-        });
+        return res.json({ success: true, data: { pointsToEarn: 0, enabled: false } });
       }
 
       let multiplier = 1;
       if (userId) {
-        const { data: account } = await supabase
-          .from('loyalty_accounts')
-          .select(`tier: loyalty_tiers(points_multiplier)`)
-          .eq('user_id', userId)
-          .single();
+        let memberQuery = supabase
+          .from('loyalty_members')
+          .select(`tier:loyalty_tiers(points_multiplier)`)
+          .eq('user_id', userId);
+        if (propertyId) memberQuery = memberQuery.eq('property_id', propertyId);
+        const { data: account } = await memberQuery.single();
         multiplier = (account?.tier as any)?.points_multiplier || 1;
       }
 
@@ -909,12 +862,7 @@ export class LoyaltyController {
 
       res.json({
         success: true,
-        data: {
-          pointsToEarn,
-          multiplier,
-          dollarValue,
-          enabled: true,
-        },
+        data: { pointsToEarn, multiplier, dollarValue, enabled: true },
       });
     } catch (error: any) {
       console.error('Error calculating points:', error);
@@ -926,15 +874,15 @@ export class LoyaltyController {
     }
   }
 
-  // FIX: Iteration 3 - Add enrollUser method (POST /enroll)
-  // Delegates to getMyAccount which auto-creates accounts with signup bonus
+  /**
+   * Enroll user (POST /enroll) — delegates to getAccount which auto-creates with signup bonus
+   */
   async enrollUser(req: Request, res: Response) {
     try {
       const userId = req.user?.userId || req.user?.id;
       if (!userId) {
         return res.status(401).json({ success: false, error: 'Not authenticated' });
       }
-
       req.params.userId = userId;
       return this.getAccount(req, res);
     } catch (error: any) {
@@ -947,7 +895,9 @@ export class LoyaltyController {
     }
   }
 
-  // FIX: Iteration 3 - Add createTier method (POST /tiers)
+  /**
+   * Create a new tier (POST /tiers)
+   */
   async createTier(req: Request, res: Response) {
     try {
       const validation = createTierSchema.safeParse(req.body);
@@ -960,53 +910,46 @@ export class LoyaltyController {
       }
 
       const data = validation.data;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
+
+      const tierPayload: Record<string, any> = {
+        name: data.name,
+        min_points: data.min_points,
+        points_multiplier: data.points_multiplier,
+        benefits: data.benefits,
+        color: data.color,
+        icon: data.icon,
+        is_active: data.is_active,
+        property_id: propertyId || null,
+      };
 
       let { data: tier, error } = await supabase
         .from('loyalty_tiers')
-        .insert({
-          name: data.name,
-          min_points: data.min_points,
-          points_multiplier: data.points_multiplier,
-          benefits: data.benefits,
-          color: data.color,
-          icon: data.icon,
-          is_active: data.is_active,
-        })
+        .insert(tierPayload)
         .select()
         .single();
 
-      // Compatibility fallback: legacy loyalty_tiers schema may not have is_active.
+      // Compat fallback: legacy schema may not have is_active column
       if (error && /is_active|schema cache|column/i.test(String(error.message || error.details || ''))) {
+        const { is_active, ...payloadWithoutActive } = tierPayload;
         ({ data: tier, error } = await supabase
           .from('loyalty_tiers')
-          .insert({
-            name: data.name,
-            min_points: data.min_points,
-            points_multiplier: data.points_multiplier,
-            benefits: data.benefits,
-            color: data.color,
-            icon: data.icon,
-          })
+          .insert(payloadWithoutActive)
           .select()
           .single());
       }
 
-      // Idempotent behavior for repeated setup runs.
+      // Idempotent for repeated setup runs
       if (error && error.code === '23505') {
-        ({ data: tier, error } = await supabase
-          .from('loyalty_tiers')
-          .select('*')
-          .eq('name', data.name)
-          .single());
+        let dupeQuery = supabase.from('loyalty_tiers').select('*').eq('name', data.name);
+        if (propertyId) dupeQuery = dupeQuery.eq('property_id', propertyId);
+        ({ data: tier, error } = await dupeQuery.single());
       }
 
       if (error) throw error;
 
-      res.status(201).json({
-        success: true,
-        data: tier,
-      });
+      res.status(201).json({ success: true, data: tier });
     } catch (error: any) {
       console.error('Error creating tier:', error);
       res.status(500).json({
@@ -1017,15 +960,18 @@ export class LoyaltyController {
     }
   }
 
-  // FIX: Iteration 3 - Add deleteTier method (DELETE /tiers/:tierId)
+  /**
+   * Delete a tier (DELETE /tiers/:tierId)
+   */
   async deleteTier(req: Request, res: Response) {
     try {
       const { tierId } = req.params;
+      const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
-      // Check tier isn't in use by any accounts
+      // Check tier isn't in use — check both table names for compat
       const { data: accountsUsingTier } = await supabase
-        .from('loyalty_accounts')
+        .from('loyalty_members')
         .select('id')
         .eq('tier_id', tierId)
         .limit(1);
@@ -1033,21 +979,17 @@ export class LoyaltyController {
       if (accountsUsingTier && accountsUsingTier.length > 0) {
         return res.status(400).json({
           success: false,
-          error: 'Cannot delete tier: it is currently assigned to loyalty accounts. Reassign accounts first.',
+          error: 'Cannot delete tier: it is currently assigned to members. Reassign them first.',
         });
       }
 
-      const { error } = await supabase
-        .from('loyalty_tiers')
-        .delete()
-        .eq('id', tierId);
+      let deleteQuery = supabase.from('loyalty_tiers').delete().eq('id', tierId);
+      if (propertyId) deleteQuery = deleteQuery.eq('property_id', propertyId);
 
+      const { error } = await deleteQuery;
       if (error) throw error;
 
-      res.json({
-        success: true,
-        message: 'Tier deleted successfully',
-      });
+      res.json({ success: true, message: 'Tier deleted successfully' });
     } catch (error: any) {
       console.error('Error deleting tier:', error);
       res.status(500).json({

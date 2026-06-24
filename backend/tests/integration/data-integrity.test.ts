@@ -16,7 +16,7 @@ describe.skip('Data Integrity', () => {
         
         // Create a test item
         const { data: item, error: createError } = await supabase
-          .from('menu_items')
+          .from('catalog_items')
           .insert({
             name: 'Test Delete Item',
             name_ar: 'عنصر اختبار',
@@ -36,7 +36,7 @@ describe.skip('Data Integrity', () => {
         
         // Soft delete
         const { error: deleteError } = await supabase
-          .from('menu_items')
+          .from('catalog_items')
           .update({ deleted_at: new Date().toISOString() })
           .eq('id', item.id);
         
@@ -44,7 +44,7 @@ describe.skip('Data Integrity', () => {
         
         // Verify record still exists
         const { data: stillExists, error: selectError } = await supabase
-          .from('menu_items')
+          .from('catalog_items')
           .select('*')
           .eq('id', item.id)
           .single();
@@ -54,7 +54,7 @@ describe.skip('Data Integrity', () => {
         expect(stillExists.deleted_at).not.toBeNull();
         
         // Clean up - hard delete for test
-        await supabase.from('menu_items').delete().eq('id', item.id);
+        await supabase.from('catalog_items').delete().eq('id', item.id);
       });
 
       it('should exclude soft-deleted items from normal queries', async () => {
@@ -62,7 +62,7 @@ describe.skip('Data Integrity', () => {
         
         // Query with deleted_at filter (standard pattern)
         const { data: items, error } = await supabase
-          .from('menu_items')
+          .from('catalog_items')
           .select('*')
           .is('deleted_at', null);
         
@@ -77,20 +77,20 @@ describe.skip('Data Integrity', () => {
       });
     });
 
-    describe('Chalets', () => {
-      it('should filter out soft-deleted chalets in listing', async () => {
+    describe('AccommodationUnits', () => {
+      it('should filter out soft-deleted accommodation_units in listing', async () => {
         const supabase = getSupabase();
         
-        const { data: chalets, error } = await supabase
-          .from('chalets')
+        const { data: accommodation_units, error } = await supabase
+          .from('accommodation_units')
           .select('*')
           .is('deleted_at', null);
         
         expect(error).toBeNull();
         
-        if (chalets && chalets.length > 0) {
-          chalets.forEach(chalet => {
-            expect(chalet.deleted_at).toBeNull();
+        if (accommodation_units && accommodation_units.length > 0) {
+          accommodation_units.forEach(accommodation_unit => {
+            expect(accommodation_unit.deleted_at).toBeNull();
           });
         }
       });
@@ -100,7 +100,7 @@ describe.skip('Data Integrity', () => {
       it('should preserve order history even if menu items are deleted', async () => {
         const supabase = getSupabase();
         
-        // Get an order with items - actual table is restaurant_orders
+        // Get an order with items - actual table is menu_service_orders
         const { data: orders, error } = await supabase
           .from('transactions')
           .select('id, status, metadata, amount')
@@ -122,10 +122,10 @@ describe.skip('Data Integrity', () => {
   });
 
   describe('Cascading Delete Prevention', () => {
-    it('should not allow deleting chalet with active bookings', async () => {
+    it('should not allow deleting accommodation unit with active bookings', async () => {
       const supabase = getSupabase();
       
-      // Find a chalet with bookings
+      // Find a accommodation unit with bookings
       const { data: bookings, error: fetchError } = await supabase
         .from('transactions')
         .select('metadata')
@@ -156,7 +156,7 @@ describe.skip('Data Integrity', () => {
       // If no error, the delete was prevented by RLS or trigger
     });
 
-    it('should not allow deleting user with restaurant orders', async () => {
+    it('should not allow deleting user with menu service orders', async () => {
       const supabase = getSupabase();
       
       // Find a user with orders
@@ -188,7 +188,7 @@ describe.skip('Data Integrity', () => {
   });
 
   describe('Data Consistency', () => {
-    it('should have referential integrity for restaurant orders', async () => {
+    it('should have referential integrity for menu service orders', async () => {
       const supabase = getSupabase();
       
       // Check that all orders reference valid modules
@@ -337,12 +337,12 @@ describe('Backup Integrity', () => {
         'roles',
         'modules',
         'site_settings',
-        'chalets',
-        'chalet_bookings',
-        'pool_sessions',
-        'pool_tickets',
-        'menu_items',
-        'menu_categories',
+        'accommodation_units',
+        'unit_bookings',
+        'capacity_windows',
+        'capacity_access_tickets',
+        'catalog_items',
+        'catalog_categories',
         'orders',
         'payments',
         'reviews'
@@ -467,7 +467,7 @@ describe('Transaction Safety', () => {
         customer_phone: '1234567890',
         order_type: 'dine_in',
         items: [
-          { menu_item_id: 'invalid-id', quantity: 1 }
+          { catalog_item_id: 'invalid-id', quantity: 1 }
         ]
       };
       

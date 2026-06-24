@@ -57,6 +57,18 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'resort' },
+    properties: [],
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+  PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 import AdminOrdersPage from '../../src/app/admin/orders/page';
 
 describe('Admin orders route coverage', () => {
@@ -69,7 +81,18 @@ describe('Admin orders route coverage', () => {
     socketEventHandlers.clear();
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/restaurant/admin/orders') {
+      if (url === '/admin/modules') {
+        return Promise.resolve({
+          data: {
+            data: [
+              { id: 'mod-1', slug: 'lagoon', name: 'Lagoon', template_type: 'menu_service', is_active: true },
+              { id: 'mod-2', slug: 'kiosk', name: 'Kiosk', template_type: 'menu_service', is_active: true },
+            ],
+          },
+        });
+      }
+
+      if (url === '/staff/modules/lagoon/orders') {
         return Promise.resolve({
           data: {
             data: [
@@ -93,12 +116,12 @@ describe('Admin orders route coverage', () => {
         });
       }
 
-      if (url === '/snack/staff/orders') {
+      if (url === '/staff/modules/kiosk/orders') {
         return Promise.resolve({
           data: {
             data: [
               {
-                id: 'snack-1',
+                id: 'kiosk-1',
                 order_number: 'S-010',
                 status: 'ready',
                 total_amount: 12,
@@ -130,7 +153,7 @@ describe('Admin orders route coverage', () => {
     await user.click(screen.getByRole('button', { name: /Confirm/i }));
 
     await waitFor(() => {
-      expect(apiPutMock).toHaveBeenCalledWith('/restaurant/admin/orders/rest-1/status', {
+      expect(apiPutMock).toHaveBeenCalledWith('/staff/modules/lagoon/orders/rest-1/status', {
         status: 'confirmed',
       });
     });
@@ -141,7 +164,7 @@ describe('Admin orders route coverage', () => {
     expect(screen.getByText('#S-010')).toBeInTheDocument();
 
     const selects = screen.getAllByRole('combobox');
-    await user.selectOptions(selects[0], 'snack_bar');
+    await user.selectOptions(selects[0], 'kiosk');
     await user.selectOptions(selects[1], 'ready');
 
     expect(screen.getByText('#S-010')).toBeInTheDocument();
@@ -167,7 +190,7 @@ describe('Admin orders route coverage', () => {
       socketEventHandlers.get('order:new')?.({
         id: 'rest-2',
         order_number: 'R-002',
-        source: 'restaurant',
+        source: 'menu_service',
         status: 'pending',
         total_amount: 20,
         items: [{ id: 'i4', name: 'Pasta', quantity: 1, unit_price: 20 }],
@@ -179,7 +202,7 @@ describe('Admin orders route coverage', () => {
     expect(await screen.findByText('#R-002')).toBeInTheDocument();
 
     act(() => {
-      socketEventHandlers.get('order:statusChanged')?.({ orderId: 'snack-1', status: 'completed' });
+      socketEventHandlers.get('order:statusChanged')?.({ orderId: 'kiosk-1', status: 'completed' });
     });
 
     expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);

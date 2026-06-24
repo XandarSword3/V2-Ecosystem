@@ -1315,13 +1315,17 @@ describe('LoyaltyController', () => {
   // ============================================
   describe('getStats', () => {
     it('should return loyalty statistics', async () => {
-      const accounts = [
-        { available_points: 500, lifetime_points: 1000 },
-        { available_points: 1000, lifetime_points: 2000 },
+      const members = [
+        { id: 'member-1', available_points: 500, lifetime_points: 1000, tier_id: 'tier-1' },
+        { id: 'member-2', available_points: 1000, lifetime_points: 2000, tier_id: 'tier-2' },
       ];
-      const tierAccounts = [
-        { tier_id: 'tier-1', tier: { name: 'Bronze', color: '#CD7F32' }, is_active: true },
-        { tier_id: 'tier-2', tier: { name: 'Silver', color: '#C0C0C0' }, is_active: true },
+      const tierMembers = [
+        { tier_id: 'tier-1', tier: { name: 'Bronze', color: '#CD7F32' } },
+        { tier_id: 'tier-2', tier: { name: 'Silver', color: '#C0C0C0' } },
+      ];
+      const memberIds = [
+        { id: 'member-1' },
+        { id: 'member-2' },
       ];
       const transactions = [
         { type: 'earn', points: 100, created_at: new Date().toISOString() },
@@ -1329,8 +1333,8 @@ describe('LoyaltyController', () => {
       ];
 
       const tableMocks: Record<string, ReturnType<typeof createQueryMock>> = {
-        loyalty_accounts: (() => {
-          const mock = createQueryMock(() => accounts);
+        loyalty_members: (() => {
+          const mock = createQueryMock(() => members);
           let callCount = 0;
           (mock as Record<string, unknown>).select = vi.fn().mockImplementation(() => {
             callCount++;
@@ -1339,35 +1343,38 @@ describe('LoyaltyController', () => {
                 resolve(val);
                 return Promise.resolve(val);
               },
-              not: vi.fn().mockReturnValue({
-                then: (resolve: (value: unknown) => void) => {
-                  resolve({ data: tierAccounts, error: null });
-                  return Promise.resolve({ data: tierAccounts, error: null });
-                },
-              }),
             });
             if (callCount === 1) {
               // count query
               return resolvable({ count: 2, data: null, error: null });
             }
             if (callCount === 2) {
-              // tier_id query with .not()
-              return resolvable({ data: tierAccounts, error: null });
+              // points data query
+              return resolvable({ data: members, error: null });
             }
-            // points data and tier distribution
-            return resolvable({ data: accounts, error: null });
+            if (callCount === 3) {
+              // tier distribution query
+              return resolvable({ data: tierMembers, error: null });
+            }
+            if (callCount === 4) {
+              // member IDs query
+              return resolvable({ data: memberIds, error: null });
+            }
+            return resolvable({ data: members, error: null });
           });
           return mock;
         })(),
         loyalty_transactions: (() => {
           const mock = createQueryMock(() => transactions);
           (mock as Record<string, unknown>).select = vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              order: vi.fn().mockReturnValue({
-                then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
-                  resolve({ data: transactions, error: null });
-                  return Promise.resolve({ data: transactions, error: null });
-                },
+            in: vi.fn().mockReturnValue({
+              gte: vi.fn().mockReturnValue({
+                order: vi.fn().mockReturnValue({
+                  then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
+                    resolve({ data: transactions, error: null });
+                    return Promise.resolve({ data: transactions, error: null });
+                  },
+                }),
               }),
             }),
           });
@@ -1376,7 +1383,7 @@ describe('LoyaltyController', () => {
       };
 
       vi.mocked(getSupabase).mockReturnValue({
-        from: (table: string) => tableMocks[table] || tableMocks[table === 'loyalty_members' ? 'loyalty_accounts' : ''] || createQueryMock(() => []),
+        from: (table: string) => tableMocks[table] || createQueryMock(() => []),
         rpc: rpcMockFn,
       } as never);
 

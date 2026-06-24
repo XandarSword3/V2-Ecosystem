@@ -8,7 +8,7 @@ import { asyncHandler } from '../../middleware/async-handler.js';
 import { alertService } from './alert.service.js';
 import { queryBuilderService } from './query-builder.service.js';
 import { guestSegmentationService } from './guest-segmentation.service.js';
-import { metricsLayer } from './metrics-layer.service.js';
+import { metricsLayer, resolveEngineType } from './metrics-layer.service.js';
 
 export class AnalyticsController {
   // =============================================
@@ -245,11 +245,7 @@ export class AnalyticsController {
     for (const m of (modules || [])) {
       moduleMap[m.id] = {
         name: m.name,
-        engine: m.engine_type || (
-          m.template_type === 'menu_service' ? 'instant_transaction' :
-          m.template_type === 'multi_day_booking' ? 'time_exclusive_reservation' :
-          m.template_type === 'session_access' ? 'shared_capacity_access' : 'instant_transaction'
-        )
+        engine: m.engine_type || resolveEngineType(m.template_type),
       };
     }
 

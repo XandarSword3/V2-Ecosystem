@@ -31,7 +31,7 @@ vi.mock('framer-motion', () => {
 vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => ({
     settings: {
-      resortName: 'V2 Ecosystem',
+      propertyName: 'V2 Ecosystem',
       tagline: 'Luxury and comfort',
       weatherEffect: 'rain',
       showWeatherWidget: true,
@@ -80,14 +80,14 @@ import {
   StaggerText,
   TypewriterText,
 } from '../../src/components/effects/TextEffects';
-import WeatherEffects from '../../src/components/effects/WeatherEffects';
+import { WeatherEffects } from '../../src/components/effects/WeatherEffects';
 
 describe('effects components', () => {
   it('renders animated counters and stat rows', () => {
     render(
       <>
         <AnimatedCounter value={120} prefix="$" />
-        <AnimatedStat label="Bookings" value={42} />
+        <AnimatedStat stat={{ label: 'Bookings', value: 42 }} />
         <AnimatedStatsRow stats={[{ label: 'Guests', value: 10 }, { label: 'Revenue', value: 900 }]} />
       </>
     );

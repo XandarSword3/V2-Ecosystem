@@ -19,7 +19,7 @@ if (!API_URL) {
 const CRITICAL_ENDPOINTS = [
   '/api/settings',
   '/api/modules?activeOnly=true',
-  '/api/v1/terminology?business_type=resort',
+  '/api/v1/terminology?business_type=property',
 ];
 
 async function expectNoVisibleText(page: import('../fixtures/auth.fixture').Page, text: string): Promise<void> {
@@ -37,7 +37,7 @@ async function expectNoVisibleText(page: import('../fixtures/auth.fixture').Page
 
 test.describe('Smoke - Production Connectivity', () => {
   test('PROD-01 @production public pages render without fatal fallback card', async ({ page }) => {
-    for (const path of ['/', '/restaurant']) {
+    for (const path of ['/', '/menu service']) {
       await page.goto(`${FRONTEND_URL}${path}`, { waitUntil: 'domcontentloaded' });
 
       // Give async API calls enough time to settle and surface fallback UI.

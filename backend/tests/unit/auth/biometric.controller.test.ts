@@ -1,5 +1,25 @@
 import { createMockReqRes } from '../utils';
 
+// Mock simplewebauthn/server
+vi.mock('@simplewebauthn/server', () => ({
+  verifyRegistrationResponse: vi.fn().mockResolvedValue({
+    verified: true,
+    registrationInfo: {
+      credential: {
+        publicKey: Buffer.from('mock-pubkey'),
+        id: 'mock-cred-id',
+        counter: 0,
+      },
+    },
+  }),
+  verifyAuthenticationResponse: vi.fn().mockResolvedValue({
+    verified: true,
+    authenticationInfo: {
+      newCounter: 1,
+    },
+  }),
+}));
+
 // Mock dependencies inline to avoid hoisting issues
 vi.mock('../../../src/database/connection.js', () => ({
   getSupabase: vi.fn(),
@@ -191,6 +211,77 @@ describe('Biometric Controller', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
     });
+
+    it('should complete registration successfully', async () => {
+      // Begin registration first to populate challengeStore
+      const { req: beginReq, res: beginRes } = createMockReqRes({
+        user: { userId: 'user-123' },
+      });
+      const mockUser = { id: 'user-123', email: 'test@example.com', full_name: 'Test User' };
+      
+      let callCount = 0;
+      mockSupabase.from.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: mockUser, error: null }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        };
+      });
+
+      await registerBegin(beginReq, beginRes);
+      const sessionId = beginRes.json.mock.calls[0][0].sessionId;
+
+      // Now call complete
+      const { req: completeReq, res: completeRes } = createMockReqRes({
+        body: {
+          sessionId,
+          credential: {
+            id: 'mock-cred-id',
+            response: {
+              attestationObject: 'mockAttestation',
+              clientDataJSON: 'mockClientData',
+            },
+          },
+          deviceType: 'face_id',
+          deviceName: 'My Phone',
+        },
+      });
+
+      mockSupabase.from.mockImplementation(() => ({
+        insert: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'cred-db-id', device_type: 'face_id', device_name: 'My Phone' },
+              error: null,
+            }),
+          }),
+        }),
+      }));
+
+      await registerComplete(completeReq, completeRes);
+
+      expect(completeRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          credential: expect.objectContaining({
+            device_type: 'face_id',
+            device_name: 'My Phone',
+          }),
+        })
+      );
+    });
   });
 
   describe('authenticateBegin', () => {
@@ -338,6 +429,145 @@ describe('Biometric Controller', () => {
       await authenticateComplete(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('should authenticate successfully with valid credentials', async () => {
+      // Begin authentication first to populate challengeStore
+      const { req: beginReq, res: beginRes } = createMockReqRes({
+        body: { email: 'test@example.com' },
+      });
+      
+      let callCount = 0;
+      mockSupabase.from.mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: { id: 'user-123' }, error: null }),
+              }),
+            }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ credential_id: 'mock-cred-id' }],
+                error: null,
+              }),
+            }),
+          }),
+        };
+      });
+
+      await authenticateBegin(beginReq, beginRes);
+      const sessionId = beginRes.json.mock.calls[0][0].sessionId;
+
+      // Now complete authentication
+      const { req: completeReq, res: completeRes } = createMockReqRes({
+        body: {
+          sessionId,
+          credential: {
+            id: 'mock-cred-id',
+            response: {
+              authenticatorData: 'mockAuthData',
+              signature: 'mockSignature',
+            },
+          },
+        },
+      });
+
+      // Mock DB calls in authenticateComplete
+      let completeDbCall = 0;
+      mockSupabase.from.mockImplementation(() => {
+        completeDbCall++;
+        if (completeDbCall === 1) {
+          // 1. Get credential
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  eq: vi.fn().mockReturnValue({
+                    single: vi.fn().mockResolvedValue({
+                      data: {
+                        id: 'cred-db-id',
+                        credential_id: 'mock-cred-id',
+                        public_key: 'bW9jay1wdWJrZXk', // base64url for "mock-pubkey"
+                        counter: 0,
+                      },
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        } else if (completeDbCall === 2) {
+          // 2. Update credential counter
+          return {
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        } else if (completeDbCall === 3) {
+          // 3. Get user details
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'user-123',
+                    email: 'test@example.com',
+                    full_name: 'Test User',
+                    token_version: 0,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        } else if (completeDbCall === 4) {
+          // 4. Get user roles
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{ roles: { name: 'customer' } }],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        } else if (completeDbCall === 5) {
+          // 5. Update user last login
+          return {
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          };
+        }
+        return mockSupabase;
+      });
+
+      // Mock generateTokens
+      vi.mocked(generateTokens).mockReturnValue({
+        accessToken: 'mock-access',
+        refreshToken: 'mock-refresh',
+      } as any);
+
+      await authenticateComplete(completeReq, completeRes);
+
+      expect(completeRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          tokens: expect.objectContaining({
+            accessToken: 'mock-access',
+          }),
+        })
+      );
     });
   });
 

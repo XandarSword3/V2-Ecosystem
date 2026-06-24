@@ -87,31 +87,31 @@ describe('Socket Module (Source)', () => {
     });
 
     it('should generate correct unit room pattern', () => {
-      const unit = 'restaurant';
+      const unit = 'menu_service';
       const roomPattern = `unit:${unit}`;
-      expect(roomPattern).toBe('unit:restaurant');
+      expect(roomPattern).toBe('unit:menu_service');
     });
   });
 
   describe('Valid business units', () => {
-    it('should include restaurant in valid units', () => {
-      const validUnits = ['restaurant', 'snack_bar', 'chalets', 'pool'];
-      expect(validUnits).toContain('restaurant');
+    it('should include menu service in valid units', () => {
+      const validUnits = ['menu_service', 'kiosk', 'accommodation_units', 'capacity'];
+      expect(validUnits).toContain('menu_service');
     });
 
-    it('should include snack_bar in valid units', () => {
-      const validUnits = ['restaurant', 'snack_bar', 'chalets', 'pool'];
-      expect(validUnits).toContain('snack_bar');
+    it('should include kiosk in valid units', () => {
+      const validUnits = ['menu_service', 'kiosk', 'accommodation_units', 'capacity'];
+      expect(validUnits).toContain('kiosk');
     });
 
-    it('should include chalets in valid units', () => {
-      const validUnits = ['restaurant', 'snack_bar', 'chalets', 'pool'];
-      expect(validUnits).toContain('chalets');
+    it('should include accommodation_units in valid units', () => {
+      const validUnits = ['menu_service', 'kiosk', 'accommodation_units', 'capacity'];
+      expect(validUnits).toContain('accommodation_units');
     });
 
     it('should include pool in valid units', () => {
-      const validUnits = ['restaurant', 'snack_bar', 'chalets', 'pool'];
-      expect(validUnits).toContain('pool');
+      const validUnits = ['menu_service', 'kiosk', 'accommodation_units', 'capacity'];
+      expect(validUnits).toContain('capacity');
     });
   });
 });

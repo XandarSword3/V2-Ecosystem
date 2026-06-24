@@ -1,11 +1,12 @@
 /**
- * OpenAPI 3.0.3 Specification for Iron Paradise Gym API v1
- * 
- * Complete API contract for mobile app development.
- * All mobile apps MUST use /api/v1/* endpoints.
- * 
- * @version 1.0.0
- * @stability stable
+ * OpenAPI 3.0.3 Specification for V2 Ecosystem API v1 — LEGACY / DEPRECATED
+ *
+ * @deprecated This file documents the pre-engine-migration v1 REST API that used
+ * hardcoded module paths (/restaurant/*, /chalets/*, /pool/*).  Those paths have
+ * been superseded by the engine-based dynamic routing introduced in the V2 refit
+ * (see openapi-spec.ts).  This file is retained for historical reference only and
+ * MUST NOT be served as the primary API contract.  New integrations should use
+ * the engine-based /{moduleSlug}/* paths documented in openapi-spec.ts.
  */
 
 export const openApiV1Spec = {
@@ -14,12 +15,18 @@ export const openApiV1Spec = {
     title: 'V2 Ecosystem Management API',
     version: '1.0.0',
     description: `
-# Iron Paradise Gym Management System API - Version 1
+# V2 Ecosystem Management API — Version 1 (DEPRECATED)
 
-This is the stable API contract for Iron Paradise Gym. **Mobile apps must use \`/api/v1/*\` endpoints.**
+> **Deprecation Notice**: This v1 API contract documents legacy module-specific
+> routes (/restaurant/*, /chalets/*, /pool/*) that have been superseded by the
+> engine-based dynamic routing architecture.  New integrations MUST use the
+> current API documented in openapi-spec.ts.
+
+This is the archived stable API contract for the legacy module architecture.
+**Mobile apps should migrate to the engine-based /{moduleSlug}/* endpoints.**
 
 ## Versioning Policy
-- **v1** is the current stable version
+- **v1** is deprecated — migrate to current engine-based API
 - Breaking changes will result in a new API version (v2)
 - Deprecation notices will be provided 6 months before removal
 - The \`X-API-Deprecation\` header indicates deprecated endpoints
@@ -42,28 +49,10 @@ Authorization: Bearer <access_token>
 - Auth endpoints: 10 requests/15 minutes
 - Financial operations: 100 requests/minute
 - Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
-
-## Error Handling
-All errors follow RFC 7807 Problem Details format:
-\`\`\`json
-{
-  "success": false,
-  "error": "Human readable message",
-  "code": "ERROR_CODE",
-  "requestId": "correlation-id",
-  "details": {}
-}
-\`\`\`
-
-## Platforms
-- **Web**: Standard browser requests
-- **iOS**: Include \`X-Platform: ios\` and \`X-App-Version\` headers
-- **Android**: Include \`X-Platform: android\` and \`X-App-Version\` headers
     `,
     contact: {
-      name: 'Iron Paradise Gym API Support',
-      email: 'api-support@ironparadisegym.com',
-      url: 'https://ironparadisegym.com/support',
+      name: 'V2 Ecosystem API Support',
+      email: 'api-support@v2ecosystem.com',
     },
     license: {
       name: 'Proprietary',
@@ -84,10 +73,9 @@ All errors follow RFC 7807 Problem Details format:
     { name: 'Auth', description: 'Authentication, registration, and session management' },
     { name: 'Users', description: 'User profile management' },
     { name: 'Devices', description: 'Device registration and push notification management' },
-    { name: 'Restaurant', description: 'Menu, categories, and order management' },
-    { name: 'Chalets', description: 'Chalet listings, bookings, and availability' },
-    { name: 'Pool', description: 'Pool sessions, tickets, and capacity' },
-    { name: 'Snack Bar', description: 'Snack bar menu and orders' },
+    { name: 'MenuService', description: 'Menu, categories, and order management' },
+    { name: 'AccommodationUnits', description: 'Unit listings, bookings, and availability' },
+    { name: 'CapacityAccess', description: 'Capacity windows, tickets' },
     { name: 'Payments', description: 'Payment processing and transactions' },
     { name: 'Loyalty', description: 'Loyalty program and points management' },
     { name: 'Gift Cards', description: 'Gift card purchase and redemption' },
@@ -679,13 +667,13 @@ All errors follow RFC 7807 Problem Details format:
     },
 
     // ============================================
-    // RESTAURANT ENDPOINTS
+    // MENU SERVICE ENDPOINTS
     // ============================================
-    '/restaurant/menu': {
+    '/${slug}/menu': {
       get: {
-        tags: ['Restaurant'],
+        tags: ['MenuService'],
         operationId: 'getMenu',
-        summary: 'Get restaurant menu',
+        summary: 'Get menu',
         description: 'Returns menu items with optional filtering',
         parameters: [
           { name: 'category', in: 'query', schema: { type: 'string' }, description: 'Filter by category slug' },
@@ -713,9 +701,9 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
     },
-    '/restaurant/categories': {
+    '/${slug}/categories': {
       get: {
-        tags: ['Restaurant'],
+        tags: ['MenuService'],
         operationId: 'getCategories',
         summary: 'Get menu categories',
         responses: {
@@ -739,12 +727,12 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
     },
-    '/restaurant/orders': {
+    '/${slug}/orders': {
       post: {
-        tags: ['Restaurant'],
+        tags: ['MenuService'],
         operationId: 'createOrder',
         summary: 'Create new order',
-        description: 'Creates a restaurant order. Supports guest checkout.',
+        description: 'Creates an order. Supports guest checkout.',
         security: [{ bearerAuth: [] as string[] }, {}],
         requestBody: {
           required: true,
@@ -773,7 +761,7 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
       get: {
-        tags: ['Restaurant'],
+        tags: ['MenuService'],
         operationId: 'getOrders',
         summary: 'Get orders (staff only)',
         security: [{ bearerAuth: [] as string[] }],
@@ -789,9 +777,9 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
     },
-    '/restaurant/orders/{id}': {
+    '/${slug}/orders/{id}': {
       get: {
-        tags: ['Restaurant'],
+        tags: ['MenuService'],
         operationId: 'getOrderById',
         summary: 'Get order details',
         security: [{ bearerAuth: [] as string[] }],
@@ -804,9 +792,9 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
     },
-    '/restaurant/orders/{id}/status': {
+    '/${slug}/orders/{id}/status': {
       patch: {
-        tags: ['Restaurant'],
+        tags: ['MenuService'],
         operationId: 'updateOrderStatus',
         summary: 'Update order status (staff only)',
         security: [{ bearerAuth: [] as string[] }],
@@ -837,51 +825,15 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
     },
-    '/restaurant/orders/track/{orderNumber}': {
-      get: {
-        tags: ['Restaurant'],
-        operationId: 'trackOrder',
-        summary: 'Track order by order number (public)',
-        description: 'Allows customers to track their order status',
-        parameters: [
-          { name: 'orderNumber', in: 'path', required: true, schema: { type: 'string' } },
-        ],
-        responses: {
-          '200': {
-            description: 'Order tracking info',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean' },
-                    data: {
-                      type: 'object',
-                      properties: {
-                        orderNumber: { type: 'string' },
-                        status: { type: 'string' },
-                        estimatedTime: { type: 'integer', description: 'Minutes' },
-                        items: { type: 'array' },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          '404': { $ref: '#/components/responses/NotFoundError' },
-        },
-      },
-    },
 
     // ============================================
-    // CHALETS ENDPOINTS
+    // ACCOMMODATION UNITS ENDPOINTS
     // ============================================
-    '/chalets': {
+    '/accommodation_units': {
       get: {
-        tags: ['Chalets'],
+        tags: ['AccommodationUnits'],
         operationId: 'getChalets',
-        summary: 'List all chalets',
+        summary: 'List all accommodation units',
         parameters: [
           { name: 'available', in: 'query', schema: { type: 'boolean' } },
           { name: 'minCapacity', in: 'query', schema: { type: 'integer' } },
@@ -889,7 +841,7 @@ All errors follow RFC 7807 Problem Details format:
         ],
         responses: {
           '200': {
-            description: 'Chalets list',
+            description: 'Accommodation units list',
             content: {
               'application/json': {
                 schema: {
@@ -898,7 +850,7 @@ All errors follow RFC 7807 Problem Details format:
                     success: { type: 'boolean' },
                     data: {
                       type: 'array',
-                      items: { $ref: '#/components/schemas/Chalet' },
+                      items: { $ref: '#/components/schemas/AccommodationUnit' },
                     },
                   },
                 },
@@ -908,25 +860,25 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
     },
-    '/chalets/{id}': {
+    '/accommodation_units/{id}': {
       get: {
-        tags: ['Chalets'],
+        tags: ['AccommodationUnits'],
         operationId: 'getChaletById',
-        summary: 'Get chalet details',
+        summary: 'Get accommodation unit details',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
         ],
         responses: {
-          '200': { description: 'Chalet details' },
+          '200': { description: 'Accommodation unit details' },
           '404': { $ref: '#/components/responses/NotFoundError' },
         },
       },
     },
-    '/chalets/{id}/availability': {
+    '/accommodation_units/{id}/availability': {
       get: {
-        tags: ['Chalets'],
+        tags: ['AccommodationUnits'],
         operationId: 'checkChaletAvailability',
-        summary: 'Check chalet availability',
+        summary: 'Check accommodation unit availability',
         parameters: [
           { name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
           { name: 'startDate', in: 'query', required: true, schema: { type: 'string', format: 'date' } },
@@ -960,11 +912,11 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
     },
-    '/chalets/bookings': {
+    '/accommodation_units/bookings': {
       post: {
-        tags: ['Chalets'],
+        tags: ['AccommodationUnits'],
         operationId: 'createBooking',
-        summary: 'Create chalet booking',
+        summary: 'Create accommodation unit booking',
         security: [{ bearerAuth: [] as string[] }, {}],
         requestBody: {
           required: true,
@@ -996,13 +948,13 @@ All errors follow RFC 7807 Problem Details format:
     },
 
     // ============================================
-    // POOL ENDPOINTS
+    // CAPACITY ACCESS ENDPOINTS
     // ============================================
-    '/pool/sessions': {
+    '/${slug}/sessions': {
       get: {
-        tags: ['Pool'],
+        tags: ['CapacityAccess'],
         operationId: 'getPoolSessions',
-        summary: 'Get pool sessions',
+        summary: 'Get capacity sessions',
         parameters: [
           { name: 'date', in: 'query', schema: { type: 'string', format: 'date' } },
         ],
@@ -1027,11 +979,11 @@ All errors follow RFC 7807 Problem Details format:
         },
       },
     },
-    '/pool/tickets': {
+    '/${slug}/tickets': {
       post: {
-        tags: ['Pool'],
+        tags: ['CapacityAccess'],
         operationId: 'purchasePoolTicket',
-        summary: 'Purchase pool ticket',
+        summary: 'Purchase capacity access ticket',
         requestBody: {
           required: true,
           content: {
@@ -1896,9 +1848,9 @@ All errors follow RFC 7807 Problem Details format:
       },
 
       // ============================================
-      // CHALET SCHEMAS
+      // ACCOMMODATION UNIT SCHEMAS
       // ============================================
-      Chalet: {
+      AccommodationUnit: {
         type: 'object',
         properties: {
           id: { type: 'string', format: 'uuid' },

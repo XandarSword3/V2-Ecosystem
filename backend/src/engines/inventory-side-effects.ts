@@ -51,7 +51,7 @@ export const deductInventorySideEffect: SideEffectFn = async (
       // Legacy fallback: query order items and deduct base recipe only (no modifier awareness)
       const { data: orderItems, error: itemsError } = await supabase
         .from('order_items')
-        .select('id, product_id, quantity, menu_item_id')
+        .select('id, product_id, quantity, catalog_item_id')
         .eq('order_id', targetOrderId);
 
       if (itemsError || !orderItems || orderItems.length === 0) {
@@ -66,7 +66,7 @@ export const deductInventorySideEffect: SideEffectFn = async (
         const { data: recipeIngredients, error: recipeError } = await supabase
           .from('menu_item_ingredients')
           .select('inventory_item_id, quantity_required, unit')
-          .eq('menu_item_id', item.menu_item_id || item.product_id);
+          .eq('catalog_item_id', item.catalog_item_id || item.product_id);
 
         if (recipeError || !recipeIngredients || recipeIngredients.length === 0) continue;
 

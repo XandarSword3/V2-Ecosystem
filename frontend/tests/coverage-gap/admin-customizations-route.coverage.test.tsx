@@ -47,10 +47,10 @@ vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => ({
     modules: [
       {
-        id: 'mod-restaurant',
+        id: 'mod-menu service',
         template_type: 'menu_service',
-        name: 'Restaurant',
-        slug: 'restaurant',
+        name: 'MenuService',
+        slug: 'menu_service',
         is_active: true,
         sort_order: 1,
       },

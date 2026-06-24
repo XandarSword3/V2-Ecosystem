@@ -373,7 +373,7 @@ describe('Inventory Advanced Controller', () => {
       const mockRecipe = { 
         id: 'recipe-1', 
         name: 'Test Recipe',
-        menu_item_id: 'menu-1' 
+        catalog_item_id: 'menu-1' 
       };
       
       mockBuilder.queueResponse(mockRecipe); // insert recipe

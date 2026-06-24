@@ -59,7 +59,7 @@ export default function DynamicWaitlistPage() {
     queryKey: ['waitlist', currentModule?.id],
     queryFn: async () => {
       if (!currentModule) return [];
-      const res = await api.get('/restaurant/waitlist', { params: { moduleId: currentModule.id } });
+      const res = await api.get(`/${slug}/waitlist`, { params: { moduleId: currentModule.id } });
       return res.data.data || [];
     },
     enabled: !!currentModule,
@@ -75,7 +75,7 @@ export default function DynamicWaitlistPage() {
   const addMutation = useMutation({
     mutationFn: async (data: { name: string; phone: string; partySize: number; notes: string }) => {
       if (!currentModule) throw new Error('No module');
-      const res = await api.post('/restaurant/waitlist', {
+      const res = await api.post(`/${slug}/waitlist`, {
         guest_name: data.name,
         phone: data.phone,
         party_size: data.partySize,
@@ -98,7 +98,7 @@ export default function DynamicWaitlistPage() {
   // Update status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await api.patch(`/restaurant/waitlist/${id}`, { status });
+      const res = await api.patch(`/${slug}/waitlist/${id}`, { status });
       return res.data;
     },
     onSuccess: () => {
@@ -113,7 +113,7 @@ export default function DynamicWaitlistPage() {
   // Notify guest (send SMS)
   const notifyMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await api.post(`/restaurant/waitlist/${id}/notify`);
+      const res = await api.post(`/${slug}/waitlist/${id}/notify`);
       return res.data;
     },
     onSuccess: () => {
@@ -128,7 +128,7 @@ export default function DynamicWaitlistPage() {
   // Remove from waitlist
   const removeMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await api.delete(`/restaurant/waitlist/${id}`);
+      const res = await api.delete(`/${slug}/waitlist/${id}`);
       return res.data;
     },
     onSuccess: () => {

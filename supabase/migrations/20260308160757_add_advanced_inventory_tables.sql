@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS inventory_batches (
 -- Recipes / Bill of Materials
 CREATE TABLE IF NOT EXISTS inventory_recipes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  menu_item_id UUID,
+  catalog_item_id UUID,
   name TEXT,
   yields INTEGER DEFAULT 1,
   prep_time_minutes INTEGER,
@@ -161,6 +161,6 @@ $$ LANGUAGE plpgsql;
 CREATE INDEX IF NOT EXISTS idx_inventory_wastage_item ON inventory_wastage(item_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_variance_item ON inventory_variance(item_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_batches_item ON inventory_batches(item_id);
-CREATE INDEX IF NOT EXISTS idx_inventory_recipes_menu_item ON inventory_recipes(menu_item_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_recipes_menu_item ON inventory_recipes(catalog_item_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_recipe_ingredients_recipe ON inventory_recipe_ingredients(recipe_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_po_items_po ON inventory_purchase_order_items(purchase_order_id);

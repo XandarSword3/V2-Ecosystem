@@ -43,8 +43,12 @@ type PriceType = 'fixed' | 'percentage' | 'per_unit' | 'per_night' | 'per_person
 // Map module template types to entity type keys
 const MODULE_TO_ENTITY_TYPE: Record<string, string> = {
   'menu_service': 'menu_item',
-  'multi_day_booking': 'chalet',
-  'session_access': 'pool_session',
+  'multi_day_booking':          'reservation_unit',
+  'session_access':             'capacity_session',
+  // canonical engine types
+  'instant_transaction':        'catalog_item',
+  'time_exclusive_reservation': 'reservation_unit',
+  'shared_capacity_access':     'capacity_session',
 };
 
 interface CustomizationGroup {
@@ -102,8 +106,8 @@ interface DualWriteStats {
 // Entity type labels - static list, but will be filtered by active modules
 const ALL_ENTITY_TYPE_LABELS: Record<string, string> = {
   menu_item: 'Menu Items',
-  snack_bar_item: 'Snack Bar Items',
-  chalet: 'Chalets',
+  catalog_item: 'Catalog Items',
+  reservation_unit: 'Accommodation Units',
   pool_session: 'Pool Sessions',
   spa_service: 'Spa Services',
   activity: 'Activities',
@@ -115,9 +119,6 @@ const ALL_ENTITY_TYPE_LABELS: Record<string, string> = {
 
 // Map module slugs to entity types
 const MODULE_SLUG_TO_ENTITY: Record<string, string[]> = {
-  'restaurant': ['menu_item'],
-  'snack-bar': ['snack_bar_item'],
-  'chalets': ['chalet'],
   'pool': ['pool_session'],
   'spa': ['spa_service'],
   'activities': ['activity'],
@@ -177,9 +178,11 @@ export default function AdminCustomizationsPage() {
           entityTypes.forEach(et => activeEntityTypes.add(et));
         }
         // Check by template type mapping
-        const entityFromTemplate = MODULE_TO_ENTITY_TYPE[mod.template_type];
-        if (entityFromTemplate) {
-          activeEntityTypes.add(entityFromTemplate);
+        if (mod.template_type) {
+          const entityFromTemplate = MODULE_TO_ENTITY_TYPE[mod.template_type];
+          if (entityFromTemplate) {
+            activeEntityTypes.add(entityFromTemplate);
+          }
         }
       }
     });

@@ -14,7 +14,7 @@ const reviewsSeed = [
     id: 'rev-1',
     rating: 5,
     text: 'Amazing stay and excellent service.',
-    service_type: 'restaurant',
+    service_type: 'menu_service',
     is_approved: false,
     created_at: '2026-07-01T12:00:00.000Z',
     users: {
@@ -26,8 +26,8 @@ const reviewsSeed = [
   {
     id: 'rev-2',
     rating: 4,
-    text: 'Very clean chalets and friendly staff.',
-    service_type: 'chalets',
+    text: 'Very clean accommodation_units and friendly staff.',
+    service_type: 'accommodation_units',
     is_approved: true,
     created_at: '2026-07-02T12:00:00.000Z',
     users: {
@@ -82,6 +82,18 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/context/PropertyContext', () => ({
+  useProperty: () => ({
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'resort' },
+    properties: [],
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn(),
+  }),
+  PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 import AdminReviewsPage from '../../src/app/admin/reviews/page';
 
 describe('Admin reviews route coverage', () => {
@@ -105,12 +117,12 @@ describe('Admin reviews route coverage', () => {
 
     expect(await screen.findByText('Reviews')).toBeInTheDocument();
     expect(screen.getByText('Amazing stay and excellent service.')).toBeInTheDocument();
-    expect(screen.getByText('Very clean chalets and friendly staff.')).toBeInTheDocument();
+    expect(screen.getByText('Very clean accommodation_units and friendly staff.')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Approve/i }));
 
     await waitFor(() => {
-      expect(apiPutMock).toHaveBeenCalledWith('/reviews/rev-1/approve');
+      expect(apiPutMock).toHaveBeenCalledWith('/reviews/rev-1/approve', {}, expect.any(Object));
     });
 
     expect(toastSuccessMock).toHaveBeenCalledWith('Review approved');
@@ -118,7 +130,7 @@ describe('Admin reviews route coverage', () => {
     await user.click(screen.getAllByRole('button', { name: /Revoke/i })[1]);
 
     await waitFor(() => {
-      expect(apiPutMock).toHaveBeenCalledWith('/reviews/rev-2/reject');
+      expect(apiPutMock).toHaveBeenCalledWith('/reviews/rev-2/reject', {}, expect.any(Object));
     });
 
     expect(toastSuccessMock).toHaveBeenCalledWith('Review rejected');

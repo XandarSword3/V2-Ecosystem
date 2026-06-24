@@ -47,8 +47,8 @@ test.describe('General Settings Page', () => {
     await page.waitForLoadState('networkidle');
     
     // Check for resort name input
-    const resortNameInput = page.locator('input[name="resortName"], input[placeholder*="Resort"]').first();
-    await expect(resortNameInput).toBeVisible({ timeout: 10000 });
+    const propertyNameInput = page.locator('input[name="propertyName"], input[placeholder*="Resort"]').first();
+    await expect(propertyNameInput).toBeVisible({ timeout: 10000 });
   });
 
   test('can switch between settings tabs', async ({ page }) => {

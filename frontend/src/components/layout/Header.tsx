@@ -153,20 +153,21 @@ export default function Header() {
 
   interface ModuleIcon {
     slug: string;
-    template_type: string;
+    template_type?: string;
+    settings?: { icon?: string };
   }
   const getIconForModule = (module: ModuleIcon) => {
-    // Specific icons for default modules
-    if (module.slug === 'restaurant') return UtensilsCrossed;
-    if (module.slug === 'snack-bar') return Cookie;
-    if (module.slug === 'pool') return Waves;
-    if (module.slug === 'chalets') return Home;
-
-    // Generic icons based on type
+    // Q156 — Check per-module custom icon setting first (set via the icon dropdown in ModuleForm)
+    if (module.settings?.icon) {
+      const customIcon = getIconByName(module.settings.icon);
+      if (customIcon) return customIcon;
+    }
+    // Fallback: icon based on canonical engine/template type
     switch (module.template_type) {
-      case 'menu_service': return UtensilsCrossed;
-      case 'multi_day_booking': return Home;
-      case 'session_access': return Waves;
+      case 'instant_transaction': return UtensilsCrossed;
+      case 'time_exclusive_reservation': return Home;
+      case 'shared_capacity_access': return Waves;
+      case 'ongoing_entitlement': return Cookie;
       default: return Home;
     }
   };
@@ -188,18 +189,8 @@ export default function Header() {
 
   // Get translated name for module - dynamic lookup with fallback
   const getModuleTranslatedName = (slug: string, fallbackName: string) => {
-    // Dynamic Terminology Overrides
-    if (slug === 'chalets' && terms?.unit_plural) return terms.unit_plural;
-    if (slug === 'pool' && terms?.facility_singular) return terms.facility_singular;
-    if (slug === 'restaurant' && terms?.dining_singular) return terms.dining_singular;
-
-    // Known translation keys mapping
+    // Known translation keys mapping (generic slugs only — no hardcoded business types)
     const knownKeys: Record<string, string> = {
-      'restaurant': 'restaurant',
-      'chalets': 'chalets',
-      'pool': 'pool',
-      'snack-bar': 'snackBar',
-      'snackbar': 'snackBar',
       'gym': 'gym',
       'spa': 'spa',
       'cafe': 'cafe',
@@ -318,21 +309,46 @@ export default function Header() {
       <Container as="div">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group" aria-label={`${settings.resortName || t('home')} Home`}>
-            <motion.div
-              whileHover={{ scale: 1.05, rotate: -3 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-500 text-white font-bold text-xl px-3.5 py-2 rounded-xl shadow-lg shadow-primary-500/30 backdrop-blur-sm"
-              aria-hidden="true"
-            >
-              {/* Generate initials from resort name or use first word */}
-              {settings.resortName 
-                ? settings.resortName.split(' ').map(word => word[0]).slice(0, 2).join('').toUpperCase()
-                : 'V2'}
-            </motion.div>
-            <span className="font-bold text-xl text-slate-900 dark:text-white hidden sm:inline group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-300">
-              {settings.resortName || 'Resort'}
-            </span>
+          <Link href="/" className="flex items-center gap-2.5 group" aria-label={`${settings.siteName || t('home')} Home`}>
+            {(settings as any).logoUrl ? (
+              <>
+                {/* Light mode logo (always shown unless dark logo overrides) */}
+                <img
+                  src={(settings as any).logoUrl}
+                  alt={settings.siteName || 'Logo'}
+                  className={`object-contain h-10 ${
+                    (settings as any).logoDarkUrl ? 'dark:hidden' : ''
+                  }`}
+                  style={{ maxWidth: `${(settings as any).logoMaxWidth || 160}px` }}
+                />
+                {/* Dark mode logo — only rendered if explicitly set */}
+                {(settings as any).logoDarkUrl && (
+                  <img
+                    src={(settings as any).logoDarkUrl}
+                    alt={settings.siteName || 'Logo'}
+                    className="object-contain h-10 hidden dark:block"
+                    style={{ maxWidth: `${(settings as any).logoMaxWidth || 160}px` }}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                {/* Fallback: generated initials badge */}
+                <motion.div
+                  whileHover={{ scale: 1.05, rotate: -3 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-500 text-white font-bold text-xl px-3.5 py-2 rounded-xl shadow-lg shadow-primary-500/30 backdrop-blur-sm"
+                  aria-hidden="true"
+                >
+                  {settings.siteName
+                    ? settings.siteName.split(' ').map(word => word[0]).slice(0, 2).join('').toUpperCase()
+                    : 'V2'}
+                </motion.div>
+                <span className="font-bold text-xl text-slate-900 dark:text-white hidden sm:inline group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-300">
+                  {settings.siteName || 'Property'}
+                </span>
+              </>
+            )}
           </Link>
 
           {/* Desktop Navigation - Enhanced with magnetic hover */}

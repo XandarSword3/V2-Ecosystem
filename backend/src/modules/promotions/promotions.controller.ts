@@ -26,7 +26,7 @@ const createCouponSchema = z.object({
   stackable: z.boolean().default(false),
   stackingGroup: z.string().optional(),
   maxStackSize: z.number().positive().default(1),
-  applicableTo: z.enum(['all', 'bookings', 'restaurant', 'spa', 'activities']).default('all'),
+  applicableTo: z.enum(['all', 'bookings', 'spa', 'activities']).default('all'),
 });
 
 const issueGiftCardSchema = z.object({

@@ -10,7 +10,7 @@ export async function seedSystemModules() {
     {
       name: 'Home Page',
       slug: 'home-page',
-      template_type: 'session_access',
+      template_type: 'instant_transaction',
       description: 'Editable visual layout for the site homepage',
       is_active: true,
       show_in_main: false,
@@ -21,7 +21,7 @@ export async function seedSystemModules() {
     {
       name: 'Privacy Policy',
       slug: 'privacy-policy',
-      template_type: 'session_access',
+      template_type: 'instant_transaction',
       description: 'Editable visual layout for the Privacy Policy page',
       is_active: true,
       show_in_main: false,
@@ -32,7 +32,7 @@ export async function seedSystemModules() {
     {
       name: 'Terms of Service',
       slug: 'terms-of-service',
-      template_type: 'session_access',
+      template_type: 'instant_transaction',
       description: 'Editable visual layout for the Terms of Service page',
       is_active: true,
       show_in_main: false,

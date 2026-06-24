@@ -37,10 +37,10 @@ test.describe('Internationalization Features [SYS-I18N-001 → 004]', () => {
     expect(body).not.toMatch(/\b(home|common|nav)\.[a-z]+\.[a-z]+/);
   });
 
-  test('no missing translation keys on restaurant page', async ({ page }) => {
-    await page.goto(`${BASE}/restaurant`);
+  test('no missing translation keys on menu service page', async ({ page }) => {
+    await page.goto(`${BASE}/menu service`);
     const body = await page.locator('body').textContent() || '';
-    expect(body).not.toMatch(/\b(restaurant|menu|common)\.[a-z]+\.[a-z]+/);
+    expect(body).not.toMatch(/\b(menu service|menu|common)\.[a-z]+\.[a-z]+/);
   });
 
   test('currency switcher is available', async ({ page }) => {

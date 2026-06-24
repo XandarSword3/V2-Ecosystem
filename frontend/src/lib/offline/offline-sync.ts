@@ -11,13 +11,13 @@
 import {
   syncQueue,
   cacheManager,
-  menuItemsStore,
-  menuCategoriesStore,
+  catalogItemsStore,
+  catalogCategoriesStore,
   modifiersStore,
   customersStore,
   ordersStore,
   paymentsStore,
-  chaletsStore,
+  bookableUnitsStore,
   bookingsStore,
   ticketsStore,
   housekeepingTasksStore,
@@ -252,14 +252,14 @@ async function updateLocalRecordSyncStatus(entityType: string, entityId: string,
     case 'booking_check_out':
       store = bookingsStore;
       break;
-    case 'pool_ticket':
+    case 'ticket':
       store = ticketsStore;
       break;
     case 'housekeeping_task':
       store = housekeepingTasksStore;
       break;
-    case 'chalet_status':
-      store = chaletsStore;
+    case 'unit_status':
+      store = bookableUnitsStore;
       break;
     case 'payment':
       store = paymentsStore;
@@ -374,7 +374,7 @@ export async function createOfflineOrder(orderData: {
  * Record an offline cash payment
  */
 export async function createOfflineCashPayment(paymentData: {
-  referenceType: 'restaurant_order' | 'pool_ticket' | 'chalet_booking';
+  referenceType: 'order' | 'ticket' | 'booking' | 'restaurant_order';
   referenceId: string;
   amount: number;
   currency?: string;
@@ -415,9 +415,9 @@ export async function createOfflineCashPayment(paymentData: {
 }
 
 /**
- * Local QR validation for pool staff
+ * Local QR validation for staff
  */
-export async function validateTicketOffline(ticketNumber: string): Promise<{
+export async function validateTicketOffline(ticketNumber: string, moduleSlug: string): Promise<{
   valid: boolean;
   ticket?: any;
   reason?: string;
@@ -461,12 +461,12 @@ export async function validateTicketOffline(ticketNumber: string): Promise<{
   });
 
   // Queue the server confirmation
-  await createOfflinePoolEntry(ticket.id);
+  await createOfflineTicketEntry(ticket.id, moduleSlug);
 
   // Log activity
   await offlineActivityStore.put({
     id: crypto.randomUUID(),
-    type: 'pool_ticket',
+    type: 'ticket',
     entityId: ticket.id,
     action: 'validate',
     timestamp: new Date().toISOString(),
@@ -533,7 +533,7 @@ export async function createOfflineBookingStatusUpdate(bookingId: string, status
 }
 
 /**
- * Update a restaurant order status offline
+ * Update an order status offline
  */
 export async function createOfflineOrderStatusUpdate(orderId: string, status: string): Promise<string> {
   const syncId = await syncQueue.add({
@@ -547,7 +547,7 @@ export async function createOfflineOrderStatusUpdate(orderId: string, status: st
   // Log activity
   await offlineActivityStore.put({
     id: crypto.randomUUID(),
-    type: 'order_status',
+    type: 'restaurant_order_status',
     entityId: orderId,
     action: 'update',
     timestamp: new Date().toISOString(),
@@ -562,7 +562,7 @@ export async function createOfflineOrderStatusUpdate(orderId: string, status: st
 }
 
 /**
- * Update a restaurant table status offline
+ * Update a table status offline
  */
 export async function createOfflineTableStatusUpdate(tableId: string, status: string): Promise<string> {
   const syncId = await syncQueue.add({
@@ -576,7 +576,7 @@ export async function createOfflineTableStatusUpdate(tableId: string, status: st
   // Log activity
   await offlineActivityStore.put({
     id: crypto.randomUUID(),
-    type: 'table_status',
+    type: 'restaurant_table_status',
     entityId: tableId,
     action: 'update',
     timestamp: new Date().toISOString(),
@@ -588,29 +588,29 @@ export async function createOfflineTableStatusUpdate(tableId: string, status: st
 }
 
 /**
- * Update a chalet status (clean/dirty/occupied) offline
+ * Update a unit status (clean/dirty/occupied) offline
  */
-export async function createOfflineChaletStatusUpdate(chaletId: string, status: string): Promise<string> {
+export async function createOfflineUnitStatusUpdate(unitId: string, status: string, moduleSlug: string): Promise<string> {
   const syncId = await syncQueue.add({
-    entityType: 'chalet_status',
-    entityId: chaletId,
+    entityType: 'unit_status',
+    entityId: unitId,
     operation: 'update',
-    data: { status },
+    data: { status, moduleSlug },
     priority: 2,
   });
 
   // Log activity
   await offlineActivityStore.put({
     id: crypto.randomUUID(),
-    type: 'chalet_status',
-    entityId: chaletId,
+    type: 'unit_status',
+    entityId: unitId,
     action: 'update',
     timestamp: new Date().toISOString(),
     syncedAt: null,
   });
   
   // Optimistic update to local store
-  await updateLocalRecordSyncStatus('chalet_status', chaletId, false, { status });
+  await updateLocalRecordSyncStatus('unit_status', unitId, false, { status });
   
   await publishSyncStatus();
   return syncId;
@@ -798,19 +798,19 @@ export async function createOfflineMaintenanceFlag(resourceType: string, resourc
 /**
  * Record a pool entry offline
  */
-export async function createOfflinePoolEntry(ticketId: string): Promise<string> {
+export async function createOfflineTicketEntry(ticketId: string, moduleSlug: string): Promise<string> {
   const syncId = await syncQueue.add({
-    entityType: 'pool_ticket',
+    entityType: 'capacity_ticket',
     entityId: ticketId,
-    operation: 'update', // entry is an update to the ticket
-    data: { type: 'entry', entry_time: new Date().toISOString() },
+    operation: 'update',
+    data: { type: 'entry', entry_time: new Date().toISOString(), moduleSlug },
     priority: 1,
   });
 
   // Log activity
   await offlineActivityStore.put({
     id: crypto.randomUUID(),
-    type: 'pool_ticket',
+    type: 'ticket',
     entityId: ticketId,
     action: 'entry',
     timestamp: new Date().toISOString(),
@@ -824,19 +824,19 @@ export async function createOfflinePoolEntry(ticketId: string): Promise<string> 
 /**
  * Record a pool exit offline
  */
-export async function createOfflinePoolExit(ticketId: string): Promise<string> {
+export async function createOfflineTicketExit(ticketId: string, moduleSlug: string): Promise<string> {
   const syncId = await syncQueue.add({
-    entityType: 'pool_ticket',
+    entityType: 'capacity_ticket',
     entityId: ticketId,
-    operation: 'update', // exit is an update to the ticket
-    data: { type: 'exit', exit_time: new Date().toISOString() },
+    operation: 'update',
+    data: { type: 'exit', exit_time: new Date().toISOString(), moduleSlug },
     priority: 1,
   });
 
   // Log activity
   await offlineActivityStore.put({
     id: crypto.randomUUID(),
-    type: 'pool_ticket',
+    type: 'ticket',
     entityId: ticketId,
     action: 'exit',
     timestamp: new Date().toISOString(),
@@ -852,12 +852,81 @@ export async function createOfflinePoolExit(ticketId: string): Promise<string> {
  */
 export async function createOfflineTicketValidation(ticketNumber: string): Promise<string> {
   const syncId = await syncQueue.add({
-    entityType: 'pool_ticket',
+    entityType: 'capacity_ticket',
     entityId: ticketNumber,
-    operation: 'update', // validation is an update/check
+    operation: 'update',
     data: { type: 'validate', ticketNumber },
   });
   
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record a pool/capacity entry offline (no module-slug required)
+ */
+export async function createOfflinePoolEntry(ticketId: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'capacity_ticket',
+    entityId: ticketId,
+    operation: 'update',
+    data: { type: 'entry' },
+    priority: 1,
+  });
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'ticket',
+    entityId: ticketId,
+    action: 'entry',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
+  });
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Record a pool/capacity exit offline (no module-slug required)
+ */
+export async function createOfflinePoolExit(ticketId: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'capacity_ticket',
+    entityId: ticketId,
+    operation: 'update',
+    data: { type: 'exit' },
+    priority: 1,
+  });
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'ticket',
+    entityId: ticketId,
+    action: 'exit',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
+  });
+  await publishSyncStatus();
+  return syncId;
+}
+
+/**
+ * Update a chalet/accommodation-unit status offline
+ */
+export async function createOfflineChaletStatusUpdate(chaletId: string, status: string): Promise<string> {
+  const syncId = await syncQueue.add({
+    entityType: 'chalet_status',
+    entityId: chaletId,
+    operation: 'update',
+    data: { status },
+    priority: 2,
+  });
+  await offlineActivityStore.put({
+    id: crypto.randomUUID(),
+    type: 'unit_status',
+    entityId: chaletId,
+    action: 'update',
+    timestamp: new Date().toISOString(),
+    syncedAt: null,
+  });
   await publishSyncStatus();
   return syncId;
 }
@@ -870,7 +939,7 @@ async function resolveSyncAction(item: any): Promise<any> {
   switch (entityType) {
     case 'order':
       if (operation === 'create') {
-        const response = await api.post('/restaurant/orders', data);
+        const response = await api.post(`/${data.moduleSlug}/orders`, data);
         // Replace temp record with real server ID
         const realId = response.data?.data?.id;
         if (realId && data.tempId) {
@@ -883,33 +952,31 @@ async function resolveSyncAction(item: any): Promise<any> {
         return response;
       }
       if (operation === 'update') {
-        return api.patch(`/restaurant/staff/orders/${entityId}/status`, data);
+        return api.patch(`/${data.moduleSlug}/orders/${entityId}/status`, data);
       }
       break;
     
     case 'booking':
       if (operation === 'update') {
-        // Correct path: /chalets/staff/bookings/:id/status
-        return api.patch(`/chalets/staff/bookings/${entityId}/status`, data);
+        return api.patch(`/${data.moduleSlug}/bookings/${entityId}/status`, data);
       }
       break;
 
     case 'restaurant_order_status':
       if (operation === 'update') {
-        return api.patch(`/restaurant/staff/orders/${entityId}/status`, data);
+        return api.patch(`/${data.moduleSlug}/orders/${entityId}/status`, data);
       }
       break;
 
     case 'restaurant_table_status':
       if (operation === 'update') {
-        // Correct path: /restaurant/staff/tables/:id (no /status suffix)
-        return api.patch(`/restaurant/staff/tables/${entityId}`, data);
+        return api.patch(`/${data.moduleSlug}/tables/${entityId}`, data);
       }
       break;
 
-    case 'chalet_status':
+    case 'unit_status':
       if (operation === 'update') {
-        return api.patch(`/chalets/staff/status`, { chaletId: entityId, status: data.status });
+        return api.patch(`/${data.moduleSlug}/units/${entityId}/status`, { status: data.status });
       }
       break;
 
@@ -931,25 +998,37 @@ async function resolveSyncAction(item: any): Promise<any> {
       }
       break;
 
-    case 'pool_ticket':
+    case 'capacity_ticket':
+      if (operation === 'update') {
+        const base = data.moduleSlug ? `/${data.moduleSlug}` : '/pool';
+        if (data.type === 'entry') return api.post(`${base}/tickets/${entityId}/entry`);
+        if (data.type === 'exit') return api.post(`${base}/tickets/${entityId}/exit`);
+        if (data.type === 'validate') {
+          return api.post(`${base}/staff/validate`, { ticketNumber: data.ticketNumber });
+        }
+      }
+      break;
+
+    // Legacy alias kept for backward-compat with queued items pre-rename
+    case 'ticket':
       if (operation === 'update') {
         if (data.type === 'entry') {
-          return api.post(`/pool/tickets/${entityId}/entry`);
+          return api.post(`/${data.moduleSlug}/tickets/${entityId}/entry`);
         }
         if (data.type === 'exit') {
-          return api.post(`/pool/tickets/${entityId}/exit`);
+          return api.post(`/${data.moduleSlug}/tickets/${entityId}/exit`);
         }
         if (data.type === 'validate') {
-          return api.post('/pool/staff/validate', { ticketNumber: data.ticketNumber });
+          return api.post(`/${data.moduleSlug}/staff/validate`, { ticketNumber: data.ticketNumber });
         }
       }
       break;
 
     case 'booking_check_in':
-      return api.patch(`/chalets/staff/bookings/${entityId}/check-in`, data);
+      return api.patch(`/${data.moduleSlug}/bookings/${entityId}/check-in`, data);
     
     case 'booking_check_out':
-      return api.patch(`/chalets/staff/bookings/${entityId}/check-out`, data);
+      return api.patch(`/${data.moduleSlug}/bookings/${entityId}/check-out`, data);
 
     case 'payment':
       if (operation === 'create') {
@@ -961,10 +1040,17 @@ async function resolveSyncAction(item: any): Promise<any> {
       return api.patch(`/inventory/items/${entityId}/adjust`, data);
 
     case 'maintenance_log':
-      return api.post('/pool/staff/maintenance', data);
+      return api.post('/maintenance/logs', data);
 
     case 'maintenance_flag':
       return api.post('/maintenance/tickets', data);
+
+    case 'chalet_status':
+      if (operation === 'update') {
+        const moduleSlug = data.moduleSlug ?? 'bookings';
+        return api.patch(`/${moduleSlug}/units/${entityId}/status`, { status: data.status });
+      }
+      break;
   }
 
   throw new Error(`Unsupported sync action: ${entityType}/${operation}`);
@@ -985,17 +1071,17 @@ export async function getOfflineTasks(): Promise<unknown[]> {
 }
 
 /**
- * Get menu items from cache
+ * Get catalog items from cache
  */
-export async function getOfflineMenuItems(): Promise<unknown[]> {
-  return menuItemsStore.getAll();
+export async function getOfflineCatalogItems(): Promise<unknown[]> {
+  return catalogItemsStore.getAll();
 }
 
 /**
- * Get menu categories from cache
+ * Get catalog categories from cache
  */
 export async function getOfflineCategories(): Promise<unknown[]> {
-  return menuCategoriesStore.getAll();
+  return catalogCategoriesStore.getAll();
 }
 
 /**
@@ -1060,8 +1146,8 @@ export async function retryFailedItems(): Promise<{ retried: number }> {
  */
 export async function clearOfflineData(): Promise<void> {
   await Promise.all([
-    menuItemsStore.clear(),
-    menuCategoriesStore.clear(),
+    catalogItemsStore.clear(),
+    catalogCategoriesStore.clear(),
     modifiersStore.clear(),
     customersStore.clear(),
     ordersStore.clear(),

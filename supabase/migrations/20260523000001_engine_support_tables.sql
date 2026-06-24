@@ -69,6 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_efl_idem     ON engine_financial_ledger (idempote
   WHERE idempotency_key IS NOT NULL;
 
 ALTER TABLE engine_financial_ledger ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS efl_read ON engine_financial_ledger;
 CREATE POLICY efl_read ON engine_financial_ledger FOR SELECT USING (true);
 
 -- -------------------------------------------------------
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS engine_idempotency_keys (
 
 CREATE INDEX IF NOT EXISTS idx_idem_expires ON engine_idempotency_keys (expires_at);
 ALTER TABLE engine_idempotency_keys ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS idem_all ON engine_idempotency_keys;
 CREATE POLICY idem_all ON engine_idempotency_keys FOR ALL USING (true);
 
 -- -------------------------------------------------------
@@ -108,6 +110,7 @@ CREATE INDEX IF NOT EXISTS idx_comp_tx     ON engine_compensation_log (tx_id);
 CREATE INDEX IF NOT EXISTS idx_comp_review ON engine_compensation_log (requires_manual_review)
   WHERE requires_manual_review = TRUE;
 ALTER TABLE engine_compensation_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS comp_log_all ON engine_compensation_log;
 CREATE POLICY comp_log_all ON engine_compensation_log FOR ALL USING (true);
 
 -- -------------------------------------------------------
@@ -122,6 +125,7 @@ CREATE TABLE IF NOT EXISTS token_blacklist (
 
 CREATE INDEX IF NOT EXISTS idx_tbl_expires ON token_blacklist (expires_at);
 ALTER TABLE token_blacklist ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tbl_system ON token_blacklist;
 CREATE POLICY tbl_system ON token_blacklist FOR ALL USING (true);
 
 -- -------------------------------------------------------

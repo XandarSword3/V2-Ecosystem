@@ -23,7 +23,7 @@ interface UserSeed {
   role: string;
   tokenKey: keyof Pick<
     Phase2State,
-    'kitchenStaffToken' | 'poolStaffToken' | 'chaletStaffToken' | 'hkStaffToken' | 'managerToken' |
+    'kitchenStaffToken' | 'capacityStaffToken' | 'accommodationStaffToken' | 'hkStaffToken' | 'managerToken' |
     'aliceToken' | 'bobToken' | 'carolToken'
   >;
   idKey: keyof Pick<
@@ -47,15 +47,15 @@ const staffSeeds: UserSeed[] = [
     email: 'pool1@v2ecosystem.com',
     password: 'Staff123!',
     role: 'staff',
-    tokenKey: 'poolStaffToken',
+    tokenKey: 'capacityStaffToken',
     idKey: 'poolStaffId',
   },
   {
-    name: 'Chalet Staff',
+    name: 'AccommodationUnit Staff',
     email: 'chalet1@v2ecosystem.com',
     password: 'Staff123!',
     role: 'staff',
-    tokenKey: 'chaletStaffToken',
+    tokenKey: 'accommodationStaffToken',
     idKey: 'chaletStaffId',
   },
   {
@@ -67,7 +67,7 @@ const staffSeeds: UserSeed[] = [
     idKey: 'hkStaffId',
   },
   {
-    name: 'Resort Manager',
+    name: 'Property Manager',
     email: 'manager@v2ecosystem.com',
     password: 'Manager123!',
     role: 'admin',
@@ -156,7 +156,7 @@ function extractId(entity: LooseRecord | undefined): string | undefined {
     return direct;
   }
 
-  for (const key of ['module', 'category', 'item', 'menuItem', 'chalet', 'session', 'user']) {
+  for (const key of ['module', 'category', 'item', 'menuItem', 'accommodation_unit', 'session', 'user']) {
     const nested = entity[key] as LooseRecord | undefined;
     const nestedId = toId(nested?.id);
     if (nestedId) {
@@ -176,14 +176,14 @@ function findByName(items: LooseRecord[], names: string[]): LooseRecord | undefi
 }
 
 function extractMenuItems(menuData: unknown): LooseRecord[] {
-  const direct = asArray<LooseRecord>(menuData, ['items', 'menuItems', 'menu_items']);
+  const direct = asArray<LooseRecord>(menuData, ['items', 'menuItems', 'catalog_items']);
   if (direct.length > 0) {
     return direct;
   }
 
   const categories = asArray<LooseRecord>(menuData, ['categories']);
   return categories.flatMap((category) =>
-    asArray<LooseRecord>(category, ['items', 'menuItems', 'menu_items'])
+    asArray<LooseRecord>(category, ['items', 'menuItems', 'catalog_items'])
   );
 }
 
@@ -228,7 +228,7 @@ async function ensureModule(admin: Phase2Client, module: {
   slug: string;
   name: string;
   template_type: string;
-  stateKey: keyof Pick<Phase2State, 'restaurantModuleId' | 'chaletsModuleId' | 'poolModuleId' | 'snackModuleId'>;
+  stateKey: keyof Pick<Phase2State, 'menuServiceModuleId' | 'accommodationModuleId' | 'capacityModuleId' | 'kioskModuleId'>;
 }): Promise<void> {
   const modulesRes = await admin.getModules();
   const modules = asArray(modulesRes.data, ['modules']);
@@ -253,7 +253,7 @@ async function ensureModule(admin: Phase2Client, module: {
 }
 
 async function ensureRestaurantData(admin: Phase2Client): Promise<void> {
-  if (!state.restaurantModuleId) {
+  if (!state.menuServiceModuleId) {
     return;
   }
 
@@ -264,7 +264,7 @@ async function ensureRestaurantData(admin: Phase2Client): Promise<void> {
     { key: 'beveragesCatId', name: 'Beverages', order: 4 },
   ];
 
-  const menuRes = await admin.getMenu(state.restaurantModuleId);
+  const menuRes = await admin.getMenu(state.menuServiceModuleId);
   const categories = asArray(menuRes.data, ['categories']);
 
   for (const def of categoryDefs) {
@@ -273,7 +273,7 @@ async function ensureRestaurantData(admin: Phase2Client): Promise<void> {
     if (!category) {
       const createRes = await admin.createCategory({
         name: def.name,
-        module_id: state.restaurantModuleId,
+        module_id: state.menuServiceModuleId,
         display_order: def.order,
         sort_order: def.order,
       });
@@ -283,7 +283,7 @@ async function ensureRestaurantData(admin: Phase2Client): Promise<void> {
     setState(def.key, extractId(category as LooseRecord | undefined));
   }
 
-  const refreshedMenu = await admin.getMenu(state.restaurantModuleId);
+  const refreshedMenu = await admin.getMenu(state.menuServiceModuleId);
   const allItems = extractMenuItems(refreshedMenu.data);
 
   const itemDefs: Array<{
@@ -307,7 +307,7 @@ async function ensureRestaurantData(admin: Phase2Client): Promise<void> {
       const createRes = await admin.createMenuItem({
         name: def.name,
         category_id: categoryId,
-        module_id: state.restaurantModuleId,
+        module_id: state.menuServiceModuleId,
         price: def.price,
         is_available: true,
       });
@@ -328,7 +328,7 @@ async function ensureRestaurantData(admin: Phase2Client): Promise<void> {
     { key: 'tableT1Id', tableNumber: '503', capacity: 8, section: 'terrace' },
   ];
 
-  const tablesRes = await admin.getTables(state.restaurantModuleId);
+  const tablesRes = await admin.getTables(state.menuServiceModuleId);
   const tables = asArray<LooseRecord>(tablesRes.data, ['tables']);
 
   for (const def of tableDefs) {
@@ -341,7 +341,7 @@ async function ensureRestaurantData(admin: Phase2Client): Promise<void> {
         table_number: def.tableNumber,
         capacity: def.capacity,
         section: def.section,
-        module_id: state.restaurantModuleId,
+        module_id: state.menuServiceModuleId,
       });
       table = (createRes.data as LooseRecord | undefined) || (createRes.data?.table as LooseRecord | undefined);
       if (table) {
@@ -354,38 +354,38 @@ async function ensureRestaurantData(admin: Phase2Client): Promise<void> {
 }
 
 async function ensureChaletData(admin: Phase2Client): Promise<void> {
-  const chaletsRes = await admin.getChalets();
-  const chalets = asArray(chaletsRes.data, ['chalets', 'data']);
+  const chaletsRes = await admin.getAccommodationUnits();
+  const accommodation_units = asArray(chaletsRes.data, ['accommodation_units', 'data']);
 
-  const chaletDefs: Array<{ key: keyof Pick<Phase2State, 'chaletAId' | 'chaletBId' | 'chaletCId'>; name: string; capacity: number; price: number }> = [
-    { key: 'chaletAId', name: 'Mountain View A', capacity: 4, price: 200 },
-    { key: 'chaletBId', name: 'Lakeside B', capacity: 6, price: 300 },
-    { key: 'chaletCId', name: 'Garden C', capacity: 2, price: 150 },
+  const chaletDefs: Array<{ key: keyof Pick<Phase2State, 'unitAId' | 'unitBId' | 'unitCId'>; name: string; capacity: number; price: number }> = [
+    { key: 'unitAId', name: 'Mountain View A', capacity: 4, price: 200 },
+    { key: 'unitBId', name: 'Lakeside B', capacity: 6, price: 300 },
+    { key: 'unitCId', name: 'Garden C', capacity: 2, price: 150 },
   ];
 
   for (const def of chaletDefs) {
-    let chalet = chalets.find((c) => normalizeName(c.name) === normalizeName(def.name));
+    let accommodation_unit = accommodation_units.find((c) => normalizeName(c.name) === normalizeName(def.name));
 
-    if (!chalet) {
-      const createRes = await admin.createChalet({
+    if (!accommodation_unit) {
+      const createRes = await admin.createAccommodationUnit({
         name: def.name,
         capacity: def.capacity,
         base_price: def.price,
         price_per_night: def.price,
         weekend_price: def.price + 30,
         is_active: true,
-        module_id: state.chaletsModuleId,
+        module_id: state.accommodationModuleId,
       });
-      chalet = createRes.data?.chalet || createRes.data;
-      if (chalet) {
-        chalets.push(chalet);
+      accommodation_unit = createRes.data?.accommodation_unit || createRes.data;
+      if (accommodation_unit) {
+        accommodation_units.push(accommodation_unit);
       }
     }
 
-    setState(def.key, extractId(chalet as LooseRecord | undefined));
+    setState(def.key, extractId(accommodation_unit as LooseRecord | undefined));
   }
 
-  const addOnsRes = await admin.getAddOns(state.chaletsModuleId);
+  const addOnsRes = await admin.getAddOns(state.accommodationModuleId);
   const addOns = asArray<LooseRecord>(addOnsRes.data, ['addOns', 'addons']);
   const addOnDefs: Array<{
     key: keyof Pick<Phase2State, 'bbqAddonId' | 'basketAddonId' | 'beddingAddonId'>;
@@ -421,10 +421,10 @@ async function ensureChaletData(admin: Phase2Client): Promise<void> {
 }
 
 async function ensurePoolData(admin: Phase2Client): Promise<void> {
-  const sessionsRes = await admin.getPoolSessions(state.poolModuleId);
+  const sessionsRes = await admin.getCapacityWindows(state.capacityModuleId);
   let sessions = asArray<LooseRecord>(sessionsRes.data, ['sessions', 'data']);
   if (sessions.length === 0) {
-    const globalSessions = await admin.getPoolSessions();
+    const globalSessions = await admin.getCapacityWindows();
     sessions = asArray<LooseRecord>(globalSessions.data, ['sessions', 'data']);
   }
 
@@ -458,7 +458,7 @@ async function ensurePoolData(admin: Phase2Client): Promise<void> {
         ...def.create,
         capacity: def.create.max_capacity,
         price: def.create.adult_price,
-        module_id: state.poolModuleId,
+        module_id: state.capacityModuleId,
         gender_restriction: 'mixed',
       });
       session = createRes.data?.session || createRes.data;
@@ -475,8 +475,8 @@ function ensureFallbacks(): void {
   const tokenKeys: StateKey[] = [
     'adminToken',
     'kitchenStaffToken',
-    'poolStaffToken',
-    'chaletStaffToken',
+    'capacityStaffToken',
+    'accommodationStaffToken',
     'hkStaffToken',
     'managerToken',
     'aliceToken',
@@ -485,10 +485,10 @@ function ensureFallbacks(): void {
   ];
 
   const idKeys: StateKey[] = [
-    'restaurantModuleId',
-    'chaletsModuleId',
-    'poolModuleId',
-    'snackModuleId',
+    'menuServiceModuleId',
+    'accommodationModuleId',
+    'capacityModuleId',
+    'kioskModuleId',
     'appetizersCatId',
     'mainsCatId',
     'dessertsCatId',
@@ -501,9 +501,9 @@ function ensureFallbacks(): void {
     'table1Id',
     'table2Id',
     'tableT1Id',
-    'chaletAId',
-    'chaletBId',
-    'chaletCId',
+    'unitAId',
+    'unitBId',
+    'unitCId',
     'bbqAddonId',
     'basketAddonId',
     'beddingAddonId',
@@ -538,31 +538,31 @@ export async function initializePhase2SuiteState(): Promise<void> {
 
   if (adminLogin.success) {
     await ensureModule(admin, {
-      slug: 'restaurant',
-      name: 'Restaurant',
-      template_type: 'menu_service',
-      stateKey: 'restaurantModuleId',
+      slug: 'menu_service',
+      name: 'MenuService',
+      template_type: 'instant_transaction',
+      stateKey: 'menuServiceModuleId',
     });
 
     await ensureModule(admin, {
-      slug: 'chalets',
-      name: 'Chalets',
-      template_type: 'multi_day_booking',
-      stateKey: 'chaletsModuleId',
+      slug: 'accommodation_units',
+      name: 'AccommodationUnits',
+      template_type: 'time_exclusive_reservation',
+      stateKey: 'accommodationModuleId',
     });
 
     await ensureModule(admin, {
-      slug: 'pool',
+      slug: 'capacity',
       name: 'Pool',
-      template_type: 'session_access',
-      stateKey: 'poolModuleId',
+      template_type: 'shared_capacity_access',
+      stateKey: 'capacityModuleId',
     });
 
     await ensureModule(admin, {
-      slug: 'snack-bar',
-      name: 'Snack Bar',
-      template_type: 'menu_service',
-      stateKey: 'snackModuleId',
+      slug: 'kiosk',
+      name: 'KioskItem Bar',
+      template_type: 'instant_transaction',
+      stateKey: 'kioskModuleId',
     });
 
     await ensureRestaurantData(admin);

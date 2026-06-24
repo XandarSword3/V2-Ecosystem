@@ -32,10 +32,15 @@ const LEGACY_ALIASES: Record<string, ModuleTemplateType> = {
   appointment_booking:  'time_exclusive_reservation',
 };
 
-export function buildModulePermissionRows(moduleSlug: string, templateType: string): string[] {
-  // Resolve legacy alias if needed, then fall back to instant_transaction if still unknown
-  const canonical = (LEGACY_ALIASES[templateType]
-    ?? (templateType in TEMPLATE_PERMISSION_PRESETS ? (templateType as ModuleTemplateType) : 'instant_transaction'));
+export function buildModulePermissionRows(moduleSlug: string, engineType: string): string[] {
+  // Resolve legacy alias if needed
+  const canonical = LEGACY_ALIASES[engineType]
+    ?? (engineType in TEMPLATE_PERMISSION_PRESETS ? (engineType as ModuleTemplateType) : null);
+
+  if (!canonical) {
+    throw new Error(`Unrecognized module engine type: ${engineType}`);
+  }
+
   const preset = TEMPLATE_PERMISSION_PRESETS[canonical];
   const permissions: string[] = [];
 

@@ -220,11 +220,11 @@ describe('api client', () => {
     api.put.mockResolvedValue({ data: {} });
     api.delete.mockResolvedValue({ data: {} });
 
-    await mod.authApi.login('a@resort.test', 'secret');
-    await mod.authApi.register({ email: 'b@resort.test', password: 'secret', fullName: 'Beta User' });
+    await mod.authApi.login('a@v2-hub.test', 'secret');
+    await mod.authApi.register({ email: 'b@v2-hub.test', password: 'secret', fullName: 'Beta User' });
     await mod.authApi.logout();
     await mod.authApi.refreshToken('refresh-token');
-    await mod.authApi.forgotPassword('a@resort.test');
+    await mod.authApi.forgotPassword('a@v2-hub.test');
     await mod.authApi.resetPassword('token', 'new-pass');
     await mod.authApi.getProfile();
     await mod.authApi.get2FAStatus();
@@ -234,55 +234,9 @@ describe('api client', () => {
     await mod.authApi.verify2FA('user-1', '123456', false);
     await mod.authApi.regenerateBackupCodes('123456');
 
-    await mod.restaurantApi.getMenu('m-1');
-    await mod.restaurantApi.getMenuByCategory('cat-1', 'm-1');
-    await mod.restaurantApi.createOrder({ items: [{ menuItemId: 'dish-1', quantity: 2 }] });
-    await mod.restaurantApi.getMyOrders();
-    await mod.restaurantApi.getOrderStatus('order-1');
-
-    await mod.snackApi.getItems('m-1');
-    await mod.snackApi.createOrder({ items: [{ itemId: 'snack-1', quantity: 1 }], paymentMethod: 'cash' });
-    await mod.snackApi.getMyOrders();
-    await mod.snackApi.getOrder('snack-order-1');
-
-    await mod.chaletsApi.getChalets('m-1');
-    await mod.chaletsApi.getChalet('chalet-1');
-    await mod.chaletsApi.getAvailability('chalet-1', '2026-01-01', '2026-01-03');
-    await mod.chaletsApi.getDailyPrices('chalet-1', '2026-01-01', '2026-01-03');
-    await mod.chaletsApi.getAddOns('m-1');
-    await mod.chaletsApi.createBooking({
-      chaletId: 'chalet-1',
-      customerName: 'Tester',
-      customerEmail: 'tester@resort.test',
-      checkInDate: '2026-01-01',
-      checkOutDate: '2026-01-03',
-      numberOfGuests: 2,
-      paymentMethod: 'online',
-    });
-    await mod.chaletsApi.getMyBookings();
-    await mod.chaletsApi.getBookingDetails('booking-1');
-
-    await mod.poolApi.getSessions('2026-02-01', 'm-2');
-    await mod.poolApi.getSession('session-1');
-    await mod.poolApi.getSessionAvailability('session-1', '2026-02-01');
-    await mod.poolApi.getAvailability('2026-02-01', 'm-2');
-    await mod.poolApi.purchaseTicket({
-      sessionId: 'session-1',
-      ticketDate: '2026-02-01',
-      customerName: 'Pool Tester',
-      numberOfGuests: 3,
-      paymentMethod: 'card',
-    });
-    await mod.poolApi.getMyTickets();
-    await mod.poolApi.getTicket('ticket-1');
-    await mod.poolApi.getMembershipPlans();
-    await mod.poolApi.getMyMembership();
-    await mod.poolApi.createMembership({ type: 'INDIVIDUAL', billingCycle: 'MONTHLY' });
-    await mod.poolApi.cancelMembership('member-1', { reason: 'paused', immediate: false });
-
     await mod.modulesApi.getAll(true);
     await mod.modulesApi.getById('module-1');
-    await mod.modulesApi.create({ template_type: 'restaurant', name: 'Module 1' });
+    await mod.modulesApi.create({ template_type: 'menu_service', name: 'Module 1' });
     await mod.modulesApi.update('module-1', { name: 'Module Updated' });
     await mod.modulesApi.delete('module-1', true);
 
@@ -295,13 +249,12 @@ describe('api client', () => {
     await mod.paymentsApi.createPaymentIntent({ amount: 1500, referenceType: 'order', referenceId: 'order-1' });
     await mod.supportApi.submitContact({
       name: 'Support User',
-      email: 'support@resort.test',
+      email: 'support@v2-hub.test',
       subject: 'Need help',
       message: 'Please assist',
     });
 
-    expect(api.post).toHaveBeenCalledWith('/auth/login', { email: 'a@resort.test', password: 'secret' });
-    expect(api.get).toHaveBeenCalledWith('/restaurant/menu', { params: { moduleId: 'm-1' } });
+    expect(api.post).toHaveBeenCalledWith('/auth/login', { email: 'a@v2-hub.test', password: 'secret' });
     expect(api.delete).toHaveBeenCalledWith('/admin/modules/module-1?force=true');
     expect(api.post).toHaveBeenCalledWith('/support/contact', expect.objectContaining({ subject: 'Need help' }));
   });

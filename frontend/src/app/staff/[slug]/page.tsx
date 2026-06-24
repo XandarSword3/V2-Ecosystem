@@ -89,7 +89,7 @@ export default function ModulePage() {
       return <MultiDayBookingDashboard slug={slug} moduleName={module.name} moduleId={module.id} />;
 
     case 'ongoing_entitlement':
-      // Pool memberships, gym memberships, season passes, VIP clubs
+      // Pool memberships, facility memberships, season passes, VIP clubs
       return <MembershipDashboard slug={slug} moduleName={module.name} moduleId={module.id} />;
 
     default:

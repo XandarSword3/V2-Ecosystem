@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -59,8 +60,17 @@ interface CouponStats {
   totalDiscountGiven: number;
 }
 
+interface Module {
+  id: string;
+  name: string;
+  slug: string;
+  is_active: boolean;
+}
+
 export default function CouponsAdminPage() {
   const router = useRouter();
+  const { activePropertyId } = useProperty();
+  const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : undefined;
   const [activeTab, setActiveTab] = useState('coupons');
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [stats, setStats] = useState<CouponStats | null>(null);
@@ -69,6 +79,7 @@ export default function CouponsAdminPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
+  const [modules, setModules] = useState<Module[]>([]);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -89,36 +100,50 @@ export default function CouponsAdminPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    loadModules();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePropertyId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [couponsRes, statsRes] = await Promise.all([
-        api.get('/coupons', { params: { status: statusFilter === 'all' ? undefined : statusFilter } }),
-        api.get('/coupons/stats'),
+        api.get('/coupons', { params: { status: statusFilter === 'all' ? undefined : statusFilter }, headers: propertyHeader }),
+        api.get('/coupons/stats', { headers: propertyHeader }),
       ]);
 
       if (couponsRes.data.success) setCoupons(couponsRes.data.data);
       if (statsRes.data.success) setStats(statsRes.data.data.summary);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load coupon data');
     } finally {
       setLoading(false);
     }
   };
 
+  const loadModules = async () => {
+    try {
+      const res = await api.get('/admin/modules', { headers: propertyHeader });
+      if (res.data.success) {
+        setModules((res.data.data as Module[]).filter((m) => m.is_active));
+      }
+    } catch {
+      // silently ignore — hardcoded fallback still renders
+    }
+  };
+
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   const generateCode = async () => {
     try {
-      const res = await api.get('/coupons/generate-code');
+      const res = await api.get('/coupons/generate-code', { headers: propertyHeader });
       if (res.data.success) {
         setFormData(f => ({ ...f, code: res.data.data.code }));
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to generate code');
     }
   };
@@ -148,9 +173,9 @@ export default function CouponsAdminPage() {
       
       let res;
       if (editingCoupon) {
-        res = await api.put(`/coupons/${editingCoupon.id}`, payload);
+        res = await api.put(`/coupons/${editingCoupon.id}`, payload, { headers: propertyHeader });
       } else {
-        res = await api.post('/coupons', payload);
+        res = await api.post('/coupons', payload, { headers: propertyHeader });
       }
       
       if (res.data.success) {
@@ -205,26 +230,25 @@ export default function CouponsAdminPage() {
 
   const handleDelete = async (couponId: string) => {
     if (!confirm('Are you sure you want to delete this coupon?')) return;
-    
     try {
-      const res = await api.delete(`/coupons/${couponId}`);
+      const res = await api.delete(`/coupons/${couponId}`, { headers: propertyHeader });
       if (res.data.success) {
         toast.success('Coupon deleted');
         loadData();
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete coupon');
     }
   };
 
   const handleToggleActive = async (coupon: Coupon) => {
     try {
-      const res = await api.put(`/coupons/${coupon.id}`, { isActive: !coupon.is_active });
+      const res = await api.put(`/coupons/${coupon.id}`, { isActive: !coupon.is_active }, { headers: propertyHeader });
       if (res.data.success) {
         toast.success(coupon.is_active ? 'Coupon deactivated' : 'Coupon activated');
         loadData();
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to update coupon');
     }
   };
@@ -597,10 +621,9 @@ export default function CouponsAdminPage() {
                     className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600"
                   >
                     <option value="all">All Orders</option>
-                    <option value="restaurant">Restaurant Only</option>
-                    <option value="chalets">Chalets Only</option>
-                    <option value="pool">Pool Only</option>
-                    <option value="snack">Snack Bar Only</option>
+                    {modules.map((m) => (
+                      <option key={m.id} value={m.slug}>{m.name} Only</option>
+                    ))}
                   </select>
                 </div>
                 

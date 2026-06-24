@@ -1,18 +1,6 @@
--- Migration: Add soft-delete columns for critical entities
--- Purpose: Enable safe deletion with recovery option for bookings, users, and staff
-
--- Add deleted_at column to chalet_bookings if not exists
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'chalet_bookings' AND column_name = 'deleted_at'
-    ) THEN
-        ALTER TABLE chalet_bookings ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
-        CREATE INDEX IF NOT EXISTS idx_chalet_bookings_deleted_at ON chalet_bookings(deleted_at) WHERE deleted_at IS NULL;
-        COMMENT ON COLUMN chalet_bookings.deleted_at IS 'Soft delete timestamp - NULL means not deleted';
-    END IF;
-END $$;
+-- Soft-delete columns for critical entities
+-- Legacy booking tables removed — now handled via transactions table.
+-- Soft-delete on transactions is handled via status field (cancelled/expired).
 
 -- Add deleted_at column to users if not exists
 DO $$ 
@@ -27,42 +15,19 @@ BEGIN
     END IF;
 END $$;
 
--- Add deleted_at column to restaurant_orders if not exists
+-- Add deleted_at column to accommodation_units if not exists (guard: no-op if table absent)
 DO $$ 
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'restaurant_orders' AND column_name = 'deleted_at'
-    ) THEN
-        ALTER TABLE restaurant_orders ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
-        CREATE INDEX IF NOT EXISTS idx_restaurant_orders_deleted_at ON restaurant_orders(deleted_at) WHERE deleted_at IS NULL;
-        COMMENT ON COLUMN restaurant_orders.deleted_at IS 'Soft delete timestamp - NULL means not deleted';
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accommodation_units') THEN
+        RETURN;
     END IF;
-END $$;
-
--- Add deleted_at column to pool_tickets if not exists
-DO $$ 
-BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'pool_tickets' AND column_name = 'deleted_at'
+        WHERE table_name = 'accommodation_units' AND column_name = 'deleted_at'
     ) THEN
-        ALTER TABLE pool_tickets ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
-        CREATE INDEX IF NOT EXISTS idx_pool_tickets_deleted_at ON pool_tickets(deleted_at) WHERE deleted_at IS NULL;
-        COMMENT ON COLUMN pool_tickets.deleted_at IS 'Soft delete timestamp - NULL means not deleted';
-    END IF;
-END $$;
-
--- Add deleted_at column to chalets if not exists
-DO $$ 
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'chalets' AND column_name = 'deleted_at'
-    ) THEN
-        ALTER TABLE chalets ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
-        CREATE INDEX IF NOT EXISTS idx_chalets_deleted_at ON chalets(deleted_at) WHERE deleted_at IS NULL;
-        COMMENT ON COLUMN chalets.deleted_at IS 'Soft delete timestamp - NULL means not deleted';
+        ALTER TABLE accommodation_units ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+        CREATE INDEX IF NOT EXISTS idx_accommodation_units_deleted_at ON accommodation_units(deleted_at) WHERE deleted_at IS NULL;
+        COMMENT ON COLUMN accommodation_units.deleted_at IS 'Soft delete timestamp - NULL means not deleted';
     END IF;
 END $$;
 
@@ -71,37 +36,17 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'chalet_bookings' AND column_name = 'deleted_by'
-    ) THEN
-        ALTER TABLE chalet_bookings ADD COLUMN deleted_by UUID REFERENCES users(id) DEFAULT NULL;
-    END IF;
-    
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'users' AND column_name = 'deleted_by'
     ) THEN
         ALTER TABLE users ADD COLUMN deleted_by UUID REFERENCES users(id) DEFAULT NULL;
     END IF;
     
-    IF NOT EXISTS (
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'accommodation_units')
+       AND NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'restaurant_orders' AND column_name = 'deleted_by'
+        WHERE table_name = 'accommodation_units' AND column_name = 'deleted_by'
     ) THEN
-        ALTER TABLE restaurant_orders ADD COLUMN deleted_by UUID REFERENCES users(id) DEFAULT NULL;
-    END IF;
-    
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'pool_tickets' AND column_name = 'deleted_by'
-    ) THEN
-        ALTER TABLE pool_tickets ADD COLUMN deleted_by UUID REFERENCES users(id) DEFAULT NULL;
-    END IF;
-    
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'chalets' AND column_name = 'deleted_by'
-    ) THEN
-        ALTER TABLE chalets ADD COLUMN deleted_by UUID REFERENCES users(id) DEFAULT NULL;
+        ALTER TABLE accommodation_units ADD COLUMN deleted_by UUID REFERENCES users(id) DEFAULT NULL;
     END IF;
 END $$;
 

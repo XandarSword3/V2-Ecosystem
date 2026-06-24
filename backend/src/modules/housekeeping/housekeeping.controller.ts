@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 // Validation schemas
 const createTaskSchema = z.object({
-  chaletId: z.string().uuid().optional(),
+  unitId: z.string().uuid().optional(),
   roomNumber: z.string().max(20).optional(),
   taskTypeId: z.string().uuid(),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
@@ -28,7 +28,7 @@ const completeTaskSchema = z.object({
 });
 
 const createScheduleSchema = z.object({
-  chaletId: z.string().uuid().optional(),
+  unitId: z.string().uuid().optional(),
   taskTypeId: z.string().uuid(),
   dayOfWeek: z.number().int().min(0).max(6).optional(), // 0=Sunday, 6=Saturday
   timeSlot: z.string().regex(/^\d{2}:\d{2}$/),
@@ -44,7 +44,7 @@ export class HousekeepingController {
   async getTaskTypes(req: Request, res: Response) {
     try {
       const supabase = getSupabase();
-      
+
       const { data: taskTypes, error } = await supabase
         .from('housekeeping_task_types')
         .select('*')
@@ -72,17 +72,17 @@ export class HousekeepingController {
    */
   async getTasks(req: Request, res: Response) {
     try {
-      const { 
-        page = '1', 
-        limit = '20', 
-        status, 
-        priority, 
-        assignedTo, 
-        chaletId,
+      const {
+        page = '1',
+        limit = '20',
+        status,
+        priority,
+        assignedTo,
+        unitId,
         date,
         unassigned,
       } = req.query;
-      
+
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
       const supabase = getSupabase();
 
@@ -106,8 +106,8 @@ export class HousekeepingController {
         query = query.eq('assigned_to', assignedTo as string);
       }
 
-      if (chaletId) {
-        query = query.eq('chalet_id', chaletId as string);
+      if (unitId) {
+        query = query.eq('unit_id', unitId as string);
       }
 
       if (date) {
@@ -115,8 +115,9 @@ export class HousekeepingController {
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date(date as string);
         endOfDay.setHours(23, 59, 59, 999);
-        query = query.gte('scheduled_for', startOfDay.toISOString())
-                     .lte('scheduled_for', endOfDay.toISOString());
+        query = query
+          .gte('scheduled_for', startOfDay.toISOString())
+          .lte('scheduled_for', endOfDay.toISOString());
       }
 
       if (unassigned === 'true') {
@@ -130,27 +131,26 @@ export class HousekeepingController {
       if (error) throw error;
 
       // Get related data
-      const taskIds = (tasks || []).map(t => t.id);
       const taskTypeIds = [...new Set((tasks || []).map(t => t.task_type_id).filter(Boolean))];
-      const chaletIds = [...new Set((tasks || []).map(t => t.chalet_id).filter(Boolean))];
+      const unitIds = [...new Set((tasks || []).map(t => t.unit_id).filter(Boolean))];
       const userIds = [...new Set((tasks || []).map(t => t.assigned_to).filter(Boolean))];
 
       // Fetch related entities
-      const [taskTypesResult, chaletsResult, usersResult] = await Promise.all([
-        taskTypeIds.length > 0 
+      const [taskTypesResult, unitsResult, usersResult] = await Promise.all([
+        taskTypeIds.length > 0
           ? supabase.from('housekeeping_task_types').select('id, name, estimated_duration, checklist').in('id', taskTypeIds)
           : { data: [] },
-        chaletIds.length > 0 
-          ? supabase.from('chalets').select('id, name').in('id', chaletIds)
+        unitIds.length > 0
+          ? supabase.from('accommodation_units').select('id, name').in('id', unitIds)
           : { data: [] },
-        userIds.length > 0 
+        userIds.length > 0
           ? supabase.from('users').select('id, full_name').in('id', userIds)
           : { data: [] },
       ]);
 
       // Create lookup maps
       const taskTypesMap = ((taskTypesResult.data || []) as any[]).reduce((acc, tt) => { acc[tt.id] = tt; return acc; }, {} as Record<string, any>);
-      const chaletsMap = ((chaletsResult.data || []) as any[]).reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, any>);
+      const unitsMap = ((unitsResult.data || []) as any[]).reduce((acc, u) => { acc[u.id] = u; return acc; }, {} as Record<string, any>);
       const usersMap = ((usersResult.data || []) as any[]).reduce((acc, u) => { acc[u.id] = u; return acc; }, {} as Record<string, any>);
 
       // Enrich tasks
@@ -159,7 +159,7 @@ export class HousekeepingController {
         task_type_name: taskTypesMap[task.task_type_id]?.name,
         estimated_duration: taskTypesMap[task.task_type_id]?.estimated_duration,
         checklist: taskTypesMap[task.task_type_id]?.checklist,
-        chalet_name: chaletsMap[task.chalet_id]?.name,
+        unit_name: unitsMap[task.unit_id]?.name,
         assigned_to_name: usersMap[task.assigned_to]?.full_name,
       }));
 
@@ -206,29 +206,29 @@ export class HousekeepingController {
 
       if (error) throw error;
 
-      // Enrich with task type and chalet info
+      // Enrich with task type and unit info
       const taskTypeIds = [...new Set((tasks || []).map(t => t.task_type_id).filter(Boolean))];
-      const chaletIds = [...new Set((tasks || []).map(t => t.chalet_id).filter(Boolean))];
+      const unitIds = [...new Set((tasks || []).map(t => t.unit_id).filter(Boolean))];
 
-      const [taskTypesResult, chaletsResult] = await Promise.all([
-        taskTypeIds.length > 0 
+      const [taskTypesResult, unitsResult] = await Promise.all([
+        taskTypeIds.length > 0
           ? supabase.from('housekeeping_task_types').select('id, name, estimated_duration, checklist').in('id', taskTypeIds)
           : { data: [] },
-        chaletIds.length > 0 
-          ? supabase.from('chalets').select('id, name, chalet_number').in('id', chaletIds)
+        unitIds.length > 0
+          ? supabase.from('accommodation_units').select('id, name, unit_number').in('id', unitIds)
           : { data: [] },
       ]);
 
       const taskTypesMap = ((taskTypesResult.data || []) as any[]).reduce((acc, tt) => { acc[tt.id] = tt; return acc; }, {} as Record<string, any>);
-      const chaletsMap = ((chaletsResult.data || []) as any[]).reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, any>);
+      const unitsMap = ((unitsResult.data || []) as any[]).reduce((acc, u) => { acc[u.id] = u; return acc; }, {} as Record<string, any>);
 
       const enrichedTasks = (tasks || []).map(task => ({
         ...task,
         task_type_name: taskTypesMap[task.task_type_id]?.name,
         estimated_duration: taskTypesMap[task.task_type_id]?.estimated_duration,
         checklist: taskTypesMap[task.task_type_id]?.checklist,
-        chalet_name: chaletsMap[task.chalet_id]?.name,
-        chalet_number: chaletsMap[task.chalet_id]?.chalet_number,
+        unit_name: unitsMap[task.unit_id]?.name,
+        unit_number: unitsMap[task.unit_id]?.unit_number,
       }));
 
       res.json({
@@ -264,31 +264,31 @@ export class HousekeepingController {
       }
 
       // Get related data
-      const [taskTypeResult, chaletResult, assigneeResult, creatorResult, logsResult] = await Promise.all([
-        task.task_type_id 
+      const [taskTypeResult, unitResult, assigneeResult, creatorResult, logsResult] = await Promise.all([
+        task.task_type_id
           ? supabase.from('housekeeping_task_types').select('name, estimated_duration, checklist').eq('id', task.task_type_id).single()
           : { data: null },
-        task.chalet_id 
-          ? supabase.from('chalets').select('name, chalet_number').eq('id', task.chalet_id).single()
+        task.unit_id
+          ? supabase.from('accommodation_units').select('name, unit_number').eq('id', task.unit_id).single()
           : { data: null },
-        task.assigned_to 
+        task.assigned_to
           ? supabase.from('users').select('full_name').eq('id', task.assigned_to).single()
           : { data: null },
-        task.created_by 
+        task.created_by
           ? supabase.from('users').select('full_name').eq('id', task.created_by).single()
           : { data: null },
         supabase.from('housekeeping_logs').select('*').eq('task_id', id).order('created_at', { ascending: false }),
       ]);
 
       // Get performer names for logs
-      const logUserIds = [...new Set((logsResult.data || []).map(l => l.performed_by).filter(Boolean))];
+      const logUserIds = [...new Set((logsResult.data || []).map((l: any) => l.performed_by).filter(Boolean))];
       let logUsersMap: Record<string, any> = {};
       if (logUserIds.length > 0) {
         const { data: logUsers } = await supabase.from('users').select('id, full_name').in('id', logUserIds);
         logUsersMap = (logUsers || []).reduce((acc, u) => { acc[u.id] = u; return acc; }, {} as Record<string, any>);
       }
 
-      const logsWithNames = (logsResult.data || []).map(log => ({
+      const logsWithNames = (logsResult.data || []).map((log: any) => ({
         ...log,
         performed_by_name: logUsersMap[log.performed_by]?.full_name,
       }));
@@ -300,8 +300,8 @@ export class HousekeepingController {
           task_type_name: taskTypeResult.data?.name,
           estimated_duration: taskTypeResult.data?.estimated_duration,
           checklist: taskTypeResult.data?.checklist,
-          chalet_name: chaletResult.data?.name,
-          chalet_number: chaletResult.data?.chalet_number,
+          unit_name: unitResult.data?.name,
+          unit_number: unitResult.data?.unit_number,
           assigned_to_name: assigneeResult.data?.full_name,
           created_by_name: creatorResult.data?.full_name,
           logs: logsWithNames,
@@ -347,7 +347,7 @@ export class HousekeepingController {
         .insert({
           task_type_id: data.taskTypeId,
           title: taskType?.name || 'Housekeeping Task',
-          chalet_id: data.chaletId || null,
+          unit_id: data.unitId || null,
           priority: data.priority,
           notes: data.notes,
           assigned_to: data.assignedTo,
@@ -388,7 +388,7 @@ export class HousekeepingController {
     try {
       const { id } = req.params;
       const validation = updateTaskSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({
           success: false,
@@ -405,7 +405,7 @@ export class HousekeepingController {
         updated_at: new Date().toISOString(),
       };
 
-      if (data.chaletId !== undefined) updates.chalet_id = data.chaletId;
+      if (data.unitId !== undefined) updates.unit_id = data.unitId;
       if (data.roomNumber !== undefined) updates.room_number = data.roomNumber;
       if (data.taskTypeId !== undefined) updates.task_type_id = data.taskTypeId;
       if (data.priority !== undefined) updates.priority = data.priority;
@@ -464,7 +464,7 @@ export class HousekeepingController {
     try {
       const { id } = req.params;
       const validation = assignTaskSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({
           success: false,
@@ -479,9 +479,9 @@ export class HousekeepingController {
 
       const { data: result, error } = await supabase
         .from('housekeeping_tasks')
-        .update({ 
-          assigned_to: staffId, 
-          updated_at: new Date().toISOString() 
+        .update({
+          assigned_to: staffId,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
         .select()
@@ -529,7 +529,6 @@ export class HousekeepingController {
       const isAdmin = req.user?.roles?.includes('admin') || req.user?.roles?.includes('super_admin');
       const supabase = getSupabase();
 
-      // First check if the task exists and is assigned to this user
       const { data: existingTask } = await supabase
         .from('housekeeping_tasks')
         .select('id, assigned_to')
@@ -546,10 +545,10 @@ export class HousekeepingController {
 
       const { data: result, error } = await supabase
         .from('housekeeping_tasks')
-        .update({ 
-          status: 'in_progress', 
+        .update({
+          status: 'in_progress',
           started_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
         .select()
@@ -585,7 +584,7 @@ export class HousekeepingController {
     try {
       const { id } = req.params;
       const validation = completeTaskSchema.safeParse(req.body);
-      
+
       if (!validation.success) {
         return res.status(400).json({
           success: false,
@@ -599,7 +598,6 @@ export class HousekeepingController {
       const isAdmin = req.user?.roles?.includes('admin') || req.user?.roles?.includes('super_admin');
       const supabase = getSupabase();
 
-      // First check if the task exists and is assigned to this user
       const { data: existingTask } = await supabase
         .from('housekeeping_tasks')
         .select('id, assigned_to')
@@ -620,12 +618,8 @@ export class HousekeepingController {
         updated_at: new Date().toISOString(),
       };
 
-      if (data.checklistCompleted) {
-        updates.checklist_completed = data.checklistCompleted;
-      }
-      if (data.photosUrls) {
-        updates.photos_urls = data.photosUrls;
-      }
+      if (data.checklistCompleted) updates.checklist_completed = data.checklistCompleted;
+      if (data.photosUrls) updates.photos_urls = data.photosUrls;
 
       const { data: result, error } = await supabase
         .from('housekeeping_tasks')
@@ -643,17 +637,16 @@ export class HousekeepingController {
         notes: data.notes || 'Task completed',
       });
 
-      // FIX: Iteration 19 - Update chalet cleaning status when task is completed
-      // Previously only the advanced controller did this; basic controller left chalet stale
-      if (result.chalet_id) {
+      // FIX: Iteration 19 - Update unit cleaning status when task is completed
+      if (result.unit_id) {
         await supabase
-          .from('chalets')
+          .from('accommodation_units')
           .update({
             cleaning_status: 'clean',
             last_cleaned: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .eq('id', result.chalet_id);
+          .eq('id', result.unit_id);
       }
 
       res.json({
@@ -680,16 +673,14 @@ export class HousekeepingController {
       const userId = req.user?.id;
       const supabase = getSupabase();
 
-      // Update task to on_hold
       await supabase
         .from('housekeeping_tasks')
-        .update({ 
+        .update({
           status: 'on_hold',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id);
 
-      // Log the issue
       await supabase.from('housekeeping_logs').insert({
         task_id: id,
         action: 'issue_reported',
@@ -718,24 +709,14 @@ export class HousekeepingController {
    */
   async getSchedules(req: Request, res: Response) {
     try {
-      const { chaletId, dayOfWeek, isActive } = req.query;
+      const { unitId, dayOfWeek, isActive } = req.query;
       const supabase = getSupabase();
 
-      let query = supabase
-        .from('housekeeping_schedules')
-        .select('*');
+      let query = supabase.from('housekeeping_schedules').select('*');
 
-      if (chaletId) {
-        query = query.eq('chalet_id', chaletId as string);
-      }
-
-      if (dayOfWeek !== undefined) {
-        query = query.or(`day_of_week.eq.${dayOfWeek},repeat_pattern.eq.daily`);
-      }
-
-      if (isActive !== undefined) {
-        query = query.eq('is_active', isActive === 'true');
-      }
+      if (unitId) query = query.eq('unit_id', unitId as string);
+      if (dayOfWeek !== undefined) query = query.or(`day_of_week.eq.${dayOfWeek},repeat_pattern.eq.daily`);
+      if (isActive !== undefined) query = query.eq('is_active', isActive === 'true');
 
       const { data: schedules, error } = await query.order('time_slot', { ascending: true });
 
@@ -743,30 +724,30 @@ export class HousekeepingController {
 
       // Enrich with related data
       const taskTypeIds = [...new Set((schedules || []).map(s => s.task_type_id).filter(Boolean))];
-      const chaletIds = [...new Set((schedules || []).map(s => s.chalet_id).filter(Boolean))];
+      const unitIds = [...new Set((schedules || []).map(s => s.unit_id).filter(Boolean))];
       const userIds = [...new Set((schedules || []).map(s => s.assigned_to).filter(Boolean))];
 
-      const [taskTypesResult, chaletsResult, usersResult] = await Promise.all([
-        taskTypeIds.length > 0 
+      const [taskTypesResult, unitsResult, usersResult] = await Promise.all([
+        taskTypeIds.length > 0
           ? supabase.from('housekeeping_task_types').select('id, name, estimated_duration').in('id', taskTypeIds)
           : { data: [] },
-        chaletIds.length > 0 
-          ? supabase.from('chalets').select('id, name').in('id', chaletIds)
+        unitIds.length > 0
+          ? supabase.from('accommodation_units').select('id, name').in('id', unitIds)
           : { data: [] },
-        userIds.length > 0 
+        userIds.length > 0
           ? supabase.from('users').select('id, full_name').in('id', userIds)
           : { data: [] },
       ]);
 
       const taskTypesMap = ((taskTypesResult.data || []) as any[]).reduce((acc, tt) => { acc[tt.id] = tt; return acc; }, {} as Record<string, any>);
-      const chaletsMap = ((chaletsResult.data || []) as any[]).reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, any>);
+      const unitsMap = ((unitsResult.data || []) as any[]).reduce((acc, u) => { acc[u.id] = u; return acc; }, {} as Record<string, any>);
       const usersMap = ((usersResult.data || []) as any[]).reduce((acc, u) => { acc[u.id] = u; return acc; }, {} as Record<string, any>);
 
       const enrichedSchedules = (schedules || []).map(schedule => ({
         ...schedule,
         task_type_name: taskTypesMap[schedule.task_type_id]?.name,
         estimated_duration: taskTypesMap[schedule.task_type_id]?.estimated_duration,
-        chalet_name: chaletsMap[schedule.chalet_id]?.name,
+        unit_name: unitsMap[schedule.unit_id]?.name,
         assigned_to_name: usersMap[schedule.assigned_to]?.full_name,
       }));
 
@@ -805,7 +786,7 @@ export class HousekeepingController {
       const { data: result, error } = await supabase
         .from('housekeeping_schedules')
         .insert({
-          chalet_id: data.chaletId,
+          unit_id: data.unitId,
           task_type_id: data.taskTypeId,
           day_of_week: data.dayOfWeek,
           time_slot: data.timeSlot,
@@ -851,7 +832,7 @@ export class HousekeepingController {
         updated_at: new Date().toISOString(),
       };
 
-      if (data.chaletId !== undefined) updates.chalet_id = data.chaletId;
+      if (data.unitId !== undefined) updates.unit_id = data.unitId;
       if (data.taskTypeId !== undefined) updates.task_type_id = data.taskTypeId;
       if (data.dayOfWeek !== undefined) updates.day_of_week = data.dayOfWeek;
       if (data.timeSlot !== undefined) updates.time_slot = data.timeSlot;
@@ -925,7 +906,6 @@ export class HousekeepingController {
       const dayOfWeek = new Date().getDay();
       const supabase = getSupabase();
 
-      // Get active schedules for today
       const { data: schedules, error } = await supabase
         .from('housekeeping_schedules')
         .select('*')
@@ -943,7 +923,7 @@ export class HousekeepingController {
           .from('housekeeping_tasks')
           .select('id')
           .eq('task_type_id', schedule.task_type_id)
-          .eq('chalet_id', schedule.chalet_id || '')
+          .eq('unit_id', schedule.unit_id || '')
           .gte('scheduled_for', `${today}T00:00:00.000Z`)
           .lte('scheduled_for', `${today}T23:59:59.999Z`)
           .single();
@@ -954,7 +934,7 @@ export class HousekeepingController {
           scheduledTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
           await supabase.from('housekeeping_tasks').insert({
-            chalet_id: schedule.chalet_id,
+            unit_id: schedule.unit_id,
             task_type_id: schedule.task_type_id,
             assigned_to: schedule.assigned_to,
             scheduled_for: scheduledTime.toISOString(),
@@ -987,7 +967,6 @@ export class HousekeepingController {
       const days = parseInt(period as string);
       const supabase = getSupabase();
 
-      // Get all tasks
       const { data: allTasks, error: tasksError } = await supabase
         .from('housekeeping_tasks')
         .select('status, priority, started_at, completed_at, created_at, assigned_to');
@@ -996,26 +975,25 @@ export class HousekeepingController {
 
       const tasks = allTasks || [];
       const today = new Date().toISOString().split('T')[0];
-      
+
       const summary = {
         pending: tasks.filter(t => t.status === 'pending').length,
         in_progress: tasks.filter(t => t.status === 'in_progress').length,
-        completed_today: tasks.filter(t => 
+        completed_today: tasks.filter(t =>
           t.status === 'completed' && t.completed_at?.startsWith(today)
         ).length,
         total_completed: tasks.filter(t => t.status === 'completed').length,
         on_hold: tasks.filter(t => t.status === 'on_hold').length,
-        urgent: tasks.filter(t => 
+        urgent: tasks.filter(t =>
           t.priority === 'urgent' && ['pending', 'in_progress'].includes(t.status)
         ).length,
       };
 
-      // Calculate avg completion time
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
-      
-      const completedWithTime = tasks.filter(t => 
-        t.completed_at && t.started_at && 
+
+      const completedWithTime = tasks.filter(t =>
+        t.completed_at && t.started_at &&
         new Date(t.completed_at) > cutoffDate
       );
 
@@ -1029,12 +1007,11 @@ export class HousekeepingController {
         avgMinutes = Math.round(totalMinutes / completedWithTime.length);
       }
 
-      // Staff performance
       const staffMap: Record<string, { id: string; tasks_completed: number; total_time: number }> = {};
-      tasks.filter(t => 
-        t.status === 'completed' && 
-        t.assigned_to && 
-        t.completed_at && 
+      tasks.filter(t =>
+        t.status === 'completed' &&
+        t.assigned_to &&
+        t.completed_at &&
         new Date(t.completed_at) > cutoffDate
       ).forEach(t => {
         if (!staffMap[t.assigned_to]) {
@@ -1066,17 +1043,12 @@ export class HousekeepingController {
           .slice(0, 10);
       }
 
-      // Daily trend
       const dateMap: Record<string, { date: string; created: number; completed: number }> = {};
       tasks.filter(t => new Date(t.created_at) > cutoffDate).forEach(t => {
         const date = t.created_at.split('T')[0];
-        if (!dateMap[date]) {
-          dateMap[date] = { date, created: 0, completed: 0 };
-        }
+        if (!dateMap[date]) dateMap[date] = { date, created: 0, completed: 0 };
         dateMap[date].created++;
-        if (t.status === 'completed') {
-          dateMap[date].completed++;
-        }
+        if (t.status === 'completed') dateMap[date].completed++;
       });
 
       const dailyTrend = Object.values(dateMap)
@@ -1108,7 +1080,6 @@ export class HousekeepingController {
     try {
       const supabase = getSupabase();
 
-      // Get role IDs for staff, admin, super_admin
       const { data: roles } = await supabase
         .from('roles')
         .select('id, name')
@@ -1116,7 +1087,6 @@ export class HousekeepingController {
 
       const roleIds = (roles || []).map(r => r.id);
 
-      // Get user IDs with these roles
       const { data: userRoleData, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -1126,7 +1096,6 @@ export class HousekeepingController {
 
       const userIds = [...new Set((userRoleData || []).map(ur => ur.user_id))];
 
-      // Get user details
       const { data: staffUsers, error: usersError } = await supabase
         .from('users')
         .select('id, full_name, email')
@@ -1134,9 +1103,6 @@ export class HousekeepingController {
 
       if (usersError) throw usersError;
 
-      const uniqueStaff = staffUsers || [];
-
-      // Get active task counts
       const { data: activeTasks } = await supabase
         .from('housekeeping_tasks')
         .select('assigned_to')
@@ -1144,12 +1110,10 @@ export class HousekeepingController {
 
       const taskCounts: Record<string, number> = {};
       (activeTasks || []).forEach(t => {
-        if (t.assigned_to) {
-          taskCounts[t.assigned_to] = (taskCounts[t.assigned_to] || 0) + 1;
-        }
+        if (t.assigned_to) taskCounts[t.assigned_to] = (taskCounts[t.assigned_to] || 0) + 1;
       });
 
-      const staff = uniqueStaff.map(s => ({
+      const staff = (staffUsers || []).map(s => ({
         ...s,
         name: s.full_name,
         active_tasks: taskCounts[s.id] || 0,

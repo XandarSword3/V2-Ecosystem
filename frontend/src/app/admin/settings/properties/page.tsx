@@ -58,7 +58,7 @@ const SETTING_METADATA: Record<string, { label: string; description: string; typ
   },
   max_guests_per_booking: {
     label: 'Max Guests per Booking',
-    description: 'The maximum allowable guest count per individual chalet booking.',
+    description: 'The maximum allowable guest count per individual unit booking.',
     type: 'number',
   },
   auto_confirm_bookings: {

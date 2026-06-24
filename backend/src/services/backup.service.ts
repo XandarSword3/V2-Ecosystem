@@ -1,5 +1,5 @@
 import { getSupabase } from "../database/connection.js";
-import { config } from "../config/index.js";
+import { config } from "../config/index";
 import { logger } from "../utils/logger.js";
 
 interface BackupResult {
@@ -179,7 +179,7 @@ export class BackupService {
         const coreTables = [
             'users', 'roles', 'user_roles', 'permissions', 'role_permissions',
             'modules', 'site_settings', 'accommodation_units', 'transactions',
-            'pool_sessions', 'menu_items', 'menu_categories',
+            'capacity_windows', 'catalog_items', 'catalog_categories',
             'payments', 'reviews', 'support_tickets'
         ];
 
@@ -207,7 +207,7 @@ export class BackupService {
         // 1. Core Users & Roles
         // 2. Settings & Content
         // 3. Operational Data (Bookings, etc)
-        const priorityTables = ['users', 'roles', 'site_settings', 'modules', 'menu_categories', 'accommodation_units'];
+        const priorityTables = ['users', 'roles', 'site_settings', 'modules', 'catalog_categories', 'accommodation_units'];
         const tableNames = Object.keys(backupData.tables);
         
         // Sort tables: priority ones first, then alphabetical

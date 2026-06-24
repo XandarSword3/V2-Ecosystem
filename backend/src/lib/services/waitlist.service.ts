@@ -57,8 +57,6 @@ export function createWaitlistService(container: Container) {
   async function estimateWait(partySize: number): Promise<number> {
     const queue = await getActiveQueue();
     const waiting = queue.filter(e => e.status === 'waiting');
-    if (waiting.length === 0) return 0;
-    // Base: 15 min per party ahead + 2 min per extra person above 2
     const baseWait = waiting.length * BASE_WAIT_PER_PARTY;
     const sizeExtra = Math.max(0, partySize - 2) * 2;
     return baseWait + sizeExtra;

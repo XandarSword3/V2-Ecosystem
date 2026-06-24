@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/Button';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import {
   ChefHat,
-  Cookie,
   Home,
   Waves,
   Clock,
@@ -22,7 +21,6 @@ import {
   AlertCircle,
   TrendingUp,
   RefreshCw,
-  ClipboardList,
   Package,
   AlertTriangle,
   Trash2,
@@ -103,7 +101,15 @@ export default function StaffDashboard() {
   const { activeProperty } = useProperty();
 
   const fetchDashboardData = useCallback(async () => {
-    if (!activeProperty?.id) return;
+    if (!activeProperty?.id) {
+      // PropertyContext not yet resolved — release the loading gate so the
+      // page doesn't spin forever. The useCallback dep on activeProperty?.id
+      // means this function is replaced (and this effect re-runs) as soon as
+      // the property becomes available, at which point we proceed to fetch.
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     
     try {
       // Fetch live transactions from unified endpoint
@@ -319,13 +325,16 @@ export default function StaffDashboard() {
     );
   }
 
-  const moduleActions = (modules || [])
-    .filter(m => m.is_active && !['restaurant', 'chalets', 'pool', 'snack-bar'].includes(m.slug))
+  // Quick actions derived entirely from active modules — no hardcoded slugs.
+  // Routes are /staff/modules/:slug for all modules so new modules work
+  // automatically without any code changes here.
+  const quickActions = (modules || [])
+    .filter(m => m.is_active)
     .map(m => {
       let icon = Home;
       let color = 'from-blue-400 to-indigo-500';
       let bgColor = 'bg-blue-50 dark:bg-blue-950/30';
-      let description = 'Manage module';
+      let description = m.description || 'Manage module';
 
       if (m.template_type === 'instant_transaction') {
         icon = ChefHat;
@@ -337,6 +346,11 @@ export default function StaffDashboard() {
         color = 'from-primary-400 to-secondary-500';
         bgColor = 'bg-primary-50 dark:bg-primary-950/30';
         description = 'Sessions & Capacity';
+      } else if (m.template_type === 'time_exclusive_reservation') {
+        icon = Home;
+        color = 'from-emerald-400 to-teal-500';
+        bgColor = 'bg-emerald-50 dark:bg-emerald-950/30';
+        description = 'Reservations';
       }
 
       return {
@@ -345,53 +359,9 @@ export default function StaffDashboard() {
         href: `/staff/modules/${m.slug}`,
         icon,
         color,
-        bgColor
+        bgColor,
       };
     });
-
-  const quickActions = [
-    {
-      title: td('kitchenOrders'),
-      description: td('kitchenOrdersDesc'),
-      href: '/staff/restaurant',
-      icon: ChefHat,
-      color: 'from-orange-400 to-rose-500',
-      bgColor: 'bg-orange-50 dark:bg-orange-950/30',
-    },
-    ...moduleActions,
-    {
-      title: td('snackBar'),
-      description: td('snackBarDesc'),
-      href: '/staff/snack',
-      icon: Cookie,
-      color: 'from-amber-400 to-orange-500',
-      bgColor: 'bg-amber-50 dark:bg-amber-950/30',
-    },
-    {
-      title: td('housekeeping'),
-      description: td('housekeepingDesc'),
-      href: '/staff/housekeeping',
-      icon: ClipboardList,
-      color: 'from-blue-400 to-indigo-500',
-      bgColor: 'bg-blue-50 dark:bg-blue-950/30',
-    },
-    {
-      title: td('chalets'),
-      description: td('chaletsDesc'),
-      href: '/staff/chalets',
-      icon: Home,
-      color: 'from-emerald-400 to-teal-500',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950/30',
-    },
-    {
-      title: td('pool'),
-      description: td('poolDesc'),
-      href: '/staff/pool',
-      icon: Waves,
-      color: 'from-primary-400 to-secondary-500',
-      bgColor: 'bg-primary-50 dark:bg-primary-950/30',
-    },
-  ];
 
   const statsDisplay = [
     { label: td('pendingOrders'), value: stats.pendingOrders.toString(), icon: Clock, color: 'text-amber-600 dark:text-amber-400' },

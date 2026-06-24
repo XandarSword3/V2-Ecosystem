@@ -2,16 +2,16 @@ import { CacheKeys, CacheTTL } from '../../src/utils/cache';
 
 describe('Cache Utils - Constants', () => {
   describe('CacheKeys', () => {
-    it('should have correct MENU prefix', () => {
-      expect(CacheKeys.MENU).toBe('menu:');
+    it('should have correct CATALOG prefix', () => {
+      expect(CacheKeys.CATALOG).toBe('catalog:');
     });
 
-    it('should have correct MENU_ITEM prefix', () => {
-      expect(CacheKeys.MENU_ITEM).toBe('menu:item:');
+    it('should have correct CATALOG_ITEM prefix', () => {
+      expect(CacheKeys.CATALOG_ITEM).toBe('catalog:item:');
     });
 
-    it('should have correct MENU_CATEGORY prefix', () => {
-      expect(CacheKeys.MENU_CATEGORY).toBe('menu:category:');
+    it('should have correct CATALOG_CATEGORY prefix', () => {
+      expect(CacheKeys.CATALOG_CATEGORY).toBe('catalog:category:');
     });
 
     it('should have correct SETTINGS prefix', () => {
@@ -30,8 +30,8 @@ describe('Cache Utils - Constants', () => {
       expect(CacheKeys.RATE_LIMIT).toBe('rate:');
     });
 
-    it('should have correct CHALET prefix', () => {
-      expect(CacheKeys.CHALET).toBe('chalet:');
+    it('should have correct UNIT prefix', () => {
+      expect(CacheKeys.UNIT).toBe('unit:');
     });
 
     it('should have correct AVAILABILITY prefix', () => {
@@ -62,10 +62,10 @@ describe('Cache Utils - Constants', () => {
   });
 
   describe('Cache Key Generation', () => {
-    it('should generate proper menu key with module id', () => {
-      const moduleId = 'restaurant';
-      const key = `${CacheKeys.MENU}${moduleId}:items`;
-      expect(key).toBe('menu:restaurant:items');
+    it('should generate proper catalog key with module id', () => {
+      const moduleId = 'menu_service';
+      const key = `${CacheKeys.CATALOG}${moduleId}:items`;
+      expect(key).toBe('catalog:menu_service:items');
     });
 
     it('should generate proper settings key', () => {
@@ -86,10 +86,10 @@ describe('Cache Utils - Constants', () => {
       expect(key).toBe('rate:ip:192.168.1.1');
     });
 
-    it('should generate proper chalet key', () => {
-      const chaletId = 'chalet-456';
-      const key = `${CacheKeys.CHALET}${chaletId}`;
-      expect(key).toBe('chalet:chalet-456');
+    it('should generate proper accommodation unit key', () => {
+      const unitId = 'unit-456';
+      const key = `${CacheKeys.UNIT}${unitId}`;
+      expect(key).toBe('unit:unit-456');
     });
 
     it('should generate proper availability key', () => {
@@ -101,15 +101,15 @@ describe('Cache Utils - Constants', () => {
 });
 
 describe('Cache Pattern Utilities', () => {
-  it('should create wildcard pattern for menu cache', () => {
-    const pattern = `${CacheKeys.MENU}*`;
-    expect(pattern).toBe('menu:*');
+  it('should create wildcard pattern for catalog cache', () => {
+    const pattern = `${CacheKeys.CATALOG}*`;
+    expect(pattern).toBe('catalog:*');
   });
 
-  it('should create specific pattern for module menu', () => {
-    const moduleId = 'restaurant';
-    const pattern = `${CacheKeys.MENU}${moduleId}:*`;
-    expect(pattern).toBe('menu:restaurant:*');
+  it('should create specific pattern for module catalog', () => {
+    const moduleId = 'menu_service';
+    const pattern = `${CacheKeys.CATALOG}${moduleId}:*`;
+    expect(pattern).toBe('catalog:menu_service:*');
   });
 
   it('should create pattern for user sessions', () => {

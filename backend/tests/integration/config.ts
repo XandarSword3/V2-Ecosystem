@@ -36,9 +36,9 @@ export const TEST_CONFIG = {
       fullName: 'Administrator',
     },
     staff: {
-      email: process.env.TEST_STAFF_EMAIL || 'restaurant.staff@v2ecosystem.com',
+      email: process.env.TEST_STAFF_EMAIL || 'menu.service.staff@v2ecosystem.com',
       password: process.env.TEST_STAFF_PASSWORD || 'staff123',
-      fullName: 'Restaurant Staff',
+      fullName: 'MenuService Staff',
     },
     customer: {
       email: process.env.TEST_CUSTOMER_EMAIL || 'customer.test@v2ecosystem.local',

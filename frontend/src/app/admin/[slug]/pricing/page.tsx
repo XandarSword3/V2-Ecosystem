@@ -28,7 +28,7 @@ import {
 interface PricingRule {
   id: string;
   name: string;
-  chalet_id?: string;
+  unit_id?: string;
   base_price: number;
   price?: number;
   weekend_price?: number;
@@ -71,7 +71,7 @@ export default function DynamicPricingPage() {
   const fetchPricingRules = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/chalets/admin/price-rules', { params: { moduleId: currentModule.id } });
+      const response = await api.get('/accommodations/admin/price-rules', { params: { moduleId: currentModule.id } });
       setPricingRules(response.data.data || []);
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));
@@ -95,10 +95,10 @@ export default function DynamicPricingPage() {
       setSaving(true);
       const payload = { ...formData, module_id: currentModule.id };
       if (editing) {
-        await api.put(`/chalets/admin/price-rules/${editing.id}`, payload);
+        await api.put(`/accommodations/admin/price-rules/${editing.id}`, payload);
         toast.success(tc('success.updated'));
       } else {
-        await api.post('/chalets/admin/price-rules', payload);
+        await api.post('/accommodations/admin/price-rules', payload);
         toast.success(tc('success.created'));
       }
       setShowModal(false);
@@ -138,7 +138,7 @@ export default function DynamicPricingPage() {
   const handleDelete = async (id: string) => {
     if (!confirm(tc('pricing.confirmDelete'))) return;
     try {
-      await api.delete(`/chalets/admin/price-rules/${id}`);
+      await api.delete(`/accommodations/admin/price-rules/${id}`);
       setPricingRules((prev) => prev.filter((r) => r.id !== id));
       toast.success(tc('success.deleted'));
     } catch (error) {

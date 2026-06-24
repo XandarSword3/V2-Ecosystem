@@ -23,33 +23,12 @@ import type { UUID } from './index';
 /**
  * The four fundamental economic engines.
  * Maps 1:1 to database enum `module_template_type`.
- *
- * Database mapping:
- *   'menu_service'       → EngineType.InstantTransaction
- *   'multi_day_booking'  → EngineType.TimeExclusiveReservation
- *   'session_access'     → EngineType.SharedCapacityAccess
- *   'subscription'       → EngineType.OngoingEntitlement   (future)
  */
 export type EngineType =
   | 'instant_transaction'
   | 'time_exclusive_reservation'
   | 'shared_capacity_access'
   | 'ongoing_entitlement';
-
-/** Database template_type → engine type mapping */
-export const TEMPLATE_TO_ENGINE: Record<string, EngineType> = {
-  menu_service: 'instant_transaction',
-  multi_day_booking: 'time_exclusive_reservation',
-  session_access: 'shared_capacity_access',
-  subscription: 'ongoing_entitlement',
-};
-
-export const ENGINE_TO_TEMPLATE: Record<EngineType, string> = {
-  instant_transaction: 'menu_service',
-  time_exclusive_reservation: 'multi_day_booking',
-  shared_capacity_access: 'session_access',
-  ongoing_entitlement: 'subscription',
-};
 
 // ============================================
 // 2. State Machine Types

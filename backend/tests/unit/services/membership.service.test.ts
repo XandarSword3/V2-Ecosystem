@@ -4,9 +4,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMembershipService } from '../../src/lib/services/membership.service';
-import { InMemoryMembershipRepository } from '../../src/lib/repositories/membership.repository.memory';
-import type { Container } from '../../src/lib/container/types';
+import { createMembershipService } from '../../../src/lib/services/membership.service';
+import { InMemoryMembershipRepository } from '../../../src/lib/repositories/membership.repository.memory';
+import type { Container } from '../../../src/lib/container/types';
 
 describe('MembershipService', () => {
   let service: ReturnType<typeof createMembershipService>;

@@ -459,10 +459,10 @@ export default function MessagingPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <MessageSquare className="w-6 h-6 text-blue-500" />
           <h1 className="text-xl font-semibold text-gray-900">Guest Messaging</h1>
@@ -475,13 +475,13 @@ export default function MessagingPage() {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <div className="flex bg-gray-100 rounded-lg p-1">
+          <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
             {(['inbox', 'templates', 'canned', 'analytics'] as Tab[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => { setActiveTab(tab); setSelectedConvId(null); }}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
-                  activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  activeTab === tab ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
               >
                 {tab === 'canned' ? 'Quick Replies' : tab}
@@ -496,14 +496,14 @@ export default function MessagingPage() {
         <div className="flex flex-1 min-h-0">
 
           {/* Conversation list */}
-          <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+          <div className="w-80 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
 
             {/* List controls */}
-            <div className="p-3 border-b border-gray-100 space-y-2">
+            <div className="p-3 border-b border-gray-100 dark:border-gray-700 space-y-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Search conversations…"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
@@ -529,11 +529,11 @@ export default function MessagingPage() {
             {/* List */}
             <div className="flex-1 overflow-y-auto">
               {convLoading ? (
-                <div className="flex items-center justify-center h-32 text-gray-400">
+                <div className="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500">
                   <Loader2 className="w-5 h-5 animate-spin" />
                 </div>
               ) : filteredConvs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                <div className="flex flex-col items-center justify-center h-40 text-gray-400 dark:text-gray-500">
                   <Inbox className="w-8 h-8 mb-2 opacity-40" />
                   <p className="text-sm">No conversations</p>
                 </div>
@@ -553,16 +553,16 @@ export default function MessagingPage() {
           {/* Thread panel */}
           <div className="flex-1 flex flex-col min-w-0">
             {!selectedConvId ? (
-              <div className="flex-1 flex items-center justify-center text-gray-400">
-                <div className="text-center">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">Select a conversation to start</p>
+              <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+              <div className="text-center">
+              <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Select a conversation to start</p>
                 </div>
               </div>
             ) : (
               <>
                 {/* Thread header */}
-                <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setSelectedConvId(null)}
@@ -625,7 +625,7 @@ export default function MessagingPage() {
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50">
+                <div className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50 dark:bg-gray-900">
                   {msgLoading ? (
                     <div className="flex items-center justify-center h-32 text-gray-400">
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -642,7 +642,7 @@ export default function MessagingPage() {
                 </div>
 
                 {/* Compose */}
-                <div className="bg-white border-t border-gray-200 px-4 py-3 flex-shrink-0">
+                <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex-shrink-0">
                   {/* Canned responses dropdown */}
                   {showCannedMenu && (
                     <div className="mb-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
@@ -756,10 +756,10 @@ export default function MessagingPage() {
                           <p className="text-xs text-gray-500 mb-2">Subject: {tpl.subject}</p>
                         )}
                         <p className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 rounded-lg p-3">{tpl.body}</p>
-                        {tpl.variables.length > 0 && (
+                        {(tpl.variables ?? []).length > 0 && (
                           <div className="flex items-center gap-1 mt-2">
                             <span className="text-xs text-gray-400">Variables:</span>
-                            {tpl.variables.map(v => (
+                            {(tpl.variables ?? []).map(v => (
                               <span key={v} className="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-mono">{`{{${v}}}`}</span>
                             ))}
                           </div>
@@ -894,8 +894,8 @@ export default function MessagingPage() {
       {/* ── Template dialog ────────────────────────────────────────────── */}
       {showTemplateDialog && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg">
+          <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-700">
               <h3 className="font-semibold text-gray-900">New Message Template</h3>
               <button onClick={() => setShowTemplateDialog(false)} className="p-1 hover:bg-gray-100 rounded-lg">
                 <X className="w-4 h-4 text-gray-500" />
@@ -948,7 +948,7 @@ export default function MessagingPage() {
               />
               <p className="text-xs text-gray-400">Use <code className="bg-gray-100 px-1 rounded">{'{{guest_name}}'}</code>, <code className="bg-gray-100 px-1 rounded">{'{{booking_id}}'}</code> etc. as placeholders</p>
             </div>
-            <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
+            <div className="flex justify-end gap-3 p-5 border-t border-gray-100 dark:border-gray-700">
               <button onClick={() => setShowTemplateDialog(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
                 Cancel
               </button>

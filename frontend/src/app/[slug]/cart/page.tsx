@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { restaurantApi } from '@/lib/api';
+import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/stores/cartStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -92,7 +92,7 @@ export default function ModuleCartPage() {
   // FIX: Iteration 4 - Use dynamic tax rate from settings instead of hardcoded 0.11
   const taxRate = settings.taxRate || 0.11;
   const tax = subtotal * taxRate;
-  // Phase 2: Add service charge + delivery fee to match restaurant cart parity
+  // Phase 2: Add service charge + delivery fee to match instant_transaction cart parity
   const serviceChargeRate = settings.serviceChargeRate ?? 0.10;
   const serviceCharge = orderType === 'dine_in' ? subtotal * serviceChargeRate : 0;
   const deliveryFee = orderType === 'delivery' ? (settings.deliveryFee ?? 5) : 0;
@@ -127,7 +127,7 @@ export default function ModuleCartPage() {
   }
 
   const orderMutation = useMutation({
-    mutationFn: (data: OrderData) => restaurantApi.createOrder(data),
+    mutationFn: (data: OrderData) => api.post('/orders', data),
     onSuccess: (response) => {
       const order = response?.data?.data;
       const orderId = order?.id || order?.order_id || '';

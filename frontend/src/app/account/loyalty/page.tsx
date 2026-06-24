@@ -374,15 +374,9 @@ export default function CustomerLoyaltyPage() {
           Use your points at checkout or save them for bigger rewards!
         </p>
         <div className="flex justify-center gap-4">
-          <Link href="/restaurant">
-            <Button variant="outline">
-              Order Food
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          </Link>
-          <Link href="/chalets">
+          <Link href="/">
             <Button>
-              Book a Chalet
+              Explore Services
               <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </Link>

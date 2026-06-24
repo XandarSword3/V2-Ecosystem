@@ -135,7 +135,9 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     // Generate unique filename
     const ext = mimeType.split('/')[1]?.replace('svg+xml', 'svg').replace('x-icon', 'ico').replace('vnd.microsoft.icon', 'ico') || 'png';
     const timestamp = Date.now();
-    const safeName = (filename || 'file').replace(/[^a-zA-Z0-9.-]/g, '_').substring(0, 50);
+    // Strip any existing extension first so we never get double extensions like download.jpg.jpeg
+    const baseName = (filename || 'file').replace(/\.[^.]+$/, '');
+    const safeName = baseName.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 50);
     
     // Prefix storage path by property ID to ensure isolation
     const storagePath = propertyId 
@@ -155,12 +157,12 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
       throw error;
     }
     
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(storagePath);
-    
-    const publicUrl = urlData.publicUrl;
+    // Build a backend-proxied URL so the Supabase project reference never reaches the frontend.
+    // The /api/v1/assets/* route in v1.routes.ts does a server-side redirect to the real Supabase URL.
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const backendBase = process.env.BACKEND_URL || `${proto}://${host}`;
+    const assetUrl = `${backendBase}/api/v1/assets/${storagePath}`;
     
     // If this is a logo or favicon, update site settings
     if (uploadType === 'logo' || uploadType === 'favicon') {
@@ -173,7 +175,7 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
           const { resolveSetting, setPropertySetting } = await import('../../multi-property/settings-resolution.service.js');
           const resolved = await resolveSetting(propertyId, 'branding', {});
           brandingSettings = (resolved?.value as Record<string, unknown>) || {};
-          brandingSettings[settingKey] = publicUrl;
+          brandingSettings[settingKey] = assetUrl;
           
           await setPropertySetting(propertyId, 'branding', brandingSettings, 'appearance', userId);
         } catch (err) {
@@ -188,7 +190,7 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
           .single();
         
         brandingSettings = (existing?.value as Record<string, unknown>) || {};
-        brandingSettings[settingKey] = publicUrl;
+        brandingSettings[settingKey] = assetUrl;
         
         // Update settings
         const { error: updateError } = await supabase
@@ -223,7 +225,7 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        url: publicUrl,
+        url: assetUrl,
         path: storagePath,
         type: uploadType,
         size: fileBuffer.length,

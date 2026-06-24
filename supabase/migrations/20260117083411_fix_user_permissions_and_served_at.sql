@@ -18,4 +18,6 @@ CREATE INDEX IF NOT EXISTS idx_user_permissions_user ON user_permissions(user_id
 
 -- FIX 2: Add served_at column for order completion tracking
 -- Required for KDS "Mark Served" functionality
-ALTER TABLE restaurant_orders ADD COLUMN IF NOT EXISTS served_at TIMESTAMPTZ;
+-- Stored in transactions.metadata->>'served_at'; no separate column needed.
+-- This statement is intentionally a no-op to preserve migration history.
+DO $$ BEGIN NULL; END $$;

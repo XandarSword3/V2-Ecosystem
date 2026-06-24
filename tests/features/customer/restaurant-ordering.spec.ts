@@ -3,13 +3,13 @@ import { test, expect } from '../../fixtures/auth.fixture';
 const FRONTEND = 'http://localhost:3000';
 const API = 'http://localhost:3005/api';
 
-test.describe('Customer Restaurant Ordering [CUS-REST]', () => {
+test.describe('Customer MenuService Ordering [CUS-REST]', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${FRONTEND}/restaurant`);
+    await page.goto(`${FRONTEND}/menu service`);
   });
 
   test('CUS-REST-001: browse menu categories visible', async ({ page }) => {
-    const heading = page.getByRole('heading', { name: /menu|restaurant/i });
+    const heading = page.getByRole('heading', { name: /menu|menu service/i });
     await expect(heading).toBeVisible();
     const categories = page.locator('[class*="categor"], [class*="menu-section"], nav >> text=/appetizer|starter|main|drink|dessert/i');
     await expect(categories.first()).toBeVisible();

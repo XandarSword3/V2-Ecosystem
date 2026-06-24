@@ -49,7 +49,12 @@ interface Booking {
   customer_phone?: string;
   payment_status?: string;
   module_id?: string;
-  chalets?: {
+  unit?: {
+    id?: string;
+    name: string;
+    capacity: number;
+  };
+  accommodation_units?: {
     id?: string;
     name: string;
     capacity: number;
@@ -88,7 +93,7 @@ export default function DynamicBookingsPage() {
   const fetchBookings = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/chalets/staff/bookings', { params: { moduleId: currentModule.id } });
+      const response = await api.get(`/${slug}/staff/bookings`, { params: { moduleId: currentModule.id } });
       setBookings(response.data.data || []);
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));
@@ -105,7 +110,7 @@ export default function DynamicBookingsPage() {
 
   const updateBookingStatus = async (bookingId: string, status: string) => {
     try {
-      await api.patch(`/chalets/staff/bookings/${bookingId}/status`, { status });
+      await api.patch(`/${slug}/staff/bookings/${bookingId}/status`, { status });
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: status as Booking['status'] } : b)));
       toast.success(tc('success.updated'));
     } catch (error) {
@@ -119,7 +124,7 @@ export default function DynamicBookingsPage() {
       const query = searchQuery.toLowerCase();
       return (
         b.booking_number.toLowerCase().includes(query) ||
-        b.chalets?.name?.toLowerCase().includes(query) ||
+        (b.unit?.name || b.accommodation_units?.name)?.toLowerCase().includes(query) ||
         b.users?.full_name?.toLowerCase().includes(query) ||
         b.customer_name?.toLowerCase().includes(query)
       );
@@ -286,7 +291,7 @@ export default function DynamicBookingsPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <Home className="w-4 h-4 text-slate-400" />
-                            <span>{booking.chalets?.name || 'N/A'}</span>
+                            <span>{booking.unit?.name || booking.accommodation_units?.name || 'N/A'}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -376,7 +381,7 @@ export default function DynamicBookingsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-slate-500">{tc('bookings.unit')}</p>
-                    <p className="font-medium">{selectedBooking.chalets?.name || 'N/A'}</p>
+                    <p className="font-medium">{selectedBooking.unit?.name || selectedBooking.accommodation_units?.name || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">{tc('tables.status')}</p>

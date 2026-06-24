@@ -13,10 +13,10 @@ const viewports: Viewport[] = [
 
 const routes = [
   '/',
-  '/restaurant',
+  '/menu service',
   '/pool',
-  '/snack-bar',
-  '/chalets',
+  '/kiosk',
+  '/accommodation_units',
   '/giftcards',
   '/login',
   '/register',

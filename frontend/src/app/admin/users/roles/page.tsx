@@ -234,12 +234,12 @@ export default function RolesPage() {
               <div>
                 <label className="text-sm font-medium mb-1 block">Role Name *</label>
                 <Input
-                  placeholder="e.g., pool_manager"
+                  placeholder="e.g., billing_manager"
                   value={newRoleName}
                   onChange={(e) => setNewRoleName(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Use lowercase with underscores (e.g., restaurant_staff)
+                  Use lowercase with underscores (e.g., support_staff)
                 </p>
               </div>
               

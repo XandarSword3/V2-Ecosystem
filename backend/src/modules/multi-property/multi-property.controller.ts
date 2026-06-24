@@ -3,6 +3,25 @@ import * as multiPropertyService from './multi-property.service.js';
 import * as settingsService from './settings-resolution.service.js';
 import { assertPropertyLimit } from '../../services/feature-limits.service.js';
 
+// ==================== CURRENCIES (reference data) ====================
+
+export async function getCurrencies(req: Request, res: Response): Promise<void> {
+  try {
+    const { getSupabase } = await import('../../database/connection.js');
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('currencies')
+      .select('code, symbol, name')
+      .eq('is_active', true)
+      .order('code');
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to get currencies';
+    res.status(500).json({ error: message });
+  }
+}
+
 // ==================== PROPERTY GROUPS ====================
 
 export async function getPropertyGroups(req: Request, res: Response): Promise<void> {
@@ -420,7 +439,21 @@ export async function createProperty(req: Request, res: Response): Promise<void>
     // Enforce tenant property limit before any DB work
     await assertPropertyLimit(req);
 
-    const { name, property_code, property_type, address, city, country, timezone, currency, phone, email, total_rooms, group_id, slug } = req.body;
+    const {
+      name,
+      property_code,
+      property_type,
+      address,
+      city,
+      country,
+      timezone,
+      currency,
+      phone,
+      email,
+      total_rooms,
+      group_id,
+      description,
+    } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'Property name is required' });
@@ -437,7 +470,7 @@ export async function createProperty(req: Request, res: Response): Promise<void>
         group_id: group_id ?? null,
         property_code: property_code ?? null,
         property_type: property_type ?? 'hotel',
-        address: address ?? null,
+        address_line1: address ?? null,
         city: city ?? null,
         country: country ?? null,
         timezone: timezone ?? 'UTC',
@@ -445,7 +478,7 @@ export async function createProperty(req: Request, res: Response): Promise<void>
         phone: phone ?? null,
         email: email ?? null,
         total_rooms: total_rooms ?? null,
-        slug: slug ?? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+        description: description ?? null,
         is_active: true,
       })
       .select()

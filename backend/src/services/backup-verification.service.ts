@@ -50,7 +50,7 @@ const CRITICAL_TABLES = [
   'transactions',
   'pool_memberships',
   'payments',
-  'menu_items',
+  'catalog_items',
   'seasonal_pricing_rules',
   'system_settings',
   'security_audit_log',
@@ -210,7 +210,7 @@ export class BackupVerificationService {
       counts[table] = count || 0;
 
       // Check for unexpectedly empty tables that should have data
-      if (count === 0 && ['system_settings', 'accommodation_units', 'menu_items'].includes(table)) {
+      if (count === 0 && ['system_settings', 'accommodation_units', 'catalog_items'].includes(table)) {
         issues.push(`Table ${table} is unexpectedly empty`);
       }
     }

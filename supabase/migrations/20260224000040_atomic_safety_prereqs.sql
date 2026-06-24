@@ -5,19 +5,16 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'pool_sessions'
+    WHERE table_schema = 'public' AND table_name = 'capacity_windows'
   ) AND NOT EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'pool_sessions' AND column_name = 'module_id'
+    WHERE table_schema = 'public' AND table_name = 'capacity_windows' AND column_name = 'module_id'
   ) THEN
-    ALTER TABLE pool_sessions ADD COLUMN module_id UUID;
+    ALTER TABLE capacity_windows ADD COLUMN module_id UUID;
   END IF;
 END $$;
 
 DO $$
 BEGIN
-  RAISE NOTICE 'Atomic safety functions created successfully:';
-  RAISE NOTICE '  - purchase_pool_ticket_atomic (H2 fix)';
-  RAISE NOTICE '  - create_chalet_booking_with_addons (H4/M3 fix)';
-  RAISE NOTICE '  - reverse_coupon_usage (M4 fix)';
+  -- legacy function notices removed (names updated in atomic_safety_functions migration)
 END $$;

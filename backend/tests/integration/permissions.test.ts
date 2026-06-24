@@ -75,17 +75,17 @@ describe('Permission Middleware Integration', () => {
       }
     );
 
-    // Restaurant orders - requires restaurant:order:read_all
-    app.get('/restaurant/orders', 
+    // MenuService orders - requires menu service:order:read_all
+    app.get('/${slug}/orders', 
       mockAuthMiddleware, 
       requirePermission(Permissions.RESTAURANT_ORDER_READ_ALL), 
       (req, res) => {
-        res.json({ success: true, message: 'Restaurant orders' });
+        res.json({ success: true, message: 'MenuService orders' });
       }
     );
 
-    // Create order - requires restaurant:order:create
-    app.post('/restaurant/orders', 
+    // Create order - requires menu service:order:create
+    app.post('/${slug}/orders', 
       mockAuthMiddleware, 
       requirePermission(Permissions.RESTAURANT_ORDER_CREATE), 
       (req, res) => {
@@ -198,11 +198,11 @@ describe('Permission Middleware Integration', () => {
       });
     });
 
-    describe('Restaurant Orders', () => {
+    describe('MenuService Orders', () => {
       it('should deny staff from reading all orders (module routes use role gates, not permission constants)', async () => {
         const token = createTestToken('staff-1', [Roles.STAFF]);
         const response = await request(app)
-          .get('/restaurant/orders')
+          .get('/${slug}/orders')
           .set('Authorization', `Bearer ${token}`);
         expect(response.status).toBe(403);
       });
@@ -210,7 +210,7 @@ describe('Permission Middleware Integration', () => {
       it('should allow admin to read orders', async () => {
         const token = createTestToken('admin-1', [Roles.ADMIN]);
         const response = await request(app)
-          .get('/restaurant/orders')
+          .get('/${slug}/orders')
           .set('Authorization', `Bearer ${token}`);
         expect(response.status).toBe(200);
       });
@@ -218,7 +218,7 @@ describe('Permission Middleware Integration', () => {
       it('should deny customer from reading all orders', async () => {
         const token = createTestToken('customer-1', [Roles.CUSTOMER]);
         const response = await request(app)
-          .get('/restaurant/orders')
+          .get('/${slug}/orders')
           .set('Authorization', `Bearer ${token}`);
         expect(response.status).toBe(403);
       });
@@ -226,7 +226,7 @@ describe('Permission Middleware Integration', () => {
       it('should allow customer to create orders', async () => {
         const token = createTestToken('customer-1', [Roles.CUSTOMER]);
         const response = await request(app)
-          .post('/restaurant/orders')
+          .post('/${slug}/orders')
           .set('Authorization', `Bearer ${token}`)
           .send({ items: [] });
         expect(response.status).toBe(200);
@@ -322,14 +322,14 @@ describe('Permission Middleware Integration', () => {
       
       // Can create orders (customer permission)
       const orderResponse = await request(app)
-        .post('/restaurant/orders')
+        .post('/${slug}/orders')
         .set('Authorization', `Bearer ${token}`)
         .send({ items: [] });
       expect(orderResponse.status).toBe(200);
       
       // Staff role does not add module-specific read-all permission
       const readResponse = await request(app)
-        .get('/restaurant/orders')
+        .get('/${slug}/orders')
         .set('Authorization', `Bearer ${token}`);
       expect(readResponse.status).toBe(403);
     });
@@ -385,7 +385,7 @@ describe('Permission Matrix Validation', () => {
     it('customer should have limited permissions', () => {
       const customerPerms = RolePermissions[Roles.CUSTOMER];
       expect(customerPerms).toContain(Permissions.USER_READ_SELF);
-      expect(customerPerms).toContain(Permissions.RESTAURANT_ORDER_CREATE);
+      expect(customerPerms).toContain(Permissions.ORDER_CREATE);
       expect(customerPerms).not.toContain(Permissions.ADMIN_DASHBOARD);
     });
 
