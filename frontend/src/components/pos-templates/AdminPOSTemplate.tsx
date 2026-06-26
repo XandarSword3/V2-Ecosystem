@@ -174,6 +174,8 @@ export default function AdminPOSTemplate({ moduleId, moduleSlug, moduleName }: A
   const [showRoleModal, setShowRoleModal] = useState<string | null>(null);
   const [showAddPrinterModal, setShowAddPrinterModal] = useState(false);
   const [newPrinter, setNewPrinter] = useState({ name: '', ip: '', type: 'receipt' });
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const importInputRef = typeof document !== 'undefined'
     ? (() => { const el = document.createElement('input'); el.type = 'file'; el.accept = '.csv'; return el; })()
     : null;
@@ -364,6 +366,20 @@ export default function AdminPOSTemplate({ moduleId, moduleSlug, moduleName }: A
       setNewPrinter({ name: '', ip: '', type: 'receipt' });
     } catch {
       toast.error('Failed to add printer');
+    }
+  };
+
+  // Add category
+  const addCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const res = await api.post(`/admin/modules/${moduleSlug}/categories`, { name: newCategoryName.trim(), sort_order: categories.length });
+      setCategories(prev => [...prev, res.data.data]);
+      toast.success('Category added');
+      setShowAddCategoryModal(false);
+      setNewCategoryName('');
+    } catch {
+      toast.error('Failed to add category');
     }
   };
 
@@ -564,7 +580,7 @@ export default function AdminPOSTemplate({ moduleId, moduleSlug, moduleName }: A
                       </span>
                     </button>
                   ))}
-                  <Button variant="outline" size="sm" className="w-full mt-4">
+                  <Button variant="outline" size="sm" className="w-full mt-4" onClick={() => setShowAddCategoryModal(true)}>
                     <Plus className="h-4 w-4 mr-2" /> Add Category
                   </Button>
                 </div>
@@ -1517,6 +1533,31 @@ export default function AdminPOSTemplate({ moduleId, moduleSlug, moduleName }: A
               <div className="flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => setShowBOMEditor(false)}>Cancel</Button>
                 <Button className="flex-1" onClick={() => saveBOM(selectedBOMItem.id)}><Save className="h-4 w-4 mr-2" /> Save BOM</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      {showAddCategoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={e => { if (e.key === 'Escape') setShowAddCategoryModal(false); }}>
+          <Card className="w-full max-w-sm">
+            <CardHeader><CardTitle>Add Category</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Category Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Starters, Mains, Drinks"
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addCategory(); }}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => { setShowAddCategoryModal(false); setNewCategoryName(''); }}>Cancel</Button>
+                <Button className="flex-1" onClick={addCategory} disabled={!newCategoryName.trim()}><Plus className="h-4 w-4 mr-2" /> Add</Button>
               </div>
             </CardContent>
           </Card>
