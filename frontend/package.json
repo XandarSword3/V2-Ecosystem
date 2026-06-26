@@ -77,10 +77,10 @@
     "@types/react": "^18.2.67",
     "@types/react-dom": "^18.2.22",
     "@vitejs/plugin-react": "^4.7.0",
-    "@vitest/coverage-istanbul": "^4.0.17",
-    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/coverage-istanbul": "^4.1.0",
+    "@vitest/coverage-v8": "^4.1.0",
     "autoprefixer": "^10.4.19",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.9",
     "eslint-plugin-jsx-a11y": "^6.10.2",
@@ -89,11 +89,15 @@
     "postcss": ">=8.5.15",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.4.3",
-    "vitest": "^4.0.17"
+    "vitest": "^4.1.0"
   },
   "overrides": {
-    "ws": ">=8.20.1",
-    "rollup": ">=4.22.4",
+    "js-yaml": "^4.2.0",
+    "ws": "^8.21.0",
+    "form-data": "^4.0.6",
+    "vite": "^7.3.5",
+    "@opentelemetry/core": "^2.8.0",
+    "@babel/core": "^7.29.6",
     "next": {
       "postcss": ">=8.5.15"
     }
