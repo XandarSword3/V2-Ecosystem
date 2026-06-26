@@ -70,7 +70,7 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
       // All user transactions (unified)
       (() => {
         let q = supabase.from('transactions')
-          .select('id, engine_type, order_number, ticket_number, booking_number, status, amount, payment_status, customer_name, customer_phone, created_at, reference_id, reference_table')
+          .select('id, engine_type, status, amount, metadata, created_at, reference_id, reference_table')
           .eq('customer_id', userId);
         if (propertyId) q = q.eq('property_id', propertyId);
         return q.order('created_at', { ascending: false });
@@ -86,8 +86,8 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
       // Reviews
       (() => {
         let q = supabase.from('reviews')
-          .select('id, rating, text, service_type, created_at')
-          .eq('user_id', userId);
+          .select('id, rating, content, service_type, created_at')
+          .eq('customer_id', userId);
         if (propertyId) q = q.eq('property_id', propertyId);
         return q.order('created_at', { ascending: false });
       })(),
@@ -104,7 +104,7 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
       // Activity logs (last 1000)
       (() => {
         let q = supabase.from('audit_logs')
-          .select('id, action, resource, resource_id, old_value, new_value, ip_address, user_agent, created_at')
+          .select('id, action, remetadata, remetadata_id, old_value, new_value, ip_address, user_agent, created_at')
           .eq('user_id', userId);
         if (propertyId) q = q.eq('property_id', propertyId);
         return q.order('created_at', { ascending: false }).limit(1000);
@@ -112,14 +112,19 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
         
       // Loyalty Data
       (() => {
-        let q = supabase.from('loyalty_accounts').select('*').eq('user_id', userId);
+        let q = supabase.from('loyalty_members').select('*, tier:loyalty_tiers(*)').eq('user_id', userId);
         if (propertyId) q = q.eq('property_id', propertyId);
         return q.maybeSingle();
       })(),
-      (() => {
-        let q = supabase.from('loyalty_transactions').select('*').eq('user_id', userId);
-        if (propertyId) q = q.eq('property_id', propertyId);
-        return q.order('created_at', { ascending: false });
+      (async () => {
+        // First get member id
+        let memberQ = supabase.from('loyalty_members').select('id').eq('user_id', userId);
+        if (propertyId) memberQ = memberQ.eq('property_id', propertyId);
+        const { data: member } = await memberQ.maybeSingle();
+        if (!member) return { data: [] };
+        // Then get transactions for that member
+        let txQ = supabase.from('loyalty_transactions').select('*').eq('member_id', member.id);
+        return txQ.order('created_at', { ascending: false });
       })(),
       
       // Gift Cards
@@ -268,7 +273,7 @@ export const deleteUserData = asyncHandler(async (req: Request, res: Response) =
     const { error: reviewsError, count: reviewsCount } = await supabase
       .from('reviews')
       .delete({ count: 'exact' })
-      .eq('user_id', userId);
+      .eq('customer_id', userId);
     deletionResults.reviews = { deleted: reviewsCount || 0, error: reviewsError?.message };
 
     // 3. Delete support ticket messages first

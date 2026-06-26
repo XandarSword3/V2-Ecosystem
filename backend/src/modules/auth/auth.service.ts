@@ -22,6 +22,7 @@ export interface RegisterData {
   fullName: string;
   phone?: string;
   preferredLanguage?: 'en' | 'ar' | 'fr';
+  tenantId?: string; // Required for non-platform scopes (customer, tenant_staff, etc.)
 }
 
 export async function register(data: RegisterData) {
@@ -51,6 +52,13 @@ export async function register(data: RegisterData) {
   // Hash password
   const passwordHash = await bcrypt.hash(data.password, 12);
 
+  // Validate that non-platform registrations have a tenant context.
+  // The DB enforces CHECK (scope IN ('super_admin','platform_admin') OR tenant_id IS NOT NULL),
+  // so inserting a 'customer' row without tenant_id will 500. Fail fast here with a clear message.
+  if (!data.tenantId) {
+    throw new AppError('Registration requires a tenant context', 400, 'MISSING_TENANT_CONTEXT');
+  }
+
   // Create user
   const { data: user, error: userError } = await supabase
     .from('users')
@@ -61,6 +69,7 @@ export async function register(data: RegisterData) {
       phone: data.phone,
       preferred_language: data.preferredLanguage || 'en',
       email_verified: true, // Auto-verify so users can login immediately; verification email still sent
+      tenant_id: data.tenantId,
     })
     .select('id, email, full_name')
     .single();
@@ -157,7 +166,11 @@ export async function login(email: string, password: string, meta: SessionMeta) 
   // Q103 — Enforce mandatory 2FA for privileged scopes.
   // A super_admin or tenant_admin without 2FA enabled is blocked here
   // and must complete 2FA enrollment before tokens are issued.
-  const requiresMandatory2FA = userScope === 'super_admin' || userScope === 'tenant_admin';
+  const requiresMandatory2FA =
+    userScope === 'super_admin' ||
+    userScope === 'tenant_admin' ||
+    userScope === 'platform_admin' ||
+    userScope === 'tenant_owner';
   if (requiresMandatory2FA && !user.two_factor_enabled) {
     return {
       requiresTwoFactorSetup: true,

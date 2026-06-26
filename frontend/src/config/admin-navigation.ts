@@ -1,8 +1,13 @@
 /**
  * Admin Panel Navigation Configuration
- * 
+ *
  * Organized into logical category groups for improved UX.
  * Categories are collapsible with items organized by function.
+ *
+ * All href values are constructed relative to the active property slug so that
+ * URLs follow the [tenant].localhost/[property]/admin/... pattern introduced in
+ * Item 13. Pass the current property slug (from useParams().property) to both
+ * getStaticNavigation and getModuleChildren.
  */
 
 import {
@@ -76,51 +81,61 @@ export const moduleTypeIcons: Record<string, LucideIcon> = {
   default: Cloud,
 };
 
-// Build module children based on template type — uses canonical engine type names
-export function getModuleChildren(slug: string, templateType: string, t: (key: string) => string): NavChild[] {
+// Build module children based on template type — uses canonical engine type names.
+// propertySlug: the active property slug from the URL ([tenant].host/[property]/admin/...).
+export function getModuleChildren(
+  slug: string,
+  templateType: string,
+  t: (key: string) => string,
+  propertySlug: string,
+): NavChild[] {
   const safeSlug = encodeURIComponent(slug);
-  
+  const base = `/${propertySlug}/admin`;
+
   switch (templateType) {
     case 'instant_transaction':
       return [
-        { name: t('nav.menuItems'), href: `/admin/${safeSlug}/menu`, translationKey: 'nav.menuItems' },
-        { name: t('nav.categories'), href: `/admin/${safeSlug}/categories`, translationKey: 'nav.categories' },
-        { name: t('nav.orders'), href: `/admin/${safeSlug}/orders`, translationKey: 'nav.orders' },
-        { name: t('nav.tables'), href: `/admin/${safeSlug}/tables`, translationKey: 'nav.tables' },
-        { name: t('nav.reservations') || 'Reservations', href: `/admin/${safeSlug}/reservations`, translationKey: 'nav.reservations' },
-        { name: t('nav.waitlist') || 'Waitlist', href: `/admin/${safeSlug}/waitlist`, translationKey: 'nav.waitlist' },
-        { name: t('nav.modifiers') || 'Modifiers', href: `/admin/${safeSlug}/modifiers`, translationKey: 'nav.modifiers' },
+        { name: t('nav.menuItems'), href: `${base}/${safeSlug}/menu`, translationKey: 'nav.menuItems' },
+        { name: t('nav.categories'), href: `${base}/${safeSlug}/categories`, translationKey: 'nav.categories' },
+        { name: t('nav.orders'), href: `${base}/${safeSlug}/orders`, translationKey: 'nav.orders' },
+        { name: t('nav.tables'), href: `${base}/${safeSlug}/tables`, translationKey: 'nav.tables' },
+        { name: t('nav.reservations') || 'Reservations', href: `${base}/${safeSlug}/reservations`, translationKey: 'nav.reservations' },
+        { name: t('nav.waitlist') || 'Waitlist', href: `${base}/${safeSlug}/waitlist`, translationKey: 'nav.waitlist' },
+        { name: t('nav.modifiers') || 'Modifiers', href: `${base}/${safeSlug}/modifiers`, translationKey: 'nav.modifiers' },
       ];
     case 'time_exclusive_reservation':
       return [
-        { name: t('nav.allUnits') || 'All Units', href: `/admin/${safeSlug}`, translationKey: 'nav.allUnits' },
-        { name: t('nav.bookings'), href: `/admin/${safeSlug}/bookings`, translationKey: 'nav.bookings' },
-        { name: t('nav.pricingRules'), href: `/admin/${safeSlug}/pricing`, translationKey: 'nav.pricingRules' },
-        { name: t('nav.addons'), href: `/admin/${safeSlug}/addons`, translationKey: 'nav.addons' },
+        { name: t('nav.allUnits') || 'All Units', href: `${base}/${safeSlug}`, translationKey: 'nav.allUnits' },
+        { name: t('nav.bookings'), href: `${base}/${safeSlug}/bookings`, translationKey: 'nav.bookings' },
+        { name: t('nav.pricingRules'), href: `${base}/${safeSlug}/pricing`, translationKey: 'nav.pricingRules' },
+        { name: t('nav.addons'), href: `${base}/${safeSlug}/addons`, translationKey: 'nav.addons' },
       ];
     case 'shared_capacity_access':
       return [
-        { name: t('nav.sessions'), href: `/admin/${safeSlug}/sessions`, translationKey: 'nav.sessions' },
-        { name: t('nav.tickets'), href: `/admin/${safeSlug}/tickets`, translationKey: 'nav.tickets' },
-        { name: t('nav.capacity'), href: `/admin/${safeSlug}/capacity`, translationKey: 'nav.capacity' },
+        { name: t('nav.sessions'), href: `${base}/${safeSlug}/sessions`, translationKey: 'nav.sessions' },
+        { name: t('nav.tickets'), href: `${base}/${safeSlug}/tickets`, translationKey: 'nav.tickets' },
+        { name: t('nav.capacity'), href: `${base}/${safeSlug}/capacity`, translationKey: 'nav.capacity' },
       ];
     case 'ongoing_entitlement':
       return [
-        { name: t('nav.memberships') || 'Memberships', href: `/admin/${safeSlug}/memberships`, translationKey: 'nav.memberships' },
-        { name: t('nav.members') || 'Members', href: `/admin/${safeSlug}/members`, translationKey: 'nav.members' },
+        { name: t('nav.memberships') || 'Memberships', href: `${base}/${safeSlug}/memberships`, translationKey: 'nav.memberships' },
+        { name: t('nav.members') || 'Members', href: `${base}/${safeSlug}/members`, translationKey: 'nav.members' },
       ];
     case 'platform_entitlement':
       return [
-        { name: 'Plans', href: `/admin/${safeSlug}/plans` },
-        { name: 'Tenants', href: `/admin/${safeSlug}/tenants` },
+        { name: 'Plans', href: `${base}/${safeSlug}/plans` },
+        { name: 'Tenants', href: `${base}/${safeSlug}/tenants` },
       ];
     default:
       return [];
   }
 }
 
-// Static navigation categories (non-module items)
-export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
+// Static navigation categories (non-module items).
+// propertySlug: the active property slug from the URL ([tenant].host/[property]/admin/...).
+export function getStaticNavigation(t: (key: string) => string, propertySlug: string): NavCategory[] {
+  const base = `/${propertySlug}/admin`;
+
   return [
     // DASHBOARD - Always first, standalone
     {
@@ -128,11 +143,11 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
       name: t('nav.dashboard'),
       translationKey: 'nav.dashboard',
       items: [
-        { 
-          name: t('nav.dashboard'), 
-          href: '/admin', 
+        {
+          name: t('nav.dashboard'),
+          href: base,
           icon: LayoutDashboard,
-          translationKey: 'nav.dashboard'
+          translationKey: 'nav.dashboard',
         },
       ],
       collapsible: false,
@@ -158,29 +173,29 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
       translationKey: 'nav.marketing',
       icon: Megaphone,
       items: [
-        { 
-          name: t('nav.loyalty') || 'Loyalty Program', 
-          href: '/admin/loyalty', 
+        {
+          name: t('nav.loyalty') || 'Loyalty Program',
+          href: `${base}/loyalty`,
           icon: Award,
-          translationKey: 'nav.loyalty'
+          translationKey: 'nav.loyalty',
         },
-        { 
-          name: t('nav.giftCards') || 'Gift Cards', 
-          href: '/admin/giftcards', 
+        {
+          name: t('nav.giftCards') || 'Gift Cards',
+          href: `${base}/giftcards`,
           icon: Gift,
-          translationKey: 'nav.giftCards'
+          translationKey: 'nav.giftCards',
         },
-        { 
-          name: t('nav.coupons') || 'Coupons', 
-          href: '/admin/coupons', 
+        {
+          name: t('nav.coupons') || 'Coupons',
+          href: `${base}/coupons`,
           icon: Ticket,
-          translationKey: 'nav.coupons'
+          translationKey: 'nav.coupons',
         },
-        { 
-          name: t('nav.reviews') || 'Reviews', 
-          href: '/admin/reviews', 
+        {
+          name: t('nav.reviews') || 'Reviews',
+          href: `${base}/reviews`,
           icon: Star,
-          translationKey: 'nav.reviews'
+          translationKey: 'nav.reviews',
         },
       ],
       collapsible: true,
@@ -194,39 +209,39 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
       translationKey: 'nav.operations',
       icon: Wrench,
       items: [
-        { 
-          name: t('nav.housekeeping') || 'Housekeeping', 
-          href: '/admin/housekeeping', 
+        {
+          name: t('nav.housekeeping') || 'Housekeeping',
+          href: `${base}/housekeeping`,
           icon: Brush,
-          translationKey: 'nav.housekeeping'
+          translationKey: 'nav.housekeeping',
         },
-        { 
-          name: t('nav.inventory') || 'Inventory', 
-          href: '/admin/inventory', 
+        {
+          name: t('nav.inventory') || 'Inventory',
+          href: `${base}/inventory`,
           icon: Package,
-          translationKey: 'nav.inventory'
+          translationKey: 'nav.inventory',
         },
-        { 
-          name: 'Channel Manager', 
-          href: '/admin/channels', 
+        {
+          name: 'Channel Manager',
+          href: `${base}/channels`,
           icon: Share2,
-          translationKey: 'nav.channelManager'
+          translationKey: 'nav.channelManager',
         },
         {
           name: 'Guest Messaging',
-          href: '/admin/messaging',
+          href: `${base}/messaging`,
           icon: MessageSquare,
           translationKey: 'nav.guestMessaging',
         },
         {
           name: 'Rate Parity',
-          href: '/admin/parity',
+          href: `${base}/parity`,
           icon: TrendingUp,
           translationKey: 'nav.rateParity',
         },
-        { 
-          name: 'Multi-Property', 
-          href: '/admin/properties', 
+        {
+          name: 'Multi-Property',
+          href: `${base}/properties`,
           icon: Building2,
           translationKey: 'nav.multiProperty',
           roles: ['super_admin'], // Only super admins see this
@@ -245,16 +260,16 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
       items: [
         {
           name: t('nav.users'),
-          href: '/admin/users',
+          href: `${base}/users`,
           icon: Users,
           translationKey: 'nav.users',
           children: [
-            { name: t('nav.customers'), href: '/admin/users/customers', translationKey: 'nav.customers' },
-            { name: t('nav.staff'), href: '/admin/users/staff', translationKey: 'nav.staff' },
-            { name: t('nav.admins'), href: '/admin/users/admins', translationKey: 'nav.admins' },
-            { name: t('nav.rolesPermissions'), href: '/admin/users/roles', translationKey: 'nav.rolesPermissions' },
-            { name: t('nav.liveUsers') || 'Live Users', href: '/admin/users/live', translationKey: 'nav.liveUsers' },
-          ]
+            { name: t('nav.customers'), href: `${base}/users/customers`, translationKey: 'nav.customers' },
+            { name: t('nav.staff'), href: `${base}/users/staff`, translationKey: 'nav.staff' },
+            { name: t('nav.admins'), href: `${base}/users/admins`, translationKey: 'nav.admins' },
+            { name: t('nav.rolesPermissions'), href: `${base}/users/roles`, translationKey: 'nav.rolesPermissions' },
+            { name: t('nav.liveUsers') || 'Live Users', href: `${base}/users/live`, translationKey: 'nav.liveUsers' },
+          ],
         },
       ],
       collapsible: true,
@@ -270,48 +285,48 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
       items: [
         {
           name: t('nav.reports') || 'Reports',
-          href: '/admin/cockpit',
+          href: `${base}/cockpit`,
           icon: BarChart3,
           translationKey: 'nav.reports',
           children: [
-            { name: 'Economics', href: '/admin/reports?tab=economics', translationKey: 'nav.economics' },
-            { name: 'Executive Cockpit', href: '/admin/cockpit', translationKey: 'nav.executiveCockpit' },
-            { name: 'Financial Reports', href: '/admin/financial-reports', translationKey: 'nav.financialReports' },
-            { name: 'Alert Management', href: '/admin/alerts', translationKey: 'nav.alertManagement' },
-          ]
+            { name: 'Economics', href: `${base}/reports?tab=economics`, translationKey: 'nav.economics' },
+            { name: 'Executive Cockpit', href: `${base}/cockpit`, translationKey: 'nav.executiveCockpit' },
+            { name: 'Financial Reports', href: `${base}/financial-reports`, translationKey: 'nav.financialReports' },
+            { name: 'Alert Management', href: `${base}/alerts`, translationKey: 'nav.alertManagement' },
+          ],
         },
-        { 
-          name: t('nav.modules'), 
-          href: '/admin/modules', 
+        {
+          name: t('nav.modules'),
+          href: `${base}/modules`,
           icon: Cloud,
-          translationKey: 'nav.modules'
+          translationKey: 'nav.modules',
         },
         {
           name: t('nav.settings'),
-          href: '/admin/settings',
+          href: `${base}/settings`,
           icon: Settings,
           translationKey: 'nav.settings',
           children: [
-            { name: t('nav.general'), href: '/admin/settings', translationKey: 'nav.general' },
-            { name: t('nav.propertySettings') || 'Property Settings', href: '/admin/settings/properties', translationKey: 'nav.propertySettings' },
-            { name: t('nav.navbar'), href: '/admin/settings/navbar', translationKey: 'nav.navbar' },
-            { name: t('nav.appearance'), href: '/admin/settings/appearance', translationKey: 'nav.appearance' },
-            { name: 'Brand & Identity', href: '/admin/settings/brand', translationKey: 'nav.brand' },
-            { name: 'Customizations', href: '/admin/customizations', translationKey: 'nav.customizations' },
-            { name: 'Terminology', href: '/admin/terminology', translationKey: 'nav.terminology' },
-            { name: t('nav.homepage'), href: '/admin/settings/homepage', translationKey: 'nav.homepage' },
-            { name: t('nav.footer'), href: '/admin/settings/footer', translationKey: 'nav.footer' },
-            { name: t('nav.translations'), href: '/admin/settings/translations', translationKey: 'nav.translations' },
-            { name: t('nav.payments'), href: '/admin/settings/payments', translationKey: 'nav.payments' },
-            { name: 'Tax Configuration', href: '/admin/settings/tax', translationKey: 'nav.taxConfiguration' },
-            { name: t('nav.notifications'), href: '/admin/settings/notifications', translationKey: 'nav.notifications' },
-            { name: t('nav.databaseBackups'), href: '/admin/settings/backups', translationKey: 'nav.databaseBackups' },
-            { name: 'Integrations', href: '/admin/integrations', translationKey: 'nav.integrations' },
-          ]
+            { name: t('nav.general'), href: `${base}/settings`, translationKey: 'nav.general' },
+            { name: t('nav.propertySettings') || 'Property Settings', href: `${base}/settings/properties`, translationKey: 'nav.propertySettings' },
+            { name: t('nav.navbar'), href: `${base}/settings/navbar`, translationKey: 'nav.navbar' },
+            { name: t('nav.appearance'), href: `${base}/settings/appearance`, translationKey: 'nav.appearance' },
+            { name: 'Brand & Identity', href: `${base}/settings/brand`, translationKey: 'nav.brand' },
+            { name: 'Customizations', href: `${base}/customizations`, translationKey: 'nav.customizations' },
+            { name: 'Terminology', href: `${base}/terminology`, translationKey: 'nav.terminology' },
+            { name: t('nav.homepage'), href: `${base}/settings/homepage`, translationKey: 'nav.homepage' },
+            { name: t('nav.footer'), href: `${base}/settings/footer`, translationKey: 'nav.footer' },
+            { name: t('nav.translations'), href: `${base}/settings/translations`, translationKey: 'nav.translations' },
+            { name: t('nav.payments'), href: `${base}/settings/payments`, translationKey: 'nav.payments' },
+            { name: 'Tax Configuration', href: `${base}/settings/tax`, translationKey: 'nav.taxConfiguration' },
+            { name: t('nav.notifications'), href: `${base}/settings/notifications`, translationKey: 'nav.notifications' },
+            { name: t('nav.databaseBackups'), href: `${base}/settings/backups`, translationKey: 'nav.databaseBackups' },
+            { name: 'Integrations', href: `${base}/integrations`, translationKey: 'nav.integrations' },
+          ],
         },
-        { 
-          name: t('nav.auditLogs'), 
-          href: '/admin/audit', 
+        {
+          name: t('nav.auditLogs'),
+          href: `${base}/audit`,
           icon: Shield,
           translationKey: 'nav.auditLogs',
           roles: ['super_admin', 'admin'],
@@ -326,7 +341,7 @@ export function getStaticNavigation(t: (key: string) => string): NavCategory[] {
 // Flatten all navigation items for search
 export function flattenNavigation(categories: NavCategory[]): Array<{ name: string; href: string; category: string }> {
   const items: Array<{ name: string; href: string; category: string }> = [];
-  
+
   for (const category of categories) {
     for (const item of category.items) {
       items.push({ name: item.name, href: item.href, category: category.name });
@@ -337,21 +352,25 @@ export function flattenNavigation(categories: NavCategory[]): Array<{ name: stri
       }
     }
   }
-  
+
   return items;
 }
 
 // Filter navigation by user roles
 export function filterNavigationByRole(categories: NavCategory[], userRoles: string[]): NavCategory[] {
-  return categories.map(category => ({
-    ...category,
-    items: category.items
-      .filter(item => !item.roles || item.roles.some(role => userRoles.includes(role)))
-      .map(item => ({
-        ...item,
-        children: item.children?.filter(child => !child.roles || child.roles.some(role => userRoles.includes(role)))
-      }))
-  })).filter(category => category.items.length > 0);
+  return categories
+    .map((category) => ({
+      ...category,
+      items: category.items
+        .filter((item) => !item.roles || item.roles.some((role) => userRoles.includes(role)))
+        .map((item) => ({
+          ...item,
+          children: item.children?.filter(
+            (child) => !child.roles || child.roles.some((role) => userRoles.includes(role)),
+          ),
+        })),
+    }))
+    .filter((category) => category.items.length > 0);
 }
 
 // Local storage keys for persisting expanded state

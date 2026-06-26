@@ -397,6 +397,11 @@ export async function authenticateComplete(req: Request, res: Response) {
       userId: user.id,
       email: user.email,
       roles: roleNames,
+      scope: roleNames.includes('super_admin') ? 'super_admin'
+           : roleNames.includes('admin')       ? 'tenant_admin'
+           : roleNames.includes('manager')     ? 'property_manager'
+           : roleNames.includes('staff')       ? 'property_staff'
+           : 'customer',
       tokenVersion: user.token_version ?? 0,
     });
 

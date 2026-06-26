@@ -58,6 +58,22 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_translations_lookup ON translations(language, namespace);
 CREATE INDEX IF NOT EXISTS idx_translations_key ON translations(translation_key);
 
+-- Create translation_keys table for i18n key management
+CREATE TABLE IF NOT EXISTS translation_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key_path TEXT NOT NULL UNIQUE,
+  context TEXT NOT NULL,
+  default_value TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Add index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_translation_keys_key_path ON translation_keys(key_path);
+CREATE INDEX IF NOT EXISTS idx_translation_keys_context ON translation_keys(context);
+CREATE INDEX IF NOT EXISTS idx_translation_keys_is_active ON translation_keys(is_active);
+
 COMMIT;
 
 -- DOWN Migration

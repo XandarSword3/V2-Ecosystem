@@ -1321,7 +1321,9 @@
       "housekeeping": "Entretien",
       "inventory": "Inventaire",
       "logout": "Déconnexion",
-      "navbar": "Navigation"
+      "navbar": "Navigation",
+      "memberships": "Adhésions",
+      "members": "Membres"
     },
     "messages": {
       "loggedOutSuccessfully": "Déconnexion réussie"

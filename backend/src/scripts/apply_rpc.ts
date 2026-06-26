@@ -56,8 +56,8 @@ BEGIN
   RETURN jsonb_build_object(
     'success', true, 
     'id', v_booking_record.id,
-    'booking_number', v_booking_record.booking_number,
-    'total_amount', v_booking_record.total_amount,
+    'booking_number', v_booking_record.booking_number || v_booking_record.id,
+    'total_amount', v_booking_record.amount,
     'status', v_booking_record.status,
     'check_in_date', v_booking_record.check_in_date,
     'check_out_date', v_booking_record.check_out_date,

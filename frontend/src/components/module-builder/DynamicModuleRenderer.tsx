@@ -140,7 +140,7 @@ function useCanvasScale() {
   return scale;
 }
 
-export function DynamicModuleRenderer({ layout, module }: RendererProps) {
+export function DynamicModuleRenderer({ layout, module, propertySlug }: RendererProps & { propertySlug?: string }) {
   const scale = useCanvasScale();
 
   // Validate schema version
@@ -165,7 +165,7 @@ export function DynamicModuleRenderer({ layout, module }: RendererProps) {
           This module does not have any layout defined yet. Open the Customization Manager to drag and drop components, customize the styling, and publish your design.
         </p>
         <button 
-          onClick={() => window.location.href = '/admin/customizations'}
+          onClick={() => window.location.href = propertySlug ? `/${propertySlug}/admin/customizations` : '/admin/customizations'}
           className="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
         >
           Open Customization Manager
@@ -1030,14 +1030,21 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['menu', module.id],
-    queryFn: () => api.get(`/${module.slug}/menu`, { params: { moduleId: module.id } }),
+    // /items is the correct instant_transaction route — /menu never existed.
+    // Returns { success: true, data: [...] } where each item has a `category`
+    // text field (not a category_id FK — catalog_items has no categories table).
+    queryFn: () => api.get(`/${module.slug}/items`),
   });
 
-  const categories: MenuCategory[] = data?.data?.data?.categories || [];
-  const items: MenuItem[] = data?.data?.data?.items || [];
+  // Flat item array from the /items response shape.
+  const items: MenuItem[] = data?.data?.data || [];
+  // Derive unique categories from the items themselves.
+  const categories: MenuCategory[] = Array.from(
+    new Set(items.map((i) => i.category).filter(Boolean))
+  ).map((cat) => ({ id: cat as string, name: cat as string, sort_order: 0 }));
 
   const filteredItems = selectedCategory
-    ? items.filter((item) => item.category_id === selectedCategory)
+    ? items.filter((item) => item.category === selectedCategory)
     : items;
 
   const getItemQuantity = (itemId: string) => {

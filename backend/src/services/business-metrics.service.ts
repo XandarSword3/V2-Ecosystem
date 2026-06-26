@@ -98,7 +98,7 @@ class BusinessMetricsService {
     // Get booking counts
     const { data: bookings } = await supabase
       .from('transactions')
-      .select('status, amount, room_type, source')
+      .select('status, amount, metadata')
       .eq('engine_type', 'time_exclusive_reservation')
       .gte('created_at', periodStart);
 
@@ -123,13 +123,14 @@ class BusinessMetricsService {
 
     // Group by room type
     for (const booking of bookings || []) {
-      if (booking.room_type) {
-        metrics.bookings_by_room_type[booking.room_type] =
-          (metrics.bookings_by_room_type[booking.room_type] || 0) + 1;
+      const meta = booking.metadata || {};
+      if (meta.room_type) {
+        metrics.bookings_by_room_type[meta.room_type] =
+          (metrics.bookings_by_room_type[meta.room_type] || 0) + 1;
       }
-      if (booking.source) {
-        metrics.bookings_by_source[booking.source] =
-          (metrics.bookings_by_source[booking.source] || 0) + 1;
+      if (meta.source) {
+        metrics.bookings_by_source[meta.source] =
+          (metrics.bookings_by_source[meta.source] || 0) + 1;
       }
     }
 

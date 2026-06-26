@@ -21,7 +21,8 @@
     "test:all": "npm run test:unit && npm run test:integration",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
-    "postinstall": "node -e \"const fs=require('fs'),path=require('path');const nested=path.join(__dirname,'node_modules','exceljs','node_modules','uuid');const safe=path.join(__dirname,'node_modules','uuid');if(fs.existsSync(nested)){fs.rmSync(nested,{recursive:true,force:true});console.log('Removed vulnerable exceljs/node_modules/uuid (CVE GHSA-w5hq-g745-h8pq)');}else{console.log('exceljs nested uuid not present, nothing to do');}\""
+    "postinstall": "node -e \"const fs=require('fs'),path=require('path');const nested=path.join(__dirname,'node_modules','exceljs','node_modules','uuid');const safe=path.join(__dirname,'node_modules','uuid');if(fs.existsSync(nested)){fs.rmSync(nested,{recursive:true,force:true});console.log('Removed vulnerable exceljs/node_modules/uuid (CVE GHSA-w5hq-g745-h8pq)');}else{console.log('exceljs nested uuid not present, nothing to do');}\"",
+    "test:smoke": "node scripts/api-smoke-test.js"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -70,6 +71,7 @@
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
     "redis": "^5.10.0",
+    "sharp": "^0.33.5",
     "socket.io": "^4.8.3",
     "stripe": "^14.25.0",
     "swagger-jsdoc": "^6.2.8",
@@ -99,12 +101,14 @@
     "@types/pdfkit": "^0.17.4",
     "@types/pg": "^8.16.0",
     "@types/qrcode": "^1.5.5",
+    "@types/sharp": "^0.31.1",
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^8.53.0",
     "@typescript-eslint/parser": "^8.53.0",
     "@vitest/coverage-v8": "^4.0.17",
     "eslint": "^8.57.0",
+    "express-list-endpoints": "^7.1.1",
     "openapi-types": "^12.1.3",
     "supertest": "^7.0.0",
     "ts-node": "^1.7.1",

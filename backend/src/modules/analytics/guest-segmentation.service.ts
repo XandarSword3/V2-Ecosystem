@@ -83,23 +83,18 @@ export class GuestSegmentationService {
       .from('transactions')
       .select(`
         user_id,
-        users:user_id(email, first_name, last_name, phone),
+        users:user_id(email, full_name, phone),
         id,
         amount,
-        room_rate,
-        nights,
-        check_in,
-        check_out,
         created_at,
         status,
-        source,
         metadata
       `)
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .not('user_id', 'is', null)
       .order('user_id')
-      .order('check_in', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
@@ -117,7 +112,7 @@ export class GuestSegmentationService {
     const now = dayjs();
 
     for (const [userId, bookings] of Object.entries(userBookings)) {
-      const validBookings = bookings.filter((b: any) => 
+      const validBookings = bookings.filter((b: any) =>
         ['confirmed', 'checked_in', 'checked_out'].includes(b.status)
       );
 
@@ -125,7 +120,8 @@ export class GuestSegmentationService {
 
       // Recency: days since last check-out
       const lastBooking = validBookings[0];
-      const lastCheckOut = dayjs(lastBooking.check_out);
+      const lastMeta = lastBooking.metadata || {};
+      const lastCheckOut = dayjs(lastMeta.check_out_date_date);
       const recencyDays = now.diff(lastCheckOut, 'day');
 
       // Frequency: count of bookings
@@ -144,9 +140,10 @@ export class GuestSegmentationService {
 
       // Calculate additional metrics
       const firstBooking = validBookings[validBookings.length - 1];
-      const totalNights = validBookings.reduce((sum: number, b: any) => sum + (b.nights || 1), 0);
-      const avgAdr = totalNights > 0 
-        ? validBookings.reduce((sum: number, b: any) => sum + (b.room_rate || 0), 0) / totalNights 
+      const firstMeta = firstBooking.metadata || {};
+      const totalNights = validBookings.reduce((sum: number, b: any) => sum + ((b.metadata as any)?.number_of_nights || 1), 0);
+      const avgAdr = totalNights > 0
+        ? validBookings.reduce((sum: number, b: any) => sum + ((b.metadata as any)?.room_rate || 0), 0) / totalNights
         : 0;
 
       // Preferred room type (most booked)
@@ -161,7 +158,7 @@ export class GuestSegmentationService {
       // Preferred channel
       const channelCounts: Record<string, number> = {};
       for (const b of validBookings) {
-        const source = b.source || 'direct';
+        const source = (b.metadata as any)?.source || 'direct';
         channelCounts[source] = (channelCounts[source] || 0) + 1;
       }
       const preferredChannel = Object.entries(channelCounts)
@@ -170,31 +167,30 @@ export class GuestSegmentationService {
       // Cancellation rate
       const allBookings = bookings;
       const cancelled = allBookings.filter((b: any) => b.status === 'cancelled').length;
-      const cancellationRate = allBookings.length > 0 
-        ? (cancelled / allBookings.length) * 100 
+      const cancellationRate = allBookings.length > 0
+        ? (cancelled / allBookings.length) * 100
         : 0;
 
       // Average lead time
       const leadTimes = validBookings.map((b: any) => {
         const created = dayjs(b.created_at);
-        const checkIn = dayjs(b.check_in);
+        const checkIn = dayjs((b.metadata as any)?.check_in_date);
         return checkIn.diff(created, 'day');
       });
-      const avgLeadTime = leadTimes.length > 0 
-        ? leadTimes.reduce((a: number, b: number) => a + b, 0) / leadTimes.length 
+      const avgLeadTime = leadTimes.length > 0
+        ? leadTimes.reduce((a: number, b: number) => a + b, 0) / leadTimes.length
         : 0;
 
-      const user = lastBooking.users as unknown as { 
-        email?: string; 
-        first_name?: string; 
-        last_name?: string; 
+      const user = lastBooking.users as unknown as {
+        email?: string;
+        full_name?: string;
         phone?: string;
       } | null;
 
       profiles.push({
         userId,
         email: user?.email || '',
-        name: user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : undefined,
+        name: user?.full_name || undefined,
         phone: user?.phone,
         rfmMetrics: { recencyDays, frequency, monetary },
         rScore,
@@ -203,8 +199,8 @@ export class GuestSegmentationService {
         segment: segment.code,
         segmentName: segment.name,
         lifetimeValue: monetary,
-        firstBookingDate: new Date(firstBooking.check_in),
-        lastBookingDate: new Date(lastBooking.check_out),
+        firstBookingDate: new Date(lastMeta.check_in_date_date),
+        lastBookingDate: new Date(lastMeta.check_out_date_date),
         totalNights,
         averageAdr: Math.round(avgAdr * 100) / 100,
         preferredRoomType,
@@ -340,12 +336,12 @@ export class GuestSegmentationService {
     // Get all bookings grouped by user and month
     const { data: bookings, error } = await this.supabase
       .from('transactions')
-      .select('user_id, check_in, amount, created_at, status')
+      .select('user_id, amount, created_at, status, metadata')
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .not('user_id', 'is', null)
       .order('user_id')
-      .order('check_in');
+      .order('created_at');
 
     if (error) throw error;
 
@@ -362,7 +358,7 @@ export class GuestSegmentationService {
     const userCohorts: Record<string, string> = {};
     for (const [userId, userBks] of Object.entries(userBookings)) {
       const firstBooking = userBks[0];
-      userCohorts[userId] = dayjs(firstBooking.check_in).format('YYYY-MM');
+      userCohorts[userId] = dayjs((firstBooking.metadata as any)?.check_in_date).format('YYYY-MM');
     }
 
     // Group users by cohort
@@ -396,8 +392,8 @@ export class GuestSegmentationService {
         for (const userId of userIds) {
           const hasBooking = userBookings[userId].some((b: any) => {
             if (!['confirmed', 'checked_in', 'checked_out'].includes(b.status)) return false;
-            const checkIn = dayjs(b.check_in);
-            return checkIn.isAfter(monthStart.subtract(1, 'day')) && 
+            const checkIn = dayjs((b.metadata as any)?.check_in_date);
+            return checkIn.isAfter(monthStart.subtract(1, 'day')) &&
                    checkIn.isBefore(monthEnd.add(1, 'day'));
           });
 
@@ -406,8 +402,8 @@ export class GuestSegmentationService {
             monthRevenue += userBookings[userId]
               .filter((b: any) => {
                 if (!['confirmed', 'checked_in', 'checked_out'].includes(b.status)) return false;
-                const checkIn = dayjs(b.check_in);
-                return checkIn.isAfter(monthStart.subtract(1, 'day')) && 
+                const checkIn = dayjs((b.metadata as any)?.check_in_date);
+                return checkIn.isAfter(monthStart.subtract(1, 'day')) &&
                        checkIn.isBefore(monthEnd.add(1, 'day'));
               })
               .reduce((sum: number, b: any) => sum + (b.amount || 0), 0);

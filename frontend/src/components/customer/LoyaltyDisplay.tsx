@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { formatNumber } from '@/lib/utils';
 import { Award, Star, Gift, TrendingUp, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 
 interface LoyaltyAccount {
   id: string;
@@ -36,6 +37,8 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
   const { user, isAuthenticated } = useAuth();
   const [account, setAccount] = useState<LoyaltyAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -72,7 +75,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
   // Mini variant - just points badge
   if (variant === 'mini') {
     return (
-      <Link href="/account/loyalty" className={`flex items-center gap-2 ${className}`}>
+      <Link href={propertySlug ? `/${propertySlug}/account/loyalty` : '/account/loyalty'} className={`flex items-center gap-2 ${className}`}>
         <div 
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white text-sm font-medium"
           style={{ backgroundColor: tierColor }}
@@ -87,7 +90,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
   // Compact variant - points + tier
   if (variant === 'compact') {
     return (
-      <Link href="/account/loyalty" className={`block ${className}`}>
+      <Link href={propertySlug ? `/${propertySlug}/account/loyalty` : '/account/loyalty'} className={`block ${className}`}>
         <motion.div 
           className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-r shadow-lg hover:shadow-xl transition-shadow"
           style={{ 
@@ -193,7 +196,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
         )}
         
         <Link 
-          href="/account/loyalty"
+          href={propertySlug ? `/${propertySlug}/account/loyalty` : '/account/loyalty'}
           className="mt-6 block w-full text-center py-3 rounded-lg font-medium transition-colors"
           style={{ 
             backgroundColor: `${tierColor}15`,

@@ -806,7 +806,7 @@ export class GroupBookingService {
 
       if (invoice) {
         const newPaidAmount = (invoice.paid_amount || 0) + amount;
-        const newStatus = newPaidAmount >= invoice.total_amount ? 'paid' : 'partial';
+        const newStatus = newPaidAmount >= amount ? 'paid' : 'partial';
 
         await this.supabase
           .from('group_invoices')
@@ -946,11 +946,12 @@ export class GroupBookingService {
   }
 
   private mapRoomBlock(row: any): RoomBlock {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
     return {
       id: row.id,
       groupId: row.group_id,
-      roomTypeId: row.room_type_id,
-      roomTypeName: row.room_types?.name,
+      roomTypeId: meta.room_type_id as string,
+      roomTypeName: (meta.room_types as any)?.name,
       date: new Date(row.block_date),
       blockedCount: row.blocked_count,
       pickedUp: row.picked_up || 0,
@@ -962,6 +963,7 @@ export class GroupBookingService {
   }
 
   private mapGroupBooking(row: any): GroupBooking {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
     return {
       id: row.id,
       groupId: row.group_id,
@@ -969,9 +971,9 @@ export class GroupBookingService {
       guestName: row.guest_name,
       guestEmail: row.guest_email,
       guestPhone: row.guest_phone,
-      roomTypeId: row.room_type_id,
-      checkIn: new Date(row.check_in),
-      checkOut: new Date(row.check_out),
+      roomTypeId: meta.room_type_id as string | undefined,
+      checkIn: new Date(meta.check_in_date as string),
+      checkOut: new Date(meta.check_out_date as string),
       specialRequests: row.special_requests,
       status: row.status
     };
@@ -1018,7 +1020,7 @@ export class GroupBookingService {
       status: row.status,
       subtotal: row.subtotal,
       taxAmount: row.tax_amount,
-      totalAmount: row.total_amount,
+      totalAmount: row.amount,
       paidAmount: row.paid_amount || 0,
       dueDate: new Date(row.due_date),
       lineItems: row.line_items || []

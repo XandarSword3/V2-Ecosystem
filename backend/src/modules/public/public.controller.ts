@@ -56,8 +56,6 @@ export async function getSettings(req: Request, res: Response) {
             settings = data || [];
         }
 
-        console.log('Public controller - raw settings from DB:', settings);
-
         // Build response from database settings
         const result: Record<string, unknown> = {
             theme: 'default',
@@ -68,7 +66,6 @@ export async function getSettings(req: Request, res: Response) {
             for (const setting of settings) {
                 if (setting.key === 'appearance' && setting.value && typeof setting.value === 'object') {
                     const appearance = setting.value as Record<string, unknown>;
-                    console.log('Public controller - appearance data:', appearance);
                     if (appearance.theme) result.theme = appearance.theme;
                     if (appearance.themeColors) result.themeColors = appearance.themeColors;
                     if (appearance.weatherEffect) result.weatherEffect = appearance.weatherEffect;
@@ -163,7 +160,6 @@ export async function getSettings(req: Request, res: Response) {
             }
         }
 
-        console.log('Public controller - final result:', result);
         // Settings can change at any time via the admin CMS. Without an explicit
         // Cache-Control header, Express's default ETag behaviour causes browsers
         // to serve stale 304s indefinitely — the ETag is computed from the last
@@ -175,7 +171,7 @@ export async function getSettings(req: Request, res: Response) {
         res.set('Cache-Control', 'no-cache');
         res.json(result);
     } catch (error) {
-        console.error('Public controller - error:', error);
+        logger.error('Public controller - error:', error);
         res.json({
             theme: 'default',
             contact: { email: null }

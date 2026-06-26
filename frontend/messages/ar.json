@@ -1246,7 +1246,9 @@
       "system": "النظام",
       "reservations": "Reservations",
       "waitlist": "Waitlist",
-      "modifiers": "Modifiers"
+      "modifiers": "Modifiers",
+      "memberships": "العضويات",
+      "members": "الأعضاء"
     },
     "messages": {
       "loggedOutSuccessfully": "Logged out successfully"

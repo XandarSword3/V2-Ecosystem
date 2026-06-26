@@ -261,7 +261,7 @@ export interface RoomMapping {
 export async function getRoomMappings(connectionId: string): Promise<RoomMapping[]> {
   const { data, error } = await supabase
     .from('channel_room_mappings')
-    .select('*, room_types(name)')
+    .select('*, metadatas(name)')
     .eq('connection_id', connectionId);
 
   if (error) throw error;
@@ -487,7 +487,7 @@ export async function pushAvailabilityForDateRange(
   // Get availability for date range from our system
   const { data: availability } = await supabase
     .from('room_availability')
-    .select('room_type_id, date, available_units')
+    .select('metadata_id, date, available_units, room_type_id')
     .gte('date', startDate.toISOString().split('T')[0])
     .lte('date', endDate.toISOString().split('T')[0])
     .in('room_type_id', mappings.map(m => m.room_type_id));
@@ -702,8 +702,7 @@ export async function processInboundReservation(
           const { data: newGuest } = await client
             .from('guests')
             .insert({
-              first_name: nameParts[0] || 'Guest',
-              last_name: nameParts.slice(1).join(' ') || '',
+              full_name: nameParts.join(" ") || '',
               email: reservation.guestEmail,
               phone: reservation.guestPhone
             })
@@ -822,16 +821,16 @@ export async function handleSiteMinderWebhook(
   const reservation: InboundReservation = {
     channelBookingRef: payload.booking_id || payload.confirmation_number,
     channelGuestId: payload.guest_id,
-    guestName: payload.guest_name || `${payload.first_name} ${payload.last_name}`,
+    guestName: payload.guest_name || `${payload.full_name}`,
     guestEmail: payload.email,
     guestPhone: payload.phone,
-    checkIn: payload.check_in || payload.arrival_date,
-    checkOut: payload.check_out || payload.departure_date,
-    roomTypeCode: payload.room_type_code || payload.room_code,
+    checkIn: payload.arrival_date,
+    checkOut: payload.departure_date,
+    roomTypeCode: payload.room_code,
     rateCode: payload.rate_code,
     numAdults: payload.adults || payload.num_adults || 1,
     numChildren: payload.children || payload.num_children || 0,
-    totalAmount: payload.total || payload.total_amount || 0,
+    totalAmount: payload.total || 0,
     currency: payload.currency || 'USD',
     commissionAmount: payload.commission,
     paymentStatus: payload.payment_status || 'pending',

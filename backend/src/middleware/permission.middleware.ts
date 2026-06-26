@@ -34,7 +34,7 @@ export function requirePermission(permission: Permission) {
 
     const userRoles = req.user.roles || [];
 
-    if (userRoles.includes('super_admin')) {
+    if (req.user.scope === 'super_admin' || userRoles.includes('super_admin')) {
       return next();
     }
 
@@ -74,7 +74,7 @@ export function requireAnyPermission(permissions: Permission[]) {
 
     const userRoles = req.user.roles || [];
 
-    if (userRoles.includes('super_admin')) {
+    if (req.user.scope === 'super_admin' || userRoles.includes('super_admin')) {
       return next();
     }
 
@@ -113,7 +113,7 @@ export function requireAllPermissions(permissions: Permission[]) {
 
     const userRoles = req.user.roles || [];
 
-    if (userRoles.includes('super_admin')) {
+    if (req.user.scope === 'super_admin' || userRoles.includes('super_admin')) {
       return next();
     }
 
@@ -154,7 +154,7 @@ export function attachPermissions(req: Request, res: Response, next: NextFunctio
  */
 export function canAccess(req: Request, permission: Permission): boolean {
   if (!req.user || !req.user.roles) return false;
-  if (req.user.roles.includes('super_admin')) return true;
+  if (req.user.scope === 'super_admin' || req.user.roles.includes('super_admin')) return true;
   return req.user.roles.some((role) => permissionCache.hasPermission(role, permission));
 }
 

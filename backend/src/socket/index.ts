@@ -17,6 +17,7 @@ interface ActiveConnection {
   email?: string;
   fullName?: string;
   roles: string[];
+  tenantId?: string;   // tenant-scoped room key
   currentPage?: string;
   connectedAt: Date;
   lastActivity: Date;
@@ -83,13 +84,18 @@ export function getOnlineUsers(): string[] {
  *
  * This mirrors the behaviour of getAuthenticatedUserCount() — one user
  * with 3 tabs counts as 1 entry, not 3.
+ *
+ * Pass tenantId to scope results to one tenant. Omitting it returns every
+ * connection platform-wide — callers other than super_admin must always
+ * pass tenantId or this leaks cross-tenant presence data.
  */
-export function getOnlineUsersDetailed(): ActiveConnection[] {
+export function getOnlineUsersDetailed(tenantId?: string): ActiveConnection[] {
   // userId → most-recently-active connection
   const byUser = new Map<string, ActiveConnection>();
   const anon: ActiveConnection[] = [];
 
   activeConnections.forEach(conn => {
+    if (tenantId && conn.tenantId !== tenantId) return;
     if (!conn.userId) {
       anon.push(conn);
       return;
@@ -103,25 +109,49 @@ export function getOnlineUsersDetailed(): ActiveConnection[] {
   return [...Array.from(byUser.values()), ...anon];
 }
 
-// Get count of authenticated users only
-function getAuthenticatedUserCount(): number {
+// Get count of authenticated users only. Pass tenantId to scope the count
+// to one tenant — omitting it returns the platform-wide count, which must
+// only ever be exposed to super_admin (see request:online_users handlers).
+function getAuthenticatedUserCount(tenantId?: string): number {
   const userIds = new Set<string>();
   activeConnections.forEach(conn => {
-    if (conn.userId) {
+    if (conn.userId && (!tenantId || conn.tenantId === tenantId)) {
       userIds.add(conn.userId);
     }
   });
   return userIds.size;
 }
 
-// Broadcast online users update to admins
+// Broadcast online users update to admins — scoped per tenant so
+// tenant A's admins never receive tenant B's stats.
+//
+// IMPORTANT: socket.io's .to(roomA).to(roomB) is a UNION, not an
+// intersection. io.to(`tenant:${id}`).to('role:admin') broadcasts to every
+// socket in tenant:{id} (any role, including non-admins) PLUS every socket
+// in role:admin (every tenant's admins) — the exact cross-tenant leak this
+// function exists to close. Tenant+role targeting must use the compound
+// `tenant:{id}:role:{role}` room that sockets join on connection instead.
 function broadcastOnlineUsersToAdmins() {
   if (!io) return;
-  // Use authenticated user count instead of all socket connections
-  const count = getAuthenticatedUserCount();
-  const detailedUsers = getOnlineUsersDetailed();
-  io.to('role:admin').to('role:super_admin').emit('stats:online_users', { count });
-  io.to('role:admin').to('role:super_admin').emit('stats:online_users_detailed', { users: detailedUsers, count });
+
+  // Collect unique tenant IDs currently connected
+  const tenantIds = new Set<string>();
+  activeConnections.forEach(conn => { if (conn.tenantId) tenantIds.add(conn.tenantId); });
+
+  for (const tenantId of tenantIds) {
+    const tenantCount = getAuthenticatedUserCount(tenantId);
+    const tenantDetailed = getOnlineUsersDetailed(tenantId);
+
+    // Emit ONLY to this tenant's admin room (compound room — true AND, not OR)
+    const tenantAdminRoom = `tenant:${tenantId}:role:admin`;
+    io.of('/admin').to(tenantAdminRoom).emit('stats:online_users', { count: tenantCount });
+    io.of('/admin').to(tenantAdminRoom).emit('stats:online_users_detailed', { users: tenantDetailed, count: tenantCount });
+  }
+
+  // super_admin gets cross-tenant global count — intentional, the one role
+  // with legitimate platform-wide visibility.
+  const globalCount = getAuthenticatedUserCount();
+  io.of('/admin').to('role:super_admin').emit('stats:online_users', { count: globalCount });
 }
 
 export function initializeSocketServer(httpServer: HttpServer) {
@@ -167,6 +197,7 @@ export function initializeSocketServer(httpServer: HttpServer) {
       email: socket.data.email,
       fullName: socket.data.fullName,
       roles: socket.data.roles || [],
+      tenantId: socket.data.tenantId,
       currentPage: '/',
       connectedAt: new Date(),
       lastActivity: new Date(),
@@ -219,22 +250,38 @@ export function initializeSocketServer(httpServer: HttpServer) {
   adminIo.on('connection', (socket) => {
     handleConnection(socket, 'admin');
 
-    // Join Role Rooms
-    socket.data.roles?.forEach((r: string) => socket.join(`role:${r}`));
+    // Join tenant room — broad tenant-scope membership, any role. NOTE: this
+    // does NOT scope the role rooms below — see broadcastOnlineUsersToAdmins
+    // for why chaining .to(tenant).to(role) doesn't intersect.
+    if (socket.data.tenantId) {
+      socket.join(`tenant:${socket.data.tenantId}`);
+    }
+
+    // Join Role Rooms. `role:{r}` is a global cross-tenant room — reserve it
+    // for genuinely platform-wide targets (role:super_admin). Tenant-scoped
+    // admin events must target the compound `tenant:{id}:role:{r}` room.
+    socket.data.roles?.forEach((r: string) => {
+      socket.join(`role:${r}`);
+      if (socket.data.tenantId) socket.join(`tenant:${socket.data.tenantId}:role:${r}`);
+    });
     if (socket.data.userId) socket.join(`user:${socket.data.userId}`);
 
     // Admin-specific listeners
     broadcastOnlineUsersToAdmins();
 
+    const isSuperAdmin = socket.data.roles?.includes('super_admin');
+
     socket.on('request:online_users', () => {
-      socket.emit('stats:online_users', { count: getAuthenticatedUserCount() });
+      const count = getAuthenticatedUserCount(isSuperAdmin ? undefined : socket.data.tenantId);
+      socket.emit('stats:online_users', { count });
     });
 
     socket.on('request:online_users_detailed', () => {
-      if (socket.data.roles?.includes('admin') || socket.data.roles?.includes('super_admin')) {
-        const users = getOnlineUsersDetailed();
+      if (socket.data.roles?.includes('admin') || isSuperAdmin) {
+        const tenantId = isSuperAdmin ? undefined : socket.data.tenantId;
+        const users = getOnlineUsersDetailed(tenantId);
         // Use authenticated user count (unique users) not socket count
-        socket.emit('stats:online_users_detailed', { users, count: getAuthenticatedUserCount() });
+        socket.emit('stats:online_users_detailed', { users, count: getAuthenticatedUserCount(tenantId) });
       }
     });
 
@@ -246,24 +293,43 @@ export function initializeSocketServer(httpServer: HttpServer) {
     });
   });
 
-  // --- NAMESPACE: PUBLIC (Legacy/Default) ---
+  // --- NAMESPACE: PUBLIC (Mandatory Auth — Item 15) ---
+  // Unauthenticated connections are refused at the handshake.
+  // Customer/guest pages that previously relied on anonymous sockets must
+  // either obtain a guest token or use polling for public data.
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
-      if (token) {
-        const payload = verifyToken(token);
-        socket.data = { ...socket.data, ...payload };
+      if (!token) {
+        next(new Error('Authentication required'));
+        return;
       }
-    } catch { /* Allow anonymous */ }
-    next();
+      const payload = verifyToken(token);
+      socket.data = { ...socket.data, ...payload };
+      next();
+    } catch {
+      next(new Error('Authentication failed'));
+    }
   });
 
   io.on('connection', (socket) => {
     handleConnection(socket, 'public');
+
+    // Join tenant room (scopes all subsequent room chatter)
+    if (socket.data.tenantId) {
+      socket.join(`tenant:${socket.data.tenantId}`);
+    }
+
     if (socket.data.userId) socket.join(`user:${socket.data.userId}`);
 
-    // Join role rooms so public-namespace clients receive role-targeted events
-    socket.data.roles?.forEach((r: string) => socket.join(`role:${r}`));
+    // Join role rooms so public-namespace clients receive role-targeted events.
+    // Also join the compound tenant+role room — see broadcastOnlineUsersToAdmins
+    // for why plain `role:{r}` can't be combined with `tenant:{id}` via .to() chaining.
+    const isSuperAdmin = socket.data.roles?.includes('super_admin');
+    socket.data.roles?.forEach((r: string) => {
+      socket.join(`role:${r}`);
+      if (socket.data.tenantId) socket.join(`tenant:${socket.data.tenantId}:role:${r}`);
+    });
 
     // Allow public-namespace clients to join unit rooms (any active module slug)
     socket.on('join:unit', (unit: string) => {
@@ -272,13 +338,15 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
     // Allow public-namespace clients to request online users
     socket.on('request:online_users', () => {
-      socket.emit('stats:online_users', { count: getAuthenticatedUserCount() });
+      const count = getAuthenticatedUserCount(isSuperAdmin ? undefined : socket.data.tenantId);
+      socket.emit('stats:online_users', { count });
     });
 
     socket.on('request:online_users_detailed', () => {
-      if (socket.data.roles?.includes('admin') || socket.data.roles?.includes('super_admin')) {
-        const users = getOnlineUsersDetailed();
-        socket.emit('stats:online_users_detailed', { users, count: getAuthenticatedUserCount() });
+      if (socket.data.roles?.includes('admin') || isSuperAdmin) {
+        const tenantId = isSuperAdmin ? undefined : socket.data.tenantId;
+        const users = getOnlineUsersDetailed(tenantId);
+        socket.emit('stats:online_users_detailed', { users, count: getAuthenticatedUserCount(tenantId) });
       }
     });
   });
@@ -338,6 +406,11 @@ export function emitToUser(userId: string, event: string, data: unknown) {
   getIO().of('/admin').to(`user:${userId}`).emit(event, data);
 }
 
+// FLAG (not in scope of items 12/15, but same bug class): `unit:{slug}` is
+// not tenant-namespaced. Two tenants both running a "spa" module join the
+// same `unit:spa` room, so this leaks cross-tenant. Needs `tenant:{id}:unit:{slug}`
+// the same way roles do, plus a matching change to the join:unit handlers
+// above and the frontend's socket.emit('join:unit', ...) call sites.
 export function emitToUnit(unit: string, event: string, data: unknown) {
   // Units are operational (staff), so emit to admin namespace
   // Also emit to public just in case of mixed usage
@@ -345,11 +418,28 @@ export function emitToUnit(unit: string, event: string, data: unknown) {
   getIO().to(`unit:${unit}`).emit(event, data);
 }
 
-export function emitToRole(role: string, event: string, data: unknown) {
-  // Roles are strict admin/staff concept
-  getIO().of('/admin').to(`role:${role}`).emit(event, data);
+// Roles are strict admin/staff concept. `super_admin` is the one role with
+// legitimate platform-wide visibility — every other role is tenant data and
+// MUST be scoped via tenantId, or this re-introduces the exact cross-tenant
+// leak item 12 closes (chaining .to(tenant).to(role) is a union, not an
+// intersection, so it can't be fixed by adding a tenant room to the chain).
+export function emitToRole(role: string, event: string, data: unknown, tenantId?: string) {
+  if (role === 'super_admin') {
+    getIO().of('/admin').to(`role:${role}`).emit(event, data);
+    return;
+  }
+  if (!tenantId) {
+    logger.warn(`emitToRole('${role}', '${event}') called without tenantId — refusing to broadcast cross-tenant.`);
+    return;
+  }
+  getIO().of('/admin').to(`tenant:${tenantId}:role:${role}`).emit(event, data);
 }
 
+// FLAG: true platform-wide broadcast, bypasses tenant scoping entirely.
+// Per item 12 this should only ever be used for genuine platform-wide
+// system events (the shutdown notice in closeSocketServer is the one
+// legitimate case). Any caller using this for tenant data is a leak — audit
+// call sites.
 export function emitToAll(event: string, data: unknown) {
   getIO().emit(event, data);
   getIO().of('/admin').emit(event, data);

@@ -15,7 +15,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
   // Fetch orders (instant_transaction)
   const ordersResult = await supabase
     .from('transactions')
-    .select('id, order_number, status, created_at')
+    .select('id, metadata, status, created_at')
     .eq('engine_type', 'instant_transaction')
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
@@ -57,7 +57,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
   const orderNotifs = (orders || []).map((o: any) => ({
     id: `order-${o.id}`,
     title: 'New Order',
-    message: `Order ${o.order_number} is ${o.status}`,
+    message: `Order ${o.metadata?.order_number ?? o.id} is ${o.status}`,
     type: 'info' as const,
     is_read: o.status !== 'pending',
     created_at: o.created_at,

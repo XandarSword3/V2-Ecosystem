@@ -124,10 +124,10 @@ async function getUserDeletePreview(supabase: any, userId: string, propertyId?: 
   }
 
   // Count related data
-  let bookingsQuery = supabase.from('transactions').select('id, booking_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'time_exclusive_reservation').limit(5);
-  let ordersQuery = supabase.from('transactions').select('id, order_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'instant_transaction').limit(5);
-  let poolTicketsQuery = supabase.from('transactions').select('id, ticket_number', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'shared_capacity_access').limit(5);
-  let reviewsQuery = supabase.from('reviews').select('id, rating', { count: 'exact' }).eq('user_id', userId).limit(5);
+  let bookingsQuery = supabase.from('transactions').select('id, metadata, status', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'time_exclusive_reservation').limit(5);
+  let ordersQuery = supabase.from('transactions').select('id, metadata', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'instant_transaction').limit(5);
+  let poolTicketsQuery = supabase.from('transactions').select('id, metadata', { count: 'exact' }).eq('customer_id', userId).eq('engine_type', 'shared_capacity_access').limit(5);
+  let reviewsQuery = supabase.from('reviews').select('id, rating', { count: 'exact' }).eq('customer_id', userId).limit(5);
 
   if (propertyId) {
     bookingsQuery = bookingsQuery.eq('property_id', propertyId);
@@ -153,9 +153,9 @@ async function getUserDeletePreview(supabase: any, userId: string, propertyId?: 
   ]);
 
   const relatedEntities: RelatedEntity[] = [
-    { table: 'bookings', count: bookingsResult.count || 0, examples: bookingsResult.data?.map((b: any) => ({ id: b.id, identifier: b.booking_number })) },
-    { table: 'orders', count: ordersResult.count || 0, examples: ordersResult.data?.map((o: any) => ({ id: o.id, identifier: o.order_number })) },
-    { table: 'tickets', count: poolTicketsResult.count || 0, examples: poolTicketsResult.data?.map((t: any) => ({ id: t.id, identifier: t.ticket_number })) },
+    { table: 'bookings', count: bookingsResult.count || 0, examples: bookingsResult.data?.map((b: any) => ({ id: b.id, identifier: b.metadata?.booking_number ?? b.id })) },
+    { table: 'orders', count: ordersResult.count || 0, examples: ordersResult.data?.map((o: any) => ({ id: o.id, identifier: o.metadata?.order_number ?? o.id })) },
+    { table: 'tickets', count: poolTicketsResult.count || 0, examples: poolTicketsResult.data?.map((t: any) => ({ id: t.id, identifier: t.metadata?.ticket_number ?? t.id })) },
     { table: 'reviews', count: reviewsResult.count || 0 },
     { table: 'user_sessions', count: sessionsResult.count || 0 },
     { table: 'user_roles', count: rolesResult.count || 0 },
@@ -209,7 +209,7 @@ async function getUserDeletePreview(supabase: any, userId: string, propertyId?: 
 async function getBookingDeletePreview(supabase: any, bookingId: string, propertyId?: string): Promise<DeletePreviewResult> {
   let query = supabase
     .from('transactions')
-    .select('id, booking_number, status, amount, customer_id, created_at, property_id')
+    .select('id, metadata, status, amount, customer_id, created_at, property_id')
     .eq('id', bookingId)
     .eq('engine_type', 'time_exclusive_reservation');
 
@@ -222,6 +222,8 @@ async function getBookingDeletePreview(supabase: any, bookingId: string, propert
   if (error || !booking) {
     throw new Error('Booking not found');
   }
+
+  const bookingNumber = ((booking.metadata as Record<string, unknown> | null)?.booking_number as string | undefined) ?? booking.id;
 
   let paymentsQuery = supabase.from('payments').select('id, amount', { count: 'exact' }).eq('reference_id', bookingId).eq('reference_table', 'transactions');
   if (propertyId) {
@@ -260,12 +262,12 @@ async function getBookingDeletePreview(supabase: any, bookingId: string, propert
     entity: {
       type: 'booking',
       id: bookingId,
-      identifier: booking.booking_number,
+      identifier: bookingNumber,
       created_at: booking.created_at,
     },
     impact: {
       severity,
-      message: `Booking ${booking.booking_number} (${booking.status})`,
+      message: `Booking ${bookingNumber} (${booking.status})`,
       warnings,
     },
     relatedEntities,
@@ -403,7 +405,7 @@ async function getUnitDeletePreview(supabase: any, unitId: string, propertyId?: 
     throw new Error('Unit not found');
   }
 
-  let bookingsQuery = supabase.from('transactions').select('id, booking_number, status', { count: 'exact' }).eq('reference_id', unitId).eq('reference_table', 'accommodation_units').limit(10);
+  let bookingsQuery = supabase.from('transactions').select('id, metadata, status', { count: 'exact' }).eq('reference_id', unitId).eq('reference_table', 'accommodation_units').limit(10);
   let imagesQuery = supabase.from('accommodation_unit_images').select('id', { count: 'exact' }).eq('unit_id', unitId);
 
   if (propertyId) {
@@ -420,7 +422,7 @@ async function getUnitDeletePreview(supabase: any, unitId: string, propertyId?: 
   ).length || 0;
 
   const relatedEntities: RelatedEntity[] = [
-    { table: 'bookings', count: bookingsResult.count || 0, examples: bookingsResult.data?.slice(0, 5).map((b: any) => ({ id: b.id, identifier: b.booking_number })) },
+    { table: 'bookings', count: bookingsResult.count || 0, examples: bookingsResult.data?.slice(0, 5).map((b: any) => ({ id: b.id, identifier: b.metadata?.booking_number ?? b.id })) },
     { table: 'images', count: imagesResult.count || 0 },
   ].filter(e => e.count > 0);
 

@@ -26,7 +26,7 @@ DO $$ BEGIN NULL; END $$; -- booking records now tracked in transactions table
 
 CREATE TABLE IF NOT EXISTS housekeeping_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    unit_id UUID NOT NULL, -- Could be accommodation_unit_id or other unit
+    unit_id UUID NOT NULL REFERENCES accommodation_units(id) ON DELETE CASCADE,
     unit_type VARCHAR(50) NOT NULL DEFAULT 'accommodation_unit',
     task_type VARCHAR(50) NOT NULL, -- 'cleaning', 'deep_clean', 'linen'
     status housekeeping_status DEFAULT 'pending',
