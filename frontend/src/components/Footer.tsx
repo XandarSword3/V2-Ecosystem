@@ -15,11 +15,13 @@ import {
     ArrowUpRight
 } from 'lucide-react';
 import { useSiteSettings } from '@/lib/settings-context';
-import { usePathname } from 'next/navigation';
+import { usePathname, useParams } from 'next/navigation';
 import { Container } from '@/components/layout/Container';
 
 export default function Footer() {
     const pathname = usePathname();
+    const params = useParams();
+    const propertySlug = (params?.property as string) || '';
     // useLocale() call triggers re-render on language change
     useLocale();
     const tFooter = useTranslations('footer');
@@ -41,22 +43,22 @@ export default function Footer() {
         if (activeModules.length === 0) {
             // No modules configured - show just gift cards
             return [
-                { label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards' }
+                { label: tFooter('giftCards') || 'Gift Cards', href: propertySlug ? `/${propertySlug}/giftcards` : '/giftcards' }
             ];
         }
 
         // Build links from active modules
         const moduleLinks = activeModules.map(m => ({
             label: m.name,
-            href: `/${m.slug}`,
+            href: propertySlug ? `/${propertySlug}/${m.slug}` : `/${m.slug}`,
             moduleSlug: m.slug
         }));
 
         // Add gift cards link
-        moduleLinks.push({ label: tFooter('giftCards') || 'Gift Cards', href: '/giftcards', moduleSlug: '' });
+        moduleLinks.push({ label: tFooter('giftCards') || 'Gift Cards', href: propertySlug ? `/${propertySlug}/giftcards` : '/giftcards', moduleSlug: '' });
 
         return moduleLinks;
-    }, [activeModules, tFooter]);
+    }, [activeModules, tFooter, propertySlug]);
 
     // Don't show footer on admin or staff pages
     if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {
@@ -78,7 +80,7 @@ export default function Footer() {
                     { label: tFooter('privacyPolicy'), href: '/privacy' },
                     { label: tFooter('termsOfService'), href: '/terms' },
                     { label: 'Cookie Policy', href: '/cookie-policy' },
-                    { label: tFooter('cancellationPolicy'), href: '/cancellation' }
+                    { label: tFooter('cancellationPolicy'), href: propertySlug ? `/${propertySlug}/cancellation` : '/cancellation' }
                 ]
             }
         ],

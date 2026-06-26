@@ -81,6 +81,7 @@ export default function DynamicUnitDetailPage() {
 
   const slug = Array.isArray(params?.slug) ? params.slug[0] : params?.slug || '';
   const unitId = Array.isArray(params?.unitId) ? params.unitId[0] : params?.unitId || '';
+  const propertySlug = (params?.property as string) || '';
   const moduleIdParam = searchParams.get('module') || undefined;
 
   const currentModule = modules.find((m) => m.slug.toLowerCase() === slug.toLowerCase());
@@ -185,7 +186,7 @@ export default function DynamicUnitDetailPage() {
         paymentMethod: 'cash',
       });
       toast.success('Booking submitted successfully!');
-      router.push(`/${slug}/confirmation?type=booking&id=${response.data.data.id}`);
+      router.push(`/${propertySlug}/${slug}/confirmation?type=booking&id=${response.data.data.id}`);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { error?: string } } };
       toast.error(axiosError.response?.data?.error || 'Failed to submit booking');
@@ -208,7 +209,7 @@ export default function DynamicUnitDetailPage() {
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Unit not found</h2>
-          <Link href={`/${slug}`}>
+          <Link href={`/${propertySlug}/${slug}`}>
             <Button className="mt-4">Back to {moduleName}</Button>
           </Link>
         </div>
@@ -223,7 +224,7 @@ export default function DynamicUnitDetailPage() {
       {/* Back Button */}
       <div className="max-w-7xl mx-auto px-4 py-4">
         <Link
-          href={`/${slug}`}
+          href={`/${propertySlug}/${slug}`}
           className="inline-flex items-center text-slate-600 dark:text-slate-400 hover:text-primary-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />

@@ -46,6 +46,7 @@ export default function ModuleCartPage() {
   const params = useParams();
   const rawSlug = params?.slug;
   const slug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
+  const propertySlug = (params?.property as string) || '';
 
   const { modules, loading: modulesLoading, settings } = useSiteSettings();
   
@@ -141,7 +142,7 @@ export default function ModuleCartPage() {
         // For cash payments or zero total, redirect directly
         moduleItems.forEach(item => removeItem(item.id));
         toast.success(t('orderPlaced') || 'Order placed successfully!');
-        router.push(`/${slug}/confirmation?type=order&id=${orderId}`);
+        router.push(`/${propertySlug}/${slug}/confirmation?type=order&id=${orderId}`);
       }
     },
     onError: (err: MutationError) => {
@@ -153,7 +154,7 @@ export default function ModuleCartPage() {
   const handleStripePaymentSuccess = () => {
     moduleItems.forEach(item => removeItem(item.id));
     toast.success(t('orderPlaced') || 'Order placed successfully!');
-    router.push(`/${slug}/confirmation?type=order&id=${pendingOrderId}`);
+    router.push(`/${propertySlug}/${slug}/confirmation?type=order&id=${pendingOrderId}`);
   };
 
   const handleStripePaymentError = (error: string) => {
@@ -268,8 +269,7 @@ export default function ModuleCartPage() {
               Add some delicious items to get started!
             </p>
             
-            <Link href={`/${slug}`}>
-              <Button size="lg" className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 hover:from-orange-600 hover:via-amber-600 hover:to-orange-600 shadow-lg shadow-orange-500/30 px-8">
+            <Link href={`/${propertySlug}/${slug}`}>
                 <UtensilsCrossed className="w-5 h-5 mr-2" />
                 {t('backToMenu') || 'Back to Menu'}
               </Button>
@@ -303,7 +303,7 @@ export default function ModuleCartPage() {
       <Container as="div" className="relative py-8">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <Link href={`/${slug}`} className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors mb-4">
+          <Link href={`/${propertySlug}/${slug}`} className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors mb-4">
             <ArrowLeft className="w-4 h-4" />
             <span>Back to {currentModule.name}</span>
           </Link>

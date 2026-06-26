@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { useRef, useMemo, useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import {
   UtensilsCrossed,
   Home,
@@ -50,6 +51,8 @@ export default function HomePage() {
   const tCommon = useTranslations('common');
   const tFooter = useTranslations('footer');
   const { settings, modules } = useSiteSettings();
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
 
   const homePageModule = modules.find(m => m.slug === 'home-page');
 
@@ -118,7 +121,7 @@ export default function HomePage() {
         icon: <IconComponent className="w-8 h-8" />,
         title: module.name,
         description: module.description || getModuleDefaultDescription(module),
-        href: `/${module.slug}`,
+        href: propertySlug ? `/${propertySlug}/${module.slug}` : `/${module.slug}`,
         image: `/images/${module.slug}-bg.jpg`,
         module, // Keep reference for rendering
       };
