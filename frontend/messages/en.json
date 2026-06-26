@@ -1978,18 +1978,18 @@
     "tabs": {
       "profile": "Profile",
       "orders": "Orders",
-      "snacks": "Snack Bar",
       "bookings": "Bookings",
-      "tickets": "Pool Tickets"
+      "tickets": "Sessions",
+      "statement": "Statement",
+      "payments": "Payments",
+      "privacy": "Privacy & Data"
     },
     "myOrders": "My Orders",
     "noOrders": "You have no orders yet",
-    "mySnackOrders": "My Snack Bar Orders",
-    "noSnackOrders": "You have no snack bar orders yet",
     "myBookings": "My Bookings",
     "noBookings": "You have no bookings yet",
-    "myTickets": "My Pool Tickets",
-    "noTickets": "You have no pool tickets yet",
+    "myTickets": "My Sessions",
+    "noTickets": "No sessions yet",
     "bookingDetails": "Booking Details",
     "specialRequests": "Special Requests",
     "addOns": "Add-ons",
@@ -2034,7 +2034,8 @@
       "disableWarning": "Warning",
       "disableWarningDesc": "Disabling two-factor authentication will make your account less secure.",
       "enterCodeToDisable": "Enter your 2FA code to confirm"
-    }
+    },
+    "numberOfGuests": "{count} guests"
   },
   "legal": {
     "privacy": {

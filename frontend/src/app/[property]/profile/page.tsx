@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useSiteSettings } from '@/lib/settings-context';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -26,9 +27,8 @@ import {
   Camera,
   UtensilsCrossed,
   Home,
-  Waves,
-  Cookie,
   Ticket,
+  CreditCard,
   Calendar,
   Clock,
   ChevronRight,
@@ -40,7 +40,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
-type TabType = 'profile' | 'orders' | 'snacks' | 'bookings' | 'tickets' | 'statement' | 'payments' | 'privacy';
+type TabType = 'profile' | 'orders' | 'bookings' | 'tickets' | 'statement' | 'payments' | 'privacy';
 
 interface OrderRecord {
   id: string;
@@ -115,6 +115,7 @@ export default function ProfilePage() {
   const tCommon = useTranslations('common');
   const { user, logout, isLoading: authLoading, refreshUser } = useAuth();
   const currency = useSettingsStore((s) => s.currency);
+  const { modules } = useSiteSettings();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [saving, setSaving] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingRecord | null>(null);
@@ -144,18 +145,11 @@ export default function ProfilePage() {
     enabled: activeTab === 'bookings' && !!user,
   });
 
-  // Fetch user pool tickets
+  // Fetch user session passes (shared_capacity_access)
   const { data: ticketsData, isLoading: ticketsLoading } = useQuery({
     queryKey: ['my-tickets'],
     queryFn: () => api.get('/capacity-access/me'),
     enabled: activeTab === 'tickets' && !!user,
-  });
-
-  // Fetch user kiosk orders
-  const { data: snackOrdersData, isLoading: snackOrdersLoading } = useQuery({
-    queryKey: ['my-kiosk-orders'],
-    queryFn: () => api.get('/orders/kiosk/me'),
-    enabled: activeTab === 'snacks' && !!user,
   });
 
   const { data: statementData, isLoading: statementLoading } = useQuery({
@@ -173,7 +167,6 @@ export default function ProfilePage() {
   const orders = ordersData?.data?.data || [];
   const bookings = bookingsData?.data?.data || [];
   const tickets = ticketsData?.data?.data || [];
-  const snackOrders = snackOrdersData?.data?.data || [];
   const statement = statementData?.data?.data || [];
   const payments = paymentsData?.data?.data || [];
 
@@ -265,15 +258,19 @@ export default function ProfilePage() {
     );
   }
 
+  // Derive which engine types have at least one active module on this property
+  const hasInstantTransaction = modules.some(m => m.is_active && m.engine_type === 'instant_transaction');
+  const hasTimeExclusiveReservation = modules.some(m => m.is_active && m.engine_type === 'time_exclusive_reservation');
+  const hasSharedCapacityAccess = modules.some(m => m.is_active && m.engine_type === 'shared_capacity_access');
+
   const tabs = [
     { id: 'profile' as TabType, label: t('tabs.profile'), icon: User },
-    { id: 'orders' as TabType, label: t('tabs.orders'), icon: UtensilsCrossed },
-    { id: 'snacks' as TabType, label: t('tabs.snacks'), icon: Cookie },
-    { id: 'bookings' as TabType, label: t('tabs.bookings'), icon: Home },
-    { id: 'tickets' as TabType, label: t('tabs.tickets'), icon: Ticket },
-    { id: 'statement' as TabType, label: 'Statement', icon: Calendar },
-    { id: 'payments' as TabType, label: 'Payments', icon: Shield },
-    { id: 'privacy' as TabType, label: 'Privacy & Data', icon: Shield },
+    ...(hasInstantTransaction ? [{ id: 'orders' as TabType, label: t('tabs.orders'), icon: UtensilsCrossed }] : []),
+    ...(hasTimeExclusiveReservation ? [{ id: 'bookings' as TabType, label: t('tabs.bookings'), icon: Home }] : []),
+    ...(hasSharedCapacityAccess ? [{ id: 'tickets' as TabType, label: t('tabs.tickets'), icon: Ticket }] : []),
+    { id: 'statement' as TabType, label: t('tabs.statement'), icon: Calendar },
+    { id: 'payments' as TabType, label: t('tabs.payments'), icon: CreditCard },
+    { id: 'privacy' as TabType, label: t('tabs.privacy'), icon: Shield },
   ];
 
   return (
@@ -430,7 +427,7 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Roles Card */}
+              {/* Access Level Card */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -440,7 +437,11 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {user.roles?.length > 0 ? (
+                    {user.scope ? (
+                      <span className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                        {user.scope.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </span>
+                    ) : user.roles?.length > 0 ? (
                       user.roles.map((role) => (
                         <span
                           key={role}
@@ -488,61 +489,6 @@ export default function ProfilePage() {
                   ) : (
                     <div className="space-y-4">
                       {orders.map((order: OrderRecord) => (
-                        <div
-                          key={order.id}
-                          className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-mono text-sm font-medium">#{order.order_number}</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[order.status] || statusColors.pending}`}>
-                              {order.status?.toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatDate(order.created_at)}
-                            </span>
-                            <span className="font-semibold text-slate-900 dark:text-white">
-                              {formatCurrency(order.total_amount, currency)}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          {activeTab === 'snacks' && (
-            <motion.div
-              key="snacks"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Cookie className="w-5 h-5" />
-                    {t('mySnackOrders')}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {snackOrdersLoading ? (
-                    <div className="flex justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                    </div>
-                  ) : snackOrders.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Cookie className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-500">{t('noSnackOrders')}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {snackOrders.map((order: OrderRecord) => (
                         <div
                           key={order.id}
                           className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -619,7 +565,7 @@ export default function ProfilePage() {
                             </span>
                           </div>
                           <div className="mt-2 flex justify-between">
-                            <span className="text-sm text-slate-500">{booking.number_of_guests} guests</span>
+                            <span className="text-sm text-slate-500">{t('numberOfGuests', { count: booking.number_of_guests })}</span>
                             <span className="font-semibold text-slate-900 dark:text-white">
                               {formatCurrency(booking.total_amount, currency)}
                             </span>
@@ -643,7 +589,7 @@ export default function ProfilePage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Waves className="w-5 h-5" />
+                    <Ticket className="w-5 h-5" />
                     {t('myTickets')}
                   </CardTitle>
                 </CardHeader>
@@ -678,7 +624,7 @@ export default function ProfilePage() {
                             <span>{ticket.session?.name}</span>
                           </div>
                           <div className="mt-2 flex justify-between">
-                            <span className="text-sm text-slate-500">{ticket.number_of_guests} guests</span>
+                            <span className="text-sm text-slate-500">{t('numberOfGuests', { count: ticket.number_of_guests ?? 0 })}</span>
                             <span className="font-semibold text-slate-900 dark:text-white">
                               {formatCurrency(ticket.total_amount, currency)}
                             </span>
@@ -757,7 +703,7 @@ export default function ProfilePage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
+                    <CreditCard className="w-5 h-5" />
                     My Payments
                   </CardTitle>
                 </CardHeader>

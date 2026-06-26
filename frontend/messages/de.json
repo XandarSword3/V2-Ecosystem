@@ -1848,18 +1848,18 @@
     "tabs": {
       "profile": "Profil",
       "orders": "Bestellungen",
-      "snacks": "Snackbar",
       "bookings": "Buchungen",
-      "tickets": "Pool-Tickets"
+      "tickets": "Sessions",
+      "statement": "Kontoauszug",
+      "payments": "Zahlungen",
+      "privacy": "Datenschutz"
     },
     "myOrders": "Meine Bestellungen",
     "noOrders": "Keine Bestellungen",
-    "mySnackOrders": "Meine Snackbar-Bestellungen",
-    "noSnackOrders": "Keine Snackbar-Bestellungen",
     "myBookings": "Meine Buchungen",
     "noBookings": "Keine Buchungen",
-    "myTickets": "Meine Pool-Tickets",
-    "noTickets": "Keine Pool-Tickets",
+    "myTickets": "Meine Sessions",
+    "noTickets": "Noch keine Sessions",
     "bookingDetails": "Buchungsdetails",
     "specialRequests": "Besondere Wünsche",
     "addOns": "Zusatzleistungen",
@@ -1904,7 +1904,8 @@
       "disableWarning": "Warnung",
       "disableWarningDesc": "Deaktivierung macht Konto unsicherer.",
       "enterCodeToDisable": "2FA-Code zur Bestätigung eingeben"
-    }
+    },
+    "numberOfGuests": "{count} Gäste"
   },
   "legal": {
     "privacy": {
