@@ -1859,18 +1859,18 @@
     "tabs": {
       "profile": "Profil",
       "orders": "Commandes",
-      "snacks": "Snack Bar",
       "bookings": "Réservations",
-      "tickets": "Billets Piscine"
+      "tickets": "Séances",
+      "statement": "Relevé",
+      "payments": "Paiements",
+      "privacy": "Confidentialité"
     },
     "myOrders": "Mes Commandes",
     "noOrders": "Vous n'avez pas encore de commandes",
-    "mySnackOrders": "Mes Commandes Snack Bar",
-    "noSnackOrders": "Vous n'avez pas encore de commandes snack bar",
     "myBookings": "Mes Réservations",
     "noBookings": "Vous n'avez pas encore de réservations",
-    "myTickets": "Mes Billets Piscine",
-    "noTickets": "Vous n'avez pas encore de billets piscine",
+    "myTickets": "Mes Séances",
+    "noTickets": "Aucune séance pour l'instant",
     "bookingDetails": "Détails de la réservation",
     "specialRequests": "Demandes spéciales",
     "addOns": "Suppléments",
@@ -1915,7 +1915,8 @@
       "disableWarning": "Avertissement",
       "disableWarningDesc": "La désactivation de l'authentification à deux facteurs rendra votre compte moins sécurisé.",
       "enterCodeToDisable": "Entrez votre code 2FA pour confirmer"
-    }
+    },
+    "numberOfGuests": "{count} invités"
   },
   "legal": {
     "privacy": {

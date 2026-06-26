@@ -1848,18 +1848,18 @@
     "tabs": {
       "profile": "Profilo",
       "orders": "Ordini",
-      "snacks": "Snack Bar",
       "bookings": "Prenotazioni",
-      "tickets": "Biglietti piscina"
+      "tickets": "Sessioni",
+      "statement": "Estratto conto",
+      "payments": "Pagamenti",
+      "privacy": "Privacy"
     },
     "myOrders": "I miei ordini",
     "noOrders": "Nessun ordine",
-    "mySnackOrders": "I miei ordini snack bar",
-    "noSnackOrders": "Nessun ordine snack bar",
     "myBookings": "Le mie prenotazioni",
     "noBookings": "Nessuna prenotazione",
-    "myTickets": "I miei biglietti piscina",
-    "noTickets": "Nessun biglietto piscina",
+    "myTickets": "Le mie Sessioni",
+    "noTickets": "Nessuna sessione ancora",
     "bookingDetails": "Dettagli prenotazione",
     "specialRequests": "Richieste speciali",
     "addOns": "Extra",
@@ -1904,7 +1904,8 @@
       "disableWarning": "Attenzione",
       "disableWarningDesc": "Disabilitare rende il tuo account meno sicuro.",
       "enterCodeToDisable": "Inserisci codice 2FA per confermare"
-    }
+    },
+    "numberOfGuests": "{count} ospiti"
   },
   "legal": {
     "privacy": {
