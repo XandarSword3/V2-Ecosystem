@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
+import { useParams, useRouter } from 'next/navigation';
 
 // Type definitions for menu and session data
 interface MenuItem {
@@ -1197,6 +1198,8 @@ function SessionListComponent({ module, props }: { module: Module; props: BlockP
   const tCommon = useTranslations('common');
   const { translateContent } = useContentTranslation();
   const currency = useSettingsStore((s) => s.currency);
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   const { data, isLoading, error } = useQuery({
@@ -1289,7 +1292,10 @@ function SessionListComponent({ module, props }: { module: Module; props: BlockP
                   </span>
                   <span className="text-slate-500 text-sm ml-1">/person</span>
                 </div>
-                <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+                <button
+                  onClick={() => window.location.href = `/${propertySlug}/${module.slug}/reserve?session=${session.id}`}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                >
                   Book Now
                 </button>
               </div>
@@ -1312,6 +1318,8 @@ function SessionListComponent({ module, props }: { module: Module; props: BlockP
 // ============================================
 function BookingCalendarComponent({ module, props }: { module: Module; props: BlockProps }) {
   const tCommon = useTranslations('common');
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
   const startDate = new Date().toISOString().split('T')[0];
@@ -1369,6 +1377,11 @@ function BookingCalendarComponent({ module, props }: { module: Module; props: Bl
 
         <button
           disabled={!checkIn || !checkOut}
+          onClick={() => {
+            if (checkIn && checkOut) {
+              window.location.href = `/${propertySlug}/${module.slug}/reserve?checkIn=${checkIn}&checkOut=${checkOut}`;
+            }
+          }}
           className="w-full mt-6 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Search Availability
@@ -1817,6 +1830,8 @@ function PricingTableComponent({ module, props, isEditing = false, onUpdateProps
 // ============================================
 function ClassScheduleComponent({ module, props }: { module: Module; props: BlockProps }) {
   const t = useTranslations('common');
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
   const classes = props.classes || [
     { id: '1', name: 'Strength Training', time: '07:00 AM - 08:00 AM', trainer: 'Coach Mike', category: 'Full Body', icon: 'Dumbbell' },
     { id: '2', name: 'Yoga Flow', time: '09:30 AM - 10:30 AM', trainer: 'Coach Sarah', category: 'Mind & Flexibility', icon: 'Sparkles' },
@@ -1831,7 +1846,10 @@ function ClassScheduleComponent({ module, props }: { module: Module; props: Bloc
           <h3 className="text-sm font-semibold text-amber-500 uppercase tracking-wider">{props.subtitle || 'Upcoming Sessions'}</h3>
           <h2 className="text-2xl font-bold text-white">{props.title || 'Next Classes'}</h2>
         </div>
-        <button className="text-amber-500 hover:text-amber-400 text-sm font-medium flex items-center gap-1">
+        <button
+          onClick={() => window.location.href = `/${propertySlug}/${module.slug}`}
+          className="text-amber-500 hover:text-amber-400 text-sm font-medium flex items-center gap-1"
+        >
           {t('viewFullSchedule') || 'View Full Schedule'} →
         </button>
       </div>
@@ -1860,7 +1878,10 @@ function ClassScheduleComponent({ module, props }: { module: Module; props: Bloc
               <p className="text-sm text-slate-400">{cls.time} • {cls.trainer}</p>
             </div>
 
-            <button className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-medium text-sm rounded-lg transition-colors">
+            <button
+              onClick={() => window.location.href = `/${propertySlug}/${module.slug}/reserve?class=${encodeURIComponent(cls.id)}`}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-medium text-sm rounded-lg transition-colors"
+            >
               Book
             </button>
           </motion.div>
@@ -1874,7 +1895,9 @@ function ClassScheduleComponent({ module, props }: { module: Module; props: Bloc
 // Calendar Component
 // ============================================
 function CalendarComponent({ module, props }: { module: Module; props: BlockProps }) {
-  const [currentMonth] = useState(new Date());
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -1906,9 +1929,15 @@ function CalendarComponent({ module, props }: { module: Module; props: BlockProp
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-xl font-bold text-white">{props.title || 'Weekly Schedule'}</h3>
         <div className="flex items-center gap-2 text-slate-300">
-          <button className="p-1 hover:bg-slate-700 rounded">←</button>
+          <button
+            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+            className="p-1 hover:bg-slate-700 rounded"
+          >←</button>
           <span className="text-sm font-medium">{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
-          <button className="p-1 hover:bg-slate-700 rounded">→</button>
+          <button
+            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+            className="p-1 hover:bg-slate-700 rounded"
+          >→</button>
         </div>
       </div>
 
@@ -1939,7 +1968,10 @@ function CalendarComponent({ module, props }: { module: Module; props: BlockProp
         </div>
       </div>
 
-      <button className="w-full mt-4 py-2 text-center text-sm text-slate-400 hover:text-white border border-slate-700 rounded-lg hover:bg-slate-800 transition-colors">
+      <button
+        onClick={() => window.location.href = `/${propertySlug}/${module.slug}`}
+        className="w-full mt-4 py-2 text-center text-sm text-slate-400 hover:text-white border border-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
+      >
         View Full Calendar →
       </button>
     </div>
