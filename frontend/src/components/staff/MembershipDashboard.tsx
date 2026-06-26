@@ -23,8 +23,8 @@ export function MembershipDashboard({ slug, moduleName, moduleId }: MembershipDa
     setLoading(true);
     try {
       const [listResponse, expiringResponse] = await Promise.all([
-        api.get('/pool/memberships/staff/list'),
-        api.get('/pool/memberships/staff/expiring'),
+        api.get(`/${slug}/staff/list`),
+        api.get(`/${slug}/staff/expiring`),
       ]);
       setMemberships(listResponse.data?.data || []);
       setExpiring(expiringResponse.data?.data || []);
@@ -50,9 +50,9 @@ export function MembershipDashboard({ slug, moduleName, moduleId }: MembershipDa
 
   async function runAction(id: string, action: 'activate' | 'extend' | 'suspend') {
     if (action === 'extend') {
-      await api.patch(`/pool/memberships/staff/${id}/extend`, { days: 7 });
+      await api.patch(`/${slug}/staff/${id}/extend`, { days: 7 });
     } else {
-      await api.patch(`/pool/memberships/staff/${id}/${action}`);
+      await api.patch(`/${slug}/staff/${id}/${action}`);
     }
     await loadData();
   }

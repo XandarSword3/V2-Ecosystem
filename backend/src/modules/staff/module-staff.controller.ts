@@ -42,7 +42,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    if (module.engine_type !== 'menu_service') {
+    if (module.engine_type !== 'instant_transaction' && module.engine_type !== 'menu_service') {
       return res.status(400).json({ success: false, error: 'Module is not a menu service' });
     }
 
@@ -50,8 +50,8 @@ export async function getModuleOrders(req: Request, res: Response) {
     let query = supabase
       .from('transactions')
       .select(`
-        id, order_number, customer_id, engine_type, status, amount, created_at, 
-        reference_id, reference_table, customer_name, customer_phone, table_id, staff_id, metadata
+        id, customer_id, engine_type, status, amount, created_at,
+        reference_id, reference_table, metadata
       `)
       .eq('engine_type', 'instant_transaction')
       .eq('module_id', moduleId || module.id)
@@ -73,18 +73,21 @@ export async function getModuleOrders(req: Request, res: Response) {
     if (error) throw error;
 
     // Transform data for frontend
-    const transformedOrders = (orders || []).map(order => ({
-      id: order.id,
-      orderNumber: order.order_number,
-      customerName: order.customer_name || 'Guest',
-      customerId: order.customer_id,
-      orderType: order.engine_type,
-      status: order.status,
-      items: [], // Items would need to be fetched separately from order items table
-      totalAmount: order.amount,
-      tableNumber: order.table_id,
-      createdAt: order.created_at,
-    }));
+    const transformedOrders = (orders || []).map(order => {
+      const meta = (order.metadata ?? {}) as Record<string, unknown>;
+      return {
+        id: order.id,
+        orderNumber: meta.order_number ?? null,
+        customerName: (meta.customer_name as string) || 'Guest',
+        customerId: order.customer_id,
+        orderType: order.engine_type,
+        status: order.status,
+        items: [], // Items fetched separately from order_items
+        totalAmount: order.amount,
+        tableNumber: meta.table_number ?? meta.table_id ?? null,
+        createdAt: order.created_at,
+      };
+    });
 
     res.json({
       success: true,
@@ -113,7 +116,7 @@ export async function splitModuleTable(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'menu_service') {
+    if (!module || (module.engine_type !== 'instant_transaction' && module.engine_type !== 'menu_service')) {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
     }
 
@@ -198,7 +201,7 @@ export async function mergeModuleTables(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'menu_service') {
+    if (!module || (module.engine_type !== 'instant_transaction' && module.engine_type !== 'menu_service')) {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
     }
 
@@ -277,7 +280,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'menu_service') {
+    if (!module || (module.engine_type !== 'instant_transaction' && module.engine_type !== 'menu_service')) {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
     }
 
@@ -393,7 +396,7 @@ export async function getModuleBookings(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    if (module.engine_type !== 'multi_day_booking') {
+    if (module.engine_type !== 'time_exclusive_reservation' && module.engine_type !== 'multi_day_booking') {
       return res.status(400).json({ success: false, error: 'Module is not a booking service' });
     }
 
@@ -401,15 +404,16 @@ export async function getModuleBookings(req: Request, res: Response) {
     let query = supabase
       .from('transactions')
       .select(`
-        *,
+        id, customer_id, status, amount, metadata, created_at, reference_id,
         unit:accommodation_units!reference_id(id, name, capacity),
         user:users!customer_id(id, full_name, email, phone)
       `)
-      .eq('engine_type', 'time_exclusive_reservation');
+      .eq('engine_type', 'time_exclusive_reservation')
+      .eq('module_id', moduleId || module.id);
 
-    // Filter by date (check-in or check-out on this date)
+    // Filter by date (check-in or check-out on this date — stored in metadata)
     if (date) {
-      query = query.or(`check_in_date.eq.${date},check_out_date.eq.${date}`);
+      query = query.or(`metadata->>check_in_date.eq.${date},metadata->>check_out_date.eq.${date}`);
     }
 
     // Filter by status
@@ -419,7 +423,7 @@ export async function getModuleBookings(req: Request, res: Response) {
 
     // Pagination
     const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
-    query = query.order('check_in_date', { ascending: true })
+    query = query.order('created_at', { ascending: false })
       .range(offset, offset + parseInt(limit as string) - 1);
 
     const { data: bookings, error, count } = await query;
@@ -427,23 +431,27 @@ export async function getModuleBookings(req: Request, res: Response) {
     if (error) throw error;
 
     // Transform for frontend
-    // Transform for frontend
-    const transformedBookings = (bookings || []).map(booking => ({
-      id: booking.id,
-      bookingNumber: booking.booking_number,
-      guestName: booking.customer_name || (Array.isArray((booking as any).user) ? (booking as any).user[0] : (booking as any).user)?.full_name || 'Guest',
-      guestEmail: booking.customer_email || (Array.isArray((booking as any).user) ? (booking as any).user[0] : (booking as any).user)?.email,
-      guestPhone: (Array.isArray((booking as any).user) ? (booking as any).user[0] : (booking as any).user)?.phone,
-      unitId: booking.reference_id,
-      unitName: (Array.isArray((booking as any).unit) ? (booking as any).unit[0] : (booking as any).unit)?.name || 'Unit',
-      checkIn: booking.metadata?.check_in_date,
-      checkOut: booking.metadata?.check_out_date,
-      status: booking.status,
-      totalPrice: (booking as any).amount,
-      guestCount: (booking as any).metadata?.number_of_guests,
-      specialRequests: booking.metadata?.special_requests,
-      createdAt: booking.created_at,
-    }));
+    const transformedBookings = (bookings || []).map(booking => {
+      const meta = (booking.metadata ?? {}) as Record<string, unknown>;
+      const userRow = Array.isArray((booking as any).user) ? (booking as any).user[0] : (booking as any).user;
+      const unitRow = Array.isArray((booking as any).unit) ? (booking as any).unit[0] : (booking as any).unit;
+      return {
+        id: booking.id,
+        bookingNumber: meta.booking_number ?? booking.id ?? null,
+        guestName: (meta.customer_name as string) || userRow?.full_name || 'Guest',
+        guestEmail: (meta.customer_email as string) || userRow?.email,
+        guestPhone: userRow?.phone,
+        unitId: booking.reference_id,
+        unitName: unitRow?.name || 'Unit',
+        checkIn: meta.check_in_date ?? null,
+        checkOut: meta.check_out_date ?? null,
+        status: booking.status,
+        totalPrice: booking.amount,
+        guestCount: meta.number_of_guests,
+        specialRequests: meta.special_requests,
+        createdAt: booking.created_at,
+      };
+    });
 
     res.json({
       success: true,
@@ -473,7 +481,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'multi_day_booking') {
+    if (!module || (module.engine_type !== 'time_exclusive_reservation' && module.engine_type !== 'multi_day_booking')) {
       return res.status(400).json({ success: false, error: 'Invalid module for booking operations' });
     }
 
@@ -486,7 +494,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
     // Get current booking from unified transactions
     const { data: currentBooking } = await supabase
       .from('transactions')
-      .select('status, reference_id, booking_number')
+      .select('status, reference_id, metadata')
       .eq('id', bookingId)
       .single();
 
@@ -542,7 +550,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
           task_type: 'turnover',
           priority: 'high',
           status: 'pending',
-          notes: `Auto-generated from checkout. Booking #${booking.booking_number}`,
+          notes: `Auto-generated from checkout. Booking #${(currentBooking?.metadata as Record<string, unknown>)?.booking_number ?? bookingId}`,
           reference_id: bookingId,
           reference_table: 'transactions'
         });
@@ -597,23 +605,20 @@ export async function getModuleSessions(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    if (module.engine_type !== 'session_access') {
+    if (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access') {
       return res.status(400).json({ success: false, error: 'Module is not a session access service' });
     }
 
-    // Get sessions for today or specified date
-    const targetDate = date || new Date().toISOString().split('T')[0];
-
-    // Actual table is capacity_windows
+    // Actual table is capacity_windows — no per-date filter, sessions are time windows not calendar days
     const { data: sessions, error } = await supabase
       .from('capacity_windows')
       .select(`
-        id, name, start_time, end_time, capacity, current_count, status,
-        tickets:transactions(id, ticket_number, status, customer_id, user:users!customer_id(full_name))
+        id, name, starts_at, ends_at, max_capacity,
+        tickets:transactions(id, status, customer_id, user:users!customer_id(full_name))
       `)
       .filter('tickets.engine_type', 'eq', 'shared_capacity_access')
-      .eq('date', targetDate)
-      .order('start_time', { ascending: true });
+      .eq('module_id', module.id)
+      .order('starts_at', { ascending: true });
 
     if (error) throw error;
 
@@ -640,20 +645,21 @@ export async function validateModuleTicket(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'session_access') {
+    if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for ticket validation' });
     }
 
-    // Find the ticket from unified transactions
+    // Find the ticket — ticket_number is stored in metadata
     const { data: ticket, error } = await supabase
       .from('transactions')
       .select(`
-        id, ticket_number, status, customer_id, customer_name, metadata,
-        session:capacity_windows!reference_id(id, name, capacity)
+        id, status, customer_id, metadata,
+        session:capacity_windows!reference_id(id, name, max_capacity)
       `)
-      .eq('ticket_number', ticketNumber)
+      .filter('metadata->>ticket_number', 'eq', ticketNumber)
       .eq('engine_type', 'shared_capacity_access')
-      .single();
+      .eq('module_id', module.id)
+      .maybeSingle();
 
     if (error || !ticket) {
       return res.json({
@@ -662,11 +668,11 @@ export async function validateModuleTicket(req: Request, res: Response) {
       });
     }
 
-    // Verify ticket belongs to this module
     const session = Array.isArray(ticket.session) ? ticket.session[0] : ticket.session;
+    const meta = (ticket.metadata ?? {}) as Record<string, unknown>;
 
     // Check ticket status
-    if (ticket.status === 'used') {
+    if (ticket.status === 'used' || ticket.status === 'expired') {
       return res.json({
         success: true,
         data: { valid: false, reason: 'Ticket has already been used', ticket }
@@ -686,12 +692,12 @@ export async function validateModuleTicket(req: Request, res: Response) {
         valid: true,
         ticket: {
           id: ticket.id,
-          ticketNumber: ticket.ticket_number,
+          ticketNumber: (meta.ticket_number as string) ?? null,
           status: ticket.status,
-          guestName: ticket.customer_name || 'Guest',
+          guestName: (meta.customer_name as string) || 'Guest',
           sessionName: session?.name,
-          entryTime: ticket.metadata?.entry_time,
-          exitTime: ticket.metadata?.exit_time,
+          entryTime: meta.entry_time,
+          exitTime: meta.exit_time,
         }
       }
     });
@@ -721,7 +727,7 @@ export async function recordEntry(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'session_access') {
+    if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for entry operations' });
     }
 
@@ -785,7 +791,7 @@ export async function recordExit(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'session_access') {
+    if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for exit operations' });
     }
 
@@ -848,7 +854,7 @@ export async function getModuleCapacity(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'session_access') {
+    if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for capacity operations' });
     }
 
@@ -856,10 +862,10 @@ export async function getModuleCapacity(req: Request, res: Response) {
 
     const { data: sessions, error } = await supabase
       .from('capacity_windows')
-      .select('id, name, max_capacity, start_time, end_time')
+      .select('id, name, max_capacity, starts_at, ends_at')
       .eq('module_id', module.id)
       .eq('is_active', true)
-      .order('start_time', { ascending: true });
+      .order('starts_at', { ascending: true });
 
     if (error) throw error;
 
@@ -877,8 +883,8 @@ export async function getModuleCapacity(req: Request, res: Response) {
           name: s.name,
           capacity: s.max_capacity,
           currentCount: 0,
-          startTime: s.start_time,
-          endTime: s.end_time,
+          startTime: s.starts_at,
+          endTime: s.ends_at,
           utilizationPercent: 0,
         })),
       }
@@ -904,7 +910,7 @@ export async function getTodaysTickets(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'session_access') {
+    if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for ticket operations' });
     }
 
@@ -913,9 +919,8 @@ export async function getTodaysTickets(req: Request, res: Response) {
     let query = supabase
       .from('transactions')
       .select(`
-        id, ticket_number, customer_name, customer_phone,
-        status, payment_status, amount, created_at, metadata,
-        session:capacity_windows!reference_id(id, name, start_time, end_time)
+        id, customer_id, status, amount, created_at, metadata,
+        session:capacity_windows!reference_id(id, name, starts_at, ends_at)
       `)
       .eq('module_id', module.id)
       .eq('engine_type', 'shared_capacity_access')
@@ -932,20 +937,24 @@ export async function getTodaysTickets(req: Request, res: Response) {
 
     res.json({
       success: true,
-      data: (tickets || []).map(t => ({
-        id: t.id,
-        ticketNumber: t.ticket_number,
-        customerName: t.customer_name,
-        customerPhone: t.customer_phone,
-        guests: t.metadata?.number_of_guests,
-        status: t.status,
-        paymentStatus: t.payment_status,
-        entryTime: t.metadata?.entry_time,
-        exitTime: t.metadata?.exit_time,
-        totalAmount: t.amount,
-        sessionName: (Array.isArray(t.session) ? t.session[0] : t.session)?.name,
-        sessionTime: `${(Array.isArray(t.session) ? t.session[0] : t.session)?.start_time} - ${(Array.isArray(t.session) ? t.session[0] : t.session)?.end_time}`,
-      })),
+      data: (tickets || []).map(t => {
+        const tMeta = (t.metadata ?? {}) as Record<string, unknown>;
+        const sess = Array.isArray((t as any).session) ? (t as any).session[0] : (t as any).session;
+        return {
+          id: t.id,
+          ticketNumber: tMeta.ticket_number ?? null,
+          customerName: (tMeta.customer_name as string) ?? null,
+          customerPhone: (tMeta.customer_phone as string) ?? null,
+          guests: tMeta.number_of_guests,
+          status: t.status,
+          paymentStatus: t.status === 'completed' || t.status === 'valid' ? 'paid' : 'pending',
+          entryTime: tMeta.entry_time,
+          exitTime: tMeta.exit_time,
+          totalAmount: t.amount,
+          sessionName: sess?.name,
+          sessionTime: `${sess?.starts_at ?? ''} - ${sess?.ends_at ?? ''}`,
+        };
+      }),
     });
   } catch (error: any) {
     logger.error('Error fetching today\'s tickets:', error);
@@ -971,7 +980,7 @@ export async function getModuleMaintenanceLogs(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'session_access') {
+    if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for maintenance operations' });
     }
 
@@ -1007,7 +1016,7 @@ export async function createModuleMaintenanceLog(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || module.engine_type !== 'session_access') {
+    if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for maintenance operations' });
     }
 

@@ -18,6 +18,25 @@ export interface HostSegments {
   property: string | null;
 }
 
+// Root-level route segments that are NOT property slugs.
+// Mirrors the same set in proxy.ts.
+const GLOBAL_ROUTE_SEGMENTS = new Set([
+  'login', 'register', 'forgot-password', 'reset-password',
+  'install', 'platform-admin', 'cookie-policy', 'terms', 'privacy',
+  'offline', 'error', 'global-error', 'api',
+]);
+
+/**
+ * Extract a property slug from the current URL pathname.
+ * Used for path-based property routing ([tenant].localhost/[property]/...)
+ * where the property is the first path segment, not a subdomain.
+ */
+export function extractPropertyFromPath(pathname: string): string | null {
+  const segment = pathname.split('/')[1];
+  if (!segment || GLOBAL_ROUTE_SEGMENTS.has(segment)) return null;
+  return segment;
+}
+
 export function extractHostSegments(host: string | null | undefined): HostSegments {
   const none: HostSegments = { tenant: null, property: null };
   if (!host) return none;
@@ -239,15 +258,14 @@ api.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
 
-      // Inject X-Tenant-Slug / X-Property-Slug from the current subdomain on
-      // every request — this is how the backend's tenantAccess/
-      // propertyResolution middleware identifies which tenant/property a
-      // request belongs to, since this axios client talks to a fixed,
-      // tenant-agnostic API origin (NEXT_PUBLIC_API_URL) and the backend's
-      // own Host header never carries subdomain context. Applies to public
-      // storefront requests too, not just admin/staff — unlike x-property-id
-      // below, which is purely for authenticated multi-property switching.
-      const { tenant: tenantSlug, property: propertySlug } = extractHostSegments(window.location.host);
+      // Inject X-Tenant-Slug / X-Property-Slug on every request so the
+      // backend's tenantAccess/propertyResolution middleware can resolve
+      // context. Tenant always comes from the subdomain. Property may come
+      // from the subdomain (resort-a.acme.localhost) OR from the URL path
+      // ([tenant].localhost/[property]/admin/...) — path takes precedence
+      // when subdomain carries no property segment.
+      const { tenant: tenantSlug, property: subdomainProperty } = extractHostSegments(window.location.host);
+      const propertySlug = subdomainProperty ?? extractPropertyFromPath(window.location.pathname);
       if (tenantSlug) {
         config.headers['X-Tenant-Slug'] = tenantSlug;
       }
@@ -265,10 +283,13 @@ api.interceptors.request.use(
       // page could otherwise pick up a stale admin-set value by accident.
       // See CONTEXT.md "Public/Admin Property Context Contamination"
       // (session 7-9).
+      // With path-based property routing, admin/staff live at
+      // /{property}/admin and /{property}/staff — not directly at /admin or
+      // /staff. The regex matches both the new nested form and the legacy
+      // direct form for backward compat.
       const isAdminOrStaffRoute =
         typeof window !== 'undefined' &&
-        (window.location.pathname.startsWith('/admin') ||
-          window.location.pathname.startsWith('/staff') ||
+        (/\/(?:admin|staff)(\/?$|\/)/.test(window.location.pathname) ||
           window.location.pathname.startsWith('/platform-admin'));
 
       if (isAdminOrStaffRoute) {

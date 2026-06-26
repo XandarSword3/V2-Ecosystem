@@ -226,7 +226,7 @@ export async function createMembership(
     if (!stripeCustomerId) {
       const customer = await stripeClient.customers.create({
         email: user.email,
-        name: `${user.first_name} ${user.last_name}`,
+        name: `${user.full_name}`,
         metadata: { userId: input.userId },
       });
       

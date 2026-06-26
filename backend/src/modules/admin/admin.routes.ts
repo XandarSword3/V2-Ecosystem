@@ -100,6 +100,7 @@ router.put('/users/:id', authorizeManager, usersController.updateUser);
 router.put('/users/:id/roles', authorize('admin', 'super_admin', 'tenant_owner'), usersController.assignUserRoles); // Role assignment is sensitive
 router.delete('/users/:id', authorize('super_admin', 'tenant_owner'), usersController.deleteUser);
 router.put('/users/:id/permissions', authorize('super_admin', 'tenant_owner'), permissionsController.updateUserPermissions); // User Override
+router.post('/users/:id/revoke-sessions', authorize('admin', 'super_admin', 'tenant_owner'), usersController.revokeUserSessions); // Force logout a compromised account
 
 // Roles & Permissions (using refactored controller) - TENANT OWNER (or platform super_admin)
 // tenant_owner is scoped to this tenant's own roles table (tenant_id FK) — not platform-global.

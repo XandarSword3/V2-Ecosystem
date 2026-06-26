@@ -611,28 +611,26 @@ export class MetricsLayerService {
           .select('amount')
           .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
-          .gte('check_in', dateRange.start.toISOString())
-          .lte('check_in', dateRange.end.toISOString())
+          .gte('created_at', dateRange.start.toISOString())
+          .lte('created_at', dateRange.end.toISOString())
           .in('status', ['confirmed', 'checked_in', 'checked_out']);
         value = (revenue || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
         break;
 
       case 'occupancy_rate':
-        const today = dayjs().format('YYYY-MM-DD');
+        // Occupancy = checked-in reservations / total active units for this property
         const { count: occupied } = await this.supabase
           .from('transactions')
           .select('*', { count: 'exact', head: true })
           .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
-          .eq('status', 'checked_in')
-          .lte('check_in', today)
-          .gt('check_out', today);
-        const { data: rooms } = await this.supabase
-          .from('rooms')
+          .in('status', ['checked_in', 'CHECKED_IN']);
+        const { data: units } = await this.supabase
+          .from('bookable_units')
           .select('id')
           .eq('property_id', propertyId)
           .eq('is_active', true);
-        value = rooms?.length ? ((occupied || 0) / rooms.length) * 100 : 0;
+        value = units?.length ? ((occupied || 0) / units.length) * 100 : 0;
         break;
 
       case 'active_guests':
@@ -645,16 +643,21 @@ export class MetricsLayerService {
         break;
 
       case 'adr':
+        // ADR = total revenue / total bookings for date range
+        // room_rate and nights are in metadata; approximate with amount / count
         const { data: adrBookings } = await this.supabase
           .from('transactions')
-          .select('room_rate, nights')
+          .select('amount, metadata')
           .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
-          .gte('check_in', dateRange.start.toISOString())
-          .lte('check_in', dateRange.end.toISOString())
+          .gte('created_at', dateRange.start.toISOString())
+          .lte('created_at', dateRange.end.toISOString())
           .in('status', ['confirmed', 'checked_in', 'checked_out']);
-        const totalNights = (adrBookings || []).reduce((sum: number, b: any) => sum + (b.nights || 1), 0);
-        const totalRate = (adrBookings || []).reduce((sum: number, b: any) => sum + (b.room_rate || 0), 0);
+        const totalNights = (adrBookings || []).reduce((sum: number, b: any) => {
+          const nights = (b.metadata as Record<string, unknown>)?.nights;
+          return sum + (Number(nights) || 1);
+        }, 0);
+        const totalRate = (adrBookings || []).reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
         value = totalNights > 0 ? totalRate / totalNights : 0;
         break;
 
@@ -795,25 +798,38 @@ export class MetricsLayerService {
     propertyId: string,
     period: { start: Date; end: Date }
   ): Promise<any> {
-    // Implementation for paginated revenue report
     const { data: bookings } = await this.supabase
       .from('transactions')
-      .select('id, check_in, guest_name, room_number, amount, source, status')
+      .select('id, created_at, amount, status, metadata')
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
-      .gte('check_in', period.start.toISOString())
-      .lte('check_in', period.end.toISOString())
-      .order('check_in');
+      .gte('created_at', period.start.toISOString())
+      .lte('created_at', period.end.toISOString())
+      .order('created_at');
+
+    const rows = (bookings || []).map((b: any) => {
+      const meta = (b.metadata ?? {}) as Record<string, unknown>;
+      return {
+        id: b.id,
+        check_in_date:  (meta.check_in_date_date as string)  ?? b.created_at,
+        guest_name:     (meta.guest_name as string)     ?? (meta.customer_name as string) ?? null,
+        unit_id:        (meta.unit_id as string)        ?? null,
+        booking_number: (meta.booking_number as string) ?? b.id ?? null,
+        amount: b.amount,
+        source: (meta.source as string) ?? null,
+        status: b.status,
+      };
+    });
 
     return {
       summary: {
         total_revenue: (bookings || []).reduce((s: number, b: any) => s + (b.amount || 0), 0),
         booking_count: bookings?.length || 0,
-        average_value: bookings?.length 
-          ? (bookings || []).reduce((s: number, b: any) => s + (b.amount || 0), 0) / bookings.length 
+        average_value: bookings?.length
+          ? (bookings || []).reduce((s: number, b: any) => s + (b.amount || 0), 0) / bookings.length
           : 0
       },
-      rows: bookings || [],
+      rows,
       footnotes: ['Revenue includes confirmed, checked-in, and checked-out bookings only.'],
       exportable: true
     };

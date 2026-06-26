@@ -123,10 +123,10 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
   const { data: review, error } = await supabase
     .from('reviews')
     .insert({
-      user_id: userId,
+      customer_id: userId,
       property_id: propertyId,
       rating: data.rating,
-      comment: data.text,
+      content: data.text,
       module_id: moduleId,
       status: 'pending',
       target_type: 'module',
@@ -164,10 +164,10 @@ export const getAllReviews = asyncHandler(async (req: Request, res: Response) =>
     .select(`
       id,
       rating,
-      comment,
+      content,
       module_id,
       status,
-      user_id,
+      customer_id,
       created_at
     `)
     .is('deleted_at', null)
@@ -190,7 +190,7 @@ export const getAllReviews = asyncHandler(async (req: Request, res: Response) =>
     return res.json({ success: true, data: [] });
   }
 
-  const userIds = [...new Set((data || []).map((r: any) => r.user_id).filter(Boolean))];
+  const userIds = [...new Set((data || []).map((r: any) => r.customer_id).filter(Boolean))];
   let usersMap: Record<string, any> = {};
 
   if (userIds.length > 0) {
@@ -205,10 +205,10 @@ export const getAllReviews = asyncHandler(async (req: Request, res: Response) =>
 
   const mappedData = (data || []).map((r: any) => ({
     ...r,
-    text: r.comment,
+    text: r.content,
     service_type: r.module_id,
     is_approved: r.status === 'approved',
-    users: usersMap[r.user_id] || { full_name: 'Unknown', email: '', profile_image_url: null },
+    users: usersMap[r.customer_id] || { full_name: 'Unknown', email: '', profile_image_url: null },
   }));
 
   res.json({ success: true, data: mappedData });

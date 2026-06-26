@@ -153,6 +153,161 @@ function asNumber(input: unknown, fallback = 0): number {
 }
 
 function buildInstantTransactionRouter(router: Router): void {
+  // Categories endpoints
+  router.get('/categories', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('catalog_categories')
+        .select('id, name, description, sort_order, is_active')
+        .eq('module_id', mounted.id)
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /categories failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list categories' });
+    }
+  });
+
+  router.post('/admin/categories', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const { name, description } = req.body ?? {};
+      if (!name) {
+        return res.status(400).json({ success: false, error: 'name is required' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('catalog_categories')
+        .insert({
+          module_id: mounted.id,
+          name,
+          description: description ?? null,
+          sort_order: 0,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /admin/categories failed', error);
+      res.status(500).json({ success: false, error: 'Failed to create category' });
+    }
+  });
+
+  router.put('/admin/categories/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const { name, description } = req.body ?? {};
+      if (!name) {
+        return res.status(400).json({ success: false, error: 'name is required' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('catalog_categories')
+        .update({ name, description: description ?? null })
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] PUT /admin/categories/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to update category' });
+    }
+  });
+
+  router.delete('/admin/categories/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('catalog_categories')
+        .delete()
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('[Dynamic Router] DELETE /admin/categories/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to delete category' });
+    }
+  });
+
+  // Tables endpoints
+  router.get('/tables', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('restaurant_tables')
+        .select('id, table_number, capacity, is_active')
+        .eq('module_id', mounted.id)
+        .order('table_number', { ascending: true });
+
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /tables failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list tables' });
+    }
+  });
+
+  // Modifiers endpoints
+  router.get('/modifiers', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('catalog_modifiers')
+        .select('id, name, description, price, is_available')
+        .eq('module_id', mounted.id)
+        .eq('is_available', true)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /modifiers failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list modifiers' });
+    }
+  });
+
+  // Items endpoint
   router.get('/items', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -168,11 +323,14 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('is_available', true)
         .order('name', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        logger.error('[Dynamic Router] GET /items database error', { error: error.message, moduleId: mounted.id });
+        throw error;
+      }
       res.json({ success: true, data: data ?? [] });
-    } catch (error) {
-      logger.error('[Dynamic Router] GET /items failed', error);
-      res.status(500).json({ success: false, error: 'Failed to list items' });
+    } catch (error: any) {
+      logger.error('[Dynamic Router] GET /items failed', { error: error?.message, stack: error?.stack });
+      res.status(500).json({ success: false, error: 'Failed to list items', details: error?.message });
     }
   });
 
@@ -361,6 +519,62 @@ function buildInstantTransactionRouter(router: Router): void {
     } catch (error) {
       logger.error('[Dynamic Router] PATCH /orders/:id/status failed', error);
       res.status(500).json({ success: false, error: 'Failed to update order status' });
+    }
+  });
+
+  // Staff endpoints
+  router.get('/staff/orders', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { status } = req.query;
+      let query = supabase
+        .from('transactions')
+        .select('id, customer_id, status, amount, created_at, metadata')
+        .eq('engine_type', 'instant_transaction')
+        .eq('module_id', mounted.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (status && typeof status === 'string') {
+        const statusList = status.split(',');
+        query = query.in('status', statusList);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /staff/orders failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list staff orders' });
+    }
+  });
+
+  router.get('/staff/tables', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('restaurant_tables')
+        .select('id, table_number, capacity, is_active')
+        .eq('module_id', mounted.id)
+        .eq('is_active', true)
+        .order('table_number', { ascending: true });
+
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /staff/tables failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list tables' });
     }
   });
 }
@@ -595,10 +809,10 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       const date = req.query.date as string;
       const { data, error } = await supabase
         .from('capacity_windows')
-        .select('id, name, start_time, end_time, max_capacity, price, module_id, is_active, metadata')
+        .select('id, name, starts_at, ends_at, max_capacity, price, module_id, is_active, metadata')
         .eq('module_id', mounted.id)
         .eq('is_active', true)
-        .order('start_time', { ascending: true });
+        .order('starts_at', { ascending: true });
       if (error) throw error;
       
       let normalized = (data ?? []).map((w) => ({
@@ -773,6 +987,236 @@ function buildSharedCapacityAccessRouter(router: Router): void {
     }
   });
 
+  // Staff endpoints
+  router.get('/staff/capacity', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('capacity_windows')
+        .select('id, name, starts_at, ends_at, max_capacity')
+        .eq('module_id', mounted.id)
+        .eq('is_active', true)
+        .single();
+      if (error) throw error;
+      // current_occupancy is now derived live from transactions; compute it here
+      const { count: occupancyCount } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('engine_type', 'shared_capacity_access')
+        .eq('module_id', mounted.id)
+        .in('status', ['active', 'confirmed', 'valid', 'checked_in']);
+      const capacityData = data
+        ? { ...data, current_occupancy: occupancyCount ?? 0 }
+        : { max_capacity: 100, current_occupancy: 0 };
+      res.json({ success: true, data: capacityData });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /staff/capacity failed', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch capacity' });
+    }
+  });
+
+  router.get('/staff/tickets/today', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const today = dayjs().format('YYYY-MM-DD');
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, customer_id, status, amount, reference_id, metadata, created_at')
+        .eq('engine_type', 'shared_capacity_access')
+        .eq('module_id', mounted.id)
+        .gte('created_at', `${today}T00:00:00`)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /staff/tickets/today failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list today tickets' });
+    }
+  });
+
+  router.post('/staff/tickets', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const { session_id, quantity, ticket_type } = req.body ?? {};
+      if (!session_id) {
+        return res.status(400).json({ success: false, error: 'session_id is required' });
+      }
+      const guestCount = asNumber(quantity, 1);
+      const supabase = getSupabase();
+      const { data: session, error: sessionError } = await supabase
+        .from('capacity_windows')
+        .select('price, metadata')
+        .eq('id', session_id)
+        .eq('module_id', mounted.id)
+        .single();
+      if (sessionError) throw sessionError;
+      const unitPrice = asNumber(session?.price, 0);
+      const lineItems = [{
+        itemId: String(session_id),
+        name: 'session_ticket',
+        quantity: guestCount,
+        unitPrice,
+      }];
+      const pricing = await engineService.calculatePricing(
+        mounted.engine_type,
+        lineItems,
+        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
+      );
+      const ticketDate = dayjs().format('YYYY-MM-DD');
+      const purchase = await purchaseSharedCapacityAtomic(supabase, {
+        sessionId: String(session_id),
+        moduleId: mounted.id,
+        propertyId: mounted.property_id ?? null,
+        customerId: req.user?.userId ?? null,
+        quantity: guestCount,
+        ticketDate,
+        amount: pricing.totalAmount,
+        metadata: {
+          ticket_type: ticket_type ?? 'adult',
+          payment_method: req.body?.payment_method ?? 'cash',
+        },
+      });
+      if (!purchase.success) {
+        const status = purchase.errorMessage?.includes('capacity') ? 409 : 400;
+        return res.status(status).json({
+          success: false,
+          error: purchase.errorMessage ?? 'Failed to reserve capacity',
+          availableCapacity: purchase.availableCapacity,
+        });
+      }
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, module_id, customer_id, status, amount, reference_id, metadata')
+        .eq('id', purchase.transactionId!)
+        .single();
+      if (error) throw error;
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /staff/tickets failed', error);
+      res.status(500).json({ success: false, error: 'Failed to create staff ticket' });
+    }
+  });
+
+  router.post('/tickets/:id/bracelet', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const { braceletNumber } = req.body ?? {};
+      if (!braceletNumber) {
+        return res.status(400).json({ success: false, error: 'braceletNumber is required' });
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('transactions')
+        .update({ 
+          metadata: (await supabase.from('transactions').select('metadata').eq('id', req.params.id).single()).data?.metadata || {},
+        })
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .select()
+        .single();
+      if (error) throw error;
+      const updatedMetadata = { ...(data?.metadata as Record<string, unknown> || {}), bracelet_number: braceletNumber };
+      const { data: updated, error: updateError } = await supabase
+        .from('transactions')
+        .update({ metadata: updatedMetadata })
+        .eq('id', req.params.id)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /tickets/:id/bracelet failed', error);
+      res.status(500).json({ success: false, error: 'Failed to assign bracelet' });
+    }
+  });
+
+  router.delete('/tickets/:id/bracelet', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('metadata')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .single();
+      if (error) throw error;
+      const updatedMetadata = { ...(data?.metadata as Record<string, unknown> || {}) };
+      delete updatedMetadata.bracelet_number;
+      const { data: updated, error: updateError } = await supabase
+        .from('transactions')
+        .update({ metadata: updatedMetadata })
+        .eq('id', req.params.id)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      logger.error('[Dynamic Router] DELETE /tickets/:id/bracelet failed', error);
+      res.status(500).json({ success: false, error: 'Failed to return bracelet' });
+    }
+  });
+
+  router.post('/sessions/:id/capacity/override', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const { additional, reason, approved_by } = req.body ?? {};
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('capacity_windows')
+        .select('max_capacity, metadata')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .single();
+      if (error) throw error;
+      const currentMetadata = data?.metadata as Record<string, unknown> || {};
+      const newMaxCapacity = asNumber(data?.max_capacity, 0) + asNumber(additional, 0);
+      const { data: updated, error: updateError } = await supabase
+        .from('capacity_windows')
+        .update({ 
+          max_capacity: newMaxCapacity,
+          metadata: {
+            ...currentMetadata,
+            capacity_override: {
+              additional: asNumber(additional, 0),
+              reason,
+              approved_by,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        })
+        .eq('id', req.params.id)
+        .select()
+        .single();
+      if (updateError) throw updateError;
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /sessions/:id/capacity/override failed', error);
+      res.status(500).json({ success: false, error: 'Failed to override capacity' });
+    }
+  });
+
   router.patch('/tickets/:id/validate', authorize('staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -821,6 +1265,177 @@ function buildSharedCapacityAccessRouter(router: Router): void {
     } catch (error) {
       logger.error('[Dynamic Router] PATCH /tickets/:id/validate failed', error);
       res.status(500).json({ success: false, error: 'Failed to validate ticket' });
+    }
+  });
+
+  // Admin endpoints
+  router.get('/admin/sessions', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('capacity_windows')
+        .select('id, name, starts_at, ends_at, max_capacity, price, is_active, metadata')
+        .eq('module_id', mounted.id)
+        .order('starts_at', { ascending: true });
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /admin/sessions failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list sessions' });
+    }
+  });
+
+  router.post('/admin/sessions', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      // Accept both new (starts_at/ends_at) and legacy (start_time/end_time) field names
+      const { name, starts_at, ends_at, start_time, end_time, max_capacity, price, metadata } = req.body ?? {};
+      const sessionStartsAt = starts_at ?? start_time ?? null;
+      const sessionEndsAt = ends_at ?? end_time ?? null;
+      if (!name || !sessionStartsAt || !sessionEndsAt) {
+        return res.status(400).json({ success: false, error: 'name, starts_at, and ends_at are required' });
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('capacity_windows')
+        .insert({
+          module_id: mounted.id,
+          name,
+          starts_at: sessionStartsAt,
+          ends_at: sessionEndsAt,
+          max_capacity: asNumber(max_capacity, 100),
+          price: asNumber(price, 0),
+          is_active: true,
+          metadata: metadata || {},
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /admin/sessions failed', error);
+      res.status(500).json({ success: false, error: 'Failed to create session' });
+    }
+  });
+
+  router.put('/admin/sessions/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      // Accept both new (starts_at/ends_at) and legacy (start_time/end_time) field names
+      const { name, starts_at: updStarts, ends_at: updEnds, start_time: updLegacyStart, end_time: updLegacyEnd, max_capacity, price, is_active, metadata } = req.body ?? {};
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('capacity_windows')
+        .update({
+          name,
+          starts_at: updStarts ?? updLegacyStart,
+          ends_at: updEnds ?? updLegacyEnd,
+          max_capacity: asNumber(max_capacity, 100),
+          price: asNumber(price, 0),
+          is_active: is_active !== undefined ? is_active : true,
+          metadata: metadata || {},
+        })
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .select()
+        .single();
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] PUT /admin/sessions/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to update session' });
+    }
+  });
+
+  router.delete('/admin/sessions/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('capacity_windows')
+        .delete()
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('[Dynamic Router] DELETE /admin/sessions/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to delete session' });
+    }
+  });
+
+  router.put('/admin/settings', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const { maxCapacity } = req.body ?? {};
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('capacity_windows')
+        .update({ max_capacity: asNumber(maxCapacity, 100) })
+        .eq('module_id', mounted.id)
+        .select()
+        .maybeSingle();
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] PUT /admin/settings failed', error);
+      res.status(500).json({ success: false, error: 'Failed to update settings' });
+    }
+  });
+
+  router.post('/admin/reset-occupancy', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      // current_occupancy is now derived live from the transactions table.
+      // No counter column exists — nothing to reset.
+      res.json({ success: true, data: null });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /admin/reset-occupancy failed', error);
+      res.status(500).json({ success: false, error: 'Failed to reset occupancy' });
+    }
+  });
+
+  router.get('/staff/bracelets/active', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('id, customer_id, status, metadata, created_at')
+        .eq('engine_type', 'shared_capacity_access')
+        .eq('module_id', mounted.id)
+        .not('metadata->>bracelet_number', 'is', null)
+        .in('status', ['active', 'confirmed', 'in_use'])
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /staff/bracelets/active failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list active bracelets' });
     }
   });
 }
@@ -980,11 +1595,135 @@ function buildOngoingEntitlementRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .select('id, status, updated_at')
         .single();
+
       if (error) throw error;
       res.json({ success: true, data });
     } catch (error) {
       logger.error('[Dynamic Router] PATCH /subscriptions/:id/status failed', error);
       res.status(500).json({ success: false, error: 'Failed to update subscription status' });
+    }
+  });
+
+  // Staff endpoints
+  router.get('/staff/list', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('memberships')
+        .select('id, customer_id, plan_id, status, amount, created_at, users')
+        .eq('module_id', mounted.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /staff/list failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list memberships' });
+    }
+  });
+
+  router.get('/staff/expiring', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const thirtyDaysFromNow = dayjs().add(30, 'day').toISOString();
+      const { data, error } = await supabase
+        .from('memberships')
+        .select('id, customer_id, plan_id, status, amount, created_at, users')
+        .eq('module_id', mounted.id)
+        .eq('status', 'ACTIVE')
+        .lte('expires_at', thirtyDaysFromNow)
+        .order('expires_at', { ascending: true })
+        .limit(100);
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /staff/expiring failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list expiring memberships' });
+    }
+  });
+
+  router.patch('/staff/:id/extend', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const { days } = req.body ?? {};
+      const supabase = getSupabase();
+      const { data: current, error: currentError } = await supabase
+        .from('memberships')
+        .select('id, expires_at')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .maybeSingle();
+      if (currentError) throw currentError;
+      if (!current) return res.status(404).json({ success: false, error: 'Membership not found' });
+      
+      const newExpiry = dayjs(current.expires_at || new Date()).add(asNumber(days, 7), 'day').toISOString();
+      const { data, error } = await supabase
+        .from('memberships')
+        .update({ expires_at: newExpiry, updated_at: new Date().toISOString() })
+        .eq('id', req.params.id)
+        .select()
+        .single();
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] PATCH /staff/:id/extend failed', error);
+      res.status(500).json({ success: false, error: 'Failed to extend membership' });
+    }
+  });
+
+  router.patch('/staff/:id/:action', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const action = req.params.action as string;
+      const supabase = getSupabase();
+      const { data: current, error: currentError } = await supabase
+        .from('memberships')
+        .select('id, status')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .maybeSingle();
+      if (currentError) throw currentError;
+      if (!current) return res.status(404).json({ success: false, error: 'Membership not found' });
+
+      const actor = actorForUser(req);
+      const targetStatus = action === 'activate' ? 'ACTIVE' : action === 'suspend' ? 'SUSPENDED' : action === 'cancel' ? 'CANCELLED' : current.status;
+      const transition = await engineService.transitionState(
+        mounted.engine_type,
+        current.status,
+        action,
+        actor,
+        { moduleId: mounted.id },
+      );
+
+      if (!transition.allowed) {
+        return res.status(400).json({ success: false, error: transition.error ?? 'Invalid status transition' });
+      }
+
+      const { data, error } = await supabase
+        .from('memberships')
+        .update({ status: transition.targetState, updated_at: new Date().toISOString() })
+        .eq('id', req.params.id)
+        .select()
+        .single();
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] PATCH /staff/:id/:action failed', error);
+      res.status(500).json({ success: false, error: 'Failed to update membership' });
     }
   });
 }
@@ -1208,8 +1947,8 @@ async function commitImportForEngine(
       }>) {
         const { error } = await supabase.from('capacity_windows').insert({
           name: item.name,
-          start_time: item.startTime,
-          end_time: item.endTime,
+          starts_at: item.startTime,
+          ends_at: item.endTime,
           max_capacity: item.capacity,
           price: item.adultPrice,
           is_active: item.isActive ?? true,

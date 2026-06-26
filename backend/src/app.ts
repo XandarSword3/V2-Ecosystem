@@ -11,7 +11,7 @@ import { logger } from './utils/logger.js';
 import { getSupabase } from './database/connection.js';
 
 // Controller imports
-import { getModules } from './modules/admin/modules.controller.js';
+import { getModules, getModule } from './modules/admin/modules.controller.js';
 import * as publicController from './modules/public/public.controller.js';
 import { authenticate, authorize } from './middleware/auth.middleware.js';
 
@@ -179,6 +179,8 @@ app.get('/api/branding', resolveTenant, resolveProperty, (req, res, next) => {
 
 // Mount /api/modules with tenant and property resolution to prevent cross-tenant leaks
 app.get('/api/modules', resolveTenant, resolveProperty, getModules);
+// Single module by slug (or UUID) — used by [slug]/page.tsx to fetch full settings.layout
+app.get('/api/modules/:slug', resolveTenant, resolveProperty, getModule);
 
 // Mount the rest of public routes with tenant/property resolution
 // NOTE: This must come AFTER the specific routes above to avoid conflicts

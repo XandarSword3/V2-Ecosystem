@@ -110,8 +110,8 @@ class EmailService {
           settings.companyAddress = String(s.value.address || 'Your Business');
         }
         if (s.key === 'accommodation' && s.value) {
-          settings.unit_check_in = String(s.value.checkIn || s.value.check_in_time || '3:00 PM');
-          settings.unit_check_out = String(s.value.checkOut || s.value.check_out_time || '12:00 PM');
+          settings.unit_check_in = String(s.value.checkIn || s.value.check_in_date_time || '3:00 PM');
+          settings.unit_check_out = String(s.value.checkOut || s.value.check_out_date_time || '12:00 PM');
           settings.chalet_check_in = settings.unit_check_in;
           settings.chalet_check_out = settings.unit_check_out;
         }

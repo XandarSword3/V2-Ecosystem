@@ -10,13 +10,14 @@ const router = Router();
 const parseParams = (req: Request): DateRangeParams => {
   const { from, to, propertyId, moduleId, engineType } = req.query;
   
-  if (!from || !to) {
-    throw new Error('Both "from" and "to" parameters are required.');
-  }
+  // Default to last 30 days if not provided
+  const defaultFrom = new Date();
+  defaultFrom.setDate(defaultFrom.getDate() - 30);
+  const defaultTo = new Date();
 
   return {
-    from: String(from),
-    to: String(to),
+    from: from ? String(from) : defaultFrom.toISOString(),
+    to: to ? String(to) : defaultTo.toISOString(),
     propertyId: propertyId ? String(propertyId) : undefined,
     moduleId: moduleId ? String(moduleId) : undefined,
     engineType: engineType ? String(engineType) : undefined,

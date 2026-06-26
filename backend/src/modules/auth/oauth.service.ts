@@ -563,6 +563,11 @@ async function findOrCreateOAuthUser(data: {
     userId: existingUser.id,
     email: existingUser.email,
     roles,
+    scope: roles.includes('super_admin') ? 'super_admin'
+         : roles.includes('admin')       ? 'tenant_admin'
+         : roles.includes('manager')     ? 'property_manager'
+         : roles.includes('staff')       ? 'property_staff'
+         : 'customer',
     tokenVersion: existingUser.token_version ?? 0,
   });
 

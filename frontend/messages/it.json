@@ -1310,7 +1310,9 @@
       "coupons": "Coupon",
       "housekeeping": "Pulizie",
       "inventory": "Inventario",
-      "navbar": "Navigation"
+      "navbar": "Navigation",
+      "memberships": "Iscrizioni",
+      "members": "Membri"
     },
     "messages": {
       "loggedOutSuccessfully": "Disconnesso con successo"

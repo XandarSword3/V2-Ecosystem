@@ -14,9 +14,9 @@ export type ReviewStatus = 'pending' | 'approved';
 
 export interface Review {
   id: string;
-  user_id: string;
+  customer_id: string;
   rating: number;
-  text: string;
+  content: string;
   service_type: ServiceType;
   is_approved: boolean;
   created_at: string;
@@ -72,10 +72,10 @@ export async function getApprovedReviews(options: GetReviewsOptions = {}): Promi
     .select(`
       id,
       rating,
-      text,
+      content,
       service_type,
       created_at,
-      users!reviews_user_id_fkey (
+      users!reviews_customer_id_fkey (
         full_name,
         profile_image_url
       )
@@ -126,7 +126,7 @@ export async function createReview(
   const { data: existingReview } = await supabase
     .from('reviews')
     .select('id')
-    .eq('user_id', userId)
+    .eq('customer_id', userId)
     .eq('service_type', service_type)
     .single();
 
@@ -137,9 +137,9 @@ export async function createReview(
   const { data: review, error } = await supabase
     .from('reviews')
     .insert({
-      user_id: userId,
+      customer_id: userId,
       rating: data.rating,
-      text: data.text,
+      content: data.text,
       service_type,
       is_approved: false, // Needs admin approval
     })
@@ -163,11 +163,11 @@ export async function getAllReviews(options: GetAllReviewsOptions = {}): Promise
     .select(`
       id,
       rating,
-      text,
+      content,
       service_type,
       is_approved,
       created_at,
-      users!reviews_user_id_fkey (
+      users!reviews_customer_id_fkey (
         id,
         full_name,
         email,
@@ -272,7 +272,7 @@ export async function getReviewsByUser(userId: string): Promise<Review[]> {
   const { data, error } = await supabase
     .from('reviews')
     .select('*')
-    .eq('user_id', userId)
+    .eq('customer_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;

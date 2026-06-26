@@ -135,7 +135,7 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
         toast.error('Invalid quantity');
         return;
       }
-      await api.post('/pool/staff/tickets', {
+      await api.post(`/${slug}/staff/tickets`, {
         session_id: sessionId,
         quantity,
         ticket_type: 'adult',
@@ -197,7 +197,7 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
 
   const loadBracelets = async () => {
     try {
-      const { data } = await api.get('/pool/staff/bracelets/active');
+      const { data } = await api.get(`/${slug}/staff/bracelets/active`);
       setBracelets(data.data || []);
     } catch (error) {
       toast.error('Failed to load bracelets');
@@ -210,7 +210,7 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
       if (!ticketId) return;
       const braceletNumber = window.prompt('Bracelet number');
       if (!braceletNumber) return;
-      await api.post(`/pool/tickets/${ticketId}/bracelet`, { braceletNumber });
+      await api.post(`/${slug}/tickets/${ticketId}/bracelet`, { braceletNumber });
       toast.success('Bracelet assigned');
       loadBracelets();
     } catch (error) {
@@ -220,7 +220,7 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
 
   const returnBracelet = async (ticketId: string) => {
     try {
-      await api.delete(`/pool/tickets/${ticketId}/bracelet`);
+      await api.delete(`/${slug}/tickets/${ticketId}/bracelet`);
       toast.success('Bracelet returned');
       loadBracelets();
     } catch (error) {
@@ -239,7 +239,7 @@ export function SessionAccessDashboard({ slug, moduleName, moduleId }: SessionAc
         toast.error('Invalid additional capacity');
         return;
       }
-      await api.post(`/pool/sessions/${sessionId}/capacity/override`, {
+      await api.post(`/${slug}/sessions/${sessionId}/capacity/override`, {
         additional,
         reason,
         approved_by: 'manager',

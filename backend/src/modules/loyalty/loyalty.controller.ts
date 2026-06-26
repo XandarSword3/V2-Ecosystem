@@ -460,8 +460,8 @@ export class LoyaltyController {
 
       const { data: transactionData } = await supabase
         .from('transactions')
-        .select('id, engine_type, order_number, ticket_number, booking_number, amount, status')
-        .in('reference_id', allReferenceIds);
+        .select('id, engine_type, metadata, amount, status')
+        .in('id', allReferenceIds);
 
       const legacyTypeMap: Record<string, string> = {
         'instant_transaction': 'restaurant_order',
@@ -470,19 +470,19 @@ export class LoyaltyController {
       };
 
       const sourceLookup = new Map<string, any>();
-      (transactions || []).forEach((row: any) => sourceLookup.set(`${row.engine_type}:${row.id}`, row));
+      (transactionData || []).forEach((row: any) => sourceLookup.set(row.id, row));
 
       const enrichedTransactions = (transactions || []).map((row: any) => {
-        const key = row.engine_type && row.reference_id ? `${row.engine_type}:${row.reference_id}` : '';
-        const source = sourceLookup.get(key);
+        const source = row.reference_id ? sourceLookup.get(row.reference_id) : undefined;
         if (!source) return row;
+        const meta = source.metadata || {};
         return {
           ...row,
           source_summary: {
-            type: row.engine_type,
+            type: source.engine_type,
             id: row.reference_id,
-            number: source.order_number || source.booking_number || source.ticket_number || null,
-            total_amount: source.total_amount || null,
+            number: meta.order_number || meta.booking_number || row.reference_id || meta.ticket_number || null,
+            total_amount: source.amount || null,
             status: source.status || null,
           },
         };

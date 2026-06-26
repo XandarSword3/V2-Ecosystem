@@ -44,6 +44,19 @@ function getAuthToken(): string | null {
 function createSocket(): Socket {
   const token = getAuthToken();
   
+  // Don't connect without a token - backend requires auth on all namespaces (Item 15)
+  if (!token) {
+    socketLogger.warn('No auth token available - socket connection skipped');
+    // Return a disconnected socket that will reconnect when token becomes available
+    const socket = io(cleanSocketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: false,
+      autoConnect: false,
+      auth: undefined,
+    });
+    return socket;
+  }
+  
   const socket = io(cleanSocketUrl, {
     transports: ['websocket', 'polling'],
     reconnection: true,
@@ -54,7 +67,7 @@ function createSocket(): Socket {
     forceNew: false,           // Reuse existing connection
     multiplex: true,           // Allow connection sharing
     autoConnect: true,
-    auth: token ? { token } : undefined,
+    auth: { token },
     // Buffer events when disconnected
     retries: 3,
   });

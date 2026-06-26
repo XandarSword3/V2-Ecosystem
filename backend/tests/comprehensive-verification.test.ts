@@ -58,11 +58,25 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
     let moduleId: string;
     let initialVersion: number;
 
+    let platformTenantId: string | null = null;
+
     beforeAll(async () => {
         // Create a test role
         await supabase.from('roles').insert({ name: testRoleName, description: 'Test Role' });
 
-        // Seed users referenced by generated JWTs
+        // Look up the platform root tenant (seeded by migration) to satisfy
+        // the NOT NULL tenant_id constraint on payment_ledger and app_permissions.
+        const { data: platformTenant } = await supabase
+            .from('tenants')
+            .select('id')
+            .eq('subdomain', 'platform')
+            .maybeSingle();
+        platformTenantId = platformTenant?.id ?? null;
+
+        // Seed users referenced by generated JWTs.
+        // scope = 'super_admin' bypasses chk_scope_tenant (which requires
+        // tenant_id for non-platform scopes). These are platform-level test
+        // identities, not tenant-scoped customers.
         await supabase.from('users').upsert([
             {
                 id: superAdminId,
@@ -72,7 +86,7 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
                 is_active: true,
                 email_verified: true,
                 token_version: 0,
-                roles: ['super_admin'],
+                scope: 'super_admin',
             },
             {
                 id: testUserId,
@@ -82,7 +96,7 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
                 is_active: true,
                 email_verified: true,
                 token_version: 0,
-                roles: [testRoleName],
+                scope: 'super_admin',
             },
         ], { onConflict: 'id' });
     });
@@ -206,7 +220,7 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
     // 4. Payment Idempotency
     it('should enforce unique webhook_id in payment_ledger', async () => {
         const webhookId = `test_webhook_${testId}`;
-        const entry = {
+        const entry: Record<string, unknown> = {
             reference_type: 'test_order',
             reference_id: uuidv4(),
             event_type: 'authorized',
@@ -215,6 +229,12 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
             status: 'success',
             webhook_id: webhookId
         };
+
+        // Include tenant_id when available — the isolation remediation
+        // migration added tenant_id to payment_ledger (may be NOT NULL).
+        if (platformTenantId) {
+            entry.tenant_id = platformTenantId;
+        }
 
         // First Insert
         const { error: err1 } = await supabase.from('payment_ledger').insert(entry);

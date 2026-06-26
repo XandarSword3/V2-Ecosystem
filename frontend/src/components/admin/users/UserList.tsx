@@ -9,7 +9,7 @@ import { Search, Filter, MoreVertical, Edit2, Trash2, Shield, Circle, User } fro
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 interface User {
   id: string;
@@ -33,6 +33,8 @@ export default function UserList({ type, title }: UserListProps) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const router = useRouter();
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
   const { user: currentUser } = useAuth();
   
   // Refresh interval for online status
@@ -78,7 +80,7 @@ export default function UserList({ type, title }: UserListProps) {
           </p>
         </div>
         {/* Only show 'Create' button for staff/admin if needed, or all types */}
-        <Button onClick={() => router.push(`/admin/users/create?type=${type}`)}>
+        <Button onClick={() => router.push(`/${propertySlug}/admin/users/create?type=${type}`)}>
           + {t('addUser')}
         </Button>
       </div>
@@ -121,7 +123,7 @@ export default function UserList({ type, title }: UserListProps) {
                     <tr 
                       key={user.id} 
                       className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
-                      onClick={() => router.push(`/admin/users/${user.id}`)}
+                      onClick={() => router.push(`/${propertySlug}/admin/users/${user.id}`)}
                     >
                       <td className="p-4">
                         <div className="flex items-center gap-3">
@@ -169,7 +171,7 @@ export default function UserList({ type, title }: UserListProps) {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="sm" onClick={() => router.push(`/admin/users/${user.id}`)}>
+                          <Button variant="ghost" size="sm" onClick={() => router.push(`/${propertySlug}/admin/users/${user.id}`)}>
                             <Edit2 className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(user.id)}>
