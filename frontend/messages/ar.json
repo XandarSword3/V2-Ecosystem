@@ -1692,22 +1692,23 @@
     "tabs": {
       "profile": "Profile",
       "orders": "Orders",
-      "snacks": "Snack Bar",
       "bookings": "Bookings",
-      "tickets": "Pool Tickets"
+      "tickets": "الجلسات",
+      "statement": "كشف الحساب",
+      "payments": "المدفوعات",
+      "privacy": "الخصوصية والبيانات"
     },
     "myOrders": "طلباتي",
     "noOrders": "You have no orders yet",
-    "mySnackOrders": "My Snack Bar Orders",
-    "noSnackOrders": "You have no snack bar orders yet",
     "myBookings": "حجوزاتي",
     "noBookings": "You have no bookings yet",
-    "myTickets": "تذاكري",
-    "noTickets": "You have no pool tickets yet",
+    "myTickets": "جلساتي",
+    "noTickets": "لا توجد جلسات بعد",
     "bookingDetails": "Booking Details",
     "specialRequests": "Special Requests",
     "addOns": "Add-ons",
-    "twoFactor": "التحقق بخطوتين"
+    "twoFactor": "التحقق بخطوتين",
+    "numberOfGuests": "{count} ضيوف"
   },
   "legal": {
     "privacy": {
