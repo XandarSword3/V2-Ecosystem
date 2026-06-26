@@ -114,6 +114,7 @@ export class LoyaltyController {
           .from('loyalty_members')
           .insert({
             user_id: userId,
+            tenant_id: req.user?.tenantId || null,
             property_id: propertyId || null,
             tier_id: defaultTier?.id,
             available_points: signupBonus,

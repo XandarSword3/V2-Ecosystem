@@ -10,13 +10,34 @@ import { queryBuilderService } from './query-builder.service.js';
 import { guestSegmentationService } from './guest-segmentation.service.js';
 import { metricsLayer, resolveEngineType } from './metrics-layer.service.js';
 
+/**
+ * Read property ID from the middleware-validated req.propertyId first (set by
+ * validatePropertyAccess after UUID-format check), falling back to the raw header
+ * only if the middleware chose not to set it (e.g. super-admin bypass).
+ *
+ * This prevents raw non-UUID header values from reaching Supabase and triggering
+ * Postgres "invalid input syntax for type uuid" errors (analytics 500s — 2E fix).
+ */
+function getPropertyId(req: Request): string | undefined {
+  return (req as any).propertyId || (req.headers['x-property-id'] as string) || undefined;
+}
+
+/** Respond 400 when propertyId is absent; returns true if caller should abort. */
+function requirePropertyId(propertyId: string | undefined, res: Response): propertyId is undefined {
+  if (!propertyId) {
+    res.status(400).json({ error: 'Property ID required' });
+    return true;
+  }
+  return false;
+}
+
 export class AnalyticsController {
   // =============================================
   // REAL-TIME ANALYTICS
   // =============================================
 
   getSnapshot = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
     
     if (!propertyId) {
       res.status(400).json({ error: 'Property ID required' });
@@ -49,7 +70,7 @@ export class AnalyticsController {
   // =============================================
 
   getAlertDefinitions = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
     const { activeOnly, kpiCode } = req.query;
 
     if (!propertyId) {
@@ -66,7 +87,8 @@ export class AnalyticsController {
   });
 
   createAlertDefinition = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -91,7 +113,7 @@ export class AnalyticsController {
   });
 
   getActiveAlerts = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
 
     if (!propertyId) {
       res.status(400).json({ error: 'Property ID required' });
@@ -103,7 +125,7 @@ export class AnalyticsController {
   });
 
   getAlertHistory = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
     const { status, from, to, limit } = req.query;
 
     if (!propertyId) {
@@ -139,13 +161,15 @@ export class AnalyticsController {
   // =============================================
 
   executeQuery = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const result = await queryBuilderService.executeQuery(propertyId, req.body);
     res.json(result);
   });
 
   getQuerySuggestions = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const { table } = req.params;
 
     const suggestions = await queryBuilderService.getQuerySuggestions(propertyId, table);
@@ -153,7 +177,8 @@ export class AnalyticsController {
   });
 
   saveQuery = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -166,7 +191,7 @@ export class AnalyticsController {
   });
 
   getSavedQueries = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
     const userId = req.user?.id;
     const { category, publicOnly } = req.query;
 
@@ -189,19 +214,22 @@ export class AnalyticsController {
   // =============================================
 
   getRFMScores = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const profiles = await guestSegmentationService.calculateRFMScores(propertyId);
     res.json({ profiles, count: profiles.length });
   });
 
   getSegmentDistribution = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const distribution = await guestSegmentationService.getSegmentDistribution(propertyId);
     res.json({ distribution });
   });
 
   getGuestsBySegment = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const { segment } = req.params;
 
     const guests = await guestSegmentationService.getGuestsBySegment(propertyId, segment);
@@ -209,13 +237,15 @@ export class AnalyticsController {
   });
 
   getCohortAnalysis = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const analysis = await guestSegmentationService.calculateCohortAnalysis(propertyId);
     res.json({ analysis });
   });
 
   getSegmentRecommendations = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const recommendations = await guestSegmentationService.getSegmentRecommendations(propertyId);
     res.json({ recommendations });
   });
@@ -225,7 +255,8 @@ export class AnalyticsController {
   // =============================================
 
   getMetricsBatch = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const { codes, period, compareTo } = req.body;
 
     const metrics = await metricsLayer.getMetrics(propertyId, codes, {
@@ -249,7 +280,8 @@ export class AnalyticsController {
   });
 
   getExceptions = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const { severity, limit } = req.query;
 
     const exceptions = await metricsLayer.getExceptions(propertyId, {
@@ -289,7 +321,8 @@ export class AnalyticsController {
   });
 
   getFinancialReport = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const { reportType, period } = req.body;
 
     const report = await metricsLayer.getFinancialReport(propertyId, reportType, {
@@ -301,7 +334,8 @@ export class AnalyticsController {
   });
 
   drillDown = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
+    if (requirePropertyId(propertyId, res)) return;
     const { metricCode, dimensions, filters } = req.body;
 
     const data = await metricsLayer.drillDown(propertyId, metricCode, dimensions, filters);
@@ -313,7 +347,7 @@ export class AnalyticsController {
   // =============================================
 
   getEngines = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = req.headers['x-property-id'] as string;
+    const propertyId = getPropertyId(req);
 
     if (!propertyId) {
       res.status(400).json({ error: 'Property ID required' });
