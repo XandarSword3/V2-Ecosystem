@@ -14,9 +14,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <button className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800" aria-label="Toggle theme">
-        <Sun className="h-5 w-5" />
-      </button>
+      <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 w-9 h-9" aria-hidden="true" />
     );
   }
 

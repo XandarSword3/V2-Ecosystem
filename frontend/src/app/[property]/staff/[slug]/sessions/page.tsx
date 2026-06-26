@@ -1,10 +1,11 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
-import { Calendar, Clock, Users, ArrowRight, MoreHorizontal } from 'lucide-react';
+import { Calendar, Clock, Users, ArrowRight, MoreHorizontal, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/Badge';
 
@@ -20,16 +21,16 @@ interface Session {
 
 export default function ModuleSessionsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
+  const routeParams = useParams();
+  const propertySlug = (routeParams?.property as string) || '';
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSessions = async () => {
       try {
         setLoading(true);
-        // Using the public sessions endpoint. 
-        // Note: The backend controller needs to support ?moduleId or we use the generic route
-        // Assuming /api/:slug/sessions follows the pattern
         const response = await api.get(`/${slug}/sessions`); 
         setSessions(response.data.data || []);
       } catch (error) {
@@ -49,7 +50,7 @@ export default function ModuleSessionsPage({ params }: { params: Promise<{ slug:
            <h1 className="text-2xl font-bold capitalize">{slug} Sessions</h1>
            <p className="text-muted-foreground">Manage and view scheduled sessions</p>
         </div>
-        <Button>
+        <Button onClick={() => window.location.href = `/${propertySlug}/${slug}/admin/settings`}>
           <Calendar className="w-4 h-4 mr-2" />
           Manage Schedule
         </Button>
@@ -74,9 +75,37 @@ export default function ModuleSessionsPage({ params }: { params: Promise<{ slug:
                            <Badge variant={session.is_active ? 'default' : 'secondary'}>
                              {session.is_active ? 'Active' : 'Inactive'}
                            </Badge>
-                           <Button variant="ghost" size="icon" className="h-8 w-8">
-                             <MoreHorizontal className="w-4 h-4" />
-                           </Button>
+                           <div className="relative">
+                             <Button
+                               variant="ghost"
+                               size="icon"
+                               className="h-8 w-8"
+                               onClick={() => setMenuOpen(menuOpen === session.id ? null : session.id)}
+                               aria-label="Session options"
+                             >
+                               <MoreHorizontal className="w-4 h-4" />
+                             </Button>
+                             {menuOpen === session.id && (
+                               <div className="absolute right-0 top-8 z-10 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1">
+                                 <button
+                                   className="w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                                   onClick={() => { setMenuOpen(null); window.location.href = `/${propertySlug}/${slug}/admin/settings`; }}
+                                 >
+                                   Edit Session
+                                 </button>
+                                 <button
+                                   className="w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                                   onClick={async () => {
+                                     await api.patch(`/${slug}/sessions/${session.id}`, { is_active: !session.is_active });
+                                     setSessions(prev => prev.map(s => s.id === session.id ? { ...s, is_active: !s.is_active } : s));
+                                     setMenuOpen(null);
+                                   }}
+                                 >
+                                   {session.is_active ? 'Deactivate' : 'Activate'}
+                                 </button>
+                               </div>
+                             )}
+                           </div>
                         </div>
                         <CardTitle className="text-lg">{session.name}</CardTitle>
                         <CardDescription>
@@ -95,7 +124,12 @@ export default function ModuleSessionsPage({ params }: { params: Promise<{ slug:
                             </div>
                         </div>
                         
-                        <Button className="w-full mt-4" variant="outline" size="sm">
+                        <Button
+                          className="w-full mt-4"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.location.href = `/${propertySlug}/staff/${slug}/sessions/${session.id}/bookings`}
+                        >
                             View Bookings <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
                     </CardContent>
