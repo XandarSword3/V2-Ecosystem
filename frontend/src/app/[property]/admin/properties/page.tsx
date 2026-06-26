@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useParams } from 'next/navigation';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2,
@@ -155,6 +156,8 @@ const PROPERTY_TYPES = [
 
 export default function PropertiesPage() {
   const queryClient = useQueryClient();
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
   const { activePropertyId, setActiveProperty } = useProperty();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -384,7 +387,7 @@ export default function PropertiesPage() {
                 property={property}
                 isActive={activePropertyId === property.id}
                 onSetActive={() => setActiveProperty(property.id)}
-                onConfigure={() => (window.location.href = `/admin/settings?property=${property.id}`)}
+                onConfigure={() => (window.location.href = `/${propertySlug}/admin/settings?property=${property.id}`)}
                 onOpenDetails={() => setSelectedProperty(property)}
                 compact={viewMode === 'list'}
               />

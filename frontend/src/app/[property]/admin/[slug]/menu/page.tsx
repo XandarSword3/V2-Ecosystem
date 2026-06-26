@@ -106,6 +106,7 @@ export default function DynamicMenuPage() {
   const t = useTranslations('admin');
   
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
+  const propertySlug = (params?.property as string) || '';
   const currentModule = modules.find(m => m.slug === slug);
 
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -828,7 +829,7 @@ export default function DynamicMenuPage() {
                       <p className="text-slate-500 dark:text-slate-400">No customization groups available</p>
                       <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
                         Create modifier groups first in{' '}
-                        <a href={`/${currentModule?.slug}/admin/settings/customizations`} className="text-orange-500 hover:underline">
+                        <a href={`/${propertySlug}/${currentModule?.slug}/admin/settings/customizations`} className="text-orange-500 hover:underline">
                           Settings → Customizations
                         </a>
                       </p>
