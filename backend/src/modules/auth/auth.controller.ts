@@ -16,6 +16,10 @@ export async function register(req: Request, res: Response, next: NextFunction) 
   const body = req.body;
   try {
     const data = registerSchema.parse(body) as authService.RegisterData;
+    // Inject tenant_id from the request's resolved tenant context.
+    // The tenantAccess middleware populates req.tenant from X-Tenant-ID / X-Tenant-Slug headers.
+    // This is required: the DB constraint enforces tenant_id IS NOT NULL for 'customer' scope.
+    (data as authService.RegisterData).tenantId = req.tenant?.id;
     const result = await authService.register(data);
 
     await logActivity({

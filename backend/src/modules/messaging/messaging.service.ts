@@ -962,7 +962,7 @@ export class MessagingService {
         .maybeSingle();
 
       if (guest) {
-        variables.guest_name = `${guest.first_name} ${guest.last_name}`;
+        variables.guest_name = `${guest.full_name}`;
         variables.guest_first_name = guest.first_name;
       }
     }
@@ -977,12 +977,12 @@ export class MessagingService {
 
       if (booking) {
         variables.room_number = (booking.accommodation_units as any)?.name || '';
-        variables.room_type = 'Accommodation Unit';
         const meta = booking.metadata as any;
+        meta.room_type = 'Accommodation Unit';
         const checkIn = meta?.check_in_date || booking.created_at;
         const checkOut = meta?.check_out_date || booking.created_at;
-        variables.check_in_date = checkIn ? new Date(checkIn).toLocaleDateString() : '';
-        variables.check_out_date = checkOut ? new Date(checkOut).toLocaleDateString() : '';
+        meta.check_in_date_date = checkIn ? new Date(checkIn).toLocaleDateString() : '';
+        meta.check_out_date_date = checkOut ? new Date(checkOut).toLocaleDateString() : '';
       }
     }
 

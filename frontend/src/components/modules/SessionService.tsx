@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Loader2, AlertCircle, Clock, Users, X, Calendar, Ticket, Waves, Sparkles, ChevronRight, Sun, Umbrella, Droplets } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -80,6 +81,8 @@ export function SessionService({ module }: SessionServiceProps) {
   const currency = useSettingsStore((s) => s.currency);
   const router = useRouter();
   const { user } = useAuth();
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
 
   // Booking state
   const [selectedSession, setSelectedSession] = useState<PoolSession | null>(null);
@@ -626,7 +629,7 @@ export function SessionService({ module }: SessionServiceProps) {
               {myTickets.slice(0, 6).map((ticket: { id: string; ticket_number: string; status: string; ticket_date: string; number_of_guests: number; total_amount: number }) => (
                 <Link
                   key={ticket.id}
-                  href={`/${module.slug}/confirmation?id=${ticket.id}`}
+                  href={propertySlug ? `/${propertySlug}/${module.slug}/confirmation?id=${ticket.id}` : `/${module.slug}/confirmation?id=${ticket.id}`}
                   className="block p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-100 dark:border-blue-800 hover:shadow-md transition-shadow"
                 >
                   <div className="flex justify-between items-start mb-2">
@@ -663,7 +666,7 @@ export function SessionService({ module }: SessionServiceProps) {
             </div>
             {myTickets.length > 6 && (
               <div className="mt-4 text-center">
-                <Link href="/profile" className="text-blue-600 dark:text-blue-400 hover:underline">
+                <Link href={propertySlug ? `/${propertySlug}/profile` : '/profile'} className="text-blue-600 dark:text-blue-400 hover:underline">
                   {t('viewAllTickets') || 'View All Tickets'} ({myTickets.length})
                 </Link>
               </div>

@@ -304,7 +304,7 @@ export class FinancialLedgerService {
     let totalAdjustments = 0;
 
     for (const entry of entries) {
-      const amount = parseFloat(entry.total_amount) || 0;
+      const amount = parseFloat(entry.total_amount as string) || 0;
       switch (entry.transaction_type) {
         case 'charge':
         case 'deposit':

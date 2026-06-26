@@ -273,7 +273,7 @@ class WebhookRetryService {
   }> {
     const { data: failures, error } = await supabase
       .from('webhook_failures')
-      .select('status, source, event_type');
+      .select('status, metadata, event_type');
 
     if (error) throw error;
 
@@ -285,7 +285,8 @@ class WebhookRetryService {
 
     for (const failure of failures || []) {
       stats[failure.status as keyof typeof stats]++;
-      stats.by_source[failure.source] = (stats.by_source[failure.source] || 0) + 1;
+      const source = (failure.metadata as any)?.source || 'unknown';
+      stats.by_source[source] = (stats.by_source[source] || 0) + 1;
       if (failure.status !== 'resolved') {
         stats.by_event_type[failure.event_type] = (stats.by_event_type[failure.event_type] || 0) + 1;
       }
@@ -306,7 +307,7 @@ class WebhookRetryService {
     let query = supabase.from('webhook_failures').select('*', { count: 'exact' });
 
     if (filters.status) query = query.eq('status', filters.status);
-    if (filters.source) query = query.eq('source', filters.source);
+    if (filters.source) query = query.filter('metadata->>source', 'eq', filters.source);
     if (filters.event_type) query = query.eq('event_type', filters.event_type);
     if (filters.from_date) query = query.gte('created_at', filters.from_date);
     if (filters.to_date) query = query.lte('created_at', filters.to_date);

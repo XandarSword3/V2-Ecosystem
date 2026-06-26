@@ -328,6 +328,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
     const tokens = generateTokens({
       userId:       newUser.id,
       email:        newUser.email,
+      scope:        'super_admin',
       roles:        ['super_admin'],
       tokenVersion: 0,
     });

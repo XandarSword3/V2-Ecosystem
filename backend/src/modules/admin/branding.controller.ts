@@ -18,6 +18,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
+import xss from 'xss';
 import { authorize } from '../../middleware/auth.middleware.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { AppError } from '../../utils/AppError.js';
@@ -74,6 +75,35 @@ function deepMerge(
   }
   return result;
 }
+
+// ── Open-schema sanitization ─────────────────────────────────────────
+
+/**
+ * Recursively sanitize all string values in an object using the xss package.
+ * Applied to sections with open schemas (navbar, hero, footer, social, identity)
+ * where tenant-authored text is stored without a strict shape contract.
+ * Colors and fonts are validated via validateSection() which enforces strict
+ * allowlists — they are excluded here.
+ */
+function sanitizeStrings(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (typeof val === 'string') {
+      result[key] = xss(val, { whiteList: {}, stripIgnoreTag: true, stripIgnoreTagBody: ['script', 'style'] });
+    } else if (val && typeof val === 'object' && !Array.isArray(val)) {
+      result[key] = sanitizeStrings(val as Record<string, any>);
+    } else if (Array.isArray(val)) {
+      result[key] = val.map((item) =>
+        item && typeof item === 'object' ? sanitizeStrings(item as Record<string, any>) : item,
+      );
+    } else {
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
+const OPEN_SCHEMA_SECTIONS: BrandingSection[] = ['navbar', 'hero', 'footer', 'social', 'identity'];
 
 // ── Section validation ───────────────────────────────────────────────
 
@@ -261,6 +291,11 @@ router.patch(
 
     validateSection(section, incoming);
 
+    // Sanitize string values in open-schema sections before writing to DB
+    const sanitizedIncoming = OPEN_SCHEMA_SECTIONS.includes(section)
+      ? sanitizeStrings(incoming)
+      : incoming;
+
     const key = sectionKey(section);
     const { resolveSetting, setPropertySetting } = await import(
       '../multi-property/settings-resolution.service.js'
@@ -272,7 +307,7 @@ router.patch(
       current.value && typeof current.value === 'object' && !Array.isArray(current.value)
         ? current.value
         : {};
-    const merged = deepMerge(existing as Record<string, any>, incoming);
+    const merged = deepMerge(existing as Record<string, any>, sanitizedIncoming);
 
     await setPropertySetting(propertyId, key, merged, 'branding', userId);
 

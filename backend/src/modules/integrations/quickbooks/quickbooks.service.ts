@@ -422,7 +422,7 @@ export async function syncDailySales(
     // Get payments from V2 for this date
     const { data: payments } = await supabase
       .from('payments')
-      .select('*, users(id, email, first_name, last_name)')
+      .select('*, users(id, email, full_name)')
       .gte('created_at', startOfDay.toISOString())
       .lte('created_at', endOfDay.toISOString())
       .eq('status', 'completed');
@@ -457,7 +457,7 @@ export async function syncDailySales(
     for (const payment of paymentsToSync) {
       try {
         // Determine category based on payment type/source
-        const category = payment.source_type || 'service_revenue';
+        const category = payment.metadata?.source_type || 'service_revenue';
         
         await createSalesReceipt(connectionId, {
           transactionId: payment.id,

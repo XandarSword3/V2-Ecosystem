@@ -14,7 +14,7 @@ class BookingRemindersService {
       // Query booking transactions with metadata for reminder emails
       const { data: bookings, error } = await supabase
         .from('transactions')
-        .select('id, booking_number, metadata, status')
+        .select('id, metadata, status')
         .eq('engine_type', 'time_exclusive_reservation')
         .eq('status', 'confirmed')
         .filter('metadata->>check_in_date', 'gte', `${tomorrow}T00:00:00`)
@@ -36,7 +36,7 @@ class BookingRemindersService {
           await emailService.sendPreArrivalReminder({
             to: meta.customer_email,
             guestName: meta.customer_name,
-            bookingNumber: booking.booking_number,
+            bookingNumber: meta.booking_number || booking.id,
             chaletName: meta.chalet_name || 'Your Accommodation',
             checkInDate: meta.check_in_date,
             checkOutDate: meta.check_out_date,

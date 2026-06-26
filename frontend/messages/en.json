@@ -1438,7 +1438,9 @@
       "system": "System",
       "reservations": "Reservations",
       "waitlist": "Waitlist",
-      "modifiers": "Modifiers"
+      "modifiers": "Modifiers",
+      "memberships": "Memberships",
+      "members": "Members"
     },
     "messages": {
       "loggedOutSuccessfully": "Logged out successfully"

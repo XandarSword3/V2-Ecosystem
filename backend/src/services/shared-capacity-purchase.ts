@@ -49,7 +49,7 @@ export async function purchaseSharedCapacityAtomic(
   return {
     success: Boolean(row.success),
     transactionId: row.transaction_id ?? undefined,
-    totalAmount: row.total_amount != null ? Number(row.total_amount) : undefined,
+    totalAmount: input.amount != null ? Number(input.amount) : undefined,
     availableCapacity:
       row.available_capacity != null ? Number(row.available_capacity) : undefined,
     errorMessage: row.error_message ?? undefined,

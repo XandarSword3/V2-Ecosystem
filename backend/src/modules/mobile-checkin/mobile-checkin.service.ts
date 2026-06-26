@@ -94,7 +94,7 @@ export class MobileCheckinService {
     // Get booking details
     const { data: booking } = await this.supabase
       .from('transactions')
-      .select('*, guests(email, first_name, last_name)')
+      .select('*, guests(email, full_name)')
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('id', bookingId)
       .single();
@@ -145,7 +145,7 @@ export class MobileCheckinService {
       .from('pre_arrival_registrations')
       .select(`
         *,
-        bookings(confirmation_number, check_in, check_out, room_type_id),
+        bookings(confirmation_number, check_in, check_out, metadata_id),
         properties(name, address)
       `)
       .eq('access_token', token)

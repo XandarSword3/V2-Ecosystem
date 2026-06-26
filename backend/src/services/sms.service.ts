@@ -48,10 +48,10 @@ export type SMSStatus =
 // SMS templates
 const SMS_TEMPLATES: Record<string, (data: Record<string, any>) => string> = {
   'booking-confirmation': (data) =>
-    `V2 Ecosystem: Your booking #${data.booking_id} is confirmed for ${data.check_in_date}. Check-in: ${data.check_in_time}. Questions? Call ${data.resort_phone}`,
+    `V2 Ecosystem: Your booking #${data.booking_id} is confirmed for ${(data.metadata as any)?.check_in_date}. Check-in: ${(data.metadata as any)?.check_in_time}. Questions? Call ${data.resort_phone}`,
 
   'booking-reminder': (data) =>
-    `V2 Ecosystem: Reminder - Your stay begins ${data.check_in_date}. Looking forward to hosting you! Check-in from ${data.check_in_time}.`,
+    `V2 Ecosystem: Reminder - Your stay begins ${(data.metadata as any)?.check_in_date}. Looking forward to hosting you! Check-in from ${(data.metadata as any)?.check_in_time}.`,
 
   'pool-ticket': (data) =>
     `V2 Ecosystem Pool: Your ticket for ${data.session_date} ${data.session_time} is ready. Show this SMS or your QR code at entry. Ticket #${data.ticket_id}`,

@@ -658,7 +658,7 @@ class ReportingService {
   async generateOccupancyReport(propertyId: string, dateRange: DateRange): Promise<any> {
     const { data: rooms } = await this.supabase
       .from('rooms')
-      .select('id, room_type_id')
+      .select('id, metadata')
       .eq('property_id', propertyId)
       .eq('is_active', true);
 
@@ -694,7 +694,7 @@ class ReportingService {
     // Occupancy by room type
     const occupancyByType: Record<string, { occupied: number; total: number }> = {};
     for (const rt of (roomTypes || [])) {
-      const typeRooms = (rooms || []).filter(r => r.room_type_id === rt.id);
+      const typeRooms = (rooms || []).filter(r => (r.metadata as any)?.room_type_id === rt.id);
       const typeBookings = (bookings || []).filter((b: any) => {
         const meta = b.metadata as Record<string, unknown> | null;
         return typeRooms.some(r => r.id === meta?.unit_id);

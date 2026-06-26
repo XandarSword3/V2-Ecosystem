@@ -169,7 +169,7 @@ async function collectUserData(userId: string): Promise<Record<string, any>> {
   // User profile
   const { data: user } = await client
     .from('users')
-    .select('id, email, first_name, last_name, phone, role, created_at, updated_at')
+    .select('id, email, full_name, phone, role, created_at, updated_at')
     .eq('id', userId)
     .single();
   data.profile = user;
@@ -241,7 +241,7 @@ async function collectUserData(userId: string): Promise<Record<string, any>> {
   const { data: reviews } = await client
     .from('reviews')
     .select('*')
-    .eq('user_id', userId);
+    .eq('customer_id', userId);
   data.reviews = reviews || [];
 
   // Activity/Audit log
@@ -512,7 +512,7 @@ async function processSingleDeletion(requestId: string): Promise<void> {
         .from('users')
         .update({
           email: `deleted-${crypto.randomUUID()}@anonymized.local`,
-          first_name: 'Deleted',
+          full_name: "Deleted User",
           last_name: 'User',
           phone: null,
           is_active: false

@@ -412,10 +412,11 @@ export async function generateFromTransaction(
   });
 
   // Add line item from transaction amount
+  const txMeta = tx.metadata || {};
   const description = tx.engine_type === 'time_exclusive_reservation'
-    ? `Reservation — ${tx.booking_number || tx.id}`
+    ? `Reservation — ${txMeta.booking_number || tx.id}`
     : tx.engine_type === 'instant_transaction'
-    ? `Order — ${tx.order_number || tx.id}`
+    ? `Order — ${txMeta.order_number || tx.id}`
     : `Transaction — ${tx.id}`;
 
   await addLineItem(invoice.id, {

@@ -216,7 +216,7 @@ export class EngineObserver {
     durationMs: number,
   ): void {
     this.metrics.increment(`pricing_calculated.${engineType}`);
-    this.metrics.increment('pricing_calculated.total_amount', result.totalAmount);
+    this.metrics.increment('amount', result.totalAmount);
 
     this.emit({
       type: 'pricing_calculated',
@@ -283,7 +283,7 @@ export class EngineObserver {
   ): void {
     this.metrics.increment(`ledger_write.${engineType}`);
     this.metrics.increment(`ledger_write.${transactionType}`);
-    this.metrics.increment('ledger_write.total_amount', totalAmount);
+    this.metrics.increment('amount', totalAmount);
 
     this.emit({
       type: 'ledger_write',

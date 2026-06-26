@@ -1310,7 +1310,9 @@
       "coupons": "Gutscheine",
       "housekeeping": "Housekeeping",
       "inventory": "Inventar",
-      "navbar": "Navigation"
+      "navbar": "Navigation",
+      "memberships": "Mitgliedschaften",
+      "members": "Mitglieder"
     },
     "messages": {
       "loggedOutSuccessfully": "Erfolgreich abgemeldet"

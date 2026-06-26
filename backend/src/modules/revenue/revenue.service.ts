@@ -96,7 +96,7 @@ export class RevenueManagementService {
           .eq('engine_type', 'time_exclusive_reservation')
           .eq('property_id', propertyId)
           .filter('metadata->>check_in_date', 'gte', dayjs(currentDate).subtract(365, 'day').format('YYYY-MM-DD'))
-          .lte('check_in', dayjs(currentDate).subtract(335, 'day').format('YYYY-MM-DD'));
+          .filter('metadata->>check_in_date', 'lte', dayjs(currentDate).subtract(335, 'day').format('YYYY-MM-DD'));
 
         const avgDemand = historicalData?.length || 5;
 
@@ -133,7 +133,7 @@ export class RevenueManagementService {
   ): Promise<DemandForecast[]> {
     let query = this.supabase
       .from('demand_forecasts')
-      .select('*, room_types(name)')
+      .select('*, metadatas(name)')
       .eq('property_id', propertyId)
       .gte('forecast_date', dayjs(startDate).format('YYYY-MM-DD'))
       .lte('forecast_date', dayjs(endDate).format('YYYY-MM-DD'));
@@ -149,7 +149,7 @@ export class RevenueManagementService {
     return (forecasts || []).map((f: any) => ({
       date: f.forecast_date,
       roomTypeId: f.room_type_id,
-      roomTypeName: (f.room_types as any)?.name,
+      roomTypeName: f.room_type_name,
       forecastedDemand: parseFloat(f.forecasted_demand),
       forecastedOccupancy: parseFloat(f.forecasted_occupancy || 0),
       forecastedAdr: f.forecasted_adr ? parseFloat(f.forecasted_adr) : undefined,
@@ -169,11 +169,11 @@ export class RevenueManagementService {
     // Get actual booking data for the date
     const { data: bookings } = await this.supabase
       .from('transactions')
-      .select('room_id, room_rate, amount')
+      .select('id, amount, metadata')
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
-      .lte('check_in', dayjs(date).format('YYYY-MM-DD'))
-      .gt('check_out', dayjs(date).format('YYYY-MM-DD'))
+      .filter('metadata->>check_in_date', 'lte', dayjs(date).format('YYYY-MM-DD'))
+      .filter('metadata->>check_out_date', 'gt', dayjs(date).format('YYYY-MM-DD'))
       .not('status', 'in', '("cancelled","no_show")');
 
     const roomsSold = bookings?.length || 0;
@@ -186,7 +186,7 @@ export class RevenueManagementService {
     const totalRoomCount = totalRooms?.length || 1;
     const occupancy = (roomsSold / totalRoomCount) * 100;
     const adr = roomsSold > 0
-      ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / roomsSold
+      ? bookings!.reduce((sum, b) => sum + ((b.metadata as any)?.room_rate || 0), 0) / roomsSold
       : 0;
     const revenue = bookings?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
 
@@ -410,7 +410,7 @@ export class RevenueManagementService {
   ): Promise<any[]> {
     let query = this.supabase
       .from('pricing_calendar')
-      .select('*, room_types(name, base_rate)')
+      .select('*, metadatas(name, base_rate)')
       .eq('property_id', propertyId)
       .gte('date', dayjs(startDate).format('YYYY-MM-DD'))
       .lte('date', dayjs(endDate).format('YYYY-MM-DD'));
@@ -641,7 +641,7 @@ export class RevenueManagementService {
   ): Promise<any[]> {
     const { data, error } = await this.supabase
       .from('rate_recommendations')
-      .select('*, room_types(name)')
+      .select('*, metadatas(name)')
       .eq('property_id', propertyId)
       .eq('status', status)
       .gt('valid_until', new Date().toISOString())
@@ -1017,18 +1017,18 @@ export class RevenueManagementService {
   ): Promise<any> {
     const { data: bookings } = await this.supabase
       .from('transactions')
-      .select('amount, room_rate, nights')
+      .select('amount, metadata')
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('property_id', propertyId)
       .filter('metadata->>check_in_date', 'gte', dayjs(startDate).format('YYYY-MM-DD'))
-      .lte('check_in', dayjs(endDate).format('YYYY-MM-DD'))
+      .filter('metadata->>check_in_date', 'lte', dayjs(endDate).format('YYYY-MM-DD'))
       .not('status', 'in', '("cancelled","no_show")');
 
     const totalRevenue = bookings?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
     const totalBookings = bookings?.length || 0;
-    const roomNightsSold = bookings?.reduce((sum, b) => sum + (b.nights || 0), 0) || 0;
+    const roomNightsSold = bookings?.reduce((sum, b) => sum + ((b.metadata as any)?.number_of_nights || 0), 0) || 0;
     const adr = roomNightsSold > 0
-      ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / totalBookings
+      ? bookings!.reduce((sum, b) => sum + ((b.metadata as any)?.room_rate || 0), 0) / totalBookings
       : 0;
 
     // Get available inventory
@@ -1088,18 +1088,18 @@ export class RevenueManagementService {
 
       const { data: bookings } = await this.supabase
         .from('transactions')
-        .select('amount, room_rate, nights')
+        .select('amount, metadata')
         .eq('engine_type', 'time_exclusive_reservation')
         .in('room_id', roomIdList)
         .filter('metadata->>check_in_date', 'gte', dayjs(startDate).format('YYYY-MM-DD'))
-        .lte('check_in', dayjs(endDate).format('YYYY-MM-DD'))
+        .filter('metadata->>check_in_date', 'lte', dayjs(endDate).format('YYYY-MM-DD'))
         .not('status', 'in', '("cancelled","no_show")');
 
       const revenue = bookings?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
       const bookingCount = bookings?.length || 0;
-      const roomNights = bookings?.reduce((sum, b) => sum + (b.nights || 0), 0) || 0;
+      const roomNights = bookings?.reduce((sum, b) => sum + ((b.metadata as any)?.number_of_nights || 0), 0) || 0;
       const avgRate = bookingCount > 0
-        ? bookings!.reduce((sum, b) => sum + (b.room_rate || 0), 0) / bookingCount
+        ? bookings!.reduce((sum, b) => sum + ((b.metadata as any)?.room_rate || 0), 0) / bookingCount
         : 0;
 
       results.push({

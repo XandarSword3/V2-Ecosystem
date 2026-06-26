@@ -483,7 +483,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         });
 
         if (res.success) {
-          state[ch.key] = res.data?.id || res.data?.accommodation unit?.id;
+          state[ch.key] = res.data?.id || res.data?.accommodation_unit?.id;
         }
         if (!state[ch.key]) {
           const accommodation_units = await admin.getAccommodationUnits();

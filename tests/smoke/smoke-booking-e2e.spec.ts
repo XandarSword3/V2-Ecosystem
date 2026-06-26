@@ -67,7 +67,7 @@ async function findBookableChalet(
     );
 
     if (!hasOverlap) {
-      return accommodation unit;
+      return accommodationUnit;
     }
   }
 
@@ -86,11 +86,11 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
       { checkInDate: getIsoDate(30), checkOutDate: getIsoDate(32) },
     ];
 
-    let selectedWindow: { checkInDate: string; checkOutDate: string; accommodation unit: ChaletSummary } | null = null;
+    let selectedWindow: { checkInDate: string; checkOutDate: string; accommodationUnit: ChaletSummary } | null = null;
     for (const window of candidateWindows) {
-      const accommodation unit = await findBookableChalet(request, window.checkInDate, window.checkOutDate);
-      if (accommodation unit) {
-        selectedWindow = { ...window, accommodation unit };
+      const accommodationUnit = await findBookableChalet(request, window.checkInDate, window.checkOutDate);
+      if (accommodationUnit) {
+        selectedWindow = { ...window, accommodationUnit };
         break;
       }
     }
@@ -100,8 +100,8 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
       return;
     }
 
-    const { checkInDate, checkOutDate, accommodation unit } = selectedWindow;
-    const maxGuests = Number(accommodation unit.max_guests ?? accommodation unit.maxGuests ?? 2);
+    const { checkInDate, checkOutDate, accommodationUnit } = selectedWindow;
+    const maxGuests = Number(accommodationUnit.max_guests ?? accommodationUnit.maxGuests ?? 2);
     const numberOfGuests = Math.max(1, Math.min(2, Number.isFinite(maxGuests) ? maxGuests : 2));
 
     const createResponse = await request.post(`${API_BASE_URL}/api/v1/units/bookings`, {
@@ -110,7 +110,7 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
         'x-csrf-token': csrfToken,
       },
       data: {
-        unitId: accommodation unit.id,
+        unitId: accommodationUnit.id,
         customerName: 'Smoke Customer',
         customerEmail: `smoke.booking.${Date.now()}@example.com`,
         customerPhone: '+15550001234',
@@ -136,7 +136,7 @@ test.describe('Smoke 02 - Core Booking Flow', () => {
     const fetchedBody = await fetchResponse.json();
     expect(fetchedBody?.success).toBe(true);
     expect(fetchedBody?.data?.id).toBe(bookingId);
-    expect(fetchedBody?.data?.unit_id).toBe(accommodation unit.id);
+    expect(fetchedBody?.data?.unit_id).toBe(accommodationUnit.id);
 
     const myBookingsResponse = await request.get(`${API_BASE_URL}/api/v1/units/my-bookings`, {
       headers: { Authorization: `Bearer ${customerToken}` },

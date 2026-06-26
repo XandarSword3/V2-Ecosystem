@@ -6,7 +6,7 @@ import { getSupabase } from '../database/connection.js';
 import { bookingRemindersService } from './booking-reminders.service.js';
 import { reportingService } from '../modules/reporting/reporting.service.js';
 import { businessMetricsService } from './business-metrics.service.js';
-import { emitToRole } from '../socket/index.js';
+import { emitToRole, getIO } from '../socket/index.js';
 import { runMembershipRenewalJob } from '../jobs/membership-renewal.job.js';
 import { processApprovedDeletions } from '../modules/gdpr/gdpr.service.js';
 
@@ -226,7 +226,10 @@ export class SchedulerService {
     setInterval(async () => {
       try {
         const metrics = await businessMetricsService.getDashboardMetrics();
-        emitToRole('admin', 'dashboard:metrics', metrics);
+        // Don't use emitToRole for platform-wide metrics - it requires tenantId
+        // Super admins get platform metrics via the role:super_admin room
+        const io = getIO();
+        io.of('/admin').to('role:super_admin').emit('dashboard:metrics', metrics);
       } catch {
         // Silently ignore — dashboard is best-effort
       }

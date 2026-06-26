@@ -294,7 +294,8 @@ export interface AuthenticatedUser {
   userId: string;
   id: string; // Alias for userId
   email: string;
-  roles: string[];
+  scope: string;          // UserScope — single source of truth for authorization tier
+  roles: string[];        // Derived from scope via scopeToRoles(); kept for backward compat with existing route guards
   permissions?: string[];
   tokenVersion?: number;
   jti?: string;

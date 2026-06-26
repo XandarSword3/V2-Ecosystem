@@ -389,7 +389,7 @@ export const retryTransaction = asyncHandler(async (req: Request, res: Response)
     
     try {
       // Retry sync
-      const category = payment.source_type || 'service_revenue';
+      const category = payment.metadata?.source_type || 'service_revenue';
       
       await quickbooksService.createSalesReceipt(connectionId, {
         transactionId: payment.id,

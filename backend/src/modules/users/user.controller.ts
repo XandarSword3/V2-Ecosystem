@@ -437,7 +437,7 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
 
     let txsQuery = supabase
       .from('transactions')
-      .select('id,engine_type,amount,status,created_at,order_number,ticket_number,booking_number,reference_id,reference_table,customer_name,customer_phone,table_id,session_id,chalet_id,staff_id')
+      .select('id,engine_type,amount,net_amount,status,created_at,reference_id,reference_table,metadata')
       .eq('customer_id', userId)
       .in('engine_type', ['instant_transaction', 'shared_capacity_access', 'time_exclusive_reservation']);
 
@@ -447,17 +447,38 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
 
     const [transactions, loyalty, giftcards] = await Promise.all([
       applyDateFilters(txsQuery),
-      applyDateFilters(supabase.from('loyalty_transactions').select('id,points,type,created_at,reference_id,reference_type').eq('user_id', userId)),
+      applyDateFilters(supabase.from('loyalty_transactions').select('id,points,type,created_at,reference_id,description').eq('user_id', userId)),
       applyDateFilters(supabase.from('gift_card_transactions').select('id,amount,created_at').eq('user_id', userId)),
     ]);
 
     const rows = [
-      ...(transactions.data || []).map((row: any) => ({ 
-        type: row.engine_type === 'instant_transaction' ? 'restaurant_order' : 
-              row.engine_type === 'shared_capacity_access' ? 'pool_ticket' : 
-              row.engine_type === 'time_exclusive_reservation' ? 'chalet_booking' : 'transaction',
-        ...row 
-      })),
+      ...(transactions.data || []).map((row: any) => {
+        const meta = (row.metadata ?? {}) as Record<string, unknown>;
+        return {
+          type: row.engine_type === 'instant_transaction' ? 'restaurant_order'
+              : row.engine_type === 'shared_capacity_access' ? 'pool_ticket'
+              : row.engine_type === 'time_exclusive_reservation' ? 'booking'
+              : 'transaction',
+          id: row.id,
+          engine_type: row.engine_type,
+          amount: row.amount,
+          net_amount: row.net_amount,
+          status: row.status,
+          created_at: row.created_at,
+          reference_id: row.reference_id,
+          reference_table: row.reference_table,
+          // Unpack display fields from metadata (canonical location post-clean-transactions)
+          order_number:   meta.order_number   ?? null,
+          ticket_number:  meta.ticket_number  ?? null,
+          booking_number: meta.booking_number ?? row.id ?? null,
+          customer_name:  meta.customer_name  ?? null,
+          table_number:   meta.table_number   ?? null,
+          session_id:     meta.session_id     ?? null,
+          unit_id:        meta.unit_id        ?? null,
+          check_in_date:  meta.check_in_date  ?? null,
+          check_out_date: meta.check_out_date ?? null,
+        };
+      }),
       ...(loyalty.data || []).map((row: any) => ({ type: 'loyalty_transaction', ...row })),
       ...(giftcards.data || []).map((row: any) => ({ type: 'gift_card_transaction', ...row })),
     ].sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime());

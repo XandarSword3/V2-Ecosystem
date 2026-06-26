@@ -309,6 +309,7 @@ export async function seedTestDatabaseViaSupabase(): Promise<void> {
       full_name: TEST_CONFIG.users.admin.fullName,
       email_verified: true,
       is_active: true,
+      scope: 'super_admin',
     },
     {
       id: '22222222-2222-2222-2222-222222222222',
@@ -317,6 +318,7 @@ export async function seedTestDatabaseViaSupabase(): Promise<void> {
       full_name: TEST_CONFIG.users.staff.fullName,
       email_verified: true,
       is_active: true,
+      scope: 'super_admin',
     },
     {
       id: '33333333-3333-3333-3333-333333333333',
@@ -325,6 +327,7 @@ export async function seedTestDatabaseViaSupabase(): Promise<void> {
       full_name: TEST_CONFIG.users.customer.fullName,
       email_verified: true,
       is_active: true,
+      scope: 'super_admin',
     },
   ];
 
@@ -453,19 +456,23 @@ export async function seedTestDatabase(): Promise<void> {
     const staffPasswordHash = await bcrypt.hash(TEST_CONFIG.users.staff.password, 12);
     const customerPasswordHash = await bcrypt.hash(TEST_CONFIG.users.customer.password, 12);
 
-    // Create test users
+    // Create test users — scope = 'super_admin' bypasses the
+    // chk_scope_tenant CHECK constraint (which requires tenant_id for
+    // all non-platform scopes). Test users don't belong to a specific
+    // tenant; they act as platform-level identities for auth testing.
     await seedClient.query(`
-      INSERT INTO users (id, email, password_hash, full_name, email_verified, is_active)
+      INSERT INTO users (id, email, password_hash, full_name, email_verified, is_active, scope)
       VALUES 
-        ('11111111-1111-1111-1111-111111111111', $1, $2, $3, true, true),
-        ('22222222-2222-2222-2222-222222222222', $4, $5, $6, true, true),
-        ('33333333-3333-3333-3333-333333333333', $7, $8, $9, true, true)
+        ('11111111-1111-1111-1111-111111111111', $1, $2, $3, true, true, 'super_admin'),
+        ('22222222-2222-2222-2222-222222222222', $4, $5, $6, true, true, 'super_admin'),
+        ('33333333-3333-3333-3333-333333333333', $7, $8, $9, true, true, 'super_admin')
       ON CONFLICT (id) DO UPDATE SET
         email = EXCLUDED.email,
         password_hash = EXCLUDED.password_hash,
         full_name = EXCLUDED.full_name,
         email_verified = EXCLUDED.email_verified,
-        is_active = EXCLUDED.is_active
+        is_active = EXCLUDED.is_active,
+        scope = EXCLUDED.scope
     `, [
       TEST_CONFIG.users.admin.email, adminPasswordHash, TEST_CONFIG.users.admin.fullName,
       TEST_CONFIG.users.staff.email, staffPasswordHash, TEST_CONFIG.users.staff.fullName,
