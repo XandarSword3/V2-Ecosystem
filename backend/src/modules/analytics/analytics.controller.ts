@@ -52,6 +52,11 @@ export class AnalyticsController {
     const propertyId = req.headers['x-property-id'] as string;
     const { activeOnly, kpiCode } = req.query;
 
+    if (!propertyId) {
+      res.status(400).json({ error: 'Property ID required' });
+      return;
+    }
+
     const alerts = await alertService.getAlertDefinitions(propertyId, {
       activeOnly: activeOnly === 'true',
       kpiCode: kpiCode as string
@@ -87,6 +92,12 @@ export class AnalyticsController {
 
   getActiveAlerts = asyncHandler(async (req: Request, res: Response) => {
     const propertyId = req.headers['x-property-id'] as string;
+
+    if (!propertyId) {
+      res.status(400).json({ error: 'Property ID required' });
+      return;
+    }
+
     const alerts = await alertService.getActiveAlerts(propertyId);
     res.json({ alerts });
   });
@@ -94,6 +105,11 @@ export class AnalyticsController {
   getAlertHistory = asyncHandler(async (req: Request, res: Response) => {
     const propertyId = req.headers['x-property-id'] as string;
     const { status, from, to, limit } = req.query;
+
+    if (!propertyId) {
+      res.status(400).json({ error: 'Property ID required' });
+      return;
+    }
 
     const alerts = await alertService.getAlertHistory(propertyId, {
       status: status as 'active' | 'acknowledged' | 'resolved',
@@ -153,6 +169,11 @@ export class AnalyticsController {
     const propertyId = req.headers['x-property-id'] as string;
     const userId = req.user?.id;
     const { category, publicOnly } = req.query;
+
+    if (!propertyId) {
+      res.status(400).json({ error: 'Property ID required' });
+      return;
+    }
 
     const queries = await queryBuilderService.getSavedQueries(propertyId, {
       userId,

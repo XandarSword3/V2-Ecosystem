@@ -259,7 +259,7 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
                   slug,
                   name,
                   description,
-                  resource,
+                  remetadata,
                   action
                 )
               )
@@ -299,7 +299,7 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
                   slug,
                   name,
                   description,
-                  resource,
+                  remetadata,
                   action
                 )
               )
@@ -572,6 +572,70 @@ export const assignUserScope = asyncHandler(async (req: Request, res: Response) 
     });
 
     res.json({ success: true, message: 'Scope updated' });
+});
+
+export const revokeUserSessions = asyncHandler(async (req: Request, res: Response) => {
+    const supabase = getSupabase();
+    const { id } = req.params;
+
+    // Prevent self-revocation
+    if (req.user?.userId === id) {
+      return res.status(400).json({ success: false, error: 'Cannot revoke your own sessions' });
+    }
+
+    const isSuperAdmin = req.user?.roles?.includes('super_admin');
+
+    // tenant_admin / tenant_owner can only revoke users within their own tenant
+    if (!isSuperAdmin) {
+      const { data: targetUser } = await supabase
+        .from('users')
+        .select('tenant_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!targetUser) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+      }
+
+      const requestingTenantId = (req as any).tenant?.id;
+      if (!requestingTenantId || targetUser.tenant_id !== requestingTenantId) {
+        return res.status(403).json({ success: false, error: 'Access denied: User does not belong to your tenant' });
+      }
+    }
+
+    // Deactivate all active sessions
+    const { error: sessionError } = await supabase
+      .from('sessions')
+      .update({ is_active: false })
+      .eq('user_id', id);
+
+    if (sessionError) throw sessionError;
+
+    // Increment token_version to immediately invalidate all existing JWTs
+    try {
+      await supabase.rpc('increment_token_version', { p_user_id: id });
+    } catch {
+      // Fallback: manual increment if RPC unavailable
+      const { data: user } = await supabase
+        .from('users')
+        .select('token_version')
+        .eq('id', id)
+        .single();
+
+      await supabase
+        .from('users')
+        .update({ token_version: (user?.token_version ?? 0) + 1 })
+        .eq('id', id);
+    }
+
+    await logActivity({
+      user_id: req.user!.userId,
+      action: 'REVOKE_USER_SESSIONS',
+      resource: 'users',
+      resource_id: id,
+    });
+
+    res.json({ success: true, message: 'All sessions revoked. User will be logged out on next request.' });
 });
 
 export const toggleUserStatus = asyncHandler(async (req: Request, res: Response) => {

@@ -705,7 +705,7 @@ export class MarketingAutomationService {
     for (const recipient of eligibleRecipients) {
       try {
         const mergeVars: MergeVariables = {
-          guest_name: `${recipient.first_name} ${recipient.last_name}`,
+          guest_name: `${recipient.full_name}`,
           first_name: recipient.first_name,
           last_name: recipient.last_name,
           email: recipient.email
@@ -1447,7 +1447,7 @@ export class MarketingAutomationService {
 
         // Build merge variables
         const mergeVars: MergeVariables = {
-          guest_name: `${guest.first_name} ${guest.last_name}`,
+          guest_name: `${guest.full_name}`,
           first_name: guest.first_name,
           last_name: guest.last_name
         };
@@ -1586,7 +1586,7 @@ export class MarketingAutomationService {
     if (!guest || !template || !guest.email) return;
 
     const mergeVars: MergeVariables = {
-      guest_name: `${guest.first_name} ${guest.last_name}`,
+      guest_name: `${guest.full_name}`,
       first_name: guest.first_name,
       last_name: guest.last_name
     };

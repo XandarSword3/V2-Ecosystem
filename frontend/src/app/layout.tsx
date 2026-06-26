@@ -168,6 +168,7 @@ export default async function RootLayout({
       lang={locale}
       dir={isRtl ? 'rtl' : 'ltr'}
       suppressHydrationWarning
+      data-scroll-behavior="smooth"
     >
       <head>
         {/* Critical: Theme detection script runs BEFORE React hydrates */}

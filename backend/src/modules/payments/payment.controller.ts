@@ -343,18 +343,28 @@ async function updateReferencePaymentStatus(
     .eq('id', referenceId)
     .maybeSingle();
 
+  // Only update payment_status field in metadata on transactions, not the status field
+  // (status is managed by the state machine)
+  const { data: existingTx } = await supabase
+    .from('transactions')
+    .select('metadata')
+    .eq('id', referenceId)
+    .single();
+
   if (tx?.reference_table) {
     await supabase
       .from(tx.reference_table)
-      .update({ payment_status: status, updated_at: new Date().toISOString() })
+      .update({ metadata: { ...(existingTx?.metadata || {}), payment_status: status }, updated_at: new Date().toISOString() })
       .eq('id', referenceId);
   }
 
-  // Only update payment_status field on transactions, not the status field
-  // (status is managed by the state machine)
+  const currentMeta = existingTx?.metadata || {};
   await supabase
     .from('transactions')
-    .update({ payment_status: status, updated_at: new Date().toISOString() })
+    .update({
+      metadata: { ...currentMeta, payment_status: status },
+      updated_at: new Date().toISOString()
+    })
     .eq('id', referenceId);
 }
 
@@ -527,7 +537,7 @@ export const getMyPayments = asyncHandler(async (req: Request, res: Response) =>
   // Pull all transactions for this customer (unified source of truth)
   const { data: transactions, error: txError } = await supabase
     .from('transactions')
-    .select('id, engine_type, status, amount, currency, created_at, metadata, payment_status')
+    .select('id, engine_type, status, amount, currency, created_at, metadata')
     .eq('customer_id', userId)
     .order('created_at', { ascending: false });
 

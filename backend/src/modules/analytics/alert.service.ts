@@ -717,13 +717,13 @@ export class AlertService {
       case 'occupancy_rate': {
         const { data: rooms } = await this.supabase
           .from('rooms')
-          .select('id, room_type_id, room_types(name)')
+          .select('id, metadata_id, metadatas(name)')
           .eq('property_id', definition.propertyId)
           .eq('is_active', true);
         context.totalRooms = rooms?.length || 0;
         const roomTypes: Record<string, number> = {};
         for (const r of rooms || []) {
-          const rt = r.room_types as unknown as { name?: string } | null;
+          const rt = r.metadatas as unknown as { name?: string } | null;
           const typeName = rt?.name || 'Unknown';
           roomTypes[typeName] = (roomTypes[typeName] || 0) + 1;
         }

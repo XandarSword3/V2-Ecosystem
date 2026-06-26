@@ -9,6 +9,7 @@ import { getSupabase } from '../../../database/connection.js';
 import { logActivity } from '../../../utils/activityLogger.js';
 import { logger } from '../../../utils/logger.js';
 import { emitToAll } from '../../../socket/index.js';
+import { sanitizeImageUpload } from '../../../utils/image-processing.js';
 
 // Allowed file types for different upload categories
 const ALLOWED_TYPES: Record<string, string[]> = {
@@ -128,7 +129,18 @@ export const uploadFile = asyncHandler(async (req: Request, res: Response) => {
         error: `File too large. Max size for ${uploadType}: ${MAX_SIZES[uploadType] / 1024 / 1024}MB`,
       });
     }
-    
+
+    // Verify magic bytes and strip EXIF / embedded metadata.
+    // sanitizeImageUpload throws a 400-shaped error on mismatch or corrupt input.
+    try {
+      fileBuffer = await sanitizeImageUpload(fileBuffer, mimeType);
+    } catch (err: any) {
+      return res.status(err.status || 400).json({
+        success: false,
+        error: err.message || 'Invalid or unprocessable image file',
+      });
+    }
+
     // Ensure bucket exists
     await ensureBucket();
     

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations, useLocale } from 'next-intl';
 import { ThemeToggle } from '../ThemeToggle';
@@ -122,6 +122,10 @@ export default function Header() {
   const { terms } = useTerminology();
   const locale = useLocale();
   const pathname = usePathname();
+  const params = useParams();
+  // Property slug from current URL (present when inside a [property] segment).
+  // Used to prefix module links so they resolve to /{property}/{slug}.
+  const propertySlug = (params?.property as string) || '';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -245,17 +249,20 @@ export default function Header() {
             if (module) {
               return {
                 name: getModuleTranslatedName(module.slug, module.name),
-                href: `/${module.slug}`,
+                href: propertySlug ? `/${propertySlug}/${module.slug}` : `/${module.slug}`,
                 icon: getIconForModule(module)
               };
             }
             // Module not found or inactive - SKIP this link entirely
             return null;
           }
-          // Non-module links (internal/external) - keep as-is
+          // Non-module links (internal/external) - keep external as-is;
+          // prepend property slug to internal relative paths so /profile → /myresort/profile.
           return {
             name: link.label,
-            href: link.href,
+            href: link.type !== 'external' && link.href?.startsWith('/') && propertySlug
+              ? `/${propertySlug}${link.href}`
+              : link.href,
             icon: getIconByName(link.icon || 'Home')
           };
         });
@@ -264,21 +271,21 @@ export default function Header() {
     
     // Fallback: Auto-generate from active modules
     return [
-      { name: t('home'), href: '/', icon: Home },
+      { name: t('home'), href: propertySlug ? `/${propertySlug}` : '/', icon: Home },
       ...activeModules
-        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
-        .map(m => ({
-          name: getModuleTranslatedName(m.slug, m.name),
-          href: `/${m.slug}`,
-          icon: getIconForModule(m)
-        }))
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      .map(m => ({
+      name: getModuleTranslatedName(m.slug, m.name),
+      href: propertySlug ? `/${propertySlug}/${m.slug}` : `/${m.slug}`,
+      icon: getIconForModule(m)
+      }))
     ];
   }, [settings.navbar?.links, modules, locale, t]);
 
   // ...existing code...
 
-  // Don't show header on admin or staff pages
-  if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {
+  // Don't show header on admin or staff pages (now nested at /{property}/admin, /{property}/staff)
+  if (pathname && /\/[^/]+\/(admin|staff)(\/?$|\/)/.test(pathname)) {
     return null;
   }
 
@@ -362,7 +369,7 @@ export default function Header() {
           <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Cart Button - only show after mount to prevent hydration mismatch */}
             {mounted && navConfig.showCart && cartCount > 0 && (
-              <Link href="/cart">
+              <Link href={propertySlug ? `/${propertySlug}/cart` : '/cart'}>
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -404,7 +411,7 @@ export default function Header() {
             {/* Auth Buttons - Desktop - only render after mount to prevent hydration mismatch */}
             <div className="hidden md:flex items-center gap-2 ml-2">
               {mounted && isAuthenticated ? (
-                <Link href="/profile">
+                <Link href={propertySlug ? `/${propertySlug}/profile` : '/profile'}>
                   <motion.div
                     whileHover={{ scale: 1.02, y: -1 }}
                     whileTap={{ scale: 0.98 }}
@@ -548,7 +555,7 @@ export default function Header() {
                   >
                     {isAuthenticated ? (
                       <Link
-                        href="/profile"
+                        href={propertySlug ? `/${propertySlug}/profile` : '/profile'}
                         onClick={() => setMobileMenuOpen(false)}
                         className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all duration-300"
                       >

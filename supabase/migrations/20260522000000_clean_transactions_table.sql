@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     net_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
     currency VARCHAR(3) NOT NULL DEFAULT 'USD',
     customer_id UUID,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     reference_id UUID,
     reference_table VARCHAR(50),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS idx_transactions_engine_type ON transactions(engine_type);
 CREATE INDEX IF NOT EXISTS idx_transactions_module_id ON transactions(module_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_customer_id ON transactions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_property_id ON transactions(property_id);

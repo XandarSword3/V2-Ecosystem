@@ -89,23 +89,55 @@ class SecretsManager {
     }
 
     // Derive SESSION_SECRET from JWT_SECRET if not explicitly provided.
+    // WARNING: This coupling is DANGEROUS in production — rotating JWT_SECRET
+    // will silently invalidate all sessions AND all encrypted data simultaneously.
+    // In production, SESSION_SECRET MUST be set explicitly and independently.
     if (!this.secrets.has('SESSION_SECRET')) {
       const jwtSecret = this.secrets.get('JWT_SECRET');
       if (jwtSecret) {
+        if (process.env.NODE_ENV === 'production') {
+          // Block production startup if SESSION_SECRET is missing — do not derive silently.
+          // Derivation makes key rotation cascade catastrophically: rotating JWT_SECRET
+          // simultaneously invalidates all active sessions and all encrypted DB values.
+          console.error(
+            '[Secrets] FATAL: SESSION_SECRET must be set explicitly in production. ' +
+            'Do NOT rely on derivation from JWT_SECRET. ' +
+            'See JWT key rotation runbook in docs/DISASTER_RECOVERY.md.',
+          );
+          throw new Error(
+            'SESSION_SECRET must be configured independently from JWT_SECRET in production',
+          );
+        }
         const derived = crypto.createHash('sha256').update(`session:${jwtSecret}`).digest('hex');
         this.secrets.set('SESSION_SECRET', derived);
-        console.log('[Secrets] SESSION_SECRET derived from JWT_SECRET (set SESSION_SECRET explicitly to override)');
+        console.warn('[Secrets] SESSION_SECRET derived from JWT_SECRET (DEV ONLY — set SESSION_SECRET explicitly in production)');
       }
     }
 
     // Derive ENCRYPTION_KEY from JWT_SECRET if not explicitly provided.
-    // This keeps the key stable across restarts as long as JWT_SECRET doesn't change.
+    // Same rotation-cascade danger as SESSION_SECRET above.
+    // In production, ENCRYPTION_KEY MUST be set explicitly and independently.
+    // Key rotation procedure:
+    //   1. Generate a new ENCRYPTION_KEY (SecretsManager.generateEncryptionKey()).
+    //   2. Re-encrypt any data encrypted under the old key before cutting over.
+    //   3. Update the env var / secrets manager entry.
+    //   4. Rotate JWT_SECRET separately; leave ENCRYPTION_KEY and SESSION_SECRET unchanged.
     if (!this.secrets.has('ENCRYPTION_KEY')) {
       const jwtSecret = this.secrets.get('JWT_SECRET');
       if (jwtSecret) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error(
+            '[Secrets] FATAL: ENCRYPTION_KEY must be set explicitly in production. ' +
+            'Do NOT rely on derivation from JWT_SECRET. ' +
+            'See JWT key rotation runbook in docs/DISASTER_RECOVERY.md.',
+          );
+          throw new Error(
+            'ENCRYPTION_KEY must be configured independently from JWT_SECRET in production',
+          );
+        }
         const derived = crypto.createHash('sha256').update(jwtSecret).digest('hex'); // 64 hex chars
         this.secrets.set('ENCRYPTION_KEY', derived);
-        console.log('[Secrets] ENCRYPTION_KEY derived from JWT_SECRET (set ENCRYPTION_KEY explicitly to override)');
+        console.warn('[Secrets] ENCRYPTION_KEY derived from JWT_SECRET (DEV ONLY — set ENCRYPTION_KEY explicitly in production)');
       }
     }
 

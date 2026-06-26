@@ -35,8 +35,44 @@ export async function validatePropertyAccess(req: Request, res: Response, next: 
     return next();
   }
 
-  // Super admins can access any property
+  // Super admins can access any property (spans all tenants by design)
   if (req.user?.roles?.includes('super_admin')) {
+    (req as any).propertyId = propertyId;
+    return next();
+  }
+
+  // ── Tenant ownership guard ──────────────────────────────────────────────
+  // Before any user-level check, verify this property belongs to the request's
+  // resolved tenant. Prevents cross-tenant property access regardless of
+  // user_property_access table state — even for tenant_owner / tenant_admin.
+  // Skip only when there is no tenant context on the request (platform-admin
+  // routes without a tenanted host should never reach this middleware).
+  if (req.tenant?.id) {
+    const supabase = getSupabase();
+    const { data: ownedProperty } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('id', propertyId)
+      .eq('tenant_id', req.tenant.id)
+      .maybeSingle();
+
+    if (!ownedProperty) {
+      // Return 404 rather than 403 — avoids leaking which property UUIDs
+      // exist across other tenants.
+      res.status(404).json({ success: false, error: 'Property not found' });
+      return;
+    }
+  }
+
+  // tenant_owner and tenant_admin have implicit access to all properties within
+  // their tenant — scoped user_property_access rows are optional for these scopes.
+  // Default-deny for everyone else (property_staff, property_manager, customer).
+  const userScope = req.user?.scope;
+  if (
+    userScope === 'tenant_owner' ||
+    userScope === 'tenant_admin' ||
+    req.user?.roles?.includes('tenant_admin')
+  ) {
     (req as any).propertyId = propertyId;
     return next();
   }
@@ -69,16 +105,7 @@ export async function validatePropertyAccess(req: Request, res: Response, next: 
 async function userHasAccessToProperty(userId: string, propertyId: string): Promise<boolean> {
   const supabase = getSupabase();
 
-  // Backward compatibility: single-property deployments may not have
-  // user_property_access rows yet. In that case, allow access.
-  const { count: accessRowCount, error: countError } = await supabase
-    .from('user_property_access')
-    .select('id', { count: 'exact', head: true });
-
-  if (!countError && (accessRowCount ?? 0) === 0) {
-    return true;
-  }
-
+  // Direct user → property access row
   const { data: directAccess, error: directError } = await supabase
     .from('user_property_access')
     .select('id')

@@ -405,10 +405,16 @@ export class ApprovalsController {
           break;
  
         case 'comp':
+          const { data: existingTx } = await supabase
+            .from('transactions')
+            .select('metadata')
+            .eq('id', approval.reference_id)
+            .single();
+          
           await supabase
             .from('transactions')
             .update({
-              payment_status: 'comped',
+              metadata: { ...(existingTx?.metadata || {}), payment_status: 'comped' },
               status: 'completed',
               completed_at: new Date().toISOString(),
             })
