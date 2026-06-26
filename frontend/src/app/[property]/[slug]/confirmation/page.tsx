@@ -468,6 +468,16 @@ function ConfirmationContent() {
           <Link href={`/${propertySlug}/${slug}`}>
             <Button variant="outline">Back to {moduleName}</Button>
           </Link>
+          {ticket && (
+            <Button
+              variant="outline"
+              onClick={() => window.print()}
+              className="gap-2"
+            >
+              <Receipt className="w-4 h-4" />
+              Print Ticket
+            </Button>
+          )}
           <Link href={`/${propertySlug}/profile`}>
             <Button className="gap-2">
               {confirmationType === 'order' ? 'View My Orders' : confirmationType === 'booking' ? 'View My Bookings' : 'View My Tickets'}

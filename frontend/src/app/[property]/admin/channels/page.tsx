@@ -381,7 +381,11 @@ export default function ChannelManagerPage() {
                     <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
                   </button>
                 )}
-                <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
+                <button
+                  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                  onClick={() => toast.info(`Channel settings coming soon`)}
+                  aria-label="Channel settings"
+                >
                   <Settings className="w-4 h-4" />
                 </button>
               </div>

@@ -333,7 +333,28 @@ export default function ProfilePage() {
                       <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
                         {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
                       </div>
-                      <button aria-label="Change profile photo" className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center border border-slate-200 dark:border-slate-700"> {/* FIX Iter-8: aria-label */}
+                      <button
+                        aria-label="Change profile photo"
+                        className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-white dark:bg-slate-800 shadow-lg flex items-center justify-center border border-slate-200 dark:border-slate-700"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = async (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (!file) return;
+                            const form = new FormData();
+                            form.append('avatar', file);
+                            try {
+                              await import('@/lib/api').then(({ api }) =>
+                                api.post('/users/me/avatar', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+                              );
+                              window.location.reload();
+                            } catch { /* toast handled by interceptor */ }
+                          };
+                          input.click();
+                        }}
+                      > {/* FIX Iter-8: aria-label */}
                         <Camera className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                       </button>
                     </div>

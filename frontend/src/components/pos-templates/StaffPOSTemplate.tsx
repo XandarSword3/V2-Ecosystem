@@ -116,6 +116,12 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [kitchenOrders, setKitchenOrders] = useState<Order[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  // Cash drawer modal
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [cashModalType, setCashModalType] = useState<'in' | 'out'>('in');
+  // Item picker modal for adding to existing table order
+  const [showItemPicker, setShowItemPicker] = useState(false);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
 
   // Fetch data
   useEffect(() => {
@@ -293,6 +299,47 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
     }
   };
 
+  // Cash drawer: Pay In / Pay Out
+  const processCashAdjustment = async (type: 'in' | 'out', amount: number, note: string) => {
+    try {
+      await api.post(`/staff/shifts/${currentShift?.id}/cash`, { type, amount, note });
+      toast.success(`Cash ${type === 'in' ? 'added to' : 'removed from'} drawer`);
+      setShowCashModal(false);
+    } catch (error) {
+      toast.error('Failed to record cash adjustment');
+    }
+  };
+
+  // Create new order for an available table
+  const createNewOrder = async (tableId: string) => {
+    try {
+      const res = await api.post(`/staff/modules/${moduleSlug}/orders`, {
+        tableId,
+        orderType: 'dine_in',
+        moduleId,
+      });
+      const newOrder = res.data.data;
+      setOrders(prev => [newOrder, ...prev]);
+      setTables(prev => prev.map(t =>
+        t.id === tableId ? { ...t, status: 'occupied', currentOrder: newOrder } : t
+      ));
+      setSelectedTable(prev => prev?.id === tableId ? { ...prev, status: 'occupied', currentOrder: newOrder } : prev);
+      toast.success(`Order #${newOrder.orderNumber} created`);
+    } catch (error) {
+      toast.error('Failed to create order');
+    }
+  };
+
+  // Fetch menu items for the item picker
+  const fetchMenuItems = async () => {
+    try {
+      const res = await api.get(`/staff/modules/${moduleSlug}/menu`);
+      setMenuItems(res.data.data || []);
+    } catch (error) {
+      toast.error('Failed to load menu');
+    }
+  };
+
   // Calculate order time
   const getOrderTime = (createdAt: string) => {
     const minutes = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
@@ -460,7 +507,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                         <span>{formatCurrency(selectedTable.currentOrder.totalAmount)}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { fetchMenuItems(); setShowItemPicker(true); }}
+                        >
                           <Plus className="h-4 w-4 mr-1" /> Add Item
                         </Button>
                         <Button
@@ -477,7 +528,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                   ) : (
                     <div className="text-center py-8">
                       <p className="text-gray-500 mb-4">Table is available</p>
-                      <Button>New Order</Button>
+                      <Button onClick={() => createNewOrder(selectedTable.id)}>New Order</Button>
                     </div>
                   )}
                 </div>
@@ -809,8 +860,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-4">
-                    <Button variant="outline" size="sm">Pay In</Button>
-                    <Button variant="outline" size="sm">Pay Out</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setCashModalType('in'); setShowCashModal(true); }}>Pay In</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setCashModalType('out'); setShowCashModal(true); }}>Pay Out</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -932,6 +983,75 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Cash Adjustment Modal (Pay In / Pay Out) */}
+      {showCashModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={(e) => { if (e.key === 'Escape') setShowCashModal(false); }}>
+          <Card className="max-w-sm w-full">
+            <CardHeader>
+              <CardTitle>{cashModalType === 'in' ? 'Pay In — Add Cash' : 'Pay Out — Remove Cash'}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Amount</label>
+                  <input type="number" placeholder="0.00" min="0" step="0.01" className="w-full px-4 py-3 border rounded-lg text-lg" id="cashAmount" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Note (optional)</label>
+                  <input type="text" placeholder="Reason..." className="w-full px-3 py-2 border rounded-lg" id="cashNote" />
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" className="flex-1" onClick={() => setShowCashModal(false)}>Cancel</Button>
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      const amount = parseFloat((document.getElementById('cashAmount') as HTMLInputElement).value) || 0;
+                      const note = (document.getElementById('cashNote') as HTMLInputElement).value;
+                      processCashAdjustment(cashModalType, amount, note);
+                    }}
+                  >
+                    Confirm
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Item Picker Modal */}
+      {showItemPicker && selectedTable?.currentOrder && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" onKeyDown={(e) => { if (e.key === 'Escape') setShowItemPicker(false); }}>
+          <Card className="max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Add Item — Table {selectedTable.number}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {menuItems.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">No menu items available</p>
+              ) : (
+                <div className="space-y-2">
+                  {menuItems.map((item: any) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        addItemToOrder(selectedTable.currentOrder!.id, { catalogItemId: item.id, quantity: 1 });
+                        setShowItemPicker(false);
+                      }}
+                      className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-primary font-semibold">{formatCurrency(item.price)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Button variant="outline" className="w-full mt-4" onClick={() => setShowItemPicker(false)}>Cancel</Button>
             </CardContent>
           </Card>
         </div>
