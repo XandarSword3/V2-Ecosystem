@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { MapPin, Phone, Mail, Clock, Navigation, Waves, UtensilsCrossed, Home, Palmtree } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useSiteSettings } from '@/lib/settings-context';
+import { useParams } from 'next/navigation';
 
 interface MapLocation {
   id: string;
@@ -19,6 +20,8 @@ interface MapLocation {
 export default function InteractiveResortMap() {
   const t = useTranslations('resortMap');
   const { settings, modules } = useSiteSettings();
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
   const [selectedLocation, setSelectedLocation] = useState<MapLocation | null>(null);
   const [isHovered, setIsHovered] = useState<string | null>(null);
 
@@ -215,7 +218,7 @@ export default function InteractiveResortMap() {
                 <motion.a
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  href={`/${selectedLocation.slug}`}
+              href={propertySlug ? `/${propertySlug}/${selectedLocation.slug}` : `/${selectedLocation.slug}`}
                   className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg font-medium shadow-lg"
                 >
                   {t('explore') || 'Explore'}
