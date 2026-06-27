@@ -77,7 +77,7 @@ async function initializeFirebase(): Promise<boolean> {
   
   try {
     // Check if Firebase credentials are configured
-    const serviceAccount = config.firebase?.serviceAccountPath || process.env.FIREBASE_SERVICE_ACCOUNT;
+    const serviceAccount = config.firebase?.serviceAccountJson || process.env.FIREBASE_SERVICE_ACCOUNT;
     
     if (!serviceAccount) {
       logger.info('Firebase not configured - push notifications will be logged only');

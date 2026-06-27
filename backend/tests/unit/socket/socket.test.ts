@@ -205,10 +205,11 @@ describe('Socket Module', () => {
     });
 
     it('should format unit rooms correctly', () => {
+      const tenantId = 'tenant-abc';
       const unit = 'menu_service';
-      const roomName = `unit:${unit}`;
+      const roomName = `tenant:${tenantId}:unit:${unit}`;
       
-      expect(roomName).toBe('unit:menu_service');
+      expect(roomName).toBe('tenant:tenant-abc:unit:menu_service');
     });
   });
 });

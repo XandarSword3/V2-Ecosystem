@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { getSupabase } from '../database/connection.js';
+import { asyncHandler } from '../middleware/async-handler.js';
 
 const router = Router();
 
-router.get('/orders', authenticate, authorize('staff', 'manager', 'admin', 'super_admin'), async (req, res, next) => {
+router.get('/orders', authenticate, authorize('staff', 'manager', 'admin', 'super_admin'), asyncHandler(async (req, res) => {
   try {
     const supabase = getSupabase();
     const { customer_id, q, date_from, date_to, module, status } = req.query as Record<string, string | undefined>;
@@ -48,9 +49,9 @@ router.get('/orders', authenticate, authorize('staff', 'manager', 'admin', 'supe
     ].sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime());
 
     res.json({ success: true, data: combined });
-  } catch (error) {
-    next(error);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Search failed' });
   }
-});
+}));
 
 export default router;

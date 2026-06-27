@@ -273,7 +273,7 @@ class WebhookRetryService {
   }> {
     const { data: failures, error } = await supabase
       .from('webhook_failures')
-      .select('status, metadata, event_type');
+      .select('status, source, event_type');
 
     if (error) throw error;
 
@@ -285,7 +285,7 @@ class WebhookRetryService {
 
     for (const failure of failures || []) {
       stats[failure.status as keyof typeof stats]++;
-      const source = (failure.metadata as any)?.source || 'unknown';
+      const source = (failure as any).source || 'unknown';
       stats.by_source[source] = (stats.by_source[source] || 0) + 1;
       if (failure.status !== 'resolved') {
         stats.by_event_type[failure.event_type] = (stats.by_event_type[failure.event_type] || 0) + 1;

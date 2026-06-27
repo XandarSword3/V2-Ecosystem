@@ -6,11 +6,11 @@
  * tenantAccess.middleware.ts's resolveTenant — same priority-order pattern,
  * one layer deeper in the hierarchy.
  *
- * Critically, this middleware NEVER trusts a client-sent x-property-id
- * header. That header is for authenticated admin/staff multi-property
- * switching only (see propertyAccess.middleware.ts's validatePropertyAccess,
- * which runs after auth and checks ownership). For public traffic, property
- * identity must come from the request itself:
+ * Critically, this middleware does NOT blindly trust a client-sent x-property-id
+ * header — it validates any supplied UUID against the database before accepting
+ * it (Priority 0 below). That header is intended for authenticated admin/staff
+ * multi-property switching; for public traffic, property identity normally
+ * comes from the slug header or single-property fallback (see priorities below).
  *
  *   1. X-Property-Slug header  — set by frontend/src/middleware.ts from the
  *                                 Host header's sub-subdomain segment
@@ -165,8 +165,9 @@ async function lookupSingleProperty(groupId: string | null): Promise<PropertyRec
 
 /**
  * Resolve property from request context and attach to req.property.
- * Never reads x-property-id — that header is for authenticated
- * admin/staff flows only, validated separately by validatePropertyAccess.
+ * Priority 0 accepts x-property-id but validates the UUID against the DB
+ * before trusting it — admin/staff flows only, validated separately by
+ * validatePropertyAccess. Falls through to slug/fallback for public traffic.
  */
 export async function resolveProperty(req: Request, _res: Response, next: NextFunction): Promise<void> {
   // Priority 0: explicit x-property-id header (e.g. admin dashboard preview or local development override)

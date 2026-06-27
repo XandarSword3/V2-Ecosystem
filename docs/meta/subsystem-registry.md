@@ -1,310 +1,361 @@
-<!-- Last updated: 2026-05-10 -->
-
 # 📦 Subsystem Registry & Inventory
 
-> **Total Commits:** 257 | **Backend Modules:** 37 | **Active Migrations:** 158 | **Engine Types:** 4
+> **Generated:** 2026-06-27T14:43:57.699Z
+> **Constraint:** No READMEs to be written until this registry is approved.
 
-This registry is the single source of truth for all modules in the V2 Resort platform. All other documentation references this file for module counts and listings.
+## 🚨 Critical Subsystems (>1000 LOC or Architectural Impact)
 
----
-
-## � Backend Modules (37 Total)
-
-All modules are located in `backend/src/modules/`. Each module follows the standard structure: `controller.ts`, `routes.ts`, `index.ts`, and optional subdirectories for complex features.
-
-| Module | Path | Description | Engine Integration |
-|--------|------|-------------|-------------------|
-| **accommodations** | `backend/src/modules/accommodations/` | Property and room inventory management | `time_exclusive_reservation` pricing |
-| **admin** | `backend/src/modules/admin/` | System administration, dashboard, user management | Analytics aggregation |
-| **analytics** | `backend/src/modules/analytics/` | Data aggregation, metrics, and reporting engine | All engine types |
-| **auth** | `backend/src/modules/auth/` | Authentication, JWT, 2FA, session management | N/A |
-| **bookings** | `backend/src/modules/bookings/` | Reservation management and modification | `time_exclusive_reservation` state machine |
-| **channels** | `backend/src/modules/channels/` | OTA integration and channel management | Transaction sync |
-| **coupons** | `backend/src/modules/coupons/` | Discount codes and promotional pricing | All engine types |
-| **customization** | `backend/src/modules/customization/` | Visual theming and branding configuration | N/A |
-| **devices** | `backend/src/modules/devices/` | Hardware integration (POS, printers, scanners) | N/A |
-| **economics** | `backend/src/modules/economics/` | Pricing engine and revenue optimization | All engine types |
-| **finance** | `backend/src/modules/finance/` | Accounting, ledgers, financial reporting | Transaction ledger |
-| **gdpr** | `backend/src/modules/gdpr/` | Data privacy compliance and user data export | All transaction tables |
-| **giftcards** | `backend/src/modules/giftcards/` | Gift card issuance, redemption, tracking | All engine types |
-| **groups** | `backend/src/modules/groups/` | Group booking management and coordination | `time_exclusive_reservation` |
-| **housekeeping** | `backend/src/modules/housekeeping/` | Room cleaning schedules and task management | `time_exclusive_reservation` |
-| **i18n** | `backend/src/modules/i18n/` | Internationalization and translation management | N/A |
-| **integrations** | `backend/src/modules/integrations/` | Third-party service connectors | N/A |
-| **inventory** | `backend/src/modules/inventory/` | Stock tracking and BOM management | `instant_transaction` |
-| **kiosk** | `backend/src/modules/kiosk/` | Self-service terminal interface | All engine types |
-| **loyalty** | `backend/src/modules/loyalty/` | Points program and tier management | All engine types |
-| **manager** | `backend/src/modules/manager/` | Property manager dashboard and approvals | N/A |
-| **marketing** | `backend/src/modules/marketing/` | Campaigns, automation, and guest outreach | N/A |
-| **messaging** | `backend/src/modules/messaging/` | In-app and email communication | N/A |
-| **mobile-checkin** | `backend/src/modules/mobile-checkin/` | Guest self-check-in functionality | `time_exclusive_reservation` |
-| **multi-property** | `backend/src/modules/multi-property/` | Multi-location management | N/A |
-| **parity** | `backend/src/modules/parity/` | Rate parity monitoring and enforcement | `time_exclusive_reservation` |
-| **payments** | `backend/src/modules/payments/` | Payment processing and Stripe integration | All engine types |
-| **pos** | `backend/src/modules/pos/` | Point-of-sale terminal operations | `instant_transaction` |
-| **promotions** | `backend/src/modules/promotions/` | Dynamic pricing and promotional rules | All engine types |
-| **public** | `backend/src/modules/public/` | Public-facing API endpoints | N/A |
-| **reporting** | `backend/src/modules/reporting/` | Report generation and scheduling | All engine types |
-| **revenue** | `backend/src/modules/revenue/` | Revenue management and forecasting | All engine types |
-| **reviews** | `backend/src/modules/reviews/` | Guest feedback and review management | N/A |
-| **shared** | `backend/src/modules/shared/` | Shared utilities and common functions | N/A |
-| **staff** | `backend/src/modules/staff/` | Staff management and shift scheduling | N/A |
-| **support** | `backend/src/modules/support/` | Help desk and ticket management | N/A |
-| **users** | `backend/src/modules/users/` | User accounts, profiles, and preferences | N/A |
-
----
-
-## 🎨 Frontend Application Routes
-
-The Next.js 14 frontend uses the App Router structure in `frontend/src/app/`.
-
-| Route | Purpose | Engine Context |
-|-------|---------|----------------|
-| `/[slug]` | Dynamic module routing | All engine types |
-| `/account` | User account management | N/A |
-| `/admin` | Administration dashboard | All engine types |
-| `/api` | API routes and webhooks | N/A |
-| `/cancellation` | Booking cancellation flow | `time_exclusive_reservation` |
-| `/cart` | Shopping cart and checkout | All engine types |
-| `/contact` | Contact form | N/A |
-| `/cookie-policy` | Legal page | N/A |
-| `/forgot-password` | Password recovery | N/A |
-| `/giftcards` | Gift card purchase | `instant_transaction` |
-| `/kiosk` | Self-service kiosk interface | All engine types |
-| `/login` | Authentication | N/A |
-| `/offline` | Offline fallback page | N/A |
-| `/order` | Order tracking | `instant_transaction` |
-| `/privacy` | Privacy policy | N/A |
-| `/profile` | User profile | N/A |
-| `/register` | Account creation | N/A |
-| `/reset-password` | Password reset | N/A |
-| `/staff` | Staff portal | All engine types |
-| `/terms` | Terms of service | N/A |
-
----
-
-## ⚡ Engine Framework
-
-The V2 platform uses 4 unified engine types to handle all transaction patterns:
-
-| Engine Type | Template | Description | State Machine |
-|-------------|----------|-------------|---------------|
-| `instant_transaction` | `menu_service` | Point-of-sale transactions fulfilled immediately (food orders, snack bar) | `pending → confirmed → preparing → ready → delivered → completed` (or `cancelled`) |
-| `time_exclusive_reservation` | `multi_day_booking` | Date-range bookings that lock a unit exclusively (chalets, rooms) | `pending → confirmed → checked_in → checked_out` (or `cancelled`, `no_show`) |
-| `shared_capacity_access` | `session_access` | Capacity-limited sessions shared across guests (pool, gym) | `valid → active → used` (or `expired`, `cancelled`) |
-| `ongoing_entitlement` | `subscription` | Recurring memberships and subscriptions | `pending → active → paused` (or `expired`, `cancelled`) |
-
-**Engine Definition Files:**
-- `backend/src/engines/definitions/instant-transaction.ts`
-- `backend/src/engines/definitions/time-exclusive-reservation.ts`
-- `backend/src/engines/definitions/shared-capacity-access.ts`
-- `backend/src/engines/definitions/ongoing-entitlement.ts`
-
-**Engine Registry:** `backend/src/engines/registry.ts`
-
----
-
-## 📊 Test Infrastructure
-
-| Test Category | Location | File Count |
-|---------------|----------|------------|
-| Backend Unit/Integration | `backend/tests/` | 219 |
-| Frontend Unit | `frontend/tests/` | 113 |
-| E2E Playwright | `tests/` | 90 |
-
-**E2E Test Suites:**
-- `tests/admin-functional/` — Admin workflow tests
-- `tests/e2e/` — End-to-end integration tests
-- `tests/features/` — Feature-specific tests
-- `tests/phase3/` — Engine-aligned critical path tests (00-24)
-- `tests/rebrand/` — White-label/rebranding tests
-- `tests/smoke/` — Production smoke tests
-- `tests/workflows/` — Full workflow tests
-
----
-
-## 🗄️ Database & Infrastructure
-
-| Component | Technology | Details |
-|-----------|------------|---------|
-| Database | PostgreSQL 15 | Supabase-hosted, 160 active migrations |
-| Cache | Redis 7 | Session storage, rate limiting |
-| Backend | Node.js 20 + Express 4.18 | TypeScript 5.3 |
-| Frontend | Next.js 14.2 | TypeScript 5.4, Tailwind CSS 3.4 |
-| Mobile | React Native 0.81.5 + Expo 54.0 | iOS/Android apps |
-| Testing | Vitest + Playwright | Unit, integration, E2E |
-| CI/CD | GitHub Actions | 7-stage pipeline |
-
-**Docker Services:**
-- `postgres` (postgres:15-alpine, port 5432)
-- `redis` (redis:7-alpine, port 6379)
-
----
-
-## 🔗 Related Documentation
-
-- [Architecture Overview](../architecture/ARCHITECTURE.md) — Engine framework details
-- [API Reference](../api/API.md) — Endpoint documentation
-- [Testing Guide](../guides/TESTING.md) — CI pipeline and test structure
-- [Codebase Map](./codebase-map.md) — Directory structure
-- [File Index](./file-index.md) — Flat file listing
+| Subsystem | LOC | Files | Category | Path |
+|-----------|-----|-------|----------|------|
+| **[property]** | 54112 | 113 | Frontend Feature | `frontend\src\app\[property]` |
+| **stress-test** | 10208 | 38 | Tooling | `tools\stress-test` |
+| **admin** | 9651 | 28 | Backend Module | `backend\src\modules\admin` |
+| **analytics** | 4358 | 8 | Backend Module | `backend\src\modules\analytics` |
+| **module-builder** | 4014 | 6 | Frontend Component | `frontend\src\components\module-builder` |
+| **pos-templates** | 3482 | 4 | Frontend Component | `frontend\src\components\pos-templates` |
+| **auth** | 3424 | 11 | Backend Module | `backend\src\modules\auth` |
+| **modules** | 2894 | 10 | Frontend Component | `frontend\src\components\modules` |
+| **customization** | 2792 | 6 | Backend Module | `backend\src\modules\customization` |
+| **inventory** | 2788 | 4 | Backend Module | `backend\src\modules\inventory` |
+| **housekeeping** | 2709 | 7 | Backend Module | `backend\src\modules\housekeeping` |
+| **ui** | 2686 | 30 | Frontend Component | `frontend\src\components\ui` |
+| **marketing** | 2387 | 4 | Backend Module | `backend\src\modules\marketing` |
+| **staff** | 2367 | 4 | Backend Module | `backend\src\modules\staff` |
+| **reporting** | 2210 | 4 | Backend Module | `backend\src\modules\reporting` |
+| **offline** | 2076 | 5 | Frontend Lib | `frontend\src\lib\offline` |
+| **messaging** | 2057 | 4 | Backend Module | `backend\src\modules\messaging` |
+| **channels** | 1825 | 8 | Backend Module | `backend\src\modules\channels` |
+| **components** | 1784 | 9 | Mobile Feature | `mobile\src\components` |
+| **multi-property** | 1756 | 5 | Backend Module | `backend\src\modules\multi-property` |
+| **revenue** | 1649 | 4 | Backend Module | `backend\src\modules\revenue` |
+| **mobile-checkin** | 1629 | 4 | Backend Module | `backend\src\modules\mobile-checkin` |
+| **payments** | 1578 | 6 | Backend Module | `backend\src\modules\payments` |
+| **api** | 1574 | 1 | Mobile Feature | `mobile\src\api` |
+| **gdpr** | 1518 | 4 | Backend Module | `backend\src\modules\gdpr` |
+| **i18n** | 1496 | 4 | Backend Module | `backend\src\modules\i18n` |
+| **staff** | 1494 | 5 | Frontend Component | `frontend\src\components\staff` |
+| **groups** | 1467 | 4 | Backend Module | `backend\src\modules\groups` |
+| **store** | 1462 | 4 | Mobile Feature | `mobile\src\store` |
+| **customer** | 1423 | 4 | Frontend Component | `frontend\src\components\customer` |
+| **platform** | 1382 | 4 | Backend Module | `backend\src\modules\platform` |
+| **loyalty** | 1343 | 6 | Backend Module | `backend\src\modules\loyalty` |
+| **manager** | 1318 | 3 | Backend Module | `backend\src\modules\manager` |
+| **admin** | 1202 | 8 | Frontend Component | `frontend\src\components\admin` |
+| **bookings** | 1191 | 2 | Backend Module | `backend\src\modules\bookings` |
+| **integrations** | 1141 | 5 | Backend Module | `backend\src\modules\integrations` |
+| **shared** | 1073 | 4 | Backend Module | `backend\src\modules\shared` |
+| **coupons** | 1032 | 6 | Backend Module | `backend\src\modules\coupons` |
+| **finance** | 1030 | 4 | Backend Module | `backend\src\modules\finance` |
+| **users** | 962 | 3 | Backend Module | `backend\src\modules\users` |
+| **parity** | 933 | 4 | Backend Module | `backend\src\modules\parity` |
+| **page-client.tsx** | 906 | 1 | Frontend Feature | `frontend\src\app\page-client.tsx` |
+| **devices** | 893 | 4 | Backend Module | `backend\src\modules\devices` |
+| **promotions** | 858 | 2 | Backend Module | `backend\src\modules\promotions` |
+| **pos** | 847 | 2 | Frontend Lib | `frontend\src\lib\pos` |
+| **customization** | 838 | 2 | Frontend Component | `frontend\src\components\customization` |
+| **services** | 822 | 4 | Mobile Feature | `mobile\src\services` |
+| **booking-modification.service.ts** | 765 | 1 | Backend Service | `backend\src\services\booking-modification.service.ts` |
+| **giftcards** | 757 | 2 | Backend Module | `backend\src\modules\giftcards` |
+| **email.service.ts** | 745 | 1 | Backend Service | `backend\src\services\email.service.ts` |
+| **pool-membership.service.ts** | 737 | 1 | Backend Service | `backend\src\services\pool-membership.service.ts` |
+| **undefined** | 699 | 4 | Frontend Store | `frontend\src\store` |
+| **layout** | 677 | 3 | Frontend Component | `frontend\src\components\layout` |
+| **settings** | 670 | 2 | Frontend Component | `frontend\src\components\settings` |
+| **platform-admin** | 632 | 3 | Frontend Feature | `frontend\src\app\platform-admin` |
+| **reviews** | 627 | 3 | Backend Module | `backend\src\modules\reviews` |
+| **TestimonialsCarousel.tsx** | 590 | 1 | Frontend Component | `frontend\src\components\TestimonialsCarousel.tsx` |
+| **WeatherWidget.tsx** | 582 | 1 | Frontend Component | `frontend\src\components\WeatherWidget.tsx` |
+| **legacy-audit.js** | 573 | 1 | Tooling | `tools\legacy-audit.js` |
+| **KitchenDisplayBoard.tsx** | 569 | 1 | Frontend Component | `frontend\src\components\KitchenDisplayBoard.tsx` |
+| **privacy** | 544 | 1 | Frontend Feature | `frontend\src\app\privacy` |
+| **economics** | 531 | 2 | Backend Module | `backend\src\modules\economics` |
+| **pushNotification.service.ts** | 531 | 1 | Backend Service | `backend\src\services\pushNotification.service.ts` |
+| **email-analytics.service.ts** | 524 | 1 | Backend Service | `backend\src\services\email-analytics.service.ts` |
+| **support** | 517 | 2 | Backend Module | `backend\src\modules\support` |
+| **backup-verification.service.ts** | 513 | 1 | Backend Service | `backend\src\services\backup-verification.service.ts` |
 
 ## 🧩 Other Components / Support
 
 | Component | LOC | Files | Path |
 |-----------|-----|-------|------|
-| mobile/dist-android | 84960 | 26 | `mobile/dist-android` |
-| backend/tests | 77186 | 190 | `backend/tests` |
-| docs | 49567 | 91 | `docs` |
-| backend/src | 27615 | 177 | `backend/src` |
-| frontend | 21590 | 25 | `frontend` |
-| mobile | 21489 | 21 | `mobile` |
-| backend | 20681 | 74 | `backend` |
-| tests | 10715 | 25 | `tests` |
-| frontend/messages | 9927 | 5 | `frontend/messages` |
-| mobile/__tests__ | 8935 | 26 | `mobile/__tests__` |
-| supabase | 7151 | 67 | `supabase` |
-| mobile/android | 6675 | 42 | `mobile/android` |
-| mobile/app | 5503 | 29 | `mobile/app` |
-| frontend/tests | 4798 | 22 | `frontend/tests` |
-| frontend/src | 4317 | 15 | `frontend/src` |
-| backend/docs | 3146 | 6 | `backend/docs` |
-| backend/logs | 2238 | 2 | `backend/logs` |
-| backend/scripts | 1278 | 10 | `backend/scripts` |
-| package-lock.json | 1177 | 1 | `package-lock.json` |
-| scripts | 1040 | 4 | `scripts` |
-| README.md | 998 | 1 | `README.md` |
-| USER_GUIDE.md | 526 | 1 | `USER_GUIDE.md` |
+| backend/logs | 165815 | 4 | `backend/logs` |
+| backend/tests | 100505 | 231 | `backend/tests` |
+| docs | 68709 | 162 | `docs` |
+| tests | 37568 | 124 | `tests` |
+| backend/src | 28094 | 157 | `backend/src` |
+| frontend | 26832 | 27 | `frontend` |
+| supabase | 24946 | 230 | `supabase` |
+| mobile | 22187 | 18 | `mobile` |
+| backend | 20695 | 28 | `backend` |
+| frontend/tests | 20150 | 119 | `frontend/tests` |
+| .aider.tags.cache.v4 | 19989 | 5 | `.aider.tags.cache.v4` |
+| frontend/messages | 10664 | 5 | `frontend/messages` |
+| mobile/__tests__ | 8212 | 23 | `mobile/__tests__` |
+| search_results.txt | 7104 | 1 | `search_results.txt` |
+| mobile/app | 5655 | 29 | `mobile/app` |
+| frontend/src | 5508 | 20 | `frontend/src` |
+| scripts | 4903 | 19 | `scripts` |
+| backend/docs | 4444 | 9 | `backend/docs` |
+| backend/scripts | 2601 | 21 | `backend/scripts` |
+| wizard1 | 2333 | 9 | `wizard1` |
+| mobile/android | 2014 | 40 | `mobile/android` |
+| audit-full.txt | 1953 | 1 | `audit-full.txt` |
+| package-lock.json | 1502 | 1 | `package-lock.json` |
+| e2e | 1496 | 16 | `e2e` |
+| legacy_audit_detail_utf8.txt | 1485 | 1 | `legacy_audit_detail_utf8.txt` |
+| legacy_audit_detail.txt | 1415 | 1 | `legacy_audit_detail.txt` |
+| audit-detail.txt | 1119 | 1 | `audit-detail.txt` |
+| legacy_audit_detail_new.txt | 1098 | 1 | `legacy_audit_detail_new.txt` |
+| .github | 1063 | 8 | `.github` |
+| README.md | 921 | 1 | `README.md` |
+| backend/reports | 747 | 2 | `backend/reports` |
+| REFIT_PLAN.md | 715 | 1 | `REFIT_PLAN.md` |
+| audit-report.md | 621 | 1 | `audit-report.md` |
+| .aider.chat.history.md | 557 | 1 | `.aider.chat.history.md` |
+| backend/supabase | 536 | 13 | `backend/supabase` |
+| business-metrics.service.ts | 495 | 1 | `backend\src\services\business-metrics.service.ts` |
 | notification-preferences.service.ts | 495 | 1 | `backend\src\services\notification-preferences.service.ts` |
-| stripe-platform.service.ts | 489 | 1 | `backend\src\services\stripe-platform.service.ts` |
-| bounce-handler.service.ts | 475 | 1 | `backend\src\services\bounce-handler.service.ts` |
+| stripe-platform.service.ts | 493 | 1 | `backend\src\services\stripe-platform.service.ts` |
+| notifications.service.ts | 487 | 1 | `backend\src\services\notifications.service.ts` |
+| payments | 483 | 3 | `frontend\src\components\payments` |
+| bounce-handler.service.ts | 476 | 1 | `backend\src\services\bounce-handler.service.ts` |
+| api.ts | 468 | 1 | `frontend\src\lib\api.ts` |
+| customization.ts | 463 | 1 | `shared\types\customization.ts` |
+| invoice.service.ts | 462 | 1 | `backend\src\services\invoice.service.ts` |
 | animations | 461 | 1 | `frontend\src\lib\animations` |
-| webhook-retry.service.ts | 459 | 1 | `backend\src\services\webhook-retry.service.ts` |
-| backend/supabase | 458 | 12 | `backend/supabase` |
-| devices | 455 | 3 | `backend\src\modules\devices` |
 | sms.service.ts | 454 | 1 | `backend\src\services\sms.service.ts` |
-| seasonal-pricing.service.ts | 447 | 1 | `backend\src\services\seasonal-pricing.service.ts` |
-| payments | 445 | 3 | `frontend\src\components\payments` |
-| security-audit.service.ts | 438 | 1 | `backend\src\services\security-audit.service.ts` |
-| api.ts | 432 | 1 | `frontend\src\lib\api.ts` |
-| pos | 425 | 2 | `backend\src\modules\pos` |
-| email-rate-limiter.service.ts | 421 | 1 | `backend\src\services\email-rate-limiter.service.ts` |
-| API.md | 414 | 1 | `API.md` |
+| login | 445 | 1 | `frontend\src\app\login` |
+| security-audit.service.ts | 443 | 1 | `backend\src\services\security-audit.service.ts` |
+| email-rate-limiter.service.ts | 440 | 1 | `backend\src\services\email-rate-limiter.service.ts` |
+| booking | 438 | 1 | `frontend\src\components\booking` |
+| settings-context.tsx | 437 | 1 | `frontend\src\lib\settings-context.tsx` |
+| seasonal-pricing.service.ts | 423 | 1 | `backend\src\services\seasonal-pricing.service.ts` |
 | theme-config.ts | 413 | 1 | `frontend\src\lib\theme-config.ts` |
-| login | 407 | 1 | `frontend\src\app\login` |
+| install | 412 | 1 | `frontend\src\app\install` |
+| pos | 404 | 2 | `backend\src\modules\pos` |
 | tracing.service.ts | 401 | 1 | `backend\src\services\tracing.service.ts` |
-| RestaurantFloorPlan.tsx | 399 | 1 | `frontend\src\components\RestaurantFloorPlan.tsx` |
 | performance-monitoring.service.ts | 398 | 1 | `backend\src\services\performance-monitoring.service.ts` |
-| CookieConsentBanner.tsx | 393 | 1 | `frontend\src\components\CookieConsentBanner.tsx` |
+| install | 395 | 2 | `backend\src\modules\install` |
 | translation-audit.js | 392 | 1 | `tools\translation-audit.js` |
-| BookingModificationModal.tsx | 389 | 1 | `frontend\src\components\BookingModificationModal.tsx` |
-| settings-context.tsx | 378 | 1 | `frontend\src\lib\settings-context.tsx` |
-| chalets | 370 | 2 | `frontend\src\components\chalets` |
-| currency.service.ts | 369 | 1 | `backend\src\services\currency.service.ts` |
-| frontend/public | 365 | 2 | `frontend/public` |
-| index.ts | 352 | 1 | `shared\types\index.ts` |
+| frontend/scripts | 377 | 3 | `frontend/scripts` |
+| two-factor.service.ts | 371 | 1 | `backend\src\services\two-factor.service.ts` |
+| scheduler.service.ts | 362 | 1 | `backend\src\services\scheduler.service.ts` |
+| saas-billing.service.ts | 357 | 1 | `backend\src\services\saas-billing.service.ts` |
+| screens | 356 | 3 | `mobile\src\screens` |
+| guest.service.ts | 346 | 1 | `backend\src\services\guest.service.ts` |
 | rate-limiter.service.ts | 345 | 1 | `backend\src\services\rate-limiter.service.ts` |
-| two-factor.service.ts | 343 | 1 | `backend\src\services\two-factor.service.ts` |
-| README.md | 336 | 1 | `backend\src\lib\README.md` |
+| webhook-retry.service.ts | 342 | 1 | `backend\src\services\webhook-retry.service.ts` |
+| customization.d.ts | 342 | 1 | `shared\types\customization.d.ts` |
+| archive | 335 | 4 | `archive` |
+| socket.ts | 335 | 1 | `frontend\src\lib\socket.ts` |
 | mobile/docs | 335 | 1 | `mobile/docs` |
-| socket.ts | 331 | 1 | `frontend\src\lib\socket.ts` |
+| engines.ts | 324 | 1 | `shared\types\engines.ts` |
+| CookieConsentBanner.tsx | 323 | 1 | `frontend\src\components\CookieConsentBanner.tsx` |
+| backup.service.ts | 321 | 1 | `backend\src\services\backup.service.ts` |
+| structured-data.tsx | 319 | 1 | `frontend\src\lib\structured-data.tsx` |
 | ParallaxHero.tsx | 315 | 1 | `frontend\src\components\ParallaxHero.tsx` |
-| password-policy.service.ts | 310 | 1 | `backend\src\services\password-policy.service.ts` |
-| structured-data.tsx | 310 | 1 | `frontend\src\lib\structured-data.tsx` |
-| frontend/scripts | 309 | 1 | `frontend/scripts` |
-| Footer.tsx | 307 | 1 | `frontend\src\components\Footer.tsx` |
+| password-policy.service.ts | 313 | 1 | `backend\src\services\password-policy.service.ts` |
+| Footer.tsx | 310 | 1 | `frontend\src\components\Footer.tsx` |
 | translation.service.ts | 306 | 1 | `backend\src\services\translation.service.ts` |
-| DEVELOPMENT_SETUP.md | 306 | 1 | `DEVELOPMENT_SETUP.md` |
+| public | 297 | 2 | `backend\src\modules\public` |
+| effects | 296 | 11 | `frontend\src\components\effects` |
 | PasswordStrengthMeter.tsx | 296 | 1 | `frontend\src\components\PasswordStrengthMeter.tsx` |
-| backup.service.ts | 295 | 1 | `backend\src\services\backup.service.ts` |
-| TESTING.md | 293 | 1 | `TESTING.md` |
-| bookings | 291 | 1 | `backend\src\modules\bookings` |
-| Wishlist.tsx | 289 | 1 | `frontend\src\components\Wishlist.tsx` |
-| contact | 286 | 1 | `frontend\src\app\contact` |
+| Wishlist.tsx | 292 | 1 | `frontend\src\components\Wishlist.tsx` |
+| chargeback.service.ts | 289 | 1 | `backend\src\services\chargeback.service.ts` |
+| ThemeInjector.tsx | 288 | 1 | `frontend\src\components\ThemeInjector.tsx` |
+| templates | 275 | 2 | `backend\src\modules\templates` |
+| audit-db-column.js | 273 | 1 | `tools\audit-db-column.js` |
 | nginx | 272 | 2 | `nginx` |
-| register | 255 | 1 | `frontend\src\app\register` |
+| register | 257 | 1 | `frontend\src\app\register` |
 | DepthElements.tsx | 252 | 1 | `frontend\src\components\DepthElements.tsx` |
-| WeatherWidget.tsx | 249 | 1 | `frontend\src\components\WeatherWidget.tsx` |
-| README.md | 247 | 1 | `frontend\src\lib\README.md` |
-| README.md | 245 | 1 | `shared\types\README.md` |
-| accommodations | 242 | 2 | `backend\src\modules\accommodations` |
-| README_OVERVIEW.md | 242 | 1 | `README_OVERVIEW.md` |
-| ThemeInjector.tsx | 235 | 1 | `frontend\src\components\ThemeInjector.tsx` |
-| .github | 234 | 1 | `.github` |
-| reviews | 233 | 2 | `backend\src\modules\reviews` |
-| InteractiveResortMap.tsx | 231 | 1 | `frontend\src\components\InteractiveResortMap.tsx` |
-| auth-context.tsx | 230 | 1 | `frontend\src\lib\auth-context.tsx` |
-| pwa.ts | 228 | 1 | `frontend\src\lib\pwa.ts` |
-| stores | 227 | 2 | `frontend\src\lib\stores` |
-| README.md | 224 | 1 | `backend\src\services\README.md` |
-| LiveChatWidget.tsx | 223 | 1 | `frontend\src\components\LiveChatWidget.tsx` |
-| cart | 219 | 1 | `frontend\src\app\cart` |
-| strategic-analysis | 218 | 1 | `strategic-analysis` |
+| InteractiveResortMap.tsx | 250 | 1 | `frontend\src\components\InteractiveResortMap.tsx` |
+| amenity.service.ts | 249 | 1 | `backend\src\services\amenity.service.ts` |
+| auth-context.tsx | 246 | 1 | `frontend\src\lib\auth-context.tsx` |
+| pwa.ts | 243 | 1 | `frontend\src\lib\pwa.ts` |
+| frontend/public | 236 | 2 | `frontend/public` |
+| offline | 233 | 2 | `frontend\src\components\offline` |
+| engines.d.ts | 230 | 1 | `shared\types\engines.d.ts` |
+| isolation_report.md | 228 | 1 | `isolation_report.md` |
+| LiveChatWidget.tsx | 224 | 1 | `frontend\src\components\LiveChatWidget.tsx` |
 | pos | 215 | 1 | `frontend\src\components\pos` |
-| reset-password | 214 | 1 | `frontend\src\app\reset-password` |
-| backend/prisma | 209 | 1 | `backend/prisma` |
+| logs | 212 | 5 | `logs` |
+| reset-password | 209 | 1 | `frontend\src\app\reset-password` |
+| maintenance.service.ts | 205 | 1 | `backend\src\services\maintenance.service.ts` |
 | cdn-config.yaml | 204 | 1 | `infrastructure\cdn-config.yaml` |
-| README.md | 198 | 1 | `frontend\src\components\README.md` |
-| server-api.ts | 186 | 1 | `frontend\src\lib\server-api.ts` |
-| module-utils.ts | 185 | 1 | `frontend\src\lib\module-utils.ts` |
-| README.md | 178 | 1 | `backend\src\modules\README.md` |
+| task.service.ts | 199 | 1 | `backend\src\services\task.service.ts` |
+| layout.tsx | 198 | 1 | `frontend\src\app\layout.tsx` |
+| mig_list.txt | 191 | 1 | `mig_list.txt` |
+| currency.service.ts | 190 | 1 | `backend\src\services\currency.service.ts` |
+| audit_isolation.js | 188 | 1 | `tools\audit_isolation.js` |
+| cookie-policy | 187 | 1 | `frontend\src\app\cookie-policy` |
+| module-utils.ts | 183 | 1 | `frontend\src\lib\module-utils.ts` |
+| test-results | 180 | 8 | `test-results` |
 | webhookIdempotency.service.ts | 175 | 1 | `backend\src\services\webhookIdempotency.service.ts` |
 | pwa | 174 | 2 | `frontend\src\components\pwa` |
-| layout.tsx | 168 | 1 | `frontend\src\app\layout.tsx` |
+| feature-limits.service.ts | 170 | 1 | `backend\src\services\feature-limits.service.ts` |
+| CONTRIBUTING.md | 167 | 1 | `CONTRIBUTING.md` |
 | mobile/__mocks__ | 167 | 3 | `mobile/__mocks__` |
 | translate.ts | 166 | 1 | `frontend\src\lib\translate.ts` |
-| finance | 161 | 2 | `backend\src\modules\finance` |
-| forgot-password | 159 | 1 | `frontend\src\app\forgot-password` |
+| server-api.ts | 159 | 1 | `frontend\src\lib\server-api.ts` |
 | global-error.tsx | 157 | 1 | `frontend\src\app\global-error.tsx` |
-| ARCHITECTURE.md | 154 | 1 | `ARCHITECTURE.md` |
+| forgot-password | 154 | 1 | `frontend\src\app\forgot-password` |
+| index.ts | 153 | 1 | `shared\types\index.ts` |
 | ErrorBoundary.tsx | 152 | 1 | `frontend\src\components\ErrorBoundary.tsx` |
-| scheduler.service.ts | 151 | 1 | `backend\src\services\scheduler.service.ts` |
 | dynamic-translation.service.ts | 142 | 1 | `backend\src\services\dynamic-translation.service.ts` |
 | terminology.service.ts | 140 | 1 | `backend\src\services\terminology.service.ts` |
-| utils.ts | 129 | 1 | `frontend\src\lib\utils.ts` |
+| check-migrations.js | 140 | 1 | `tools\check-migrations.js` |
+| utils.ts | 134 | 1 | `frontend\src\lib\utils.ts` |
+| terms | 133 | 1 | `frontend\src\app\terms` |
 | LanguageSwitcher.tsx | 127 | 1 | `frontend\src\components\LanguageSwitcher.tsx` |
-| privacy | 126 | 1 | `frontend\src\app\privacy` |
-| terms | 126 | 1 | `frontend\src\app\terms` |
-| support | 124 | 1 | `backend\src\modules\support` |
-| cancellation | 122 | 1 | `frontend\src\app\cancellation` |
-| ThemeToggle.tsx | 116 | 1 | `frontend\src\components\ThemeToggle.tsx` |
-| shared | 115 | 2 | `shared` |
-| index.ts | 111 | 1 | `backend\src\lib\index.ts` |
-| docker-compose.yml | 105 | 1 | `docker-compose.yml` |
+| inventory.ts | 127 | 1 | `shared\types\inventory.ts` |
+| messaging.ts | 127 | 1 | `shared\types\messaging.ts` |
+| .gitignore | 126 | 1 | `.gitignore` |
+| index.d.ts | 126 | 1 | `shared\types\index.d.ts` |
+| marketing.ts | 118 | 1 | `shared\types\marketing.ts` |
+| sanitize.ts | 117 | 1 | `frontend\src\lib\sanitize.ts` |
+| find-imports.js | 117 | 1 | `tools\find-imports.js` |
+| messaging.d.ts | 116 | 1 | `shared\types\messaging.d.ts` |
+| ThemeToggle.tsx | 114 | 1 | `frontend\src\components\ThemeToggle.tsx` |
+| inventory.d.ts | 112 | 1 | `shared\types\inventory.d.ts` |
+| SYSTEM_AUDIT_REMEDIATION_EXECUTION.md | 112 | 1 | `SYSTEM_AUDIT_REMEDIATION_EXECUTION.md` |
+| docker-compose.yml | 107 | 1 | `docker-compose.yml` |
+| marketing.d.ts | 106 | 1 | `shared\types\marketing.d.ts` |
+| channels.ts | 105 | 1 | `shared\types\channels.ts` |
+| providers.tsx | 103 | 1 | `frontend\src\app\providers.tsx` |
 | SessionTimeoutMonitor.tsx | 102 | 1 | `frontend\src\components\SessionTimeoutMonitor.tsx` |
 | logger.ts | 101 | 1 | `frontend\src\lib\logger.ts` |
 | usePWA.ts | 100 | 1 | `frontend\src\lib\usePWA.ts` |
-| providers.tsx | 97 | 1 | `frontend\src\app\providers.tsx` |
+| offline | 96 | 1 | `frontend\src\app\offline` |
+| PropertySwitcher.tsx | 93 | 1 | `frontend\src\components\PropertySwitcher.tsx` |
+| channels.d.ts | 92 | 1 | `shared\types\channels.d.ts` |
+| token-blacklist.service.ts | 90 | 1 | `backend\src\services\token-blacklist.service.ts` |
+| order-config.service.ts | 88 | 1 | `backend\src\services\order-config.service.ts` |
+| tax.service.ts | 88 | 1 | `backend\src\services\tax.service.ts` |
 | CurrencySwitcher.tsx | 86 | 1 | `frontend\src\components\CurrencySwitcher.tsx` |
-| README.md | 77 | 1 | `tools\README.md` |
-| .env.example | 75 | 1 | `.env.example` |
-| playwright.config.ts | 69 | 1 | `playwright.config.ts` |
+| playwright.config.ts | 86 | 1 | `playwright.config.ts` |
+| playwright-report | 85 | 1 | `playwright-report` |
+| .env.example | 82 | 1 | `.env.example` |
+| FloorPlan.tsx | 82 | 1 | `frontend\src\components\FloorPlan.tsx` |
+| gdpr.ts | 82 | 1 | `shared\types\gdpr.ts` |
+| modules.ts | 81 | 1 | `shared\types\modules.ts` |
+| structured-data-generator.ts | 77 | 1 | `frontend\src\lib\structured-data-generator.ts` |
+| SECURITY.md | 74 | 1 | `SECURITY.md` |
+| gdpr.d.ts | 71 | 1 | `shared\types\gdpr.d.ts` |
+| GITHUB_ISSUES.md | 70 | 1 | `GITHUB_ISSUES.md` |
+| booking-reminders.service.ts | 69 | 1 | `backend\src\services\booking-reminders.service.ts` |
+| housekeeping.ts | 69 | 1 | `shared\types\housekeeping.ts` |
+| CODE_OF_CONDUCT.md | 66 | 1 | `CODE_OF_CONDUCT.md` |
+| subdomains-resolve.spec.ts | 66 | 1 | `infrastructure\subdomains-resolve.spec.ts` |
 | providers | 66 | 1 | `frontend\src\components\providers` |
-| structured-data-generator.ts | 64 | 1 | `frontend\src\lib\structured-data-generator.ts` |
+| playwright.all.config.ts | 65 | 1 | `playwright.all.config.ts` |
+| finance.ts | 65 | 1 | `shared\types\finance.ts` |
+| legacy_audit_report.txt | 63 | 1 | `legacy_audit_report.txt` |
+| analyze_rls.js | 61 | 1 | `tools\analyze_rls.js` |
 | error.tsx | 60 | 1 | `frontend\src\app\error.tsx` |
-| offline | 59 | 1 | `frontend\src\app\offline` |
-| business-config.service.ts | 52 | 1 | `backend\src\services\business-config.service.ts` |
-| booking-reminders.service.ts | 50 | 1 | `backend\src\services\booking-reminders.service.ts` |
-| docker-compose.supabase.yml | 49 | 1 | `docker-compose.supabase.yml` |
-| .gitignore | 46 | 1 | `.gitignore` |
-| backend/tmp_prisma | 44 | 4 | `backend/tmp_prisma` |
+| housekeeping.d.ts | 60 | 1 | `shared\types\housekeeping.d.ts` |
+| property.ts | 59 | 1 | `shared\types\property.ts` |
+| shared-capacity-purchase.ts | 58 | 1 | `backend\src\services\shared-capacity-purchase.ts` |
+| PageTracker.tsx | 58 | 1 | `frontend\src\components\PageTracker.tsx` |
+| package.json | 58 | 1 | `package.json` |
+| staff.ts | 57 | 1 | `shared\types\staff.ts` |
+| finance.d.ts | 56 | 1 | `shared\types\finance.d.ts` |
+| modules.d.ts | 54 | 1 | `shared\types\modules.d.ts` |
+| README.md | 53 | 1 | `backend\src\modules\README.md` |
+| business-config.service.ts | 53 | 1 | `backend\src\services\business-config.service.ts` |
+| shared | 53 | 4 | `shared` |
+| loyalty.ts | 52 | 1 | `shared\types\loyalty.ts` |
+| property.d.ts | 50 | 1 | `shared\types\property.d.ts` |
+| system-starts.spec.ts | 48 | 1 | `infrastructure\system-starts.spec.ts` |
+| staff.d.ts | 48 | 1 | `shared\types\staff.d.ts` |
+| docker-compose.supabase.yml | 47 | 1 | `docker-compose.supabase.yml` |
+| coupons.ts | 47 | 1 | `shared\types\coupons.ts` |
+| giftcards.ts | 47 | 1 | `shared\types\giftcards.ts` |
+| find_missing_keys.cjs | 44 | 1 | `find_missing_keys.cjs` |
+| inspect_modules.js | 44 | 1 | `tools\inspect_modules.js` |
+| loyalty.d.ts | 43 | 1 | `shared\types\loyalty.d.ts` |
+| reviews.ts | 43 | 1 | `shared\types\reviews.ts` |
+| README.md | 42 | 1 | `backend\src\services\README.md` |
+| page.tsx | 42 | 1 | `frontend\src\app\page.tsx` |
 | api | 41 | 1 | `frontend\src\app\api` |
-| package.json | 39 | 1 | `package.json` |
-| .env | 35 | 1 | `.env` |
+| .env | 40 | 1 | `.env` |
+| coupons.d.ts | 39 | 1 | `shared\types\coupons.d.ts` |
+| .aider.input.history | 38 | 1 | `.aider.input.history` |
+| README.md | 38 | 1 | `infrastructure\README.md` |
+| giftcards.d.ts | 38 | 1 | `shared\types\giftcards.d.ts` |
+| apply-sql.ts | 37 | 1 | `tools\apply-sql.ts` |
 | hydrate-settings.tsx | 34 | 1 | `frontend\src\lib\hydrate-settings.tsx` |
 | common | 33 | 1 | `frontend\src\components\common` |
+| reviews.d.ts | 33 | 1 | `shared\types\reviews.d.ts` |
 | DirectionSync.tsx | 32 | 1 | `frontend\src\components\DirectionSync.tsx` |
-| PageTracker.tsx | 31 | 1 | `frontend\src\components\PageTracker.tsx` |
+| property-id.ts | 29 | 1 | `frontend\src\lib\property-id.ts` |
+| README.md | 29 | 1 | `tools\README.md` |
+| mobile/.expo | 28 | 2 | `mobile/.expo` |
 | hooks | 27 | 1 | `mobile\src\hooks` |
+| container | 22 | 1 | `backend\src\lib\container` |
 | config | 20 | 1 | `mobile\src\config` |
+| index.js | 20 | 1 | `shared\types\index.js` |
+| supabase.env | 20 | 1 | `supabase.env` |
 | ThemeProvider.tsx | 19 | 1 | `frontend\src\components\ThemeProvider.tsx` |
-| mobile/.expo | 18 | 2 | `mobile/.expo` |
+| engines.js | 17 | 1 | `shared\types\engines.js` |
+| README.md | 15 | 1 | `frontend\src\components\README.md` |
+| supabase.ts | 14 | 1 | `backend\src\lib\supabase.ts` |
+| LICENSE | 12 | 1 | `LICENSE` |
+| backend/test-results | 11 | 8 | `backend/test-results` |
+| README.md | 10 | 1 | `frontend\src\lib\README.md` |
+| README.md | 10 | 1 | `shared\types\README.md` |
+| frontend/coverage-critical | 9 | 1 | `frontend/coverage-critical` |
 | vercel.json | 9 | 1 | `vercel.json` |
 | .vercelignore | 8 | 1 | `.vercelignore` |
 | cn.ts | 7 | 1 | `frontend\src\lib\cn.ts` |
 | lib | 7 | 1 | `mobile\src\lib` |
-| translation-audit-results.json | 6 | 1 | `tools\translation-audit-results.json` |
-| supabase.ts | 5 | 1 | `backend\src\lib\supabase.ts` |
-| prisma.ts | 4 | 1 | `backend\src\lib\prisma.ts` |
-| backend/test-results | 4 | 1 | `backend/test-results` |
+| stores | 6 | 2 | `frontend\src\lib\stores` |
+| customization.js | 6 | 1 | `shared\types\customization.js` |
+| channels.js | 5 | 1 | `shared\types\channels.js` |
+| coupons.js | 5 | 1 | `shared\types\coupons.js` |
+| finance.js | 5 | 1 | `shared\types\finance.js` |
+| gdpr.js | 5 | 1 | `shared\types\gdpr.js` |
+| giftcards.js | 5 | 1 | `shared\types\giftcards.js` |
+| housekeeping.js | 5 | 1 | `shared\types\housekeeping.js` |
+| inventory.js | 5 | 1 | `shared\types\inventory.js` |
+| loyalty.js | 5 | 1 | `shared\types\loyalty.js` |
+| marketing.js | 5 | 1 | `shared\types\marketing.js` |
+| messaging.js | 5 | 1 | `shared\types\messaging.js` |
+| modules.js | 5 | 1 | `shared\types\modules.js` |
+| property.js | 5 | 1 | `shared\types\property.js` |
+| reviews.js | 5 | 1 | `shared\types\reviews.js` |
+| staff.js | 5 | 1 | `shared\types\staff.js` |
 | mobile/assets | 1 | 1 | `mobile/assets` |
+| channels.d.ts.map | 1 | 1 | `shared\types\channels.d.ts.map` |
+| channels.js.map | 1 | 1 | `shared\types\channels.js.map` |
+| coupons.d.ts.map | 1 | 1 | `shared\types\coupons.d.ts.map` |
+| coupons.js.map | 1 | 1 | `shared\types\coupons.js.map` |
+| customization.d.ts.map | 1 | 1 | `shared\types\customization.d.ts.map` |
+| customization.js.map | 1 | 1 | `shared\types\customization.js.map` |
+| engines.d.ts.map | 1 | 1 | `shared\types\engines.d.ts.map` |
+| engines.js.map | 1 | 1 | `shared\types\engines.js.map` |
+| finance.d.ts.map | 1 | 1 | `shared\types\finance.d.ts.map` |
+| finance.js.map | 1 | 1 | `shared\types\finance.js.map` |
+| gdpr.d.ts.map | 1 | 1 | `shared\types\gdpr.d.ts.map` |
+| gdpr.js.map | 1 | 1 | `shared\types\gdpr.js.map` |
+| giftcards.d.ts.map | 1 | 1 | `shared\types\giftcards.d.ts.map` |
+| giftcards.js.map | 1 | 1 | `shared\types\giftcards.js.map` |
+| housekeeping.d.ts.map | 1 | 1 | `shared\types\housekeeping.d.ts.map` |
+| housekeeping.js.map | 1 | 1 | `shared\types\housekeeping.js.map` |
+| index.d.ts.map | 1 | 1 | `shared\types\index.d.ts.map` |
+| index.js.map | 1 | 1 | `shared\types\index.js.map` |
+| inventory.d.ts.map | 1 | 1 | `shared\types\inventory.d.ts.map` |
+| inventory.js.map | 1 | 1 | `shared\types\inventory.js.map` |
+| loyalty.d.ts.map | 1 | 1 | `shared\types\loyalty.d.ts.map` |
+| loyalty.js.map | 1 | 1 | `shared\types\loyalty.js.map` |
+| marketing.d.ts.map | 1 | 1 | `shared\types\marketing.d.ts.map` |
+| marketing.js.map | 1 | 1 | `shared\types\marketing.js.map` |
+| messaging.d.ts.map | 1 | 1 | `shared\types\messaging.d.ts.map` |
+| messaging.js.map | 1 | 1 | `shared\types\messaging.js.map` |
+| modules.d.ts.map | 1 | 1 | `shared\types\modules.d.ts.map` |
+| modules.js.map | 1 | 1 | `shared\types\modules.js.map` |
+| property.d.ts.map | 1 | 1 | `shared\types\property.d.ts.map` |
+| property.js.map | 1 | 1 | `shared\types\property.js.map` |
+| reviews.d.ts.map | 1 | 1 | `shared\types\reviews.d.ts.map` |
+| reviews.js.map | 1 | 1 | `shared\types\reviews.js.map` |
+| staff.d.ts.map | 1 | 1 | `shared\types\staff.d.ts.map` |
+| staff.js.map | 1 | 1 | `shared\types\staff.js.map` |

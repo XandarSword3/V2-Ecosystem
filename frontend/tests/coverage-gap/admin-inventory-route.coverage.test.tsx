@@ -51,7 +51,7 @@ vi.mock('sonner', () => ({
 vi.mock('@/context/PropertyContext', () => ({
   useProperty: () => ({
     activePropertyId: 'prop-1',
-    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'resort' },
+    activeProperty: { id: 'prop-1', name: 'Test Property', type: 'property' },
     properties: [],
     setActiveProperty: vi.fn(),
     loading: false,

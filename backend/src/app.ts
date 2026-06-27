@@ -6,7 +6,7 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import { config } from './config/index';
 import { csrfProtection, csrfTokenHandler, ensureCsrfToken } from './middleware/csrf.middleware.js';
-import { initSentry, sentryRequestHandler, sentryErrorHandler } from './utils/sentry.js';
+import { sentryRequestHandler, sentryErrorHandler } from './utils/sentry.js';
 import { logger } from './utils/logger.js';
 import { getSupabase } from './database/connection.js';
 
@@ -49,16 +49,23 @@ import platformRoutes from './modules/platform/platform.routes.js';
 import { handleSaasStripeWebhook } from './modules/platform/saas-webhook.controller.js';
 import { skipTenantGate, tenantGate, resolveTenant } from './middleware/tenantAccess.middleware.js';
 import { resolveProperty } from './middleware/propertyResolution.middleware.js';
+import { xssSanitizer, parameterPollutionProtection } from './middleware/api-security.middleware.js';
 import { getSupabase as getSupabaseForAssets } from './database/connection.js';
 import { asyncHandler } from './middleware/async-handler.js';
 
 const app = express();
 
+// SECURITY: Tell Express we're behind one trusted reverse proxy (Nginx / Render).
+// Without this, req.ip returns the proxy's internal IP (127.0.0.1), which breaks
+// IP-based rate limiting and audit log ip_address fields for every user.
+app.set('trust proxy', 1);
+
 // SECURITY FIX: Raw SQL execution endpoint removed (CRITICAL-001)
 // Use proper migration scripts via `npm run migrate` instead.
 
-// Initialize Sentry
-initSentry(app);
+// NOTE: Sentry is initialized in index.ts before the HTTP server starts.
+// Do NOT call initSentry() here — calling it twice causes undefined behaviour
+// in some Sentry SDK versions (duplicate events, wrong sampling).
 
 // Sentry Request Handler - must be the first middleware on the app
 app.use(sentryRequestHandler());
@@ -84,8 +91,24 @@ app.post(
   handleSaasStripeWebhook,
 );
 
+// Per-property Stripe webhook — same raw-body requirement.
+// Must be mounted BEFORE express.json() or req.rawBody will be undefined
+// and the controller will immediately return 400.
+app.post(
+  '/api/v1/payments/webhook/stripe',
+  express.raw({ type: 'application/json' }),
+  (req, _res, next) => {
+    // Expose raw buffer so payment.controller.ts can use it for Stripe signature verification
+    (req as any).rawBody = req.body;
+    next();
+  },
+);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// HTTP Parameter Pollution protection — prevents ?role=customer&role=admin bypass tricks
+app.use(parameterPollutionProtection);
 
 // Log all incoming requests
 app.use((req, res, next) => {
@@ -119,10 +142,12 @@ app.get('/health/ready', async (req, res) => {
     const dbLatency = Date.now() - startTime;
 
     if (error) {
+      // Log the real error internally; never expose DB details to unauthenticated callers
+      logger.error('Health readiness probe DB error:', { message: error.message });
       return res.status(503).json({
         status: 'unhealthy',
         timestamp: new Date(),
-        database: { status: 'error', error: error.message },
+        database: { status: 'database_unavailable' },
       });
     }
 
@@ -134,10 +159,11 @@ app.get('/health/ready', async (req, res) => {
       uptime: process.uptime(),
     });
   } catch (error) {
+    logger.error('Health readiness probe unexpected error:', error);
     res.status(503).json({
       status: 'unhealthy',
       timestamp: new Date(),
-      error: error instanceof Error ? error.message : 'Unknown error',
+      database: { status: 'database_unavailable' },
     });
   }
 });
@@ -192,6 +218,9 @@ const apiRouter = express.Router();
 // GDPR: Log staff access to PII-containing routes
 import { gdprAccessLogger } from './middleware/gdpr-access-logger.js';
 apiRouter.use(gdprAccessLogger);
+
+// XSS sanitization — scrub all user-supplied strings in body/query/params
+apiRouter.use(xssSanitizer);
 
 // ── Tenant gate ──────────────────────────────────────────────────────────────
 // Resolves the calling tenant (via X-Tenant-ID header, X-Tenant-Slug header,

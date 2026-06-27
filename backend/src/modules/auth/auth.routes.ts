@@ -37,7 +37,7 @@ const twoFactorLimiter = userRateLimit({
 // Public routes (rate limited)
 router.post('/register', registerLimiter, authController.register);
 router.post('/login', loginLimiter, authController.login);
-router.post('/refresh', authController.refreshToken);
+router.post('/refresh', resetLimiter, authController.refreshToken);
 router.post('/forgot-password', resetLimiter, authController.forgotPassword);
 router.post('/reset-password', resetLimiter, authController.resetPassword);
 router.get('/verify-email', authController.verifyEmail);

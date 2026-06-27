@@ -363,7 +363,7 @@ export function scopeToRoles(scope: UserScope): string[] {
     case 'platform_admin':
       return ['platform_admin'];
     case 'tenant_owner':
-      return ['tenant_owner', 'admin'];
+      return ['admin'];
     case 'tenant_admin':
       return ['admin'];
     case 'property_manager':

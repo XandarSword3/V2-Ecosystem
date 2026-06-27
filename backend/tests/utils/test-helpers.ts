@@ -16,10 +16,8 @@ import type {
   ActivityLoggerService,
   SocketEmitter,
   AppConfig,
-  Container,
 } from '../../src/lib/container/types';
 import type { AuthenticatedUser } from '../../src/types/index';
-import { InMemoryCapacityRepository } from '../../src/lib/repositories/pool.repository.memory';
 
 // ============================================
 // Mock Factories
@@ -122,35 +120,6 @@ export function createTestConfig(overrides?: Partial<AppConfig>): AppConfig {
     email: { host: 'smtp.test.com', port: 587, user: 'test', pass: 'test', from: 'test@test.com' },
     ...overrides,
   };
-}
-
-// ============================================
-// Container Factory for Tests
-// ============================================
-
-export interface TestContainer extends Omit<Container, 'database'> {
-  poolRepository: InMemoryCapacityRepository;
-  emailService: ReturnType<typeof createMockEmailService>;
-  logger: ReturnType<typeof createMockLogger>;
-  activityLogger: ReturnType<typeof createMockActivityLogger>;
-  socketEmitter: ReturnType<typeof createMockSocketEmitter>;
-}
-
-/**
- * Create a complete test container with all mocked dependencies
- */
-export function createTestContainer(overrides?: Partial<TestContainer>): TestContainer {
-  const defaults: TestContainer = {
-    poolRepository: new InMemoryCapacityRepository(),
-    emailService: createMockEmailService(),
-    qrCodeService: createMockQRCodeService(),
-    logger: createMockLogger(),
-    activityLogger: createMockActivityLogger(),
-    socketEmitter: createMockSocketEmitter(),
-    config: createTestConfig(),
-  };
-
-  return { ...defaults, ...overrides };
 }
 
 // ============================================

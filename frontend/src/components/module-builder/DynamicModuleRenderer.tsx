@@ -33,6 +33,7 @@ interface MenuItem {
   image_url?: string;
   image?: string;
   category_id: string;
+  category?: string;
   is_available: boolean;
 }
 

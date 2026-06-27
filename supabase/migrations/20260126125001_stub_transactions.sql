@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     net_amount      DECIMAL(12,2)   NOT NULL DEFAULT 0,
     currency        VARCHAR(3)      NOT NULL DEFAULT 'USD',
     customer_id     UUID,
+    user_id         UUID            REFERENCES users(id) ON DELETE SET NULL,
     reference_id    UUID,
     reference_table VARCHAR(50),
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),

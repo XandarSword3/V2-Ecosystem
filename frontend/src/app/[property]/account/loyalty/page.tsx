@@ -77,7 +77,7 @@ export default function CustomerLoyaltyPage() {
   // FIX Iter-18: AbortController to prevent state updates on unmounted component
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push(`/login?redirect=/${propertySlug}/account/loyalty');
+      router.push(`/login?redirect=/${propertySlug}/account/loyalty`);
       return;
     }
     if (isAuthenticated) {

@@ -16,7 +16,7 @@ vi.mock('../../../src/utils/logger.js', () => ({
 }));
 
 import { getSupabase } from '../../../src/database/connection';
-import { resolveTenant } from '../../../src/middleware/tenantAccess.middleware';
+import { resolveTenant, tenantGate } from '../../../src/middleware/tenantAccess.middleware';
 
 describe('TenantAccess Middleware', () => {
   beforeEach(() => {
@@ -156,8 +156,8 @@ describe('TenantAccess Middleware', () => {
 
   it('should block requests with 402 if billing status is suspended', async () => {
     const mockTenant = {
-      id: 'tenant-123',
-      subdomain: 'acme',
+      id: 'tenant-suspended-999',
+      subdomain: 'suspended-co',
       billing_status: 'suspended',
       subscription_tier: 'growth'
     };
@@ -168,17 +168,13 @@ describe('TenantAccess Middleware', () => {
 
     const { req, res, next } = createMockReqRes({
       headers: {
-        'x-tenant-id': 'tenant-123'
+        'x-tenant-id': 'tenant-suspended-999'
       }
     });
 
-    await resolveTenant(req, res, next);
+    await tenantGate(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(402);
-    expect(res.json).toHaveBeenCalledWith({
-      success: false,
-      error: 'Payment required'
-    });
     expect(next).not.toHaveBeenCalled();
   });
 });

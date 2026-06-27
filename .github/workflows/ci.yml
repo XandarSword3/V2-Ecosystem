@@ -312,7 +312,7 @@ jobs:
         working-directory: frontend
         run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: https://api.example.com
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'https://v2-ecosystem-backend.onrender.com' }}
 
   e2e-smoke:
     name: Stage 5 - E2E Smoke

@@ -115,21 +115,21 @@ describe('register', () => {
     mockChain.insert.mockResolvedValueOnce({ data: null, error: null }); // call 2: user_roles insert
   }
 
-  it('creates user and returns tokens', async () => {
+  it('creates user and returns user object (no tokens; email verification required first)', async () => {
     setupRegisterMocks();
     const result = await authService.register({
       email: 'new@example.com',
       password: 'Password123!',
       fullName: 'New User',
+      tenantId: 'tenant-00000000-0000-0000-0000-000000000001',
     });
     expect(result.user.email).toBe('new@example.com');
-    expect(result.tokens.accessToken).toBeDefined();
-    expect(result.tokens.refreshToken).toBeDefined();
+    expect((result as any).tokens).toBeUndefined();
   });
 
   it('hashes the password before storing', async () => {
     setupRegisterMocks();
-    await authService.register({ email: 'x@x.com', password: 'Password123!', fullName: 'X' });
+    await authService.register({ email: 'x@x.com', password: 'Password123!', fullName: 'X', tenantId: 'tenant-00000000-0000-0000-0000-000000000001' });
     expect(vi.mocked(bcrypt.hash)).toHaveBeenCalledWith('Password123!', 12);
   });
 
@@ -139,6 +139,7 @@ describe('register', () => {
       email: 'UPPER@EXAMPLE.COM',
       password: 'Password123!',
       fullName: 'Upper',
+      tenantId: 'tenant-00000000-0000-0000-0000-000000000001',
     });
     expect(result.user.email).toBe('upper@example.com');
   });
@@ -260,7 +261,7 @@ describe('login', () => {
 
   it('returns requiresTwoFactorSetup when 2FA is not enabled for super_admin or tenant_admin', async () => {
     mockChain.single.mockResolvedValueOnce({
-      data: { ...activeUser, two_factor_enabled: false, roles: ['super_admin'] },
+      data: { ...activeUser, two_factor_enabled: false, roles: ['super_admin'], scope: 'super_admin' },
       error: null,
     });
     const result = await authService.login('admin@example.com', 'Password123!', {});
@@ -364,8 +365,9 @@ describe('sendPasswordResetEmail', () => {
 
 describe('resetPassword', () => {
   it('throws INVALID_TOKEN for bad token', async () => {
-    // .select().eq('refresh_token', token).eq('is_active', true) — two chained eqs, second resolves
+    // .select().eq('refresh_token').eq('is_active').eq('session_type') — three chained eqs, third resolves
     mockChain.eq
+      .mockReturnValueOnce(mockChain)
       .mockReturnValueOnce(mockChain)
       .mockResolvedValueOnce({ data: [], error: null });
     await expect(authService.resetPassword('bad-token', 'NewPass123!')).rejects.toMatchObject({
@@ -375,6 +377,7 @@ describe('resetPassword', () => {
 
   it('throws TOKEN_EXPIRED for expired token', async () => {
     mockChain.eq
+      .mockReturnValueOnce(mockChain)
       .mockReturnValueOnce(mockChain)
       .mockResolvedValueOnce({
         data: [
@@ -396,8 +399,9 @@ describe('resetPassword', () => {
     // Ensure validatePassword returns valid (might have stale queue from previous test)
     mockValidatePassword.mockResolvedValue({ valid: true, errors: [] });
     const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    // token lookup: .select().eq('refresh_token', token).eq('is_active', true)
+    // token lookup: .select().eq('refresh_token').eq('is_active').eq('session_type') — three chained eqs
     mockChain.eq
+      .mockReturnValueOnce(mockChain)
       .mockReturnValueOnce(mockChain)
       .mockResolvedValueOnce({
         data: [{ id: 'sess-1', user_id: 'user-1', expires_at: future, refresh_token: 'tok' }],
