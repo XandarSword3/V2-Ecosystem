@@ -28,6 +28,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      // SECURITY: never persist the token to localStorage — it must live only
+      // in memory so it cannot be exfiltrated via XSS. Only persist the
+      // non-sensitive session shape (isAuthenticated flag and public user info).
+      partialize: (state) => ({ isAuthenticated: state.isAuthenticated, user: state.user }),
     }
   )
 );

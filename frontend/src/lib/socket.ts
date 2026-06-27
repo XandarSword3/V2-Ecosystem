@@ -249,7 +249,7 @@ export function useOrderUpdates(orderId: string, onUpdate: OrderUpdateCallback) 
 }
 
 // Generic hook for real-time module order updates — works for any module slug.
-// Backend emits to room 'unit:{slug}' on order:new and order:updated.
+// Backend emits to room 'tenant:{id}:unit:{slug}' on order:new and order:updated.
 export function useModuleOrders(slug: string, onNewOrder: NewOrderCallback, onStatusUpdate: OrderUpdateCallback) {
   const { socket } = useSocket();
 

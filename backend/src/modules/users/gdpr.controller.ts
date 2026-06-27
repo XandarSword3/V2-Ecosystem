@@ -104,7 +104,7 @@ export const exportUserData = asyncHandler(async (req: Request, res: Response) =
       // Activity logs (last 1000)
       (() => {
         let q = supabase.from('audit_logs')
-          .select('id, action, remetadata, remetadata_id, old_value, new_value, ip_address, user_agent, created_at')
+          .select('id, action, resource, resource_id, old_value, new_value, ip_address, user_agent, created_at')
           .eq('user_id', userId);
         if (propertyId) q = q.eq('property_id', propertyId);
         return q.order('created_at', { ascending: false }).limit(1000);

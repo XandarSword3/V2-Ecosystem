@@ -225,8 +225,8 @@ CREATE TABLE IF NOT EXISTS loyalty_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     tier_id UUID REFERENCES loyalty_tiers(id) ON DELETE SET NULL,
-    property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
-    tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+    property_id UUID, -- FK to properties(id) added in 20260627000000_add_loyalty_members_fks.sql (after properties table exists)
+    tenant_id UUID, -- FK to tenants(id) added in 20260627000001_add_loyalty_members_tenant_fk.sql (after tenants table exists)
     total_points INTEGER DEFAULT 0,
     available_points INTEGER DEFAULT 0,
     lifetime_points INTEGER DEFAULT 0,

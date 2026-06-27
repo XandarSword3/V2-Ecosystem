@@ -96,6 +96,8 @@ auth-token.json
 .ci_*.log
 .ci_*.utf8.log
 .ci_service_probe.log
+push_error.log
+*_error.log
 .tmp_*
 **/dist-android/
 **/archive/**/*.txt

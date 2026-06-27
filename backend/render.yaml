@@ -13,7 +13,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3002
+        value: 3000
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
@@ -22,12 +22,15 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
+      # SECURITY: set these once via the Render dashboard using offline-generated secrets.
+      # generateValue: true would rotate them on every deploy, logging out all users.
+      # Generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_REFRESH_SECRET
-        generateValue: true
+        sync: false
       - key: SESSION_SECRET
-        generateValue: true
+        sync: false
       - key: ENCRYPTION_KEY
         sync: false
       - key: FRONTEND_URL

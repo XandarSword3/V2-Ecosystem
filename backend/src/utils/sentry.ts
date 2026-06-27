@@ -44,7 +44,7 @@ export function initSentry(app?: Express): void {
       release: process.env.npm_package_version || '1.0.0',
       
       // Performance Monitoring
-      tracesSampleRate: config.env === 'production' ? 0.1 : 1.0,
+      tracesSampleRate: config.env === 'production' ? 0.1 : 0.25,
       
       // Session Tracking
       autoSessionTracking: true,

@@ -51,6 +51,11 @@ vi.mock('../../src/config/index.js', () => ({
   },
 }));
 
+vi.mock('../../src/middleware/csrf.middleware.js', () => ({
+  generateCsrfToken: vi.fn().mockReturnValue('test-csrf-token'),
+  setCsrfCookie: vi.fn(),
+}));
+
 describe('Auth Controller', () => {
   let authService: typeof import('../../src/modules/auth/auth.service.js');
   let logActivity: typeof import('../../src/utils/activityLogger.js').logActivity;
@@ -152,10 +157,14 @@ describe('Auth Controller', () => {
 
   describe('login', () => {
     it('should login user successfully', async () => {
+      // Controller strips refreshToken from JSON and puts it in httpOnly cookie.
+      // Mock must use the tokens:{} shape that authService.login now returns.
       const mockResult = {
         user: { id: 'user-123', email: 'user@example.com' },
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
+        tokens: {
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+        },
       };
 
       vi.mocked(authService.login).mockResolvedValue(mockResult as any);
@@ -167,7 +176,6 @@ describe('Auth Controller', () => {
           password: 'correctPassword',
         },
       });
-      // Set up IP and user agent
       req.ip = '127.0.0.1';
       vi.mocked(req.get).mockImplementation((header: string) => {
         if (header === 'user-agent') return 'TestBrowser/1.0';
@@ -176,9 +184,13 @@ describe('Auth Controller', () => {
 
       await login(req, res, next);
 
+      // Controller returns only accessToken in JSON; refreshToken goes to httpOnly cookie.
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
-        data: mockResult,
+        data: expect.objectContaining({
+          user: mockResult.user,
+          tokens: { accessToken: 'access-token' },
+        }),
         csrfToken: expect.any(String),
       }));
       expect(authService.login).toHaveBeenCalledWith(
@@ -244,37 +256,42 @@ describe('Auth Controller', () => {
 
   describe('refreshToken', () => {
     it('should refresh access token successfully', async () => {
+      // Controller reads refreshToken from httpOnly cookie, not body.
+      // Response only returns accessToken in JSON; new refreshToken goes to cookie.
       const mockResult = {
-        accessToken: 'new-access-token',
-        refreshToken: 'new-refresh-token',
+        user: { id: 'user-123', email: 'test@example.com' },
+        tokens: { accessToken: 'new-access-token', refreshToken: 'new-refresh-token' },
       };
-      vi.mocked(authService.refreshAccessToken).mockResolvedValue(mockResult);
+      vi.mocked(authService.refreshAccessToken).mockResolvedValue(mockResult as any);
 
       const { refreshToken } = await import('../../src/modules/auth/auth.controller.js');
-      const { req, res, next } = createMockReqRes({
-        body: { refreshToken: 'valid-refresh-token' },
-      });
+      const { req, res, next } = createMockReqRes();
+      req.cookies = { refreshToken: 'valid-refresh-token' };
 
       await refreshToken(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: mockResult,
+        data: expect.objectContaining({
+          user: mockResult.user,
+          tokens: { accessToken: 'new-access-token' },
+        }),
       });
     });
 
-    it('should return 400 if refresh token is missing', async () => {
+    it('should return 401 if refresh token cookie is missing', async () => {
+      // Controller returns 401 (not 400) when cookie is absent.
       const { refreshToken } = await import('../../src/modules/auth/auth.controller.js');
-      const { req, res, next } = createMockReqRes({
-        body: {},
-      });
+      const { req, res, next } = createMockReqRes();
+      req.cookies = {};
 
       await refreshToken(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith({
         success: false,
         error: 'Refresh token required',
+        code: 'INVALID_REFRESH_TOKEN',
       });
     });
 
@@ -283,9 +300,9 @@ describe('Auth Controller', () => {
       vi.mocked(authService.refreshAccessToken).mockRejectedValue(refreshError);
 
       const { refreshToken } = await import('../../src/modules/auth/auth.controller.js');
-      const { req, res, next } = createMockReqRes({
-        body: { refreshToken: 'invalid-token' },
-      });
+      const { req, res, next } = createMockReqRes();
+      // Token must be in cookie so the controller proceeds to call refreshAccessToken.
+      req.cookies = { refreshToken: 'invalid-token' };
 
       await refreshToken(req, res, next);
 
@@ -352,10 +369,12 @@ describe('Auth Controller', () => {
       const { req, res, next } = createMockReqRes();
       req.headers = { authorization: 'Bearer valid-token' };
       req.user = { userId: 'user-123', role: 'customer' };
+      req.cookies = {}; // no refreshToken cookie → undefined
 
       await logout(req, res, next);
 
-      expect(authService.logout).toHaveBeenCalledWith('user-123', undefined);
+      // Controller passes 3 args: (userId, refreshToken|undefined, accessTokenJti|undefined)
+      expect(authService.logout).toHaveBeenCalledWith('user-123', undefined, undefined);
       expect(logActivity).toHaveBeenCalledWith(expect.objectContaining({
         user_id: 'user-123',
         action: 'LOGOUT',
@@ -371,15 +390,15 @@ describe('Auth Controller', () => {
       vi.mocked(authService.logout).mockResolvedValue(undefined);
 
       const { logout } = await import('../../src/modules/auth/auth.controller.js');
-      const { req, res, next } = createMockReqRes({
-        body: { refreshToken: 'refresh-token-123' },
-      });
+      const { req, res, next } = createMockReqRes();
       req.headers = { authorization: 'Bearer valid-token' };
       req.user = { userId: 'user-123', role: 'customer' };
+      // Controller reads refreshToken from httpOnly cookie, not body.
+      req.cookies = { refreshToken: 'refresh-token-123' };
 
       await logout(req, res, next);
 
-      expect(authService.logout).toHaveBeenCalledWith('user-123', 'refresh-token-123');
+      expect(authService.logout).toHaveBeenCalledWith('user-123', 'refresh-token-123', undefined);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         message: 'Logged out successfully',
@@ -393,10 +412,11 @@ describe('Auth Controller', () => {
       const { req, res, next } = createMockReqRes();
       req.headers = {};
       req.user = { userId: 'user-123', role: 'customer' };
+      req.cookies = {};
 
       await logout(req, res, next);
 
-      expect(authService.logout).toHaveBeenCalledWith('user-123', undefined);
+      expect(authService.logout).toHaveBeenCalledWith('user-123', undefined, undefined);
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         message: 'Logged out successfully',

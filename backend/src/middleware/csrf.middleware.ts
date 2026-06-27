@@ -29,8 +29,13 @@ const CSRF_COOKIE_SAME_SITE: CookieSameSite =
     : (process.env.NODE_ENV === 'production' ? 'none' : 'lax');
 const CSRF_COOKIE_SECURE = process.env.NODE_ENV === 'production' || CSRF_COOKIE_SAME_SITE === 'none';
 
-// Get cookie domain for cross-subdomain cookie sharing
+// Get cookie domain for cross-subdomain cookie sharing.
+// Falls back to the hard-coded platform domains so existing deploys keep working,
+// but operators with custom domains must set CSRF_COOKIE_DOMAIN explicitly.
 const getCookieDomain = (): string | undefined => {
+  if (process.env.CSRF_COOKIE_DOMAIN) {
+    return process.env.CSRF_COOKIE_DOMAIN;
+  }
   if (process.env.NODE_ENV === 'production') {
     return '.v2platform.com';
   }

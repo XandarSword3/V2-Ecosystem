@@ -714,10 +714,9 @@ export class HousekeepingAdvancedController {
     // Get all housekeeping staff
     const { data: staff } = await supabase
       .from('users')
-      .select('id, full_name, shift_start, shift_end')
+      .select('id, full_name')
       .contains('roles', ['staff'])
-      .eq('department', 'housekeeping')
-      .eq('is_active', true);
+      .eq('is_active', true); // department filter removed — users.department column dropped in schema normalization
 
     if (!staff || staff.length === 0) return null;
 
@@ -918,8 +917,7 @@ export class HousekeepingAdvancedController {
         .from('users')
         .select('id, full_name')
         .contains('roles', ['staff'])
-        .eq('department', 'housekeeping')
-        .eq('is_active', true);
+        .eq('is_active', true); // department filter removed — users.department column dropped
 
       // Calculate metrics
       const totalRooms = (units || []).length;
@@ -1004,10 +1002,9 @@ export class HousekeepingAdvancedController {
       // Get all housekeeping staff
       const { data: staff } = await supabase
         .from('users')
-        .select('id, full_name, department')
+        .select('id, full_name')
         .contains('roles', ['staff'])
-        .eq('department', 'housekeeping')
-        .eq('is_active', true);
+        .eq('is_active', true); // department filter removed — users.department column dropped
 
       if (!staff || staff.length === 0) {
         return res.json({ success: true, data: [] });

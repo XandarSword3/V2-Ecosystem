@@ -68,7 +68,7 @@ export async function register(data: RegisterData) {
       full_name: data.fullName,
       phone: data.phone,
       preferred_language: data.preferredLanguage || 'en',
-      email_verified: true, // Auto-verify so users can login immediately; verification email still sent
+      email_verified: false, // Must verify via email link before login is allowed
       tenant_id: data.tenantId,
     })
     .select('id, email, full_name')
@@ -85,17 +85,9 @@ export async function register(data: RegisterData) {
     logger.error('Failed to send verification email:', err);
   });
 
-  // Generate tokens so user can interact immediately after registration
-  // (email verification can be enforced later for certain operations)
-  const tokens = generateTokens({
-    userId: user.id,
-    email: user.email,
-    scope: 'customer',
-    roles: ['customer'],
-    tokenVersion: 0,
-  });
-
-  return { user, tokens };
+  // Do NOT issue tokens at registration — user must verify email first.
+  // The login endpoint enforces email_verified = true before issuing tokens.
+  return { user };
 }
 
 export async function login(email: string, password: string, meta: SessionMeta) {
@@ -204,6 +196,7 @@ export async function login(email: string, password: string, meta: SessionMeta) 
       expires_at: expiresAt.toISOString(),
       ip_address: meta.ipAddress,
       user_agent: meta.userAgent,
+      session_type: 'session',
     });
 
   if (sessionError) {
@@ -285,6 +278,7 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
       expires_at: expiresAt.toISOString(),
       ip_address: meta.ipAddress,
       user_agent: meta.userAgent,
+      session_type: 'session',
     });
 
   if (sessionError) {
@@ -318,11 +312,12 @@ export async function refreshAccessToken(refreshToken: string) {
   // Verify refresh token
   const payload = verifyRefreshToken(refreshToken);
 
-  // Find session
+  // Find session — filter to real sessions only so reset/verify tokens can't refresh
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .select('*')
     .eq('refresh_token', refreshToken)
+    .eq('session_type', 'session')
     .single();
 
   if (sessionError || !session || !session.is_active) {
@@ -585,21 +580,12 @@ export async function sendPasswordResetEmail(email: string) {
   const resetToken = uuidv4();
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-  // FIX: Iteration 20 - Only delete existing reset tokens, not all active sessions
-  // Reset tokens have token === refresh_token; normal login sessions have different values
-  const { data: existingSessions } = await supabase
+  // Delete any existing password-reset tokens for this user (one active at a time)
+  await supabase
     .from('sessions')
-    .select('id, token, refresh_token')
+    .delete()
     .eq('user_id', user.id)
-    .eq('is_active', true);
-
-  const resetSessionIds = (existingSessions || [])
-    .filter(s => s.token === s.refresh_token)
-    .map(s => s.id);
-
-  if (resetSessionIds.length > 0) {
-    await supabase.from('sessions').delete().in('id', resetSessionIds);
-  }
+    .eq('session_type', 'password_reset');
 
   // Store token in sessions table
   const { error: insertError } = await supabase
@@ -610,6 +596,7 @@ export async function sendPasswordResetEmail(email: string) {
       refresh_token: resetToken,
       expires_at: expiresAt.toISOString(),
       is_active: true,
+      session_type: 'password_reset',
     });
 
   if (insertError) {
@@ -638,12 +625,13 @@ export async function sendPasswordResetEmail(email: string) {
 export async function resetPassword(token: string, newPassword: string) {
   const supabase = getSupabase();
 
-  // Find valid reset token
+  // Find valid reset token — scoped to password_reset rows only
   const { data: sessions, error: sessionError } = await supabase
     .from('sessions')
     .select('id, user_id, expires_at, refresh_token')
     .eq('refresh_token', token)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .eq('session_type', 'password_reset');
 
   const session = sessions?.[0];
 
@@ -707,21 +695,12 @@ export async function sendVerificationEmail(userId: string, email: string, fullN
   const verificationToken = uuidv4();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-  // Clean up any existing verification tokens for this user
-  // Verification tokens use token === refresh_token pattern (same as reset tokens)
-  const { data: existingSessions } = await supabase
+  // Delete any existing verification tokens for this user (one active at a time)
+  await supabase
     .from('sessions')
-    .select('id, token, refresh_token')
+    .delete()
     .eq('user_id', userId)
-    .eq('is_active', true);
-
-  const verifySessionIds = (existingSessions || [])
-    .filter(s => s.token === s.refresh_token)
-    .map(s => s.id);
-
-  if (verifySessionIds.length > 0) {
-    await supabase.from('sessions').delete().in('id', verifySessionIds);
-  }
+    .eq('session_type', 'email_verification');
 
   // Store token in sessions table
   await supabase
@@ -732,6 +711,7 @@ export async function sendVerificationEmail(userId: string, email: string, fullN
       refresh_token: verificationToken,
       expires_at: expiresAt.toISOString(),
       is_active: true,
+      session_type: 'email_verification',
     });
 
   // Send verification email
@@ -761,12 +741,13 @@ export async function sendVerificationEmail(userId: string, email: string, fullN
 export async function verifyEmail(token: string) {
   const supabase = getSupabase();
 
-  // Find valid verification token
+  // Find valid verification token — scoped to email_verification rows only
   const { data: sessions, error: sessionError } = await supabase
     .from('sessions')
     .select('id, user_id, expires_at')
     .eq('refresh_token', token)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .eq('session_type', 'email_verification');
 
   const session = sessions?.[0];
 

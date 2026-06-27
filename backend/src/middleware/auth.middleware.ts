@@ -50,46 +50,6 @@ async function resolveUserFromToken(token: string): Promise<JwtPayload> {
 
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Bypass authentication in test mode
-    if (process.env.NODE_ENV === 'test') {
-      const { getSupabase } = await import('../database/connection.js');
-      const supabase = getSupabase();
-      
-      // Get a valid tenant and property for testing
-      const { data: tenant } = await supabase
-        .from('tenants')
-        .select('id, property_group_id')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-        
-      const { data: property } = await supabase
-        .from('properties')
-        .select('id, name, group_id, property_code')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      
-      req.user = {
-        userId: '00000000-0000-0000-0000-000000000000',
-        id: '00000000-0000-0000-0000-000000000000',
-        email: 'test@v2ecosystem.com',
-        scope: 'super_admin',
-        roles: ['super_admin', 'admin'],
-        tokenVersion: 1,
-        jti: 'test-jti',
-        tenantId: tenant?.id,
-        isPlatformAdmin: true,
-      };
-      
-      if (property) {
-        req.property = property;
-        (req as any).propertyId = property.id;
-      }
-      
-      return next();
-    }
-
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       res.status(401).json({ success: false, error: 'No token provided' });
@@ -141,13 +101,15 @@ export async function optionalAuthenticate(req: Request, res: Response, next: Ne
   try {
     const payload = await resolveUserFromToken(token);
     req.user = {
-      userId:       payload.userId,
-      id:           payload.userId,
-      email:        payload.email,
-      scope:        payload.scope,
-      roles:        payload.roles || [],
-      tokenVersion: payload.tokenVersion,
-      jti:          payload.jti,
+      userId:          payload.userId,
+      id:              payload.userId,
+      email:           payload.email,
+      scope:           payload.scope,
+      roles:           payload.roles || [],
+      tokenVersion:    payload.tokenVersion,
+      jti:             payload.jti,
+      tenantId:        payload.tenantId,
+      isPlatformAdmin: payload.isPlatformAdmin ?? false,
     };
   } catch {
     // Optional auth should never block the request

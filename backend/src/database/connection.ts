@@ -22,7 +22,11 @@ export async function initializeDatabase() {
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
       ssl: isLocalConnection ? false : {
-        rejectUnauthorized: false,
+        // SECURITY: rejectUnauthorized must be true in production.
+        // If Supabase's Transaction Pooler (port 6543) requires a different setting,
+        // supply DB_SSL_CA with the Supabase root CA cert and pin it explicitly.
+        rejectUnauthorized: process.env.NODE_ENV === 'production' ? true : false,
+        ...(process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA } : {}),
       },
     });
 

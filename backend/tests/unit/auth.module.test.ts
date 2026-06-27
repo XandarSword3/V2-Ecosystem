@@ -95,7 +95,8 @@ describe('Auth Service', () => {
       const result = await register({
         email: 'test@example.com',
         password: 'Password123!',
-        fullName: 'Test User'
+        fullName: 'Test User',
+        tenantId: 'tenant-00000000-0000-0000-0000-000000000001',
       });
 
       expect(result.user).toBeDefined();
@@ -114,7 +115,8 @@ describe('Auth Service', () => {
       await expect(register({
         email: 'existing@example.com',
         password: 'Password123!',
-        fullName: 'Test'
+        fullName: 'Test',
+        tenantId: 'tenant-00000000-0000-0000-0000-000000000001',
       })).rejects.toThrow('Email already registered');
     });
   });
@@ -241,7 +243,6 @@ describe('Auth Service', () => {
       const fromMock = vi.fn()
         .mockReturnValueOnce(sessionLookupBuilder)
         .mockReturnValueOnce(userLookupBuilder)
-        .mockReturnValueOnce(rolesLookupBuilder)
         .mockReturnValueOnce(sessionUpdateBuilder);
 
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);

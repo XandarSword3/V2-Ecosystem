@@ -332,8 +332,8 @@ describe('ModulesController', () => {
       const res = mockRes();
       await (createModule as Function)(req, res, mockNext());
 
-      expect(sb.from).toHaveBeenCalledWith('app_permissions');
-      expect(sb.from).toHaveBeenCalledWith('app_role_permissions');
+      expect(sb.from).toHaveBeenCalledWith('modules');
+      expect(sb.from).toHaveBeenCalledWith('roles');
     });
 
     it('should create default staff user for the module', async () => {

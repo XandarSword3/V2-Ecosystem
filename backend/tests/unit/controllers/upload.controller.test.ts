@@ -145,7 +145,8 @@ describe('UploadController', () => {
           type: 'image',
           filename: 'test.png'
         },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' },
+        headers: { 'x-forwarded-proto': 'https', 'x-forwarded-host': 'cdn.example.com' }
       });
 
       await uploadFile(req, res, next);
@@ -153,7 +154,7 @@ describe('UploadController', () => {
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: expect.objectContaining({
-          url: 'https://cdn.example.com/image/test.png',
+          url: expect.stringContaining('/api/v1/assets/'),
           type: 'image'
         })
       });

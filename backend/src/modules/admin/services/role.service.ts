@@ -155,7 +155,7 @@ export class RoleService {
   async getPermissions(): Promise<PermissionRow[]> {
     const { data, error } = await this.supabase
       .from('permissions')
-      .select('id, name, slug, description, remetadata, action')
+      .select('id, name, slug, description, resource, action')
       .order('name');
 
     if (error) throw error;

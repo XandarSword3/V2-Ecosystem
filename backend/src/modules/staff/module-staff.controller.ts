@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { validateBody } from '../../validation/schemas.js';
-import { emitToUnit } from '../../socket/index.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 
