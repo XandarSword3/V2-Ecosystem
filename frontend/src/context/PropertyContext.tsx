@@ -9,6 +9,7 @@ interface Property {
   id: string;
   name: string;
   type: string;
+  public_slug: string;
 }
 
 interface PropertyAccess {

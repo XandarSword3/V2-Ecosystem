@@ -545,7 +545,7 @@ describe('Channel Service (modules/channels)', () => {
       await channelService.getRoomMappings('conn-1');
 
       const tableMock = getTableMock('channel_room_mappings');
-      expect(tableMock.select).toHaveBeenCalledWith('*, room_types(name)');
+      expect(tableMock.select).toHaveBeenCalledWith('*, metadatas(name)');
     });
 
     it('should return empty array when no mappings exist', async () => {

@@ -268,15 +268,8 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
 
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('restaurant_tables')
-        .select('id, table_number, capacity, is_active')
-        .eq('module_id', mounted.id)
-        .order('table_number', { ascending: true });
-
-      if (error) throw error;
-      res.json({ success: true, data: data ?? [] });
+      // restaurant_tables was dropped in the legacy purge — no canonical replacement yet
+      res.json({ success: true, data: [] });
     } catch (error) {
       logger.error('[Dynamic Router] GET /tables failed', error);
       res.status(500).json({ success: false, error: 'Failed to list tables' });
@@ -291,16 +284,8 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
 
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('catalog_modifiers')
-        .select('id, name, description, price, is_available')
-        .eq('module_id', mounted.id)
-        .eq('is_available', true)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      res.json({ success: true, data: data ?? [] });
+      // catalog_modifiers was never created — no canonical replacement yet
+      res.json({ success: true, data: [] });
     } catch (error) {
       logger.error('[Dynamic Router] GET /modifiers failed', error);
       res.status(500).json({ success: false, error: 'Failed to list modifiers' });
@@ -562,16 +547,8 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
 
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('restaurant_tables')
-        .select('id, table_number, capacity, is_active')
-        .eq('module_id', mounted.id)
-        .eq('is_active', true)
-        .order('table_number', { ascending: true });
-
-      if (error) throw error;
-      res.json({ success: true, data: data ?? [] });
+      // restaurant_tables was dropped in the legacy purge — no canonical replacement yet
+      res.json({ success: true, data: [] });
     } catch (error) {
       logger.error('[Dynamic Router] GET /staff/tables failed', error);
       res.status(500).json({ success: false, error: 'Failed to list tables' });
@@ -1000,7 +977,7 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         .select('id, name, starts_at, ends_at, max_capacity')
         .eq('module_id', mounted.id)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
       if (error) throw error;
       // current_occupancy is now derived live from transactions; compute it here
       const { count: occupancyCount } = await supabase
@@ -1614,7 +1591,7 @@ function buildOngoingEntitlementRouter(router: Router): void {
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('memberships')
-        .select('id, customer_id, plan_id, status, amount, created_at, users')
+        .select('id, customer_id, plan_id, status, amount, created_at')
         .eq('module_id', mounted.id)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -1636,7 +1613,7 @@ function buildOngoingEntitlementRouter(router: Router): void {
       const thirtyDaysFromNow = dayjs().add(30, 'day').toISOString();
       const { data, error } = await supabase
         .from('memberships')
-        .select('id, customer_id, plan_id, status, amount, created_at, users')
+        .select('id, customer_id, plan_id, status, amount, created_at')
         .eq('module_id', mounted.id)
         .eq('status', 'ACTIVE')
         .lte('expires_at', thirtyDaysFromNow)

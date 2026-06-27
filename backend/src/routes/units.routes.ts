@@ -4,6 +4,7 @@ import { getSupabase } from '../database/connection.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { getEngineService } from '../engines/engine-service.js';
 import { logger } from '../utils/logger.js';
+import { asyncHandler } from '../middleware/async-handler.js';
 
 const router = Router();
 const engineService = getEngineService();
@@ -25,7 +26,7 @@ function normalizeUnitRow(row: Record<string, unknown>): Record<string, unknown>
   };
 }
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', asyncHandler(async (_req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     let query = supabase
@@ -37,15 +38,14 @@ router.get('/', async (_req: Request, res: Response) => {
     if (error) throw error;
 
     res.json({ success: true, data: (data ?? []).map((row) => normalizeUnitRow(row as Record<string, unknown>)) });
-  } catch (error) {
-    logger.error('[Units] GET /units failed', error);
-    res.status(500).json({ success: false, error: 'Failed to list units' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to get units' });
   }
-});
+}));
 
 // ── Static routes MUST be before /:id to avoid UUID casting errors ──
 
-router.get('/availability', async (req: Request, res: Response) => {
+router.get('/availability', asyncHandler(async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -55,13 +55,12 @@ router.get('/availability', async (req: Request, res: Response) => {
       .order('name', { ascending: true });
     if (error) throw error;
     res.json({ success: true, data: (data ?? []).map((row) => normalizeUnitRow(row as Record<string, unknown>)) });
-  } catch (error) {
-    logger.error('[Units] GET /units/availability failed', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch availability' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to get availability' });
   }
-});
+}));
 
-router.get('/add-ons', async (_req: Request, res: Response) => {
+router.get('/add-ons', asyncHandler(async (_req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -71,13 +70,12 @@ router.get('/add-ons', async (_req: Request, res: Response) => {
       .order('name', { ascending: true });
     if (error) throw error;
     res.json({ success: true, data: data ?? [] });
-  } catch (error) {
-    logger.error('[Units] GET /units/add-ons failed', error);
-    res.status(500).json({ success: false, error: 'Failed to list add-ons' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to get add-ons' });
   }
-});
+}));
 
-router.get('/bookings', authenticate, async (req: Request, res: Response) => {
+router.get('/bookings', authenticate, asyncHandler(async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -88,13 +86,12 @@ router.get('/bookings', authenticate, async (req: Request, res: Response) => {
       .limit(100);
     if (error) throw error;
     res.json({ success: true, data: data ?? [] });
-  } catch (error) {
-    logger.error('[Units] GET /units/bookings failed', error);
-    res.status(500).json({ success: false, error: 'Failed to list bookings' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to get bookings' });
   }
-});
+}));
 
-router.get('/bookings/:bookingId', authenticate, async (req: Request, res: Response) => {
+router.get('/bookings/:bookingId', authenticate, asyncHandler(async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -109,13 +106,12 @@ router.get('/bookings/:bookingId', authenticate, async (req: Request, res: Respo
       return;
     }
     res.json({ success: true, data });
-  } catch (error) {
-    logger.error('[Units] GET /units/bookings/:id failed', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch booking' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to get booking' });
   }
-});
+}));
 
-router.patch('/bookings/:bookingId/status', authenticate, async (req: Request, res: Response) => {
+router.patch('/bookings/:bookingId/status', authenticate, asyncHandler(async (req: Request, res: Response) => {
   try {
     const newStatus = String(req.body?.status ?? '');
     if (!newStatus) {
@@ -132,15 +128,14 @@ router.patch('/bookings/:bookingId/status', authenticate, async (req: Request, r
       .single();
     if (error) throw error;
     res.json({ success: true, data });
-  } catch (error) {
-    logger.error('[Units] PATCH /units/bookings/:id/status failed', error);
-    res.status(500).json({ success: false, error: 'Failed to update booking status' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to update booking status' });
   }
-});
+}));
 
 // ── Parameterized routes ──
 
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -156,13 +151,12 @@ router.get('/:id', async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, data: normalizeUnitRow(data as Record<string, unknown>) });
-  } catch (error) {
-    logger.error('[Units] GET /units/:id failed', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch unit' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to get unit' });
   }
-});
+}));
 
-router.get('/:id/availability', async (req: Request, res: Response) => {
+router.get('/:id/availability', asyncHandler(async (req: Request, res: Response) => {
   try {
     const { startDate, endDate } = req.query;
     if (typeof startDate !== 'string' || typeof endDate !== 'string') {
@@ -216,13 +210,12 @@ router.get('/:id/availability', async (req: Request, res: Response) => {
       });
 
     res.json({ success: true, data: { blockedDates } });
-  } catch (error) {
-    logger.error('[Units] GET /units/:id/availability failed', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch availability' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to get availability' });
   }
-});
+}));
 
-router.post('/bookings', authenticate, async (req: Request, res: Response) => {
+router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Response) => {
   try {
     const { unit_id, check_in_date, check_out_date, number_of_guests } = req.body ?? {};
     if (!unit_id || !check_in_date || !check_out_date) {
@@ -272,10 +265,9 @@ router.post('/bookings', authenticate, async (req: Request, res: Response) => {
 
     if (error) throw error;
     res.status(201).json({ success: true, data: created });
-  } catch (error) {
-    logger.error('[Units] POST /units/bookings failed', error);
-    res.status(500).json({ success: false, error: 'Failed to create booking' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message ?? 'Failed to create booking' });
   }
-});
+}));
 
 export default router;

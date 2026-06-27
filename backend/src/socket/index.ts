@@ -289,7 +289,10 @@ export function initializeSocketServer(httpServer: HttpServer) {
       // Accept any valid module slug — modules are dynamically created so
       // the server cannot maintain a hardcoded allowlist. Data security is
       // enforced by RLS on the database layer, not by socket room membership.
-      if (unit && typeof unit === 'string') socket.join(`unit:${unit}`);
+      // Room is tenant-namespaced to prevent cross-tenant real-time leaks.
+      if (unit && typeof unit === 'string' && socket.data.tenantId) {
+        socket.join(`tenant:${socket.data.tenantId}:unit:${unit}`);
+      }
     });
   });
 
@@ -333,7 +336,9 @@ export function initializeSocketServer(httpServer: HttpServer) {
 
     // Allow public-namespace clients to join unit rooms (any active module slug)
     socket.on('join:unit', (unit: string) => {
-      if (unit && typeof unit === 'string') socket.join(`unit:${unit}`);
+      if (unit && typeof unit === 'string' && socket.data.tenantId) {
+        socket.join(`tenant:${socket.data.tenantId}:unit:${unit}`);
+      }
     });
 
     // Allow public-namespace clients to request online users
@@ -406,16 +411,10 @@ export function emitToUser(userId: string, event: string, data: unknown) {
   getIO().of('/admin').to(`user:${userId}`).emit(event, data);
 }
 
-// FLAG (not in scope of items 12/15, but same bug class): `unit:{slug}` is
-// not tenant-namespaced. Two tenants both running a "spa" module join the
-// same `unit:spa` room, so this leaks cross-tenant. Needs `tenant:{id}:unit:{slug}`
-// the same way roles do, plus a matching change to the join:unit handlers
-// above and the frontend's socket.emit('join:unit', ...) call sites.
-export function emitToUnit(unit: string, event: string, data: unknown) {
-  // Units are operational (staff), so emit to admin namespace
-  // Also emit to public just in case of mixed usage
-  getIO().of('/admin').to(`unit:${unit}`).emit(event, data);
-  getIO().to(`unit:${unit}`).emit(event, data);
+// FLAG resolved: unit rooms are now tenant-namespaced (`tenant:{id}:unit:{slug}`).
+export function emitToUnit(tenantId: string, unit: string, event: string, data: unknown) {
+  getIO().of('/admin').to(`tenant:${tenantId}:unit:${unit}`).emit(event, data);
+  getIO().to(`tenant:${tenantId}:unit:${unit}`).emit(event, data);
 }
 
 // Roles are strict admin/staff concept. `super_admin` is the one role with

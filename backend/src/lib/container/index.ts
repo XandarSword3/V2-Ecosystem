@@ -1,28 +1,21 @@
-import { createSupabaseNotificationRepository } from '../repositories/notification.repository.supabase.js';
-import { createNotificationService } from '../services/notification.service.js';
+/**
+ * Service Container
+ * Provides dependency injection for services
+ */
 
-export interface Container {
-  notificationService: () => ReturnType<typeof createNotificationService>;
-  [key: string]: unknown;
+import { notificationService } from '../../services/notifications.service.js';
+
+class Container {
+  notificationService() {
+    return notificationService;
+  }
 }
 
-let defaultContainer: Container | null = null;
-
-export function createContainer(overrides?: Partial<Container>): Container {
-  const notificationRepo = createSupabaseNotificationRepository();
-  const defaults: Container = {
-    notificationService: () => createNotificationService({ notificationRepository: notificationRepo }),
-  };
-  return { ...defaults, ...overrides } as Container;
-}
+let containerInstance: Container | null = null;
 
 export function getContainer(): Container {
-  if (!defaultContainer) {
-    defaultContainer = createContainer();
+  if (!containerInstance) {
+    containerInstance = new Container();
   }
-  return defaultContainer;
-}
-
-export function resetContainer(): void {
-  defaultContainer = null;
+  return containerInstance;
 }

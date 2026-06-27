@@ -173,21 +173,6 @@ function classifyHost(host: string | null): HostClassification {
 }
 
 // ---------------------------------------------------------------------------
-// Lightweight JWT payload reader (no crypto — edge runtime only)
-// ---------------------------------------------------------------------------
-
-function readJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(payload));
-  } catch {
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Middleware
 // ---------------------------------------------------------------------------
 
@@ -218,20 +203,23 @@ export async function proxy(req: NextRequest) {
       return new NextResponse('Not Found', { status: 404 });
     }
 
-    const token =
-      req.cookies.get('accessToken')?.value ??
-      req.headers.get('authorization')?.replace('Bearer ', '');
+    // SECURITY (C-1): the access token is an in-memory JS variable only —
+    // it is never written to any cookie, so it can't be read at the edge.
+    // The only thing available here is the non-httpOnly `x-auth-session`
+    // marker cookie set at login, which proves "a session exists" but
+    // carries no claims (not even isPlatformAdmin). Real authorization for
+    // isPlatformAdmin happens exclusively on the backend, which verifies
+    // the actual signed JWT on every request — this guard is just a UX
+    // redirect for anonymous visitors, not an authorization boundary.
+    const hasSession =
+      req.cookies.get('x-auth-session')?.value === '1' ||
+      Boolean(req.headers.get('authorization'));
 
-    if (!token) {
+    if (!hasSession) {
       const loginUrl = req.nextUrl.clone();
       loginUrl.pathname = '/login';
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
-    }
-
-    const payload = readJwtPayload(token);
-    if (!payload?.isPlatformAdmin) {
-      return new NextResponse('Forbidden', { status: 403 });
     }
   }
 

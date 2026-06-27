@@ -9,6 +9,7 @@ import { getSupabase } from "../database/connection.js";
 const supabase = getSupabase();
 import { notificationPreferencesService } from "../services/notification-preferences.service.js";
 import { activityLogger } from "../utils/activityLogger.js";
+import { asyncHandler } from '../middleware/async-handler.js';
 
 const router = Router();
 
@@ -79,7 +80,7 @@ export function verifyUnsubscribeToken(token: string): UnsubscribeToken | null {
 /**
  * GET /unsubscribe - Render unsubscribe confirmation page
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const { token } = req.query;
 
   if (!token || typeof token !== 'string') {
@@ -94,13 +95,13 @@ router.get('/', async (req: Request, res: Response) => {
   // Render confirmation page
   const html = renderUnsubscribePage(decoded, token);
   res.send(html);
-});
+}));
 
 /**
  * POST /unsubscribe - Handle unsubscribe action
  * Supports both form submission and one-click unsubscribe (RFC 8058)
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', asyncHandler(async (req: Request, res: Response) => {
   let token = req.body.token || req.query.token;
 
   // Handle one-click unsubscribe (just POST with no body)
@@ -166,12 +167,12 @@ router.post('/', async (req: Request, res: Response) => {
       res.status(500).json({ error: 'Failed to process unsubscribe' });
     }
   }
-});
+}));
 
 /**
  * GET /unsubscribe/preferences - Redirect to preferences page
  */
-router.get('/preferences', async (req: Request, res: Response) => {
+router.get('/preferences', asyncHandler(async (req: Request, res: Response) => {
   const { token } = req.query;
 
   if (!token || typeof token !== 'string') {
@@ -186,7 +187,7 @@ router.get('/preferences', async (req: Request, res: Response) => {
   // Generate a temporary auth token for the preferences page
   // In production, this would go through proper auth flow
   res.redirect(`${process.env.FRONTEND_URL || 'https://v2ecosystem.com'}/settings/notifications?email=${encodeURIComponent(decoded.email)}`);
-});
+}));
 
 function getTypeDescription(type: string): string {
   switch (type) {

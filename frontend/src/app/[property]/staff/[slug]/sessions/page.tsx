@@ -50,7 +50,7 @@ export default function ModuleSessionsPage({ params }: { params: Promise<{ slug:
            <h1 className="text-2xl font-bold capitalize">{slug} Sessions</h1>
            <p className="text-muted-foreground">Manage and view scheduled sessions</p>
         </div>
-        <Button onClick={() => window.location.href = `/${propertySlug}/${slug}/admin/settings`}>
+        <Button onClick={() => window.location.href = `/${propertySlug}/admin/${slug}/sessions`}>
           <Calendar className="w-4 h-4 mr-2" />
           Manage Schedule
         </Button>
@@ -89,7 +89,7 @@ export default function ModuleSessionsPage({ params }: { params: Promise<{ slug:
                                <div className="absolute right-0 top-8 z-10 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1">
                                  <button
                                    className="w-full text-left px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
-                                   onClick={() => { setMenuOpen(null); window.location.href = `/${propertySlug}/${slug}/admin/settings`; }}
+                                   onClick={() => { setMenuOpen(null); window.location.href = `/${propertySlug}/admin/${slug}/sessions`; }}
                                  >
                                    Edit Session
                                  </button>
@@ -128,7 +128,7 @@ export default function ModuleSessionsPage({ params }: { params: Promise<{ slug:
                           className="w-full mt-4"
                           variant="outline"
                           size="sm"
-                          onClick={() => window.location.href = `/${propertySlug}/staff/${slug}/sessions/${session.id}/bookings`}
+                          onClick={() => window.location.href = `/${propertySlug}/admin/${slug}/tickets`}
                         >
                             View Bookings <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>

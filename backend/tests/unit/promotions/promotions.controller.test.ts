@@ -1,3 +1,5 @@
+/// <reference types="vitest/globals" />
+
 import { Request, Response } from 'express';
 
 vi.mock('../../../src/database/connection.js', () => ({ getSupabase: vi.fn() }));
@@ -12,7 +14,7 @@ const UUID2 = '00000000-0000-0000-0000-000000000002';
 function createMockReqRes(overrides: any = {}) {
   return {
     req: { params: {}, query: {}, body: {}, user: { userId: UUID1, role: 'admin' }, ...overrides },
-    res: { status: vi.fn().mockReturnThis(), json: vi.fn(), setHeader: vi.fn() },
+    res: { status: vi.fn().mockReturnThis(), json: vi.fn(), setHeader: vi.fn() } as any,
   };
 }
 
@@ -280,8 +282,7 @@ describe('Promotions Controller', () => {
 
     it('should award points successfully', async () => {
       mock.queueResponse({ id: 'b1', points_earned: 100 }); // batch insert
-      mock.queueResponse({ loyalty_points: '200' }); // user select
-      mock.queueResponse(null); // user update
+      mock.queueResponse([{ points_remaining: 200 }]); // batches for balance calculation
       mock.queueResponse(null); // transaction insert
       const mocks = createMockReqRes({ body: validBody });
       await ctrl.awardPoints(mocks.req as Request, mocks.res as Response);
@@ -306,10 +307,11 @@ describe('Promotions Controller', () => {
     const validBody = { userId: UUID1, points: 50, redemptionType: 'discount' as const };
 
     it('should redeem points successfully', async () => {
-      mock.queueResponse({ loyalty_points: '200', fraud_flag: false }); // user
-      mock.queueResponse([{ id: 'b1', points_remaining: 200, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-01-01' }]); // batches
+      mock.queueResponse({ id: UUID1 }); // user exists
+      mock.queueResponse(null); // no fraud flag
+      mock.queueResponse([{ points_remaining: 200 }]); // batches for balance
+      mock.queueResponse([{ id: 'b1', points_remaining: 200, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-01-01' }]); // batches for FIFO
       mock.queueResponse(null); // batch update
-      mock.queueResponse(null); // user update
       mock.queueResponse(null); // transaction insert
       const mocks = createMockReqRes({ body: validBody });
       await ctrl.redeemPoints(mocks.req as Request, mocks.res as Response);
@@ -330,14 +332,17 @@ describe('Promotions Controller', () => {
     });
 
     it('should return 403 for fraud-flagged user', async () => {
-      mock.queueResponse({ loyalty_points: '200', fraud_flag: true });
+      mock.queueResponse({ id: UUID1 }); // user exists
+      mock.queueResponse({ id: 'fraud-1' }); // fraud flag exists
       const mocks = createMockReqRes({ body: validBody });
       await ctrl.redeemPoints(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.status).toHaveBeenCalledWith(403);
     });
 
     it('should return 400 for insufficient points', async () => {
-      mock.queueResponse({ loyalty_points: '10', fraud_flag: false });
+      mock.queueResponse({ id: UUID1 }); // user exists
+      mock.queueResponse(null); // no fraud flag
+      mock.queueResponse([{ points_remaining: 10 }]); // batches with 10 points
       const mocks = createMockReqRes({ body: validBody });
       await ctrl.redeemPoints(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.status).toHaveBeenCalledWith(400);
@@ -353,7 +358,8 @@ describe('Promotions Controller', () => {
 
   describe('getUserLoyaltyStatus', () => {
     it('should return loyalty status', async () => {
-      mock.queueResponse({ id: UUID1, full_name: 'Test', loyalty_points: 150, loyalty_tier: 'Gold', fraud_flag: false });
+      mock.queueResponse({ id: UUID1, full_name: 'Test' }); // user
+      mock.queueResponse({ tier: { name: 'Gold' } }); // loyalty_members
       mock.queueResponse([{ id: 'b1', points_remaining: 100, expires_at: '2099-12-31T00:00:00Z' }]); // batches
       mock.queueResponse([{ id: 'tx1', transaction_type: 'earn', points: 100, created_at: '2024-01-01' }]); // txns
       const mocks = createMockReqRes({ params: { userId: UUID1 } });

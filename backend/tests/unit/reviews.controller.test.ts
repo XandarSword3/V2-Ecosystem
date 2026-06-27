@@ -46,18 +46,20 @@ describe('Reviews Controller', () => {
         {
           id: 'review-1',
           rating: 5,
-          comment: 'Excellent service!',
+          content: 'Excellent service!',
           module_id: 'general',
           created_at: '2024-01-01T00:00:00Z',
-          users: { full_name: 'John Doe', profile_image_url: null },
+          customer_id: 'cust-1',
+          customer_name: 'John Doe',
         },
         {
           id: 'review-2',
           rating: 4,
-          comment: 'Great experience',
+          content: 'Great experience',
           module_id: 'menu_service',
           created_at: '2024-01-02T00:00:00Z',
-          users: { full_name: 'Jane Smith', profile_image_url: null },
+          customer_id: 'cust-2',
+          customer_name: 'Jane Smith',
         },
       ];
 
@@ -84,14 +86,18 @@ describe('Reviews Controller', () => {
 
       await getApprovedReviews(req, res, next);
 
-      // Controller maps module_id -> service_type for backward compat
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: {
-          reviews: mockReviews.map(r => ({ ...r, text: r.comment, service_type: r.module_id })),
+          reviews: mockReviews.map(r => ({
+            ...r,
+            text: r.content,
+            service_type: r.module_id,
+            author: { full_name: r.customer_name, profile_image_url: null },
+          })),
           stats: {
             totalReviews: 3,
-            averageRating: 4.7, // (5+4+5)/3 = 4.67 rounded
+            averageRating: 4.7,
           },
         },
       });
@@ -317,21 +323,19 @@ describe('Reviews Controller', () => {
         {
           id: 'review-1',
           rating: 5,
-          comment: 'Great!',
+          content: 'Great!',
           module_id: 'general',
           status: 'approved',
-          user_id: 'user-1',
-          customer_name: 'John',
+          customer_id: 'user-1',
           created_at: '2024-01-01T00:00:00Z',
         },
         {
           id: 'review-2',
           rating: 3,
-          comment: 'Okay',
+          content: 'Okay',
           module_id: 'menu_service',
           status: 'pending',
-          user_id: 'user-2',
-          customer_name: 'Jane',
+          customer_id: 'user-2',
           created_at: '2024-01-02T00:00:00Z',
         },
       ];
@@ -363,14 +367,14 @@ describe('Reviews Controller', () => {
         data: [
           {
             ...mockReviews[0],
-            text: mockReviews[0].comment,
+            text: mockReviews[0].content,
             service_type: 'general',
             is_approved: true,
             users: { id: 'user-1', full_name: 'John', email: 'john@test.com', profile_image_url: null },
           },
           {
             ...mockReviews[1],
-            text: mockReviews[1].comment,
+            text: mockReviews[1].content,
             service_type: 'menu_service',
             is_approved: false,
             users: { id: 'user-2', full_name: 'Jane', email: 'jane@test.com', profile_image_url: null },

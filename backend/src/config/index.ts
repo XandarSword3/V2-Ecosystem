@@ -92,8 +92,8 @@ const generateDevSecret = (prefix: string) => {
 
 export const config = {
   env: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '3005', 10),
-  apiUrl: process.env.API_URL || 'http://localhost:3005',
+  port: parseInt(process.env.PORT || '3000', 10),
+  apiUrl: process.env.API_URL || 'http://localhost:3000',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   corsOrigins: resolveCorsOrigins(),
 
@@ -162,10 +162,11 @@ export const config = {
   },
 
   // Firebase Configuration (for mobile push notifications)
+  // Credentials are loaded from a JSON env var (never from a file path)
+  // to avoid baking secrets into Docker image layers.
+  // Generate with: FIREBASE_SERVICE_ACCOUNT_JSON=$(cat service-account.json)
   firebase: {
-    serviceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '',
-    // Alternative: JSON string of service account credentials
-    // serviceAccount: process.env.FIREBASE_SERVICE_ACCOUNT || '',
+    serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '',
     projectId: process.env.FIREBASE_PROJECT_ID || '',
   },
 

@@ -1,3 +1,5 @@
+/// <reference types="vitest/globals" />
+
 /**
  * Promotions Controller Tests
  * 
@@ -40,13 +42,13 @@ function createQueryMock(mockDataFn: () => unknown[]) {
     const firstItem = Array.isArray(data) && data.length > 0 ? data[0] : null;
     return Promise.resolve({ data: firstItem, error: null });
   });
-  mockObj.insert = vi.fn().mockImplementation((insertData) => ({
+  mockObj.insert = vi.fn().mockImplementation((insertData: any) => ({
     select: vi.fn().mockReturnValue({
       single: vi.fn().mockResolvedValue({ data: { id: 'new-1', ...insertData }, error: null })
     }),
     then: (resolve: any) => resolve({ data: insertData, error: null })
   }));
-  mockObj.upsert = vi.fn().mockImplementation((data) => ({
+  mockObj.upsert = vi.fn().mockImplementation((data: any) => ({
     select: vi.fn().mockReturnValue({
       single: vi.fn().mockResolvedValue({ data: { id: 'upsert-1', ...data }, error: null })
     })
@@ -830,8 +832,7 @@ describe('PromotionsController', () => {
     
     it('should award points successfully', async () => {
       mockSupabase.queueResponse({ id: 'batch-1', points_earned: 100 }); // batch insert
-      mockSupabase.queueResponse({ loyalty_points: '200' }); // user select
-      mockSupabase.queueResponse(null); // user update
+      mockSupabase.queueResponse([{ points_remaining: 200 }]); // batches for balance calculation
       mockSupabase.queueResponse(null); // transaction insert
       
       const { req, res } = createMockReqRes({ body: validAwardBody });
@@ -891,10 +892,9 @@ describe('PromotionsController', () => {
     });
     
     it('should award points from referral', async () => {
-      mockSupabase.queueResponse({ id: 'batch-2' });
-      mockSupabase.queueResponse({ loyalty_points: '50' });
-      mockSupabase.queueResponse(null);
-      mockSupabase.queueResponse(null);
+      mockSupabase.queueResponse({ id: 'batch-2' }); // batch insert
+      mockSupabase.queueResponse([{ points_remaining: 50 }]); // batches for balance
+      mockSupabase.queueResponse(null); // transaction insert
       
       const { req, res } = createMockReqRes({
         body: { ...validAwardBody, source: 'referral', referenceId: UUID2 }
@@ -905,10 +905,9 @@ describe('PromotionsController', () => {
     });
     
     it('should award points with custom expiry', async () => {
-      mockSupabase.queueResponse({ id: 'batch-3' });
-      mockSupabase.queueResponse({ loyalty_points: '0' });
-      mockSupabase.queueResponse(null);
-      mockSupabase.queueResponse(null);
+      mockSupabase.queueResponse({ id: 'batch-3' }); // batch insert
+      mockSupabase.queueResponse([{ points_remaining: 0 }]); // batches for balance
+      mockSupabase.queueResponse(null); // transaction insert
       
       const { req, res } = createMockReqRes({
         body: { ...validAwardBody, expiryDays: 730 }
@@ -927,13 +926,17 @@ describe('PromotionsController', () => {
     };
     
     it('should redeem points successfully (FIFO)', async () => {
-      mockSupabase.queueResponse({ loyalty_points: '200', fraud_flag: false });
+      mockSupabase.queueResponse({ id: UUID1 }); // user exists
+      mockSupabase.queueResponse(null); // no fraud flag
       mockSupabase.queueResponse([
         { id: 'b1', points_remaining: 100, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-01-01' },
         { id: 'b2', points_remaining: 100, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-02-01' }
-      ]);
+      ]); // batches for balance
+      mockSupabase.queueResponse([
+        { id: 'b1', points_remaining: 100, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-01-01' },
+        { id: 'b2', points_remaining: 100, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-02-01' }
+      ]); // batches for FIFO
       mockSupabase.queueResponse(null); // batch update
-      mockSupabase.queueResponse(null); // user update
       mockSupabase.queueResponse(null); // transaction insert
       
       const { req, res } = createMockReqRes({ body: validRedeemBody });
@@ -968,7 +971,8 @@ describe('PromotionsController', () => {
     });
     
     it('should return 403 for fraud-flagged user', async () => {
-      mockSupabase.queueResponse({ loyalty_points: '200', fraud_flag: true });
+      mockSupabase.queueResponse({ id: UUID1 }); // user exists
+      mockSupabase.queueResponse({ id: 'fraud-1' }); // fraud flag exists
       
       const { req, res } = createMockReqRes({ body: validRedeemBody });
       await promotionsController.redeemPoints(req, res);
@@ -980,7 +984,9 @@ describe('PromotionsController', () => {
     });
     
     it('should return 400 for insufficient points', async () => {
-      mockSupabase.queueResponse({ loyalty_points: '20', fraud_flag: false });
+      mockSupabase.queueResponse({ id: UUID1 }); // user exists
+      mockSupabase.queueResponse(null); // no fraud flag
+      mockSupabase.queueResponse([{ points_remaining: 20 }]); // batches with 20 points
       
       const { req, res } = createMockReqRes({ body: validRedeemBody });
       await promotionsController.redeemPoints(req, res);
@@ -1002,11 +1008,12 @@ describe('PromotionsController', () => {
     });
     
     it('should redeem for freebie', async () => {
-      mockSupabase.queueResponse({ loyalty_points: '500', fraud_flag: false });
-      mockSupabase.queueResponse([{ id: 'b1', points_remaining: 500, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-01-01' }]);
-      mockSupabase.queueResponse(null);
-      mockSupabase.queueResponse(null);
-      mockSupabase.queueResponse(null);
+      mockSupabase.queueResponse({ id: UUID1 }); // user exists
+      mockSupabase.queueResponse(null); // no fraud flag
+      mockSupabase.queueResponse([{ points_remaining: 500 }]); // batches with 500 points
+      mockSupabase.queueResponse([{ id: 'b1', points_remaining: 500, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-01-01' }]); // batches for FIFO
+      mockSupabase.queueResponse(null); // batch update
+      mockSupabase.queueResponse(null); // transaction insert
       
       const { req, res } = createMockReqRes({
         body: { ...validRedeemBody, points: 200, redemptionType: 'freebie' }
@@ -1017,15 +1024,20 @@ describe('PromotionsController', () => {
     });
     
     it('should redeem points across multiple batches', async () => {
-      mockSupabase.queueResponse({ loyalty_points: '150', fraud_flag: false });
+      mockSupabase.queueResponse({ id: UUID1 }); // user exists
+      mockSupabase.queueResponse(null); // no fraud flag
       mockSupabase.queueResponse([
         { id: 'b1', points_remaining: 30, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-01-01' },
         { id: 'b2', points_remaining: 70, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-02-01' },
         { id: 'b3', points_remaining: 50, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-03-01' }
-      ]);
+      ]); // batches for balance check
+      mockSupabase.queueResponse([
+        { id: 'b1', points_remaining: 30, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-01-01' },
+        { id: 'b2', points_remaining: 70, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-02-01' },
+        { id: 'b3', points_remaining: 50, expires_at: '2099-12-31T00:00:00Z', created_at: '2024-03-01' }
+      ]); // batches for FIFO
       mockSupabase.queueResponse(null); // batch 1 update
       mockSupabase.queueResponse(null); // batch 2 update
-      mockSupabase.queueResponse(null); // user update
       mockSupabase.queueResponse(null); // transaction insert
       
       const { req, res } = createMockReqRes({
@@ -1047,18 +1059,16 @@ describe('PromotionsController', () => {
     it('should return loyalty status', async () => {
       mockSupabase.queueResponse({
         id: UUID1,
-        full_name: 'Test User',
-        loyalty_points: 500,
-        loyalty_tier: 'Gold',
-        fraud_flag: false
-      });
+        full_name: 'Test User'
+      }); // user
+      mockSupabase.queueResponse({ tier: { name: 'Gold' } }); // loyalty_members with tier
       mockSupabase.queueResponse([
         { id: 'b1', points_remaining: 300, expires_at: '2099-12-31T00:00:00Z' },
         { id: 'b2', points_remaining: 200, expires_at: '2099-06-30T00:00:00Z' }
-      ]);
+      ]); // batches
       mockSupabase.queueResponse([
         { id: 'tx1', transaction_type: 'earn', points: 100, created_at: '2024-01-15' }
-      ]);
+      ]); // transactions
       
       const { req, res } = createMockReqRes({ params: { userId: UUID1 } });
       await promotionsController.getUserLoyaltyStatus(req, res);
@@ -1075,7 +1085,7 @@ describe('PromotionsController', () => {
     });
     
     it('should return 404 for non-existent user', async () => {
-      mockSupabase.queueResponse(null, { code: 'PGRST116' });
+      mockSupabase.queueResponse(null, { code: 'PGRST116' }); // user not found
       
       const { req, res } = createMockReqRes({ params: { userId: UUID1 } });
       await promotionsController.getUserLoyaltyStatus(req, res);
@@ -1089,16 +1099,14 @@ describe('PromotionsController', () => {
       
       mockSupabase.queueResponse({
         id: UUID1,
-        full_name: 'Test',
-        loyalty_points: 200,
-        loyalty_tier: 'Silver',
-        fraud_flag: false
-      });
+        full_name: 'Test'
+      }); // user
+      mockSupabase.queueResponse({ tier: { name: 'Silver' } }); // loyalty_members
       mockSupabase.queueResponse([
         { id: 'b1', points_remaining: 100, expires_at: soon.toISOString() },
         { id: 'b2', points_remaining: 100, expires_at: '2099-12-31T00:00:00Z' }
-      ]);
-      mockSupabase.queueResponse([]);
+      ]); // batches
+      mockSupabase.queueResponse([]); // transactions
       
       const { req, res } = createMockReqRes({ params: { userId: UUID1 } });
       await promotionsController.getUserLoyaltyStatus(req, res);
@@ -1119,16 +1127,14 @@ describe('PromotionsController', () => {
     it('should return recent transactions', async () => {
       mockSupabase.queueResponse({
         id: UUID1,
-        full_name: 'Test',
-        loyalty_points: 150,
-        loyalty_tier: 'Bronze',
-        fraud_flag: false
-      });
-      mockSupabase.queueResponse([]);
+        full_name: 'Test'
+      }); // user
+      mockSupabase.queueResponse({ tier: { name: 'Bronze' } }); // loyalty_members
+      mockSupabase.queueResponse([]); // batches
       mockSupabase.queueResponse([
         { id: 'tx1', transaction_type: 'earn', points: 100 },
         { id: 'tx2', transaction_type: 'redeem', points: -50 }
-      ]);
+      ]); // transactions
       
       const { req, res } = createMockReqRes({ params: { userId: UUID1 } });
       await promotionsController.getUserLoyaltyStatus(req, res);

@@ -2,17 +2,31 @@ import axios from 'axios';
 import { getStoredPropertyId } from './property-id';
 
 // ---------------------------------------------------------------------------
-// Tenant/property slug extraction (mirrors frontend/src/middleware.ts's
-// extractHostSegments). That middleware computes the correct tenant/property
-// from the Host header but only ever attaches the result to the *response*
-// sent back to the browser — it never reaches these axios calls, which go
-// to a separate fixed-origin API host (NEXT_PUBLIC_API_URL) and therefore
-// carry no subdomain context of their own. Without this, the backend's
-// tenantAccess/propertyResolution middleware has nothing to resolve from on
-// public storefront requests and silently falls back to system-wide
-// defaults. Computed once per request from window.location.host so it stays
-// correct as the user navigates between tenant/property subdomains.
+// In-memory access token store.
+// SECURITY: Access tokens must NEVER be persisted to localStorage — doing so
+// exposes them to any XSS payload that runs on the page. Keeping the token in
+// a module-scope variable means it lives only in JS heap and is wiped on page
+// reload (forcing a silent refresh via the httpOnly refresh-token cookie).
+// The refresh token is stored in an httpOnly; Secure; SameSite=Strict cookie
+// set by the backend at login — JS cannot read or steal it.
 // ---------------------------------------------------------------------------
+let _accessToken: string | null = null;
+
+export const memoryTokenStore = {
+  get: (): string | null => _accessToken,
+  set: (token: string | null): void => { _accessToken = token; },
+  clear: (): void => { _accessToken = null; },
+};
+
+// Legacy localStorage helpers — kept as no-ops so callers don't break at
+// compile-time while we migrate call sites. Remove once all pages updated.
+/** @deprecated Use memoryTokenStore instead */
+export const legacyLocalStorage = {
+  getAccessToken: (): string | null => memoryTokenStore.get(),
+  setAccessToken: (t: string) => memoryTokenStore.set(t),
+  setRefreshToken: (_t: string) => { /* refresh token is now an httpOnly cookie */ },
+  clearTokens: () => memoryTokenStore.clear(),
+};
 export interface HostSegments {
   tenant: string | null;
   property: string | null;
@@ -233,24 +247,22 @@ const getCookie = (name: string): string | undefined => {
 api.interceptors.request.use(
   async (config) => {
     if (typeof window !== 'undefined') {
-      let token = localStorage.getItem('accessToken');
+      let token = memoryTokenStore.get();
 
       // Check if token is close to expiring and proactively refresh
       if (token && isTokenExpiringSoon(token) && !isRefreshing) {
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null') {
-          try {
-            isRefreshing = true;
-            const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
-            const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-            localStorage.setItem('accessToken', accessToken);
-            localStorage.setItem('refreshToken', newRefreshToken);
-            token = accessToken;
-          } catch {
-            // Refresh failed, continue with old token
-          } finally {
-            isRefreshing = false;
-          }
+        // Refresh is now cookie-based — send an empty body; the httpOnly
+        // refresh-token cookie is forwarded automatically by the browser.
+        try {
+          isRefreshing = true;
+          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+          const { accessToken } = response.data.data;
+          memoryTokenStore.set(accessToken);
+          token = accessToken;
+        } catch {
+          // Refresh failed, continue with old token
+        } finally {
+          isRefreshing = false;
         }
       }
 
@@ -362,30 +374,17 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = localStorage.getItem('refreshToken');
-        // Validate that we have a real refresh token
-        if (refreshToken && refreshToken !== 'undefined' && refreshToken !== 'null') {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refreshToken,
-          });
+        // Refresh token is in httpOnly cookie — browser forwards it automatically.
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+        const { accessToken } = response.data.data;
+        memoryTokenStore.set(accessToken);
 
-          const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', newRefreshToken);
-
-          processQueue(null, accessToken);
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          return api(originalRequest);
-        } else {
-          // No valid refresh token
-          processQueue(new Error('No valid refresh token'), null);
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-        }
+        processQueue(null, accessToken);
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
       } catch (refreshError: any) {
         processQueue(refreshError, null);
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        memoryTokenStore.clear();
       } finally {
         isRefreshing = false;
       }

@@ -197,22 +197,23 @@ export class PromotionsController {
     try {
       const supabase = getSupabase();
 
-      // Users with high coupon usage
+      // High coupon usage — join users for display info
       const { data: highUsage, error: usageError } = await supabase
         .from('coupon_usage')
-        .select('user_id, count')
         .select(`
           user_id,
-          users!inner(full_name, email, fraud_flag, fraud_reason)
+          users!inner(full_name, email)
         `)
         .order('created_at', { ascending: false })
         .limit(100);
 
-      // Flagged users
-      const { data: flaggedUsers, error: flagError } = await supabase
-        .from('users')
-        .select('id, full_name, email, fraud_flag, fraud_reason')
-        .eq('fraud_flag', true);
+      // Flagged users — read from loyalty_fraud_flags (users.fraud_flag/fraud_reason dropped in schema normalization)
+      const { data: fraudFlagRows } = await supabase
+        .from('loyalty_fraud_flags')
+        .select('user_id, reason, flag_type, flagged_by, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      const flaggedUsers = fraudFlagRows || [];
 
       // Suspiciously rapid usage
       const { data: rapidUsage } = await supabase
@@ -527,19 +528,15 @@ export class PromotionsController {
 
       if (batchError) throw batchError;
 
-      // Update user total points
-      const { data: user } = await supabase
-        .from('users')
-        .select('loyalty_points')
-        .eq('id', data.userId)
-        .single();
-
-      const newTotal = (parseInt(user?.loyalty_points) || 0) + data.points;
-
-      await supabase
-        .from('users')
-        .update({ loyalty_points: newTotal, updated_at: new Date().toISOString() })
-        .eq('id', data.userId);
+      // Compute balance from batches (users.loyalty_points column dropped in schema normalization)
+      const { data: batchRows } = await supabase
+        .from('loyalty_point_batches')
+        .select('points_remaining')
+        .eq('user_id', data.userId)
+        .gt('points_remaining', 0)
+        .gt('expires_at', new Date().toISOString());
+      const currentTotal = (batchRows || []).reduce((sum: number, b: any) => sum + (b.points_remaining || 0), 0);
+      const newTotal = currentTotal + data.points;
 
       // Record transaction
       await supabase.from('loyalty_transactions').insert({
@@ -579,22 +576,39 @@ export class PromotionsController {
       const data = validation.data;
       const supabase = getSupabase();
 
-      // Check user balance
+      // Verify user exists
       const { data: user } = await supabase
         .from('users')
-        .select('loyalty_points, fraud_flag')
+        .select('id')
         .eq('id', data.userId)
-        .single();
+        .maybeSingle();
 
       if (!user) {
         return res.status(404).json({ success: false, error: 'User not found' });
       }
 
-      if (user.fraud_flag) {
+      // Check fraud status via loyalty_fraud_flags (users.fraud_flag dropped in schema normalization)
+      const { data: fraudFlag } = await supabase
+        .from('loyalty_fraud_flags')
+        .select('id')
+        .eq('user_id', data.userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (fraudFlag) {
         return res.status(403).json({ success: false, error: 'Account flagged for review' });
       }
 
-      const currentPoints = parseInt(user.loyalty_points) || 0;
+      // Compute balance from batches
+      const now = new Date().toISOString();
+      const { data: activeBatches } = await supabase
+        .from('loyalty_point_batches')
+        .select('points_remaining')
+        .eq('user_id', data.userId)
+        .gt('points_remaining', 0)
+        .gt('expires_at', now);
+      const currentPoints = (activeBatches || []).reduce((sum: number, b: any) => sum + (b.points_remaining || 0), 0);
+
       if (currentPoints < data.points) {
         return res.status(400).json({
           success: false,
@@ -605,7 +619,6 @@ export class PromotionsController {
 
       // FIFO redemption from batches
       let pointsToRedeem = data.points;
-      const now = new Date().toISOString();
 
       const { data: batches } = await supabase
         .from('loyalty_point_batches')
@@ -628,14 +641,9 @@ export class PromotionsController {
         pointsToRedeem -= deduction;
       }
 
-      // Update user total
       const newTotal = currentPoints - data.points;
-      await supabase
-        .from('users')
-        .update({ loyalty_points: newTotal, updated_at: new Date().toISOString() })
-        .eq('id', data.userId);
 
-      // Record transaction
+      // Record transaction (users.loyalty_points sync removed — column dropped in schema normalization)
       await supabase.from('loyalty_transactions').insert({
         user_id: data.userId,
         transaction_type: 'redeem',
@@ -669,13 +677,20 @@ export class PromotionsController {
 
       const { data: user, error } = await supabase
         .from('users')
-        .select('id, full_name, loyalty_points, loyalty_tier, fraud_flag')
+        .select('id, full_name')
         .eq('id', userId)
         .single();
 
       if (error || !user) {
         return res.status(404).json({ success: false, error: 'User not found' });
       }
+
+      // Get tier from loyalty_members (users.loyalty_points/loyalty_tier dropped in schema normalization)
+      const { data: loyaltyMember } = await supabase
+        .from('loyalty_members')
+        .select('tier:loyalty_tiers(name)')
+        .eq('user_id', userId)
+        .maybeSingle();
 
       // Get point batches with expiry
       const now = new Date().toISOString();
@@ -708,8 +723,8 @@ export class PromotionsController {
           user: {
             id: user.id,
             name: user.full_name,
-            totalPoints: user.loyalty_points,
-            tier: user.loyalty_tier,
+            totalPoints: (batches || []).reduce((sum: number, b: any) => sum + b.points_remaining, 0),
+            tier: (loyaltyMember?.tier as any)?.name ?? null,
           },
           pointsExpiringSoon: expiringSoon,
           batches: batches || [],
@@ -732,17 +747,7 @@ export class PromotionsController {
       const adminId = req.user?.userId;
       const supabase = getSupabase();
 
-      // Update user
-      await supabase
-        .from('users')
-        .update({
-          fraud_flag: true,
-          fraud_reason: reason,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId);
-
-      // Record in fraud flags table
+      // Record in fraud flags table (users.fraud_flag/fraud_reason dropped in schema normalization)
       await supabase.from('loyalty_fraud_flags').insert({
         user_id: userId,
         flag_type: 'manual',
@@ -787,26 +792,12 @@ export class PromotionsController {
           .update({ points_remaining: 0 })
           .eq('id', batch.id);
 
-        // Deduct from user total
-        const { data: user } = await supabase
-          .from('users')
-          .select('loyalty_points')
-          .eq('id', batch.user_id)
-          .single();
-
-        const newTotal = Math.max(0, (parseInt(user?.loyalty_points) || 0) - batch.points_remaining);
-        
-        await supabase
-          .from('users')
-          .update({ loyalty_points: newTotal })
-          .eq('id', batch.user_id);
-
-        // Record transaction
+        // Record transaction (users.loyalty_points sync removed — balance tracked via loyalty_point_batches)
         await supabase.from('loyalty_transactions').insert({
           user_id: batch.user_id,
           transaction_type: 'expire',
           points: -batch.points_remaining,
-          balance_after: newTotal,
+          balance_after: 0,
           notes: 'Points expired',
         });
       }

@@ -409,10 +409,10 @@ export class GiftCardController {
       let purchaserInfo = null;
       if (giftCard.purchased_by) {
         const { data: purchaser } = await supabase
-          .from('users')
-          .select('name, email')
-          .eq('id', giftCard.purchased_by)
-          .single();
+        .from('users')
+        .select('full_name, email')
+        .eq('id', giftCard.purchased_by)
+        .single();
         purchaserInfo = purchaser;
       }
 
@@ -428,7 +428,7 @@ export class GiftCardController {
         success: true,
         data: {
           ...giftCard,
-          purchaser_name: purchaserInfo?.name,
+          purchaser_name: purchaserInfo?.full_name,
           purchaser_email_account: purchaserInfo?.email,
           transactions: transactions || [],
         },

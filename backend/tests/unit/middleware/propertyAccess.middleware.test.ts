@@ -88,7 +88,7 @@ describe('Property Access Middleware', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('should allow access if user_property_access table is empty (backward compatibility)', async () => {
+    it('should allow access if user has direct access entry (backward compatibility)', async () => {
       const propertyId = '12345678-1234-4567-a123-1234567890ab';
       const { req, res, next } = createMockReqRes({
         headers: { 'x-property-id': propertyId },
@@ -97,8 +97,7 @@ describe('Property Access Middleware', () => {
 
       const fromMock = vi.fn().mockImplementation((table: string) => {
         if (table === 'user_property_access') {
-          // Mock count check to return 0
-          return createChainableMock(null, null, 0);
+          return createChainableMock([{ id: 'access-1' }], null, 1);
         }
         return createChainableMock([]);
       });
@@ -235,7 +234,7 @@ describe('Property Access Middleware', () => {
       });
 
       const fromMock = vi.fn().mockImplementation(() => {
-        return createChainableMock(null, null, 0); // Empty access table
+        return createChainableMock([{ id: 'access-1' }], null, 1); // Has direct access row
       });
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
@@ -323,7 +322,7 @@ describe('Property Access Middleware', () => {
           return createChainableMock({ property_id: propertyId });
         }
         if (table === 'user_property_access') {
-          return createChainableMock(null, null, 0); // Empty access count => allows access
+          return createChainableMock([{ id: 'access-1' }], null, 1); // Direct access row => allows
         }
         return createChainableMock([]);
       });

@@ -184,6 +184,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         password: 'password123',
         fullName: 'Test User',
+        tenantId: 'tenant-00000000-0000-0000-0000-000000000001',
       });
 
       expect(result.user).toBeDefined();
@@ -209,6 +210,7 @@ describe('AuthService', () => {
         password: 'password123',
         fullName: 'Arabic User',
         preferredLanguage: 'ar',
+        tenantId: 'tenant-00000000-0000-0000-0000-000000000001',
       });
 
       expect(result.user).toBeDefined();

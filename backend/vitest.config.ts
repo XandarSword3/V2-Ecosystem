@@ -8,6 +8,9 @@ export default defineConfig({
     deps: {
       interopDefault: true,
     },
+    typecheck: {
+      tsconfig: './tsconfig.spec.json',
+    },
     include: ['tests/**/*.test.ts'],
     exclude: [
       'node_modules',
@@ -19,6 +22,19 @@ export default defineConfig({
       'tests/comprehensive-verification.test.ts',
       'tests/security-patches.test.ts',
       'tests/unit/modules/bookings/bookings.service.test.ts', // Blocked by config import error - requires investigation
+      // Dead tests — import from src/lib/ which was deleted (lib/ purge, June 2026)
+      'tests/unit/services/amenity.service.test.ts',
+      'tests/unit/services/event.service.test.ts',
+      'tests/unit/services/feedback.service.test.ts',
+      'tests/unit/services/maintenance.service.test.ts',
+      'tests/unit/services/membership.service.test.ts',
+      'tests/unit/services/package.service.test.ts',
+      'tests/unit/services/task.service.test.ts',
+      'tests/unit/services/waitlist.service.test.ts',
+      'tests/unit/services/weather.service.test.ts',
+      'tests/unit/modules/maintenance/maintenance.service.test.ts',
+      'tests/unit/modules/notifications/notifications.service.test.ts',
+      'tests/unit/controllers/notifications.controller.test.ts',
     ],
     env: {
       NODE_ENV: 'test',

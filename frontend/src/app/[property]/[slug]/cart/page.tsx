@@ -270,6 +270,7 @@ export default function ModuleCartPage() {
             </p>
             
             <Link href={`/${propertySlug}/${slug}`}>
+              <Button>
                 <UtensilsCrossed className="w-5 h-5 mr-2" />
                 {t('backToMenu') || 'Back to Menu'}
               </Button>

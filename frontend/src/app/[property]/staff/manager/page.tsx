@@ -841,7 +841,7 @@ export default function ManagerDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Button variant="outline" className="h-auto p-4 justify-start gap-4" onClick={() => window.location.href = `/${activeProperty?.slug}/admin/reports?type=revenue&period=today`}>
+              <Button variant="outline" className="h-auto p-4 justify-start gap-4" onClick={() => window.location.href = `/${activeProperty?.public_slug}/admin/reports?type=revenue&period=today`}>
                 <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                   <DollarSign className="w-6 h-6 text-blue-600" />
                 </div>
@@ -850,7 +850,7 @@ export default function ManagerDashboard() {
                   <p className="text-sm text-slate-500">Sales breakdown by category</p>
                 </div>
               </Button>
-              <Button variant="outline" className="h-auto p-4 justify-start gap-4" onClick={() => window.location.href = `/${activeProperty?.slug}/admin/reports?type=staff&period=today`}>
+              <Button variant="outline" className="h-auto p-4 justify-start gap-4" onClick={() => window.location.href = `/${activeProperty?.public_slug}/admin/reports?type=staff&period=today`}>
                 <div className="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                   <Users className="w-6 h-6 text-green-600" />
                 </div>
@@ -859,7 +859,7 @@ export default function ManagerDashboard() {
                   <p className="text-sm text-slate-500">Orders, response times</p>
                 </div>
               </Button>
-              <Button variant="outline" className="h-auto p-4 justify-start gap-4" onClick={() => window.location.href = `/${activeProperty?.slug}/admin/reports?type=orders&period=today`}>
+              <Button variant="outline" className="h-auto p-4 justify-start gap-4" onClick={() => window.location.href = `/${activeProperty?.public_slug}/admin/reports?type=orders&period=today`}>
                 <div className="w-12 h-12 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                   <ClipboardList className="w-6 h-6 text-purple-600" />
                 </div>

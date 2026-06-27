@@ -12,6 +12,44 @@ import { getErrorMessage } from "../../types/index.js";
 
 const isProduction = config.env === 'production';
 
+// SECURITY (C-1/H-4): the refresh token lives only in an httpOnly cookie —
+// never in the JSON body, never readable by JS. The session marker is a
+// second, non-httpOnly cookie carrying no token material, used solely so
+// Next.js middleware can tell "is there a session" for route protection
+// without ever handling the real token.
+const REFRESH_TOKEN_COOKIE = 'refreshToken';
+const SESSION_MARKER_COOKIE = 'x-auth-session';
+const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // matches session expiry in auth.service.ts
+
+// Mirrors csrf.middleware.ts's SameSite logic: production runs the frontend
+// on Vercel and the backend on Render — different registrable domains — so
+// cross-site cookies need SameSite=None+Secure. Same-site localhost dev
+// (different port, same host) only needs Lax.
+function authCookieOptions(path: string) {
+  return {
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    path,
+    maxAge: REFRESH_TOKEN_MAX_AGE_MS,
+  };
+}
+
+function setAuthCookies(res: Response, refreshTokenValue: string) {
+  res.cookie(REFRESH_TOKEN_COOKIE, refreshTokenValue, {
+    ...authCookieOptions('/api/v1/auth'),
+    httpOnly: true,
+  });
+  res.cookie(SESSION_MARKER_COOKIE, '1', {
+    ...authCookieOptions('/'),
+    httpOnly: false, // must be readable by Next.js middleware
+  });
+}
+
+function clearAuthCookies(res: Response) {
+  res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
+  res.clearCookie(SESSION_MARKER_COOKIE, { path: '/' });
+}
+
 export async function register(req: Request, res: Response, next: NextFunction) {
   const body = req.body;
   try {
@@ -110,6 +148,9 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const newCsrfToken = generateCsrfToken();
     setCsrfCookie(res, newCsrfToken);
 
+    // SECURITY FIX (C-1): refresh token never leaves the server as JSON.
+    setAuthCookies(res, loginResult.tokens.refreshToken);
+
     await logActivity({
       user_id: loginResult.user.id,
       action: 'LOGIN',
@@ -118,7 +159,14 @@ export async function login(req: Request, res: Response, next: NextFunction) {
       user_agent: req.get('user-agent')
     });
 
-    res.json({ success: true, data: loginResult, csrfToken: newCsrfToken });
+    res.json({
+      success: true,
+      data: {
+        user: loginResult.user,
+        tokens: { accessToken: loginResult.tokens.accessToken },
+      },
+      csrfToken: newCsrfToken,
+    });
   } catch (error: unknown) {
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
@@ -146,13 +194,26 @@ export async function login(req: Request, res: Response, next: NextFunction) {
 }
 
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {
-  const { refreshToken } = req.body;
-  if (!refreshToken) {
-    return res.status(400).json({ success: false, error: 'Refresh token required' });
+  // SECURITY FIX (C-1): refresh token now travels only as an httpOnly
+  // cookie set at login — never read from the request body.
+  const refreshTokenValue = req.cookies?.[REFRESH_TOKEN_COOKIE];
+  if (!refreshTokenValue) {
+    return res.status(401).json({ success: false, error: 'Refresh token required', code: 'INVALID_REFRESH_TOKEN' });
   }
   try {
-    const result = await authService.refreshAccessToken(refreshToken);
-    res.json({ success: true, data: result });
+    const result = await authService.refreshAccessToken(refreshTokenValue);
+
+    // Rotate the refresh-token cookie (auth.service.ts issues a new refresh
+    // token on every call and invalidates the old one in the sessions table).
+    setAuthCookies(res, result.tokens.refreshToken);
+
+    res.json({
+      success: true,
+      data: {
+        user: result.user,
+        tokens: { accessToken: result.tokens.accessToken },
+      },
+    });
   } catch (error: unknown) {
     const message = getErrorMessage(error);
     const lowerMessage = message.toLowerCase();
@@ -163,6 +224,9 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
       lowerMessage.includes('malformed') ||
       lowerMessage.includes('expired')
     ) {
+      // Stale/invalid refresh token — clear both cookies so the client
+      // falls back to a clean login instead of retrying with a dead cookie.
+      clearAuthCookies(res);
       return res.status(401).json({
         success: false,
         error: message,
@@ -181,8 +245,12 @@ export const getCurrentUser = asyncHandler(async (req: Request, res: Response) =
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user!.userId;
-  const refreshToken = req.body?.refreshToken;
-  await authService.logout(userId, refreshToken || undefined);
+  // SECURITY FIX (C-1): refresh token now lives in the httpOnly cookie, not the body.
+  const refreshTokenValue = req.cookies?.[REFRESH_TOKEN_COOKIE];
+  // SECURITY FIX: pass JTI so the access token is immediately blacklisted on logout,
+  // not just after its 15-minute natural expiry.
+  const accessTokenJti = req.user!.jti;
+  await authService.logout(userId, refreshTokenValue || undefined, accessTokenJti);
 
   await logActivity({
     user_id: userId,
@@ -192,6 +260,7 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     user_agent: req.get('user-agent')
   });
 
+  clearAuthCookies(res);
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
