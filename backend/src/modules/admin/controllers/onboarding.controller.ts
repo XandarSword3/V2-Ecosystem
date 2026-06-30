@@ -7,6 +7,7 @@ import Stripe from 'stripe';
 import nodemailer from 'nodemailer';
 import { secretsManager } from '../../../config/secrets.config.js';
 import { TEMPLATE_TO_ENGINE } from '../../../engines/types.js';
+import { upsertTenantIntegration } from '../../platform/tenant-integrations.service.js';
 
 /**
  * Onboarding Controller
@@ -342,17 +343,51 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       faviconUrl: themeData.faviconUrl || null,
     };
 
-    // Pass the secret keys directly to the secrets manager / environment variables (New Bug #1)
-    if (stripeSecret) {
-      await secretsManager.rotate('STRIPE_SECRET_KEY', stripeSecret);
-      process.env.STRIPE_SECRET_KEY = stripeSecret;
-    }
-    if (smtpPass) {
-      process.env.SMTP_PASS = smtpPass;
-    }
-    if (smtpApiKey) {
-      await secretsManager.rotate('SENDGRID_API_KEY', smtpApiKey);
-      process.env.SENDGRID_API_KEY = smtpApiKey;
+    // Persist credentials per-tenant (Critical #1 fix). These previously
+    // mutated process.env directly, which is global to the Node process —
+    // one tenant finishing onboarding would silently overwrite every other
+    // tenant's Stripe/SMTP/SendGrid credentials on the same instance.
+    // Falls back to the legacy process.env behavior only when no tenant is
+    // resolved (single-tenant deployments — see tenantAccess.middleware.ts),
+    // where mutating process.env is harmless since there's only one tenant.
+    const tenantId = req.tenant?.id;
+    if (tenantId) {
+      if (stripeSecret) {
+        await upsertTenantIntegration(
+          tenantId,
+          'stripe',
+          { publicKey: gatewayData.publicKey || '' },
+          stripeSecret,
+        );
+      }
+      if (smtpPass || smtpData.host) {
+        await upsertTenantIntegration(
+          tenantId,
+          'smtp',
+          {
+            host: smtpData.host || '',
+            port: smtpData.port || '',
+            user: smtpData.user || '',
+            fromEmail: smtpData.fromEmail || '',
+          },
+          smtpPass,
+        );
+      }
+      if (smtpApiKey) {
+        await upsertTenantIntegration(tenantId, 'sendgrid', {}, smtpApiKey);
+      }
+    } else {
+      if (stripeSecret) {
+        await secretsManager.rotate('STRIPE_SECRET_KEY', stripeSecret);
+        process.env.STRIPE_SECRET_KEY = stripeSecret;
+      }
+      if (smtpPass) {
+        process.env.SMTP_PASS = smtpPass;
+      }
+      if (smtpApiKey) {
+        await secretsManager.rotate('SENDGRID_API_KEY', smtpApiKey);
+        process.env.SENDGRID_API_KEY = smtpApiKey;
+      }
     }
 
     const finalGatewaySettings = {
@@ -393,7 +428,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       name: modSlug.charAt(0).toUpperCase() + modSlug.slice(1).replace(/_/g, ' '),
       slug: modSlug,
       template_type: modSlug,
-      type: TEMPLATE_TO_ENGINE[modSlug as keyof typeof TEMPLATE_TO_ENGINE] || 'instant_transaction',
+      engine_type: TEMPLATE_TO_ENGINE[modSlug as keyof typeof TEMPLATE_TO_ENGINE] || 'instant_transaction',
       is_active: true,
     }));
 

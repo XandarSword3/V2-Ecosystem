@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { validateBody } from '../../validation/schemas.js';
+import { emitToUnit } from '../../socket/index.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 
@@ -76,7 +77,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       const meta = (order.metadata ?? {}) as Record<string, unknown>;
       return {
         id: order.id,
-        orderNumber: meta.order_number ?? null,
+        orderNumber: (metadata as any)?.order_number ?? null,
         customerName: (meta.customer_name as string) || 'Guest',
         customerId: order.customer_id,
         orderType: order.engine_type,
@@ -436,14 +437,14 @@ export async function getModuleBookings(req: Request, res: Response) {
       const unitRow = Array.isArray((booking as any).unit) ? (booking as any).unit[0] : (booking as any).unit;
       return {
         id: booking.id,
-        bookingNumber: meta.booking_number ?? booking.id ?? null,
+        bookingNumber: (metadata as any)?.booking_number || id ?? null,
         guestName: (meta.customer_name as string) || userRow?.full_name || 'Guest',
         guestEmail: (meta.customer_email as string) || userRow?.email,
         guestPhone: userRow?.phone,
         unitId: booking.reference_id,
         unitName: unitRow?.name || 'Unit',
-        checkIn: meta.check_in_date ?? null,
-        checkOut: meta.check_out_date ?? null,
+        checkIn: (metadata as any)?.check_in_date_date ?? null,
+        checkOut: (metadata as any)?.check_out_date_date ?? null,
         status: booking.status,
         totalPrice: booking.amount,
         guestCount: meta.number_of_guests,
@@ -691,7 +692,7 @@ export async function validateModuleTicket(req: Request, res: Response) {
         valid: true,
         ticket: {
           id: ticket.id,
-          ticketNumber: (meta.ticket_number as string) ?? null,
+          ticketNumber: (metadata as any)?.ticket_number ?? null,
           status: ticket.status,
           guestName: (meta.customer_name as string) || 'Guest',
           sessionName: session?.name,
@@ -941,7 +942,7 @@ export async function getTodaysTickets(req: Request, res: Response) {
         const sess = Array.isArray((t as any).session) ? (t as any).session[0] : (t as any).session;
         return {
           id: t.id,
-          ticketNumber: tMeta.ticket_number ?? null,
+          ticketNumber: (metadata as any)?.ticket_number ?? null,
           customerName: (tMeta.customer_name as string) ?? null,
           customerPhone: (tMeta.customer_phone as string) ?? null,
           guests: tMeta.number_of_guests,
@@ -1129,7 +1130,7 @@ export async function searchCustomers(req: Request, res: Response) {
 
     const rollupFinancialRows = (items: Array<{ customer_id: string; total_amount?: string | number; created_at?: string }> = []) => {
     items.forEach((row) => {
-    const amount = Number(row.total_amount || 0);
+    const amount = Number(amount || 0);
     spendByCustomer[row.customer_id] = (spendByCustomer[row.customer_id] || 0) + amount;
     if (row.created_at) {
     const existing = recentOrderByCustomer[row.customer_id];

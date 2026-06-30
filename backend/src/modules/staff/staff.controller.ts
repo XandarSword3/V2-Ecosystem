@@ -961,8 +961,8 @@ export const searchCustomers = asyncHandler(async (req: Request, res: Response) 
 
   const customerIds = rows.map((u) => u.id);
   const [orderHistory, entitlements, loyaltyAccounts] = await Promise.all([
-    supabase.from('transactions').select('customer_id,amount,created_at,staff_id,metadata').in('customer_id', customerIds),
-    supabase.from('transactions').select('customer_id, status,metadata').eq('engine_type', 'ongoing_entitlement').in('customer_id', customerIds),
+    supabase.from('transactions').select('customer_id,total_amount,created_at,staff_id').in('customer_id', customerIds),
+    supabase.from('transactions').select('customer_id, status').eq('engine_type', 'ongoing_entitlement').in('customer_id', customerIds),
     supabase.from('loyalty_accounts').select('user_id,tier_name').in('user_id', customerIds),
   ]);
 
@@ -971,9 +971,9 @@ export const searchCustomers = asyncHandler(async (req: Request, res: Response) 
   const membershipByCustomer: Record<string, string> = {};
   const tierByCustomer: Record<string, string> = {};
 
-  const rollupFinancialRows = (items: Array<{ customer_id: string; amount?: string | number; created_at?: string }> = []) => {
+  const rollupFinancialRows = (items: Array<{ customer_id: string; total_amount?: string | number; created_at?: string }> = []) => {
     items.forEach((row) => {
-      const amount = Number(row.amount || 0);
+      const amount = Number(row.total_amount || 0);
       spendByCustomer[row.customer_id] = (spendByCustomer[row.customer_id] || 0) + amount;
       if (row.created_at) {
         const existing = recentOrderByCustomer[row.customer_id];

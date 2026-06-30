@@ -363,12 +363,7 @@ export class InventoryController {
         .select('*', { count: 'exact' })
         .eq('is_active', true);
 
-      // Apply module/property scope
-      if (moduleIds !== null) {
-        query = query.in('module_id', moduleIds);
-      } else if (moduleId) {
-        query = query.eq('module_id', moduleId as string);
-      }
+      // Module filtering not applicable - inventory_items doesn't have module_id column
 
       if (categoryId) {
         query = query.eq('category_id', categoryId as string);

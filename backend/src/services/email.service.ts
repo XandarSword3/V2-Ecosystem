@@ -11,6 +11,8 @@ interface EmailOptions {
   template?: string;
   context?: any;
   data?: any;
+  /** Pass the tenant's ID to use their own SMTP credentials from tenant_integrations */
+  tenantId?: string;
   attachments?: Array<{
     filename: string;
     content: string | Buffer;
@@ -56,6 +58,36 @@ class EmailService {
       const err = error as Error;
       logger.error('Failed to initialize email service:', err.message);
       this.isConfigured = false;
+    }
+  }
+
+  /**
+   * Build a transporter using a tenant's SMTP credentials from tenant_integrations.
+   * Returns null if the tenant has no SMTP integration configured.
+   */
+  private async getTenantTransporter(tenantId: string): Promise<nodemailer.Transporter | null> {
+    try {
+      const { getTenantIntegration } = await import('../database/connection.js').then(
+        () => import('../modules/platform/tenant-integrations.service.js')
+      );
+      const integration = await getTenantIntegration(tenantId, 'smtp');
+      if (!integration) return null;
+
+      const { config: cfg, credential: pass } = integration;
+      const host = cfg.host as string;
+      const port = parseInt(String(cfg.port || '587'), 10);
+      const user = cfg.user as string;
+
+      if (!host || !user || !pass) return null;
+
+      return nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+      });
+    } catch {
+      return null;
     }
   }
 
@@ -147,7 +179,17 @@ class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
-    if (!this.isConfigured || !this.transporter) {
+    // Resolve transporter: prefer tenant-specific SMTP if tenantId provided,
+    // fall back to platform SMTP (process.env / constructor init)
+    let transporter = this.transporter;
+    if (options.tenantId) {
+      const tenantTransporter = await this.getTenantTransporter(options.tenantId);
+      if (tenantTransporter) {
+        transporter = tenantTransporter;
+      }
+    }
+
+    if (!transporter) {
       logger.warn('Email not sent - service not configured');
       return false;
     }
@@ -180,7 +222,7 @@ class EmailService {
     const fromName = process.env.SMTP_FROM_NAME || 'Your Business';
 
     try {
-      const info = await this.transporter.sendMail({
+      const info = await transporter.sendMail({
         from: `"${fromName}" <${fromAddress}>`,
         to: options.to,
         subject: options.subject,

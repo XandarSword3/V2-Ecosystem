@@ -250,7 +250,7 @@ describe('ReviewsService', () => {
       expect(result).toBeDefined();
       expect(result.id).toBe('new-review-1');
       expect(result.rating).toBe(5);
-      expect(result.customer_id).toBe(userId);
+      expect(result.user_id).toBe(userId);
       expect(result.is_approved).toBe(false);
     });
 
