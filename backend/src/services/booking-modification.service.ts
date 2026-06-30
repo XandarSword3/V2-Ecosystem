@@ -147,7 +147,7 @@ export async function cancelReservation(
     }
 
     const checkInDate = booking.metadata?.check_in_date
-      ? new Date(booking.metadata?.check_in_date as string)
+      ? new Date(booking.(metadata as any)?.check_in_date_date)
       : new Date();
     const policy = getCancellationPolicy(checkInDate);
     const { refundAmount, creditAmount } = calculateRefund(Number(booking.amount || 0), policy);

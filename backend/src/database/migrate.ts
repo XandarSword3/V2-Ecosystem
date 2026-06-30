@@ -228,7 +228,7 @@ export async function migrate() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS transactions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        module_id UUID REFERENCES modules(id) ON DELETE SET NULL,
+        metadata_id UUID REFERENCES modules(id) ON DELETE SET NULL,
         engine_type VARCHAR(50) NOT NULL,
         property_id UUID,
         status VARCHAR(50) NOT NULL DEFAULT 'pending',
@@ -252,7 +252,7 @@ export async function migrate() {
       ALTER TABLE transactions ALTER COLUMN reference_table DROP NOT NULL;
 
       CREATE INDEX IF NOT EXISTS idx_transactions_engine_type ON transactions(engine_type);
-      CREATE INDEX IF NOT EXISTS idx_transactions_module_id ON transactions(module_id);
+      CREATE INDEX IF NOT EXISTS idx_transactions_metadata_id ON transactions(metadata_id);
       CREATE INDEX IF NOT EXISTS idx_transactions_customer_id ON transactions(customer_id);
       CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
       CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);

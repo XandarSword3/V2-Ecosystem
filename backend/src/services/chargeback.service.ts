@@ -246,7 +246,7 @@ class ChargebackService {
 
     const resolved = stats.won + stats.lost;
     if (resolved > 0) stats.win_rate = (stats.won / resolved) * 100;
-    if (stats.total_count > 0) stats.average_amount = stats.total_amount / stats.total_count;
+    if (stats.total_count > 0) stats.average_amount = amount / stats.total_count;
     return stats;
   }
 

@@ -601,6 +601,27 @@ export class MobileCheckinService {
 
     if (!key) throw new Error('Mobile key record not found');
 
+    // Retry helper: up to 3 attempts with exponential backoff.
+    // Door lock vendor APIs are occasionally flaky; a guest who can't
+    // get into their room is the worst possible hospitality failure.
+    const withRetry = async <T>(fn: () => Promise<T>, label: string): Promise<T> => {
+      const MAX_ATTEMPTS = 3;
+      let lastErr: unknown;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          return await fn();
+        } catch (err) {
+          lastErr = err;
+          if (attempt < MAX_ATTEMPTS) {
+            const delayMs = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms
+            logger.warn(`[MobileKey] ${label} attempt ${attempt} failed — retrying in ${delayMs}ms`, { err });
+            await new Promise(r => setTimeout(r, delayMs));
+          }
+        }
+      }
+      throw lastErr;
+    };
+
     let providerCredential: Record<string, string>;
 
     switch (key.provider?.toLowerCase()) {
@@ -608,13 +629,15 @@ export class MobileCheckinService {
         const apiKey = process.env.ASSA_ABLOY_API_KEY;
         const endpoint = process.env.ASSA_ABLOY_ENDPOINT;
         if (!apiKey || !endpoint) throw new Error('ASSA ABLOY credentials not configured');
-        const resp = await fetch(`${endpoint}/credentials`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ keyId }),
-        });
-        if (!resp.ok) throw new Error(`ASSA ABLOY credential issuance failed: ${resp.status}`);
-        const body = await resp.json() as { credentialId: string; encryptedKey: string };
+        const body = await withRetry(async () => {
+          const resp = await fetch(`${endpoint}/credentials`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyId }),
+          });
+          if (!resp.ok) throw new Error(`ASSA ABLOY credential issuance failed: ${resp.status}`);
+          return resp.json() as Promise<{ credentialId: string; encryptedKey: string }>;
+        }, 'ASSA_ABLOY');
         providerCredential = { credentialId: body.credentialId, encryptedKey: body.encryptedKey, issuedAt: new Date().toISOString() };
         break;
       }
@@ -622,13 +645,15 @@ export class MobileCheckinService {
         const apiKey = process.env.SALTO_API_KEY;
         const endpoint = process.env.SALTO_ENDPOINT;
         if (!apiKey || !endpoint) throw new Error('Salto credentials not configured');
-        const resp = await fetch(`${endpoint}/mobile-access/issue`, {
-          method: 'POST',
-          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference: keyId }),
-        });
-        if (!resp.ok) throw new Error(`Salto credential issuance failed: ${resp.status}`);
-        const body = await resp.json() as { accessToken: string };
+        const body = await withRetry(async () => {
+          const resp = await fetch(`${endpoint}/mobile-access/issue`, {
+            method: 'POST',
+            headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference: keyId }),
+          });
+          if (!resp.ok) throw new Error(`Salto credential issuance failed: ${resp.status}`);
+          return resp.json() as Promise<{ accessToken: string }>;
+        }, 'Salto');
         providerCredential = { credentialId: body.accessToken, encryptedKey: '', issuedAt: new Date().toISOString() };
         break;
       }
@@ -636,13 +661,15 @@ export class MobileCheckinService {
         const apiKey = process.env.OPENKEY_API_KEY;
         const endpoint = process.env.OPENKEY_ENDPOINT || 'https://api.openkey.co';
         if (!apiKey) throw new Error('OpenKey credentials not configured');
-        const resp = await fetch(`${endpoint}/v1/keys`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ externalId: keyId }),
-        });
-        if (!resp.ok) throw new Error(`OpenKey credential issuance failed: ${resp.status}`);
-        const body = await resp.json() as { keyId: string; payload: string };
+        const body = await withRetry(async () => {
+          const resp = await fetch(`${endpoint}/v1/keys`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ externalId: keyId }),
+          });
+          if (!resp.ok) throw new Error(`OpenKey credential issuance failed: ${resp.status}`);
+          return resp.json() as Promise<{ keyId: string; payload: string }>;
+        }, 'OpenKey');
         providerCredential = { credentialId: body.keyId, encryptedKey: body.payload, issuedAt: new Date().toISOString() };
         break;
       }

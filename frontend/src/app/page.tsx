@@ -19,8 +19,11 @@ async function validateTenant(tenantSlug: string | null): Promise<boolean> {
 
     return res.ok;
   } catch {
-    // If backend is unreachable, allow through (fail open)
-    return true;
+    // Backend unreachable — fail closed. Returning true here would let any
+    // subdomain render during outages, which is a mild security bypass.
+    // During outages legitimate tenants will see a 404; that is preferable
+    // to serving content to unregistered subdomains.
+    return false;
   }
 }
 

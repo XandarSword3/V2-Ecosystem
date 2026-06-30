@@ -162,7 +162,7 @@ export const getMissingTranslations = asyncHandler(async (req: Request, res: Res
 
         // Scope module-owned tables to active modules in this property/tenant
         if (tableConfig.templateType !== null && moduleIds.length > 0) {
-          tableQuery = tableQuery.in('module_id', moduleIds);
+          tableQuery = tableQuery.in('metadata_id', moduleIds);
         }
         // Scope the modules table itself by property/tenant directly
         if (tableConfig.table === 'modules') {
@@ -248,7 +248,7 @@ export const getTranslationStats = asyncHandler(async (req: Request, res: Respon
 
         // Scope module-owned tables to active modules in this property/tenant
         if (tableConfig.templateType !== null && moduleIds.length > 0) {
-          tableQuery = tableQuery.in('module_id', moduleIds);
+          tableQuery = tableQuery.in('metadata_id', moduleIds);
         }
         // Scope the modules table itself by property/tenant directly
         if (tableConfig.table === 'modules') {

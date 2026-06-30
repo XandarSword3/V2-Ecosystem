@@ -11,24 +11,22 @@ import { logger } from '../../../utils/logger.js';
  * SiteMinder Channel Manager Adapter
  *
  * Implements the OTAAdapter interface using SiteMinder's REST API.
- * Credentials are read from environment variables:
- *   SITEMINDER_API_KEY      — Bearer token / API key
- *   SITEMINDER_PROPERTY_ID  — Property/hotel identifier in SiteMinder
- *   SITEMINDER_BASE_URL     — Base URL (default: https://api.siteminder.com)
+ * Credentials are resolved in priority order:
+ *   1. Constructor params (from tenant_integrations DB row via getTenantIntegration)
+ *   2. Environment variables (legacy single-tenant / platform-level fallback)
  *
- * All methods throw with a descriptive message if credentials are missing,
- * so the channel service can surface a proper error to the admin rather than
- * silently returning empty data.
+ * The channel service is responsible for resolving and passing per-tenant
+ * credentials so multiple tenants can each have their own SiteMinder account.
  */
 export class SiteMinderAdapter implements OTAAdapter {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly propertyId: string;
 
-  constructor() {
-    this.baseUrl   = process.env.SITEMINDER_BASE_URL    || 'https://api.siteminder.com';
-    this.apiKey    = process.env.SITEMINDER_API_KEY     || '';
-    this.propertyId = process.env.SITEMINDER_PROPERTY_ID || '';
+  constructor(credentials?: { apiKey?: string; propertyId?: string; baseUrl?: string }) {
+    this.baseUrl    = credentials?.baseUrl    || process.env.SITEMINDER_BASE_URL    || 'https://api.siteminder.com';
+    this.apiKey     = credentials?.apiKey     || process.env.SITEMINDER_API_KEY     || '';
+    this.propertyId = credentials?.propertyId || process.env.SITEMINDER_PROPERTY_ID || '';
   }
 
   getName(): string {
@@ -38,7 +36,7 @@ export class SiteMinderAdapter implements OTAAdapter {
   private assertConfigured(): void {
     if (!this.apiKey || !this.propertyId) {
       throw new Error(
-        'SiteMinder not configured. Set SITEMINDER_API_KEY and SITEMINDER_PROPERTY_ID environment variables.'
+        'SiteMinder not configured for this tenant. Configure SiteMinder credentials via Settings → Integrations or set SITEMINDER_API_KEY and SITEMINDER_PROPERTY_ID environment variables.'
       );
     }
   }

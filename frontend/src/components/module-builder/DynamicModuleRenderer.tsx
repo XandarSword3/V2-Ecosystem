@@ -961,6 +961,19 @@ export function BlockRenderer({
                 {props.buttonText || 'Get Started'}
               </span>
             </button>
+            {isEditing && (
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <span className="text-white/50 text-xs font-mono">URL:</span>
+                <span
+                  className="text-white/70 text-xs font-mono underline underline-offset-2 min-w-[120px] outline-none border-b border-white/30 focus:border-white/70 px-1"
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => onUpdateProps?.({ buttonUrl: e.currentTarget.textContent?.trim() || '' })}
+                >
+                  {props.buttonUrl || 'https://'}
+                </span>
+              </div>
+            )}
           </motion.div>
         </div>
       );
