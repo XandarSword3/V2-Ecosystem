@@ -126,12 +126,15 @@ export class RateLimiterService {
       return config.keyGenerator(req);
     }
 
-    // Default: IP + user ID (if authenticated)
+    // Default: tenantId + IP + user ID — tenant-scoped so one abusive tenant
+    // cannot exhaust rate-limit headroom for all other tenants sharing the
+    // same IP range, NAT, or proxy.
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const userId = req.user?.id || 'anon';
+    const tenantId = (req as any).tenant?.id || 'platform';
     const path = this.normalizePath(req.path);
 
-    return `ratelimit:${ip}:${userId}:${path}`;
+    return `ratelimit:${tenantId}:${ip}:${userId}:${path}`;
   }
 
   private normalizePath(path: string): string {

@@ -811,12 +811,12 @@ export class MetricsLayerService {
       const meta = (b.metadata ?? {}) as Record<string, unknown>;
       return {
         id: b.id,
-        check_in_date:  (meta.check_in_date_date as string)  ?? b.created_at,
-        guest_name:     (meta.guest_name as string)     ?? (meta.customer_name as string) ?? null,
-        unit_id:        (meta.unit_id as string)        ?? null,
-        booking_number: (meta.booking_number as string) ?? b.id ?? null,
+        check_in_date:  (metadata as any)?.check_in_date_date  ?? b.created_at,
+        guest_name:     meta.guest_name     ?? meta.customer_name ?? null,
+        unit_id:        meta.unit_id        ?? null,
+        booking_number: (metadata as any)?.booking_number || id ?? null,
         amount: b.amount,
-        source: (meta.source as string) ?? null,
+        source: (metadata as any)?.source ?? null,
         status: b.status,
       };
     });
@@ -1229,13 +1229,13 @@ export class MetricsLayerService {
     // Recent transactions (replaces separate per-module transaction queries)
     const { data: recentTx } = await this.supabase
       .from('transactions')
-      .select('id, created_at, status, engine_type, module_id, reference_table, metadata')
+      .select('id, created_at, status, engine_type, metadata_id, reference_table, metadata')
       .eq('property_id', propertyId)
       .order('created_at', { ascending: false })
       .limit(8);
 
     for (const tx of (recentTx || [])) {
-      const mod = moduleMap[tx.module_id] || { name: tx.reference_table, engine: tx.engine_type };
+      const mod = moduleMap[tx.metadata_id] || { name: tx.reference_table, engine: tx.engine_type };
       const refLabel = tx.metadata?.order_number || tx.metadata?.booking_number || tx.metadata?.ticket_number || tx.id.slice(0, 8);
       events.push({
         id: tx.id,
@@ -1362,7 +1362,7 @@ export class MetricsLayerService {
     // 2. Get today's transactions
     const { data: todayTx } = await this.supabase
       .from('transactions')
-      .select('engine_type, module_id, status, amount')
+      .select('engine_type, metadata_id, status, amount')
       .eq('property_id', propertyId)
       .gte('created_at', todayStart)
       .lte('created_at', todayEnd);
@@ -1370,7 +1370,7 @@ export class MetricsLayerService {
     // 3. Get yesterday's transactions
     const { data: yesterdayTx } = await this.supabase
       .from('transactions')
-      .select('engine_type, module_id, status, amount')
+      .select('engine_type, metadata_id, status, amount')
       .eq('property_id', propertyId)
       .gte('created_at', yesterdayStart)
       .lte('created_at', yesterdayEnd);
@@ -1415,7 +1415,7 @@ export class MetricsLayerService {
     for (const tx of (todayTx || [])) {
       const group = moduleGroups[tx.engine_type];
       if (group) {
-        const mod = group.find(m => m.moduleId === tx.module_id);
+        const mod = group.find(m => m.moduleId === tx.metadata_id);
         if (mod) {
           mod.revenueToday += tx.amount || 0;
           mod.transactionCountToday += 1;

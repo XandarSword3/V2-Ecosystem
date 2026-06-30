@@ -83,7 +83,7 @@ export const getDeletedRecords = asyncHandler(async (req: Request, res: Response
           identifier = record.email || record.full_name;
           break;
         case 'transactions':
-          identifier = (record.metadata as any)?.ticket_number || (record.metadata as any)?.order_number || (record.metadata as any)?.booking_number || record.id || record.customer_name;
+          identifier = (metadata as any)?.ticket_number || (metadata as any)?.order_number || (metadata as any)?.booking_number || id || record.customer_name;
           break;
         case 'accommodation_units':
           identifier = record.name;

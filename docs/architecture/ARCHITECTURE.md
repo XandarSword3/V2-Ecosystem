@@ -92,14 +92,14 @@ Every transaction follows the same pipeline:
         ↓
 7. Payment Processing (Stripe integration)
         ↓
-8. Unified Transaction Record (transactions table)
+8. Unified Transaction Record (transactions table — single source of truth)
         ↓
-9. Sync Trigger (updates source table: restaurant_orders, chalet_bookings, etc.)
+9. Real-time Event (Socket.io emit)
         ↓
-10. Real-time Event (Socket.io emit)
-        ↓
-11. Client Response (transaction_id, state, pricing breakdown)
+10. Client Response (transaction_id, state, pricing breakdown)
 ```
+
+> **Architecture Law**: All financial and access events are recorded exclusively in the `transactions` table with `engine_type` + `metadata` JSONB. There are no parallel per-engine tables (no `restaurant_orders`, `chalet_bookings`, `pool_tickets`). Any reference to such tables in older code or documentation is legacy and should be treated as a bug.
 
 ---
 
@@ -211,7 +211,7 @@ Customer → Frontend → POST /api/v1/payments/intent
   → Engine: instant_transaction
   → State: pending → confirmed
   → Side Effect: Inventory deduction
-  → Table: restaurant_orders (via sync trigger)
+  → Table: transactions (engine_type = 'instant_transaction')
 ```
 
 ### Example 2: Chalet Booking (Time-Exclusive Reservation)
@@ -220,7 +220,7 @@ Customer → Frontend → POST /api/bookings
   → Engine: time_exclusive_reservation
   → State: pending → confirmed → checked_in → checked_out
   → Side Effect: Calendar hold, housekeeping schedule
-  → Table: chalet_bookings (via sync trigger)
+  → Table: transactions (engine_type = 'time_exclusive_reservation')
 ```
 
 ### Example 3: Pool Session (Shared Capacity Access)
@@ -229,7 +229,7 @@ Customer → Frontend → POST /api/pool/tickets
   → Engine: shared_capacity_access
   → State: valid → active → used
   → Side Effect: Capacity check, entry/exit logging
-  → Table: pool_tickets (via sync trigger)
+  → Table: transactions (engine_type = 'shared_capacity_access')
 ```
 
 ---

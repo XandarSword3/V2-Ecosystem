@@ -13,7 +13,7 @@ type PeriodAggregateRow = {
 };
 
 type ModuleAggregateRow = {
-  module_id: string | null;
+  metadata_id: string | null;
   name: string;
   slug: string;
   engine_type: string;
@@ -79,14 +79,14 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
     // engine_type. No hardcoded slugs. Works for any module configuration.
     const DYNAMIC_AGG_SQL = `
       SELECT
-        m.id        AS module_id,
+        m.id        AS metadata_id,
         COALESCE(m.name, t.engine_type) AS name,
         COALESCE(m.slug, t.engine_type) AS slug,
         t.engine_type,
         COUNT(*)::int                    AS count,
         COALESCE(SUM(t.amount), 0)       AS revenue
       FROM transactions t
-      LEFT JOIN modules m ON t.module_id = m.id
+      LEFT JOIN modules m ON t.metadata_id = m.id
       WHERE t.property_id = $3 AND t.created_at BETWEEN $1 AND $2
       GROUP BY m.id,
                COALESCE(m.name, t.engine_type),
@@ -146,7 +146,7 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
     let totalOrders = 0;
     let totalBookings = 0;
     for (const row of currentAgg.rows) {
-      const key = row.module_id ?? row.engine_type;
+      const key = row.metadata_id ?? row.engine_type;
       const existing = moduleMap.get(key) ?? { slug: row.slug, name: row.name, revenue: 0, count: 0 };
       existing.revenue += toNumber(row.revenue);
       existing.count += toNumber(row.count);
@@ -224,13 +224,13 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
   const [allCurrentRes, allPreviousRes, usersRes, txsForTop] = await Promise.all([
     supabase
       .from('transactions')
-      .select('id, amount, created_at, engine_type, module_id')
+      .select('id, amount, created_at, engine_type, metadata_id')
       .eq('property_id', propertyId)
       .gte('created_at', startISO)
       .lte('created_at', endISO),
     supabase
       .from('transactions')
-      .select('id, amount, engine_type, module_id')
+      .select('id, amount, engine_type, metadata_id')
       .eq('property_id', propertyId)
       .gte('created_at', prevStartISO)
       .lte('created_at', prevEndISO),
@@ -256,10 +256,10 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
   let totalOrders = 0;
   let totalBookings = 0;
   (allCurrentRes.data || []).forEach((tx: any) => {
-    const mod = tx.module_id ? modulesById.get(tx.module_id) : null;
+    const mod = tx.metadata_id ? modulesById.get(tx.metadata_id) : null;
     const slug = mod?.slug ?? tx.engine_type;
     const name = mod?.name ?? tx.engine_type;
-    const key = tx.module_id ?? tx.engine_type;
+    const key = tx.metadata_id ?? tx.engine_type;
     const existing = moduleMap.get(key) ?? { slug, name, revenue: 0, count: 0 };
     existing.revenue += Number(tx.amount) || 0;
     existing.count += 1;
@@ -315,7 +315,7 @@ export const getOverviewReport = asyncHandler(async (req: Request, res: Response
   // Legacy revenueByService shape — derived from aggregation rows, not hardcoded
   const legacyService: Record<string, number> = {};
   (allCurrentRes.data || []).forEach((tx: any) => {
-    const mod = tx.module_id ? modulesById.get(tx.module_id) : null;
+    const mod = tx.metadata_id ? modulesById.get(tx.metadata_id) : null;
     const amount = Number(tx.amount) || 0;
     if (tx.engine_type === 'time_exclusive_reservation') {
       legacyService.reservation_units = (legacyService.reservation_units ?? 0) + amount;
@@ -519,17 +519,17 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
   // 2. moduleSlug param — look up from modules table
   // 3. engineType param — filter by engine_type column
   // 4. Legacy `type` param — map to engine_type or slug
-  let queryFilter: { by: 'module_id' | 'engine_type'; value: string } | null = null;
+  let queryFilter: { by: 'metadata_id' | 'engine_type'; value: string } | null = null;
 
   if (moduleId) {
-    queryFilter = { by: 'module_id', value: moduleId };
+    queryFilter = { by: 'metadata_id', value: moduleId };
   } else if (moduleSlug || legacyType) {
     const targetSlug = moduleSlug || legacyType;
     const { data: modulesList } = await supabase.from('modules').select('id, slug').eq('property_id', propertyId);
     const modulesMap = new Map((modulesList || []).map((m: any) => [m.slug, m.id]));
     const resolvedId = modulesMap.get(targetSlug);
     if (resolvedId) {
-      queryFilter = { by: 'module_id', value: resolvedId };
+      queryFilter = { by: 'metadata_id', value: resolvedId };
     }
     // If slug doesn't match any active module, queryFilter stays null → 400 below.
   } else if (engineTypeParam) {
@@ -550,8 +550,8 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
     .lte('created_at', endISO)
     .order('created_at', { ascending: false });
 
-  if (queryFilter.by === 'module_id') {
-    txQuery = txQuery.eq('module_id', queryFilter.value);
+  if (queryFilter.by === 'metadata_id') {
+    txQuery = txQuery.eq('metadata_id', queryFilter.value);
   } else {
     txQuery = txQuery.eq('engine_type', queryFilter.value);
   }

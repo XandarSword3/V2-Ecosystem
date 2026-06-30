@@ -30,6 +30,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
+import { emailService } from '../../services/email.service.js';
 import type { SubscriptionTier, BillingStatus } from '../../middleware/tenantAccess.middleware.js';
 import { invalidateTenantCache } from '../../middleware/tenantAccess.middleware.js';
 
@@ -415,13 +416,37 @@ export class ProvisioningService {
     subdomain: string,
     tempPassword: string,
   ): Promise<void> {
-    // TODO: integrate with EmailService when ready.
-    // For now, log the credentials so they're available during development.
-    logger.info('[PROVISIONING] Welcome email queued', {
+    const loginUrl = `https://${subdomain}.v2platform.com/login`;
+
+    const sent = await emailService.sendEmail({
+      to: email,
+      subject: 'Your V2 Ecosystem account is ready',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1>Welcome, ${name}!</h1>
+          <p>Your V2 Ecosystem account has been created.</p>
+          <p><strong>Login URL:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Temporary password:</strong> ${tempPassword}</p>
+          <p>You'll be asked to set a new password the first time you sign in.</p>
+        </div>
+      `,
+    });
+
+    if (sent) {
+      logger.info('[PROVISIONING] Welcome email sent', { email, subdomain });
+      return;
+    }
+
+    // Send failed (SMTP not configured, etc.) — log as a fallback so the
+    // credentials aren't lost outright. Same dev-only redaction as before;
+    // in production this means a failed send currently has no recovery path
+    // other than the password-reset flow — flagged in CONTEXT.md as a
+    // follow-up (e.g. an admin "resend welcome email" action).
+    logger.warn('[PROVISIONING] Welcome email failed to send — credentials logged for manual delivery', {
       email,
       subdomain,
-      loginUrl: `https://${subdomain}.v2platform.com/login`,
-      note: 'temp password logged for dev — replace with email delivery in production',
+      loginUrl,
       tempPassword: process.env.NODE_ENV === 'production' ? '[REDACTED]' : tempPassword,
     });
   }

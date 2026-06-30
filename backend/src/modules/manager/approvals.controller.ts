@@ -196,7 +196,13 @@ export class ApprovalsController {
 
       if (error) throw error;
 
-      // Notify managers via socket
+      // Notify managers via socket — tenant-scoped. `role:{r}` is a global
+      // cross-tenant room (every tenant's admins); broadcasting an approval
+      // there means every admin on the platform sees every other tenant's
+      // approval requests. Must use the compound `tenant:{id}:role:{r}` room
+      // instead (see socket/index.ts broadcastOnlineUsersToAdmins for why
+      // .to(roomA).to(roomB) is a union, not an intersection, and can't be
+      // used to combine tenant+role scoping).
       const io = getIO();
       if (io) {
         // Get requester name
@@ -206,18 +212,27 @@ export class ApprovalsController {
           .eq('id', userId)
           .single();
 
-        io.to('role:admin').to('role:super_admin').to('role:manager').emit('approval:new', {
+        const payload = {
           approval: {
             ...approval,
             requested_by_name: requester?.full_name || 'Staff Member',
           },
-        });
-        io.to('role:admin').to('role:super_admin').to('role:manager').emit('new_approval_request', {
-          approval: {
-            ...approval,
-            requested_by_name: requester?.full_name || 'Staff Member',
-          },
-        });
+        };
+
+        const tenantId = req.tenant?.id;
+        if (tenantId) {
+          io.to(`tenant:${tenantId}:role:admin`)
+            .to(`tenant:${tenantId}:role:manager`)
+            .emit('approval:new', payload);
+          io.to(`tenant:${tenantId}:role:admin`)
+            .to(`tenant:${tenantId}:role:manager`)
+            .emit('new_approval_request', payload);
+        }
+        // super_admin keeps platform-wide visibility — intentional, the one
+        // role allowed to see across tenants (same exception as
+        // broadcastOnlineUsersToAdmins).
+        io.to('role:super_admin').emit('approval:new', payload);
+        io.to('role:super_admin').emit('new_approval_request', payload);
       }
 
       res.status(201).json({

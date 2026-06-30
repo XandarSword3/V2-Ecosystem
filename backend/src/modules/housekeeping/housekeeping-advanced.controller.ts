@@ -636,18 +636,18 @@ export class HousekeepingAdvancedController {
       const today = new Date().toISOString().split('T')[0];
       const { data: nextBooking } = await supabase
         .from('transactions')
-        .select('id, metadata')
+        .select('id, check_in')
         .eq('engine_type', 'time_exclusive_reservation')
         .eq('unit_id', chaletId)
         .filter('metadata->>check_in_date', 'gte', today)
-        .order('metadata->>check_in_date', { ascending: true })
+        .order('check_in', { ascending: true })
         .limit(1)
         .single();
 
       // Determine priority based on next booking
       let priority: 'low' | 'medium' | 'high' | 'urgent' = 'medium';
       if (nextBooking) {
-        const nextCheckIn = new Date((nextBooking.metadata as any)?.check_in_date);
+        const nextCheckIn = new Date(nextBooking.check_in);
         const hoursUntilCheckIn = (nextCheckIn.getTime() - Date.now()) / (1000 * 60 * 60);
         if (hoursUntilCheckIn < 4) priority = 'urgent';
         else if (hoursUntilCheckIn < 8) priority = 'high';
@@ -676,7 +676,7 @@ export class HousekeepingAdvancedController {
           task_type: 'turnover',
           priority,
           status: assignedStaff ? 'assigned' : 'pending',
-          notes: `Auto-generated from checkout. Booking #${bookingId}. ${nextBooking ? `Next check-in at ${(nextBooking.metadata as any)?.check_in_date}` : 'No upcoming booking'}`,
+          notes: `Auto-generated from checkout. Booking #${bookingId}. ${nextBooking ? `Next check-in at ${nextBooking.check_in}` : 'No upcoming booking'}`,
           assigned_to: assignedStaff?.id,
           scheduled_for: checkoutTime || now.toISOString(),
           booking_id: bookingId,
@@ -714,9 +714,10 @@ export class HousekeepingAdvancedController {
     // Get all housekeeping staff
     const { data: staff } = await supabase
       .from('users')
-      .select('id, full_name')
+      .select('id, full_name, shift_start, shift_end')
       .contains('roles', ['staff'])
-      .eq('is_active', true); // department filter removed — users.department column dropped in schema normalization
+      .eq('department', 'housekeeping')
+      .eq('is_active', true);
 
     if (!staff || staff.length === 0) return null;
 
@@ -901,9 +902,9 @@ export class HousekeepingAdvancedController {
 
       const { data: todayBookings } = await supabase
         .from('transactions')
-        .select('unit_id, status, metadata')
+        .select('unit_id, check_in, check_out, status, metadata')
         .eq('engine_type', 'time_exclusive_reservation')
-        .or(`metadata->>check_in_date.gte.${today},metadata->>check_out_date.gte.${today}`)
+        .or(`check_in.gte.${today},check_out.gte.${today}`)
         .filter('metadata->>check_in_date', 'lte', tomorrow);
 
       // Get active tasks
@@ -917,7 +918,8 @@ export class HousekeepingAdvancedController {
         .from('users')
         .select('id, full_name')
         .contains('roles', ['staff'])
-        .eq('is_active', true); // department filter removed — users.department column dropped
+        .eq('department', 'housekeeping')
+        .eq('is_active', true);
 
       // Calculate metrics
       const totalRooms = (units || []).length;
@@ -1002,9 +1004,10 @@ export class HousekeepingAdvancedController {
       // Get all housekeeping staff
       const { data: staff } = await supabase
         .from('users')
-        .select('id, full_name')
+        .select('id, full_name, department')
         .contains('roles', ['staff'])
-        .eq('is_active', true); // department filter removed — users.department column dropped
+        .eq('department', 'housekeeping')
+        .eq('is_active', true);
 
       if (!staff || staff.length === 0) {
         return res.json({ success: true, data: [] });

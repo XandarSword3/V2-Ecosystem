@@ -47,10 +47,10 @@ describe('BusinessMetricsService', () => {
   describe('getBookingMetrics', () => {
     it('should return booking metrics for default period', async () => {
       const mockBookings = [
-        { status: 'confirmed', amount: 100, metadata: { room_type: 'suite', source: 'direct' } },
-        { status: 'confirmed', amount: 150, metadata: { room_type: 'standard', source: 'booking.com' } },
-        { status: 'pending', amount: 80, metadata: { room_type: 'suite', source: 'direct' } },
-        { status: 'cancelled', amount: 120, metadata: { room_type: 'deluxe', source: 'expedia' } },
+        { status: 'confirmed', amount: 100, room_type: 'suite', source: 'direct' },
+        { status: 'confirmed', amount: 150, room_type: 'standard', source: 'booking.com' },
+        { status: 'pending', amount: 80, room_type: 'suite', source: 'direct' },
+        { status: 'cancelled', amount: 120, room_type: 'deluxe', source: 'expedia' },
       ];
 
       vi.mocked(supabase.from).mockReturnValue(createQueryMock(mockBookings));
