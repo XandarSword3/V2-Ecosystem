@@ -140,7 +140,7 @@ export default function DynamicOrdersPage() {
 
   const updateStatus = async (orderId: string, status: string) => {
     try {
-      await api.put(`/${slug}/staff/orders/${orderId}/status`, { status });
+      await api.put(`/staff/modules/${slug}/orders/${orderId}/status`, { status });
       toast.success(`Order status updated to ${status}`);
       fetchOrders();
       if (selectedOrder?.id === orderId) {
