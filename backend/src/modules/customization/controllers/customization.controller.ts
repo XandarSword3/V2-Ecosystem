@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../../middleware/async-handler.js';
 import { customizationService } from '../services/customization.service.js';
 import { logger } from '../../../utils/logger.js';
+import { AppError } from '../../../utils/AppError.js';
 import type {
   CustomizableEntityType,
   CreateCustomizationGroupRequest,
@@ -12,6 +13,20 @@ import type {
   UpdateEntityCustomizationRequest,
   CustomizationSelection
 } from '../services/customization.service.js';
+
+/**
+ * Resolve the tenant scope a request should be limited to.
+ * super_admin is the platform-wide operator role and intentionally sees
+ * everything; every other scope is confined to its own tenant.
+ * Mirrors the same convention used in auth.middleware's authorize() guard.
+ */
+function tenantScopeFor(req: Request): string | null {
+  if (req.user?.scope === 'super_admin') return null;
+  if (!req.user?.tenantId) {
+    throw new AppError('No tenant associated with this account', 403);
+  }
+  return req.user.tenantId;
+}
 
 /**
  * Unified Customization Controller
@@ -44,7 +59,7 @@ class CustomizationController {
         return;
       }
 
-      const group = await customizationService.createGroup(data);
+      const group = await customizationService.createGroup(data, { tenantId: tenantScopeFor(req) });
       
       logger.info('Customization group created', { groupId: group.id, name: group.name });
       res.status(201).json(group);
@@ -57,7 +72,7 @@ class CustomizationController {
       const { id } = req.params;
       const data: UpdateCustomizationGroupRequest = req.body;
 
-      const group = await customizationService.updateGroup(id, data);
+      const group = await customizationService.updateGroup(id, data, tenantScopeFor(req));
       
       logger.info('Customization group updated', { groupId: id });
       res.json(group);
@@ -69,7 +84,7 @@ class CustomizationController {
   deleteGroup = asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
 
-      await customizationService.deleteGroup(id);
+      await customizationService.deleteGroup(id, tenantScopeFor(req));
       
       logger.info('Customization group deleted', { groupId: id });
       res.status(204).send();
@@ -82,7 +97,7 @@ class CustomizationController {
       const { id } = req.params;
       const includeOptions = req.query.includeOptions === 'true';
 
-      const group = await customizationService.getGroup(id, includeOptions);
+      const group = await customizationService.getGroup(id, includeOptions, tenantScopeFor(req));
       
       if (!group) {
         res.status(404).json({ error: 'Customization group not found' });
@@ -103,7 +118,8 @@ class CustomizationController {
       const groups = await customizationService.listGroups({
         entityType,
         isGlobal,
-        includeOptions
+        includeOptions,
+        tenantId: tenantScopeFor(req),
       });
 
       res.json(groups);
@@ -133,7 +149,7 @@ class CustomizationController {
         return;
       }
 
-      const option = await customizationService.createOption(data);
+      const option = await customizationService.createOption(data, tenantScopeFor(req));
       
       logger.info('Customization option created', { optionId: option.id, name: option.name });
       res.status(201).json(option);
@@ -146,7 +162,7 @@ class CustomizationController {
       const { id } = req.params;
       const data: UpdateCustomizationOptionRequest = req.body;
 
-      const option = await customizationService.updateOption(id, data);
+      const option = await customizationService.updateOption(id, data, tenantScopeFor(req));
       
       logger.info('Customization option updated', { optionId: id });
       res.json(option);
@@ -158,7 +174,7 @@ class CustomizationController {
   deleteOption = asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
 
-      await customizationService.deleteOption(id);
+      await customizationService.deleteOption(id, tenantScopeFor(req));
       
       logger.info('Customization option deleted', { optionId: id });
       res.status(204).send();
@@ -170,7 +186,7 @@ class CustomizationController {
   getOptionsForGroup = asyncHandler(async (req: Request, res: Response) => {
       const { groupId } = req.params;
 
-      const options = await customizationService.getOptionsForGroup(groupId);
+      const options = await customizationService.getOptionsForGroup(groupId, tenantScopeFor(req));
 
       res.json(options);
   });
