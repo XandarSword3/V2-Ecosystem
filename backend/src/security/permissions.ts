@@ -414,7 +414,8 @@ export const EndpointPermissions: Record<string, { method: string; permission: P
     { method: 'POST', permission: Permissions.ORDER_CREATE, description: 'Create instant_transaction order' },
     { method: 'GET', permission: Permissions.ORDER_READ_ALL, description: 'List all orders (staff)' },
   ],
-  '/api/v1/{moduleSlug}/staff/orders/:id/status': [
+  '/api/v1/staff/modules/{moduleSlug}/orders/:id/status': [
+    { method: 'PUT', permission: Permissions.ORDER_UPDATE, description: 'Update order status (staff)' },
     { method: 'PATCH', permission: Permissions.ORDER_UPDATE, description: 'Update order status (staff)' },
   ],
 
