@@ -155,10 +155,23 @@ export async function setPropertySetting(
   category = 'general',
   userId?: string
 ): Promise<void> {
+  // First, get the tenant_id from the properties table
+  const { data: property, error: propertyError } = await supabase()
+    .from('properties')
+    .select('tenant_id')
+    .eq('id', propertyId)
+    .maybeSingle();
+
+  if (propertyError || !property) {
+    logger.error('Failed to find property for setting', { propertyId, key, error: propertyError });
+    throw new Error(`Failed to find property: ${propertyError?.message || 'Property not found'}`);
+  }
+
   const { error } = await supabase()
     .from('property_settings')
     .upsert({
       property_id: propertyId,
+      tenant_id: property.tenant_id,
       setting_key: key,
       setting_value: value,
       category,
@@ -184,10 +197,23 @@ export async function setGroupSetting(
   category = 'general',
   userId?: string
 ): Promise<void> {
+  // First, get the tenant_id from the property_groups table
+  const { data: group, error: groupError } = await supabase()
+    .from('property_groups')
+    .select('tenant_id')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (groupError || !group) {
+    logger.error('Failed to find group for setting', { groupId, key, error: groupError });
+    throw new Error(`Failed to find group: ${groupError?.message || 'Group not found'}`);
+  }
+
   const { error } = await supabase()
     .from('group_settings')
     .upsert({
       group_id: groupId,
+      tenant_id: group.tenant_id,
       setting_key: key,
       setting_value: value,
       category,

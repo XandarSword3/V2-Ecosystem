@@ -52,7 +52,7 @@ export default function HomePage() {
   const tFooter = useTranslations('footer');
   const { settings, modules } = useSiteSettings();
   const params = useParams();
-  const propertySlug = (params?.property as string) || '';
+  const propertySlug = (params?.property as string) || settings.propertySlug;
 
   const homePageModule = modules.find(m => m.slug === 'home-page');
 
@@ -126,7 +126,7 @@ export default function HomePage() {
         module, // Keep reference for rendering
       };
     });
-  }, [activeModules]);
+  }, [activeModules, propertySlug]);
 
   // Get sorted and enabled homepage sections from CMS settings
   const homepageSections = useMemo(() => {

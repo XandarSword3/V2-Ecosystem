@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V2 Nexus — Architecture Experience</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #020212; --void-2: #060820;
+  --glass: rgba(255,255,255,0.025); --glass-2: rgba(255,255,255,0.05);
+  --gb: rgba(255,255,255,0.07); --gb2: rgba(255,255,255,0.13);
+  --platform: #FFD700; --tenant: #00E5FF; --property: #8B5CF6;
+  --eng-a: #F59E0B; --eng-b: #3B82F6; --eng-c: #10B981;
+  --eng-d: #A855F7; --eng-e: #FFD700; --cross: #FB7185;
+  --text: #E2E8F0; --dim: #94A3B8; --muted: #475569;
+  --fh: 'Orbitron', monospace; --fb: 'Space Grotesk', sans-serif; --fm: 'JetBrains Mono', monospace;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--void); color: var(--text); font-family: var(--fb); }
+#starfield { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.grid-bg {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background-image: linear-gradient(rgba(0,229,255,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,255,0.022) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ─── BOOT ─── */
+#boot {
+  position: fixed; inset: 0; z-index: 1000; background: var(--void);
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  transition: opacity 0.9s ease;
+  overflow: hidden;
+}
+#boot::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(0,229,255,0.08) 0%, transparent 70%);
+  animation: bootPulse 4s ease-in-out infinite;
+}
+@keyframes bootPulse { 0%,100%{opacity:0.3;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.1)} }
+#boot.out { opacity: 0; pointer-events: none; }
+.boot-logo {
+  font-family: var(--fh); font-size: 60px; font-weight: 900; letter-spacing: 0.15em;
+  color: var(--tenant); text-shadow: 0 0 40px var(--tenant), 0 0 80px rgba(0,229,255,0.3);
+  margin-bottom: 6px; animation: logo-pulse 3s ease-in-out infinite, logoFloat 6s ease-in-out infinite;
+  position: relative; z-index: 2;
+}
+@keyframes logo-pulse { 0%,100%{text-shadow:0 0 40px var(--tenant),0 0 80px rgba(0,229,255,0.2)} 50%{text-shadow:0 0 60px var(--tenant),0 0 120px rgba(0,229,255,0.4)} }
+@keyframes logoFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.boot-sub { font-family: var(--fm); font-size: 10px; color: var(--muted); letter-spacing: 0.35em; margin-bottom: 44px; animation: fadeInUp 1s ease 0.5s both; position: relative; z-index: 2; }
+@keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+#terminal {
+  width: 560px; background: rgba(0,0,0,0.55); border: 1px solid rgba(0,229,255,0.18);
+  border-radius: 10px; padding: 22px 26px; font-family: var(--fm); font-size: 12.5px; min-height: 200px;
+  box-shadow: 0 0 40px rgba(0,229,255,0.06), inset 0 0 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,229,255,0.05);
+  position: relative; z-index: 2;
+  animation: terminalGlow 3s ease-in-out infinite;
+}
+@keyframes terminalGlow { 0%,100%{box-shadow:0 0 40px rgba(0,229,255,0.06), inset 0 0 20px rgba(0,0,0,0.3)} 50%{box-shadow:0 0 60px rgba(0,229,255,0.12), inset 0 0 30px rgba(0,0,0,0.4)} }
+.tl { color: var(--dim); margin-bottom: 5px; line-height: 1.6; }
+.tl .p { color: var(--tenant); } .tl .ok { color: var(--eng-c); } .tl .warn { color: var(--eng-a); }
+.cursor { display: inline-block; width: 7px; height: 13px; background: var(--tenant); animation: blink 1s step-end infinite; vertical-align: middle; margin-left: 2px; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ─── APP SHELL ─── */
+#app { position: relative; z-index: 10; display: flex; height: 100vh; opacity: 0; transition: opacity 0.9s ease; }
+#app.on { opacity: 1; }
+#sidebar {
+  width: 212px; flex-shrink: 0; border-right: 1px solid var(--gb);
+  background: rgba(2,2,18,0.92); backdrop-filter: blur(24px);
+  display: flex; flex-direction: column;
+}
+.sb-header { padding: 20px 16px 14px; border-bottom: 1px solid var(--gb); }
+.sb-logo { font-family: var(--fh); font-size: 15px; font-weight: 900; color: var(--tenant); letter-spacing: 0.1em; text-shadow: 0 0 12px rgba(0,229,255,0.4); }
+.sb-ver { font-family: var(--fm); font-size: 9px; color: var(--muted); letter-spacing: 0.2em; margin-top: 3px; }
+.nav-s { padding: 10px 0; flex: 1; overflow-y: auto; }
+.nav-s::-webkit-scrollbar { width: 0; }
+.nav-lbl { font-family: var(--fm); font-size: 9px; color: var(--muted); letter-spacing: 0.2em; padding: 6px 16px 6px; }
+.nv {
+  display: flex; align-items: center; gap: 9px; padding: 8px 16px; cursor: pointer;
+  transition: all 0.2s; border-left: 2px solid transparent; color: var(--dim); font-size: 12.5px; user-select: none;
+}
+.nv:hover { background: var(--glass-2); color: var(--text); }
+.nv.on { color: var(--text); border-left-color: var(--tenant); background: rgba(0,229,255,0.05); }
+.nv .nd { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; opacity: 0.5; transition: opacity 0.2s; }
+.nv.on .nd, .nv:hover .nd { opacity: 1; }
+.nv .nn { font-family: var(--fm); font-size: 9px; color: var(--muted); margin-left: auto; }
+.sb-bot { padding: 14px 16px; border-top: 1px solid var(--gb); }
+.status { display: flex; align-items: center; gap: 7px; }
+.sdot { width: 6px; height: 6px; border-radius: 50%; background: var(--eng-c); box-shadow: 0 0 8px var(--eng-c); animation: pg 2s ease-in-out infinite; }
+.stxt { font-family: var(--fm); font-size: 9px; color: var(--muted); letter-spacing: 0.1em; }
+@keyframes pg { 0%,100%{opacity:0.6} 50%{opacity:1} }
+
+/* ─── CONTENT ─── */
+#content { flex: 1; overflow: hidden; position: relative; perspective: 1000px; }
+.scene { position: absolute; inset: 0; padding: 30px 36px; overflow-y: auto; opacity: 0; transform: translateY(14px) rotateX(2deg); transition: opacity 0.5s cubic-bezier(.4,0,.2,1), transform 0.5s cubic-bezier(.4,0,.2,1); pointer-events: none; }
+.scene.active { opacity: 1; transform: translateY(0) rotateX(0); pointer-events: all; }
+.scene::-webkit-scrollbar { width: 3px; }
+.scene::-webkit-scrollbar-thumb { background: var(--gb); border-radius: 2px; }
+
+/* ─── COMMON UI ─── */
+.sc-eye { font-family: var(--fm); font-size: 9px; letter-spacing: 0.3em; color: var(--muted); margin-bottom: 5px; }
+.sc-h { font-family: var(--fh); font-size: 24px; font-weight: 600; color: var(--text); margin-bottom: 20px; letter-spacing: 0.05em; }
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--gb2); background: var(--glass); color: var(--text); font-family: var(--fb); font-size: 12.5px; cursor: pointer; transition: all 0.2s; }
+.btn:hover { background: var(--glass-2); border-color: rgba(255,255,255,0.2); }
+.btn-c { background: rgba(0,229,255,0.08); border-color: rgba(0,229,255,0.35); color: var(--tenant); }
+.btn-c:hover { background: rgba(0,229,255,0.16); box-shadow: 0 0 16px rgba(0,229,255,0.2); }
+.btn-g { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.35); color: var(--eng-c); }
+.btn-g:hover { background: rgba(16,185,129,0.16); }
+.panel { background: var(--glass); border: 1px solid var(--gb); border-radius: 10px; padding: 18px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-family: var(--fm); font-size: 10px; border: 1px solid currentColor; opacity: 0.75; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media (max-width: 980px){ .grid2,.grid3 { grid-template-columns: 1fr; } }
+
+/* ─── SCENE: GALAXY ─── */
+#sc-galaxy .layer-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+.lr {
+  display: flex; align-items: center; gap: 14px; padding: 12px 16px;
+  border-radius: 8px; border: 1px solid var(--gb); background: var(--glass);
+  cursor: pointer; transition: all 0.22s; position: relative; overflow: hidden;
+  animation: lrFloat 8s ease-in-out infinite;
+}
+.lr:nth-child(2) { animation-delay: -2s; }
+.lr:nth-child(3) { animation-delay: -4s; }
+.lr:nth-child(4) { animation-delay: -6s; }
+.lr:nth-child(5) { animation-delay: -8s; }
+@keyframes lrFloat { 0%,100%{transform:translateX(0)} 50%{transform:translateX(5px)} }
+.lr::before { content: ''; position: absolute; inset: 0; background: currentColor; opacity: 0; transition: opacity 0.22s; border-radius: 8px; }
+.lr:hover::before { opacity: 0.04; }
+.lr.sel::before { opacity: 0.06; }
+.lr.sel { border-color: var(--lc, var(--tenant)); box-shadow: 0 0 0 1px var(--lc, var(--tenant)) inset; }
+.lr-bar { width: 3px; border-radius: 2px; align-self: stretch; background: var(--lc, var(--tenant)); flex-shrink: 0; box-shadow: 0 0 8px var(--lc, var(--tenant)); animation: barPulse 2s ease-in-out infinite; }
+@keyframes barPulse { 0%,100%{box-shadow:0 0 8px var(--lc, var(--tenant))} 50%{box-shadow:0 0 16px var(--lc, var(--tenant))} }
+.lr-lbl { font-family: var(--fh); font-size: 10px; letter-spacing: 0.15em; color: var(--lc, var(--tenant)); flex-shrink: 0; width: 130px; }
+.lr-desc { font-size: 12px; color: var(--dim); flex: 1; }
+.lr-meta { font-family: var(--fm); font-size: 10px; color: var(--muted); }
+.layer-detail {
+  background: var(--glass); border: 1px solid var(--gb); border-radius: 10px; padding: 18px 20px;
+  opacity: 0; transform: translateY(8px); transition: all 0.3s;
+}
+.layer-detail.show { opacity: 1; transform: translateY(0); }
+.ld-title { font-family: var(--fh); font-size: 12px; letter-spacing: 0.1em; margin-bottom: 4px; }
+.ld-role { font-family: var(--fm); font-size: 10px; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.ld-role .role-pip { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ld-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.ld-tag { font-family: var(--fm); font-size: 10px; padding: 3px 10px; border-radius: 4px; background: var(--glass-2); border: 1px solid var(--gb); color: var(--dim); transition: all 0.3s; animation: tagFloat 4s ease-in-out infinite; }
+.ld-tag:nth-child(odd) { animation-delay: -2s; }
+@keyframes tagFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+.ld-tag:hover { transform: translateY(-3px) scale(1.05); border-color: var(--tenant); color: var(--text); }
+.sat-block { margin-top: 22px; }
+.sat-cluster { padding: 14px 16px; background: var(--glass); border: 1px solid var(--gb); border-radius: 8px; margin-bottom: 8px; }
+.sat-cl-title { font-family: var(--fm); font-size: 9px; letter-spacing: 0.2em; color: var(--muted); margin-bottom: 8px; }
+.sat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ─── ENGINE PAGES (shared shell, bespoke viz per layout) ─── */
+.eng-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.eng-pattern { font-family: var(--fm); font-size: 12px; color: var(--dim); }
+.eng-viz { min-height: 260px; margin-bottom: 18px; }
+.eng-meta-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media (max-width: 980px){ .eng-meta-row { grid-template-columns: 1fr; } }
+.eng-meta-row ul { font-size: 12px; color: var(--dim); list-style: none; }
+.eng-meta-row ul li { padding: 4px 0; border-bottom: 1px solid var(--gb); display: flex; gap: 7px; }
+.eng-meta-row ul li::before { content: '→'; color: var(--muted); flex-shrink: 0; }
+.pcfg-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--gb); font-size: 12px; }
+.pcfg-row:last-child { border: none; }
+.pcfg-on { color: var(--eng-c); } .pcfg-off { color: var(--muted); }
+
+/* Engine A — ticket rail */
+.tix-rail { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+.tix-col { background: rgba(0,0,0,0.2); border: 1px solid var(--gb); border-radius: 8px; padding: 10px; min-height: 220px; }
+.tix-col-h { font-family: var(--fm); font-size: 9px; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 8px; display:flex; justify-content:space-between; }
+.tix-card {
+  background: var(--glass-2); border: 1px solid var(--gb2); border-left: 3px solid var(--eng-a);
+  border-radius: 6px; padding: 8px 10px; margin-bottom: 7px; font-size: 11.5px;
+  transition: all 0.5s cubic-bezier(.4,0,.2,1); animation: tixIn 0.4s ease, tixFloat 6s ease-in-out infinite;
+  position: relative; overflow: hidden;
+}
+.tix-card::after { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(245,158,11,0.1), transparent); animation: shimmer 3s infinite; }
+@keyframes shimmer { 0%{left:-100%} 100%{left:100%} }
+@keyframes tixFloat { 0%,100%{transform:translateX(0)} 50%{transform:translateX(3px)} }
+@keyframes tixIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }
+.tix-card .tn { font-family: var(--fm); color: var(--eng-a); font-size: 10px; }
+.tix-pulse { display:inline-block; width:6px; height:6px; border-radius:50%; background: var(--eng-c); margin-left:4px; animation: pg 1s ease 2; }
+
+/* Engine B — calendar timeline */
+.cal-grid { display: grid; grid-template-columns: 60px repeat(10, 1fr); gap: 2px; }
+.cal-cell { height: 30px; background: rgba(255,255,255,0.02); border: 1px solid var(--gb); border-radius: 3px; position: relative; }
+.cal-day-lbl { font-family: var(--fm); font-size: 9px; color: var(--muted); display:flex; align-items:center; justify-content:center; }
+.cal-row-lbl { font-family: var(--fm); font-size: 9px; color: var(--muted); display:flex; align-items:center; padding-left:4px; }
+.cal-block {
+  position: absolute; top: 2px; bottom: 2px; background: rgba(59,130,246,0.25); border: 1px solid var(--eng-b);
+  border-radius: 4px; font-size: 9px; color: var(--text); display:flex; align-items:center; justify-content:center;
+  cursor: pointer; transition: all 0.2s; overflow:hidden; white-space:nowrap;
+  animation: calPulse 4s ease-in-out infinite;
+}
+@keyframes calPulse { 0%,100%{background:rgba(59,130,246,0.25)} 50%{background:rgba(59,130,246,0.35)} }
+.cal-block:hover { background: rgba(59,130,246,0.4); }
+.cal-block.checkout-fire { animation: hkfire 0.9s ease; }
+@keyframes hkfire { 0%{box-shadow:0 0 0 0 rgba(16,185,129,0.6)} 100%{box-shadow:0 0 18px 6px rgba(16,185,129,0)} }
+
+/* Engine C — capacity gauges */
+.gauge-grid { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+.gauge-wrap { width: 130px; text-align: center; }
+.gauge-svg circle.bg { stroke: rgba(255,255,255,0.08); }
+.gauge-svg circle.fg { stroke: var(--eng-c); transition: stroke-dashoffset 0.6s ease; transform: rotate(-90deg); transform-origin: center; animation: gaugePulse 3s ease-in-out infinite; }
+@keyframes gaugePulse { 0%,100%{filter:drop-shadow(0 0 2px var(--eng-c))} 50%{filter:drop-shadow(0 0 8px var(--eng-c))} }
+.gauge-lbl { font-family: var(--fm); font-size: 10px; color: var(--dim); margin-top: 6px; }
+.gauge-val { font-family: var(--fh); font-size: 16px; }
+.qr-flash { position: absolute; inset:0; border-radius:50%; border:2px solid var(--eng-c); opacity:0; }
+@keyframes qrflash { 0%{opacity:1;transform:scale(0.8)} 100%{opacity:0;transform:scale(1.4)} }
+
+/* Engine D — membership card + wheel */
+.mcard-zone { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.mcard { width: 260px; height: 160px; perspective: 1000px; cursor: pointer; animation: cardFloat 5s ease-in-out infinite; }
+@keyframes cardFloat { 0%,100%{transform:translateY(0) rotateX(0)} 50%{transform:translateY(-8px) rotateX(2deg)} }
+.mcard-inner { width:100%; height:100%; position:relative; transition: transform 0.6s; transform-style: preserve-3d; }
+.mcard.flip .mcard-inner { transform: rotateY(180deg); }
+.mcard-face {
+  position:absolute; inset:0; backface-visibility:hidden; border-radius: 14px; padding: 18px;
+  background: linear-gradient(135deg, rgba(168,85,247,0.18), rgba(0,0,0,0.4)); border: 1px solid var(--eng-d);
+  display:flex; flex-direction:column; justify-content:space-between;
+  animation: cardGlow 4s ease-in-out infinite;
+}
+@keyframes cardGlow { 0%,100%{box-shadow:0 0 20px rgba(168,85,247,0.2)} 50%{box-shadow:0 0 40px rgba(168,85,247,0.4)} }
+.mcard-face.back { transform: rotateY(180deg); background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(0,0,0,0.4)); border-color: var(--eng-e); }
+.mcard-tier { font-family: var(--fh); font-size: 16px; letter-spacing: 0.1em; }
+.wheel-wrap { width: 170px; text-align: center; }
+.wheel-svg .seg { fill: none; stroke-width: 14; opacity: 0.25; transition: all 0.5s; cursor: pointer; }
+.wheel-svg .seg.active { opacity: 1; animation: segPulse 2s ease-in-out infinite; }
+@keyframes segPulse { 0%,100%{stroke-width:14} 50%{stroke-width:16} }
+.wheel-svg .marker { transition: transform 0.8s cubic-bezier(.4,0,.2,1); }
+.wheel-paused .marker { filter: grayscale(1) opacity(0.5); }
+
+/* Engine E — tenant fleet radar */
+.radar-board { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+.radar-col { background: rgba(0,0,0,0.2); border: 1px solid var(--gb); border-radius: 8px; padding: 10px; min-height: 200px; }
+.radar-col-h { font-family: var(--fm); font-size: 9px; letter-spacing: 0.15em; margin-bottom: 8px; }
+.radar-chip {
+  padding: 7px 9px; border-radius: 6px; background: var(--glass-2); border: 1px solid var(--gb2);
+  font-size: 11px; margin-bottom: 6px; transition: all 0.7s cubic-bezier(.4,0,.2,1);
+  animation: radarFloat 3s ease-in-out infinite; position: relative; overflow: hidden;
+}
+.radar-chip::before { content: ''; position: absolute; inset: 0; background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent); animation: radarShine 4s infinite; }
+@keyframes radarFloat { 0%,100%{transform:translateX(0)} 50%{transform:translateX(4px)} }
+@keyframes radarShine { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+.radar-chip.drift { border-color: var(--cross); box-shadow: 0 0 10px -2px var(--cross); }
+
+/* ─── CONVERGENCE ─── */
+.conv-track { display: flex; gap: 0; overflow-x: auto; padding-bottom: 16px; }
+.conv-node { flex-shrink:0; width: 130px; text-align:center; padding: 12px 8px; border:1px solid var(--gb); border-radius: 10px; background: var(--glass); margin-right: 8px; animation: convFloat 4s ease-in-out infinite; position: relative; overflow: hidden; }
+.conv-node::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--tenant), transparent); animation: convFlow 2s infinite; }
+@keyframes convFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+@keyframes convFlow { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+.conv-node .ce-ico { font-size: 20px; }
+.conv-node .ce-eng { font-family: var(--fm); font-size: 9px; margin-top: 4px; }
+.conv-ops-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 18px; }
+@media (max-width: 980px){ .conv-ops-grid { grid-template-columns: repeat(2,1fr); } }
+.conv-op { padding: 14px; border-radius: 8px; border: 1px solid var(--gb); background: var(--glass); text-align:center; font-size: 12px; cursor:pointer; transition: all 0.2s; animation: opFloat 5s ease-in-out infinite; }
+.conv-op:nth-child(2) { animation-delay: -1s; }
+.conv-op:nth-child(3) { animation-delay: -2s; }
+.conv-op:nth-child(4) { animation-delay: -3s; }
+@keyframes opFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+.conv-op:hover { background: var(--glass-2); transform: translateY(-2px); }
+.conv-op .co-ico { font-size: 18px; margin-bottom: 6px; }
+
+/* ─── SECURITY ─── */
+#sc-security .sec-wrap { display: grid; grid-template-columns: 380px 1fr; gap: 24px; align-items: start; }
+#shield-vis { position: relative; width: 380px; height: 380px; }
+#shield-vis svg { width: 100%; height: 100%; }
+.sli { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--gb); font-size: 12px; cursor: pointer; transition: all 0.2s; animation: secFloat 3s ease-in-out infinite; position: relative; }
+.sli::after { content: ''; position: absolute; left: 0; bottom: 0; width: 0; height: 1px; background: var(--tenant); transition: width 0.3s; }
+.sli:hover::after { width: 100%; }
+@keyframes secFloat { 0%,100%{transform:translateX(0)} 50%{transform:translateX(3px)} }
+.sli:hover .sli-name { color: var(--text); }
+.sli.hl .sli-name { color: var(--tenant); }
+.sli-n { font-family: var(--fm); font-size: 9px; color: var(--muted); width: 18px; }
+.sli-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; animation: dotPulse 2s ease-in-out infinite; }
+@keyframes dotPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.3)} }
+.sli-name { font-weight: 500; flex: 1; color: var(--dim); transition: color 0.2s; }
+.sli-role { font-family: var(--fm); font-size: 9px; color: var(--muted); }
+.sec-btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+/* ─── REALTIME ─── */
+#sc-realtime .rt-wrap { display: grid; grid-template-columns: 360px 1fr; gap: 24px; align-items: start; }
+.rt-events { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.ev-log {
+  background: rgba(0,0,0,0.35); border: 1px solid var(--gb); border-radius: 8px;
+  padding: 12px; font-family: var(--fm); font-size: 11px; height: 320px; overflow-y: auto;
+}
+.ev-log::-webkit-scrollbar { width: 3px; }
+.ev-log::-webkit-scrollbar-thumb { background: var(--gb); }
+.el { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); display: flex; gap: 8px; animation: fi 0.3s ease; }
+.el-ts { color: var(--muted); flex-shrink: 0; } .el-ev { color: var(--tenant); } .el-rm { color: var(--eng-a); }
+@keyframes fi { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:none} }
+
+/* ─── DATA ATLAS ─── */
+#sc-atlas .schema-wrap { position: relative; }
+#schema-svg { width: 100%; cursor: default; }
+.tn { cursor: pointer; transition: all 0.2s; }
+.tn:hover rect { filter: brightness(1.35); }
+.tn.sel rect { stroke-width: 2.5 !important; }
+.schema-detail {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 260px;
+  background: rgba(2,2,18,0.96); border-left: 1px solid var(--gb);
+  padding: 24px 20px; overflow-y: auto;
+  transform: translateX(100%); transition: transform 0.3s ease; z-index: 50;
+}
+.schema-detail.open { transform: translateX(0); }
+.sd-close { font-family: var(--fm); font-size: 10px; color: var(--muted); cursor: pointer; margin-bottom: 14px; }
+.sd-close:hover { color: var(--text); }
+.sd-title { font-family: var(--fh); font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.sd-col { padding: 5px 0; border-bottom: 1px solid var(--gb); display: flex; justify-content: space-between; font-size: 11px; }
+.sd-cname { color: var(--dim); } .sd-ctype { font-family: var(--fm); color: var(--muted); font-size: 10px; }
+
+/* ─── PARTICLES / ANIMATIONS ─── */
+.p-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--tenant); box-shadow: 0 0 6px var(--tenant); pointer-events: none; }
+@keyframes drop { 0%{opacity:0;transform:translateY(-6px)} 10%{opacity:1} 90%{opacity:1} 100%{opacity:0;transform:translateY(8px)} }
+@keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+<div class="grid-bg"></div>
+<!-- ─── BOOT ─── -->
+<div id="boot">
+  <div class="boot-logo">V2</div>
+  <div class="boot-sub">NEXUS · ARCHITECTURE EXPERIENCE</div>
+  <div id="terminal"><span class="cursor" id="cur"></span></div>
+</div>
+
+<!-- ─── APP ─── -->
+<div id="app">
+  <nav id="sidebar">
+    <div class="sb-header">
+      <div class="sb-logo">V2 NEXUS</div>
+      <div class="sb-ver">ARCHITECTURE v3.0</div>
+    </div>
+    <div class="nav-s">
+      <div class="nav-lbl">HIERARCHY</div>
+      <div class="nv on" data-s="sc-galaxy" onclick="goScene('sc-galaxy')">
+        <span class="nd" style="background:#00E5FF;box-shadow:0 0 6px #00E5FF"></span>
+        Galaxy Overview<span class="nn">01</span>
+      </div>
+      <div class="nav-lbl" style="margin-top:8px">ENGINES</div>
+      <div class="nv" data-s="sc-eng-a" onclick="goScene('sc-eng-a')">
+        <span class="nd" style="background:#F59E0B;box-shadow:0 0 6px #F59E0B"></span>
+        Engine A — Instant<span class="nn">02</span>
+      </div>
+      <div class="nv" data-s="sc-eng-b" onclick="goScene('sc-eng-b')">
+        <span class="nd" style="background:#3B82F6;box-shadow:0 0 6px #3B82F6"></span>
+        Engine B — Reservation<span class="nn">03</span>
+      </div>
+      <div class="nv" data-s="sc-eng-c" onclick="goScene('sc-eng-c')">
+        <span class="nd" style="background:#10B981;box-shadow:0 0 6px #10B981"></span>
+        Engine C — Capacity<span class="nn">04</span>
+      </div>
+      <div class="nv" data-s="sc-eng-d" onclick="goScene('sc-eng-d')">
+        <span class="nd" style="background:#A855F7;box-shadow:0 0 6px #A855F7"></span>
+        Engine D — Entitlement<span class="nn">05</span>
+      </div>
+      <div class="nv" data-s="sc-eng-e" onclick="goScene('sc-eng-e')">
+        <span class="nd" style="background:#FFD700;box-shadow:0 0 6px #FFD700"></span>
+        Engine E — Platform<span class="nn">06</span>
+      </div>
+      <div class="nav-lbl" style="margin-top:8px">CONVERGENCE</div>
+      <div class="nv" data-s="sc-converge" onclick="goScene('sc-converge')">
+        <span class="nd" style="background:#FB7185;box-shadow:0 0 6px #FB7185"></span>
+        Convergence<span class="nn">07</span>
+      </div>
+      <div class="nav-lbl" style="margin-top:8px">SHARED</div>
+      <div class="nv" data-s="sc-security" onclick="goScene('sc-security')">
+        <span class="nd" style="background:#FB7185;box-shadow:0 0 6px #FB7185"></span>
+        Security Shield<span class="nn">08</span>
+      </div>
+      <div class="nv" data-s="sc-realtime" onclick="goScene('sc-realtime')">
+        <span class="nd" style="background:#00E5FF;box-shadow:0 0 6px #00E5FF"></span>
+        Real-Time Pulse<span class="nn">09</span>
+      </div>
+      <div class="nv" data-s="sc-atlas" onclick="goScene('sc-atlas')">
+        <span class="nd" style="background:#10B981;box-shadow:0 0 6px #10B981"></span>
+        Data Atlas<span class="nn">10</span>
+      </div>
+    </div>
+    <div class="sb-bot">
+      <div class="status">
+        <div class="sdot"></div>
+        <div class="stxt">V2 ECOSYSTEM ONLINE</div>
+      </div>
+    </div>
+  </nav>
+
+  <main id="content">
+    <!-- ═══════ SCENE: GALAXY ═══════ -->
+    <section class="scene active" id="sc-galaxy">
+      <div class="sc-eye">SYSTEM OVERVIEW</div>
+      <div class="sc-h">Galaxy Overview</div>
+      <div class="layer-rows">
+        <div class="lr sel" style="--lc:#FFD700" data-l="platform" onclick="showLayer('platform')">
+          <div class="lr-bar"></div>
+          <div class="lr-lbl">PLATFORM LAYER</div>
+          <div class="lr-desc">Engine E · SaaS billing · tenant provisioning · Stripe integration</div>
+          <div class="lr-meta">1 tenant → N operators</div>
+        </div>
+        <div class="lr" style="--lc:#00E5FF" data-l="tenant" onclick="showLayer('tenant')">
+          <div class="lr-bar"></div>
+          <div class="lr-lbl">TENANT LAYER</div>
+          <div class="lr-desc">Billing entity · multi-property owner · role management · customization</div>
+          <div class="lr-meta">1 tenant → N properties</div>
+        </div>
+        <div class="lr" style="--lc:#8B5CF6" data-l="property" onclick="showLayer('property')">
+          <div class="lr-bar"></div>
+          <div class="lr-lbl">PROPERTY LAYER</div>
+          <div class="lr-desc">Individual resort/hotel · module activation · staff management · branding</div>
+          <div class="lr-meta">1 property → N modules</div>
+        </div>
+        <div class="lr" style="--lc:#3B82F6" data-l="module" onclick="showLayer('module')">
+          <div class="lr-bar"></div>
+          <div class="lr-lbl">MODULE LAYER</div>
+          <div class="lr-desc">Dynamic [slug] routing · engine_type driven · property-scoped · white-label</div>
+          <div class="lr-meta">1 module → 1 engine type</div>
+        </div>
+        <div class="lr" style="--lc:#10B981" data-l="engine" onclick="showLayer('engine')">
+          <div class="lr-bar"></div>
+          <div class="lr-lbl">ENGINE LAYER</div>
+          <div class="lr-desc">5 unified commerce engines · state machines · pricing pipeline · RLS-isolated</div>
+          <div class="lr-meta">5 engine types total</div>
+        </div>
+      </div>
+
+      <div class="layer-detail show" id="ld-platform">
+        <div class="ld-title" style="color:#FFD700">PLATFORM LAYER — Engine E (platform_entitlement)</div>
+        <div class="ld-items">
+          <div class="ld-tag">plans table</div><div class="ld-tag">stripe_customer_id on tenants</div>
+          <div class="ld-tag">stripe_subscription_id on tenants</div><div class="ld-tag">platform-admin/ dashboard</div>
+          <div class="ld-tag">trial → active → past_due → suspended</div><div class="ld-tag">dunning management</div>
+          <div class="ld-tag">tenant provisioning on activation</div><div class="ld-tag">write-block on suspend</div>
+        </div>
+      </div>
+      <div class="layer-detail" id="ld-tenant">
+        <div class="ld-title" style="color:#00E5FF">TENANT LAYER — Billing entity</div>
+        <div class="ld-items">
+          <div class="ld-tag">tenants table</div><div class="ld-tag">stripe_customer_id / stripe_subscription_id</div>
+          <div class="ld-tag">plan_id FK → plans</div><div class="ld-tag">RLS: tenant_id isolation</div>
+          <div class="ld-tag">multi-property management</div><div class="ld-tag">role hierarchy</div>
+          <div class="ld-tag">customization per tenant</div><div class="ld-tag">tenantGate middleware</div>
+        </div>
+      </div>
+      <div class="layer-detail" id="ld-property">
+        <div class="ld-title" style="color:#8B5CF6">PROPERTY LAYER — Resort / Hotel instance</div>
+        <div class="ld-items">
+          <div class="ld-tag">properties table → tenant_id</div><div class="ld-tag">accommodation_units</div>
+          <div class="ld-tag">capacity_windows</div><div class="ld-tag">propertyResolution middleware</div>
+          <div class="ld-tag">staff assignment</div>
+          <div class="ld-tag">branding & themes</div>
+          <div class="ld-tag">i18n per property</div><div class="ld-tag">analytics dashboards</div>
+        </div>
+      </div>
+      <div class="layer-detail" id="ld-module">
+        <div class="ld-title" style="color:#3B82F6">MODULE LAYER — Dynamic [slug] routing</div>
+        <div class="ld-items">
+          <div class="ld-tag">modules table → property_id + engine_type</div>
+          <div class="ld-tag">getDynamicModulesRouter()</div><div class="ld-tag">admin/[slug]/</div>
+          <div class="ld-tag">staff/[slug]/</div><div class="ld-tag">guest/[slug]/</div>
+          <div class="ld-tag">NO hardcoded /restaurant/ or /pool/</div>
+          <div class="ld-tag">TEMPLATE_TO_ENGINE mapping</div>
+        </div>
+      </div>
+      <div class="layer-detail" id="ld-engine">
+        <div class="ld-title" style="color:#10B981">ENGINE LAYER — The 5 Commerce Primitives</div>
+        <div class="ld-items">
+          <div class="ld-tag" style="color:#F59E0B">A: instant_transaction</div>
+          <div class="ld-tag" style="color:#3B82F6">B: time_exclusive_reservation</div>
+          <div class="ld-tag" style="color:#10B981">C: shared_capacity_access</div>
+          <div class="ld-tag" style="color:#A855F7">D: ongoing_entitlement</div>
+          <div class="ld-tag" style="color:#FFD700">E: platform_entitlement</div>
+          <div class="ld-tag">unified transactions table</div>
+          <div class="ld-tag">pricing-pipeline.ts</div>
+          <div class="ld-tag">state-machine.ts</div>
+        </div>
+      </div>
+
+      <div class="sat-block">
+        <div class="sat-cluster">
+          <div class="sat-cl-title">CROSS-CUTTING (not engine-bound)</div>
+          <div class="sat-chips">
+            <span class="chip" style="color:#FB7185">💎 Loyalty Points</span>
+            <span class="chip" style="color:#FB7185">🎁 Gift Cards</span>
+            <span class="chip" style="color:#FB7185">🏷️ Coupons</span>
+          </div>
+        </div>
+        <div class="sat-cluster">
+          <div class="sat-cl-title">REAL-TIME</div>
+          <div class="sat-chips">
+            <span class="chip" style="color:#00E5FF">Socket.IO /admin</span>
+            <span class="chip" style="color:#00E5FF">Redis adapter</span>
+          </div>
+        </div>
+        <div class="sat-cluster">
+          <div class="sat-cl-title">BACKGROUND JOBS</div>
+          <div class="sat-chips">
+            <span class="chip" style="color:#94A3B8">9 cron jobs</span>
+            <span class="chip" style="color:#94A3B8">scheduler.service.ts</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: ENGINE A ═══════ -->
+    <section class="scene" id="sc-eng-a">
+      <div class="sc-eye">ENGINE A — INSTANT TRANSACTION</div>
+      <div class="eng-head">
+        <div class="sc-h">Order → Prepare → Deliver → Done</div>
+        <div class="eng-pattern">Entity: Order · Examples: Menu service, kiosk, room service</div>
+      </div>
+      <div class="eng-viz" id="eng-a-viz">
+        <div class="tix-rail">
+          <div class="tix-col">
+            <div class="tix-col-h"><span>PENDING</span><span>3</span></div>
+            <div class="tix-card"><div class="tn">#ORD-001</div><div class="tix-pulse"></div></div>
+            <div class="tix-card"><div class="tn">#ORD-002</div></div>
+            <div class="tix-card"><div class="tn">#ORD-003</div></div>
+          </div>
+          <div class="tix-col">
+            <div class="tix-col-h"><span>CONFIRMED</span><span>2</span></div>
+            <div class="tix-card"><div class="tn">#ORD-004</div></div>
+            <div class="tix-card"><div class="tn">#ORD-005</div></div>
+          </div>
+          <div class="tix-col">
+            <div class="tix-col-h"><span>PREPARING</span><span>1</span></div>
+            <div class="tix-card"><div class="tn">#ORD-006</div></div>
+          </div>
+          <div class="tix-col">
+            <div class="tix-col-h"><span>READY</span><span>1</span></div>
+            <div class="tix-card"><div class="tn">#ORD-007</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="eng-meta-row">
+        <ul>
+          <li>Menu items with categories, modifiers, variants</li>
+          <li>Kitchen Display System (KDS) integration</li>
+          <li>Inventory deduction on order creation</li>
+          <li>Delivery fees & service charges</li>
+          <li>Full pricing pipeline (tax, discounts, loyalty)</li>
+          <li>Economics extraction — staff attribution, promo effectiveness, order metrics</li>
+        </ul>
+        <ul>
+          <li>pending → confirmed (staff/system)</li>
+          <li>confirmed → preparing (staff/system)</li>
+          <li>preparing → ready (staff)</li>
+          <li>ready → delivered (staff)</li>
+          <li>delivered → completed (staff/system)</li>
+          <li>pending → cancelled (customer/staff/admin)</li>
+        </ul>
+        <ul>
+          <li>Tax: ✅ Enabled</li>
+          <li>Service Charge: ✅ (dine-in)</li>
+          <li>Delivery Fee: ✅ (delivery)</li>
+          <li>Coupons: ✅ Supported</li>
+          <li>Gift Cards: ✅ Supported</li>
+          <li>Loyalty: ✅ Earn/Redeem</li>
+          <li>Inventory: ✅ Deduct on create</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: ENGINE B ═══════ -->
+    <section class="scene" id="sc-eng-b">
+      <div class="sc-eye">ENGINE B — TIME-EXCLUSIVE RESERVATION</div>
+      <div class="eng-head">
+        <div class="sc-h">Reserve → Confirm → Check-In → Check-Out</div>
+        <div class="eng-pattern">Entity: Booking · Examples: Accommodations, hotel rooms, villas</div>
+      </div>
+      <div class="eng-viz" id="eng-b-viz">
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <div class="eng-meta-row">
+        <ul>
+          <li>Night-by-night pricing with seasonal rules</li>
+          <li>Availability blocking (no double bookings)</li>
+          <li>Add-ons (extra bedding, etc.)</li>
+          <li>Deposit collection (fixed or percentage)</li>
+          <li>Housekeeping integration on checkout</li>
+        </ul>
+        <ul>
+          <li>pending → confirmed (staff/system)</li>
+          <li>pending → checked_in (staff/admin)</li>
+          <li>confirmed → checked_in (staff)</li>
+          <li>checked_in → checked_out (staff)</li>
+          <li>confirmed → cancelled (customer/staff/admin)</li>
+          <li>confirmed → no_show (staff/system)</li>
+        </ul>
+        <ul>
+          <li>Tax: ✅ Enabled</li>
+          <li>Service Charge: ❌ Disabled</li>
+          <li>Delivery Fee: ❌ Disabled</li>
+          <li>Coupons: ✅ Supported</li>
+          <li>Gift Cards: ✅ Supported</li>
+          <li>Loyalty: ✅ Earn/Redeem</li>
+          <li>Inventory: ❌ (availability checked)</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: ENGINE C ═══════ -->
+    <section class="scene" id="sc-eng-c">
+      <div class="sc-eye">ENGINE C — SHARED CAPACITY ACCESS</div>
+      <div class="eng-head">
+        <div class="sc-h">Purchase → Validate → Enter → Exit</div>
+        <div class="eng-pattern">Entity: Ticket · Examples: Pool, fitness center, spa, waterpark</div>
+      </div>
+      <div class="eng-viz" id="eng-c-viz">
+        <div class="gauge-grid" id="gauge-grid"></div>
+      </div>
+      <div class="eng-meta-row">
+        <ul>
+          <li>Sessions with TIMESTAMPTZ (midnight-spanning)</li>
+          <li>Real-time capacity management</li>
+          <li>QR code validation</li>
+          <li>personal_duration_minutes (per-holder timer)</li>
+          <li>Entry/exit tracking</li>
+        </ul>
+        <ul>
+          <li>valid → active (staff/system)</li>
+          <li>active → used (staff/system)</li>
+          <li>valid → cancelled (customer/staff/admin)</li>
+          <li>valid → expired (system)</li>
+          <li>active → expired (system - personal timer)</li>
+        </ul>
+        <ul>
+          <li>Tax: ✅ Enabled</li>
+          <li>Service Charge: ❌ Disabled</li>
+          <li>Delivery Fee: ❌ Disabled</li>
+          <li>Coupons: ✅ Supported</li>
+          <li>Gift Cards: ✅ Supported</li>
+          <li>Loyalty: ✅ Earn/Redeem</li>
+          <li>Inventory: ❌ (capacity checked)</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: ENGINE D ═══════ -->
+    <section class="scene" id="sc-eng-d">
+      <div class="sc-eye">ENGINE D — ONGOING ENTITLEMENT</div>
+      <div class="eng-head">
+        <div class="sc-h">Subscribe → Activate → Use → Renew/Cancel</div>
+        <div class="eng-pattern">Entity: Subscription/Membership · Examples: Memberships, VIP club, season pass</div>
+      </div>
+      <div class="eng-viz" id="eng-d-viz">
+        <div class="mcard-zone">
+          <div class="mcard" id="mcard" onclick="this.classList.toggle('flip')">
+            <div class="mcard-inner">
+              <div class="mcard-face">
+                <div class="mcard-tier">GOLD TIER</div>
+                <div style="font-size:11px;color:var(--dim)">Member since 2024</div>
+                <div style="font-family:var(--fm);font-size:14px;margin-top:auto">**** 4242</div>
+              </div>
+              <div class="mcard-face back">
+                <div style="font-size:11px;color:var(--dim)">Status: Active</div>
+                <div style="font-size:12px;margin-top:8px">Renews: Jul 15, 2026</div>
+                <div style="font-family:var(--fm);font-size:14px;margin-top:auto">$49/mo</div>
+              </div>
+            </div>
+          </div>
+          <div class="wheel-wrap">
+            <svg class="wheel-svg" id="wheel-svg" viewBox="0 0 100 100" width="100" height="100"></svg>
+            <div style="font-size:10px;color:var(--muted);margin-top:6px">Billing Cycle</div>
+          </div>
+        </div>
+      </div>
+      <div class="eng-meta-row">
+        <ul>
+          <li>Billing cycles (monthly, quarterly, annual)</li>
+          <li>Tier-based pricing with feature unlocks</li>
+          <li>Auto-renewal via Stripe</li>
+          <li>Usage tracking (visits, sessions)</li>
+          <li>Pause/resume capability</li>
+        </ul>
+        <ul>
+          <li>pending → active (system)</li>
+          <li>active → paused (customer)</li>
+          <li>paused → active (customer)</li>
+          <li>active → expired (system)</li>
+          <li>active → cancelled (customer)</li>
+        </ul>
+        <ul>
+          <li>Tax: ✅ Enabled</li>
+          <li>Service Charge: ❌ Disabled</li>
+          <li>Delivery Fee: ❌ Disabled</li>
+          <li>Coupons: ❌ Not supported</li>
+          <li>Gift Cards: ❌ Not supported</li>
+          <li>Loyalty: ✅ Earn only</li>
+          <li>Inventory: ❌ N/A</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: ENGINE E ═══════ -->
+    <section class="scene" id="sc-eng-e">
+      <div class="sc-eye">ENGINE E — PLATFORM ENTITLEMENT</div>
+      <div class="eng-head">
+        <div class="sc-h">Sign-up → Trial → Activate → Renew/Dunning</div>
+        <div class="eng-pattern">Entity: SaaS Subscription (B2B) · Examples: Starter, Growth, Enterprise plans</div>
+      </div>
+      <div class="eng-viz" id="eng-e-viz">
+        <div class="radar-board" id="radar-board"></div>
+      </div>
+      <div class="eng-meta-row">
+        <ul>
+          <li>Tenant provisioning on activation</li>
+          <li>Dunning management (payment failure handling)</li>
+          <li>Write access blocking on suspend</li>
+          <li>Platform-level billing (operator pays V2)</li>
+        </ul>
+        <ul>
+          <li>trialing → active (system)</li>
+          <li>active → past_due (system)</li>
+          <li>past_due → active (system)</li>
+          <li>past_due → suspended (system)</li>
+          <li>active → suspended (admin)</li>
+          <li>suspended → cancelled (admin)</li>
+        </ul>
+        <ul>
+          <li>Tax: ❌ Disabled</li>
+          <li>Service Charge: ❌ Disabled</li>
+          <li>Delivery Fee: ❌ Disabled</li>
+          <li>Coupons: ❌ Not supported</li>
+          <li>Gift Cards: ❌ Not supported</li>
+          <li>Loyalty: ❌ Not applicable</li>
+          <li>Inventory: ❌ N/A</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: CONVERGENCE ═══════ -->
+    <section class="scene" id="sc-converge">
+      <div class="sc-eye">CROSS-CUTTING FEATURES</div>
+      <div class="sc-h">Convergence</div>
+      <div class="conv-track" id="conv-track"></div>
+      <div class="conv-ops-grid">
+        <div class="conv-op">
+          <div class="co-ico">💎</div>
+          <div>Loyalty Points</div>
+          <div style="font-size:10px;color:var(--muted)">Available to A, B, C, D</div>
+        </div>
+        <div class="conv-op">
+          <div class="co-ico">🎁</div>
+          <div>Gift Cards</div>
+          <div style="font-size:10px;color:var(--muted)">Available to A, B, C</div>
+        </div>
+        <div class="conv-op">
+          <div class="co-ico">🏷️</div>
+          <div>Coupons</div>
+          <div style="font-size:10px;color:var(--muted)">Available to A, B, C</div>
+        </div>
+        <div class="conv-op">
+          <div class="co-ico">💳</div>
+          <div>Stripe Payments</div>
+          <div style="font-size:10px;color:var(--muted)">All engines</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: SECURITY ═══════ -->
+    <section class="scene" id="sc-security">
+      <div class="sc-eye">APP.TS MIDDLEWARE STACK · VERIFIED ORDER</div>
+      <div class="sc-h">Security Shield</div>
+      <div class="sec-wrap">
+        <div id="shield-vis"><svg id="shield-svg" viewBox="0 0 380 380"></svg></div>
+        <div>
+          <div id="sec-list"></div>
+          <div class="sec-btns">
+            <button class="btn btn-c" onclick="simulateRequest('admin')">Authenticated Admin</button>
+            <button class="btn" onclick="simulateRequest('guest')">Unauthenticated Guest</button>
+            <button class="btn" onclick="simulateRequest('webhook')">Stripe Webhook</button>
+          </div>
+          <div id="sec-result" style="margin-top:12px;font-family:var(--fm);font-size:11px;color:var(--muted);min-height:18px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: REALTIME ═══════ -->
+    <section class="scene" id="sc-realtime">
+      <div class="sc-eye">SOCKET.IO · ONE NAMESPACE · /admin</div>
+      <div class="sc-h">Real-Time Pulse</div>
+      <div class="rt-wrap">
+        <svg id="rt-svg" viewBox="0 0 360 380" style="width:100%"></svg>
+        <div>
+          <div class="rt-events" id="rt-events"></div>
+          <div class="ev-log" id="ev-log"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ SCENE: DATA ATLAS ═══════ -->
+    <section class="scene" id="sc-atlas">
+      <div class="sc-eye">CORE SCHEMA · FK GRAPH</div>
+      <div class="sc-h">Data Atlas</div>
+      <div class="schema-wrap">
+        <svg id="schema-svg" viewBox="0 0 980 580" style="width:100%"></svg>
+      </div>
+      <div class="schema-detail" id="schema-detail">
+        <div class="sd-close" onclick="closeSchema()">✕ CLOSE</div>
+        <div class="sd-title" id="sd-title"></div>
+        <div id="sd-cols"></div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+/* ═══════════════ ADVANCED STARFIELD ═══════════════ */
+(function(){
+  const cv = document.getElementById('starfield');
+  const ctx = cv.getContext('2d');
+  let stars = [], nebulae = [], connections = [];
+  
+  function resize(){
+    cv.width = window.innerWidth; cv.height = window.innerHeight;
+    stars = []; nebulae = []; connections = [];
+    
+    // Layer 1: Tiny distant stars (slow, dim)
+    for(let i=0;i<300;i++){
+      stars.push({
+        x: Math.random()*cv.width, y: Math.random()*cv.height,
+        r: Math.random()*0.8+0.1, a: Math.random(),
+        s: (Math.random()*0.005)+0.001,
+        layer: 1, color: '200,220,255'
+      });
+    }
+    // Layer 2: Medium stars (faster, brighter)
+    for(let i=0;i<150;i++){
+      stars.push({
+        x: Math.random()*cv.width, y: Math.random()*cv.height,
+        r: Math.random()*1.5+0.3, a: Math.random(),
+        s: (Math.random()*0.012)+0.004,
+        layer: 2, color: '255,255,255'
+      });
+    }
+    // Layer 3: Large bright stars (fast, with glow)
+    for(let i=0;i<30;i++){
+      stars.push({
+        x: Math.random()*cv.width, y: Math.random()*cv.height,
+        r: Math.random()*2.5+1, a: Math.random(),
+        s: (Math.random()*0.02)+0.008,
+        layer: 3, color: '0,229,255'
+      });
+    }
+    
+    // Nebula clouds
+    for(let i=0;i<5;i++){
+      nebulae.push({
+        x: Math.random()*cv.width, y: Math.random()*cv.height,
+        r: Math.random()*200+100, a: Math.random(),
+        s: (Math.random()*0.002)+0.001,
+        color: i%2 ? '168,85,247' : '0,229,255'
+      });
+    }
+    
+    // Star connections (constellation effect)
+    for(let i=0;i<50;i++){
+      connections.push({
+        x1: Math.random()*cv.width, y1: Math.random()*cv.height,
+        x2: Math.random()*cv.width, y2: Math.random()*cv.height,
+        a: Math.random(), s: Math.random()*0.003+0.001
+      });
+    }
+  }
+  
+  function tick(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    
+    // Draw nebulae
+    for(const n of nebulae){
+      n.a += n.s;
+      const op = (Math.sin(n.a)+1)/2*0.08;
+      const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+      grad.addColorStop(0, `rgba(${n.color},${op})`);
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(n.x-n.r, n.y-n.r, n.r*2, n.r*2);
+    }
+    
+    // Draw connections
+    for(const c of connections){
+      c.a += c.s;
+      const op = (Math.sin(c.a)+1)/2*0.15;
+      ctx.beginPath();
+      ctx.moveTo(c.x1, c.y1);
+      ctx.lineTo(c.x2, c.y2);
+      ctx.strokeStyle = `rgba(0,229,255,${op})`;
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+    
+    // Draw stars
+    for(const st of stars){
+      st.a += st.s;
+      const op = (Math.sin(st.a)+1)/2*0.7+0.15;
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(${st.color},${op})`;
+      ctx.fill();
+      
+      // Glow for layer 3 stars
+      if(st.layer === 3){
+        const glow = ctx.createRadialGradient(st.x, st.y, 0, st.x, st.y, st.r*4);
+        glow.addColorStop(0, `rgba(${st.color},${op*0.3})`);
+        glow.addColorStop(1, 'transparent');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(st.x, st.y, st.r*4, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+    
+    requestAnimationFrame(tick);
+  }
+  
+  window.addEventListener('resize', resize);
+  resize(); tick();
+})();
+
+/* ═══════════════ BOOT SEQUENCE ═══════════════ */
+const BOOT_LINES = [
+  {t:'> INITIALIZING V2 ECOSYSTEM CORE...', c:''},
+  {t:'> LOADING ENGINE DEFINITIONS... [5/5]', c:'ok'},
+  {t:'> TENANT ISOLATION LAYER... [RLS ACTIVE]', c:'ok'},
+  {t:'> SOCKET NAMESPACE /admin... [ONLINE]', c:'ok'},
+  {t:'> GDPR PROCESSING... [READY]', c:'ok'},
+  {t:'> V2 ECOSYSTEM ONLINE', c:'p'}
+];
+function runBoot(){
+  const term = document.getElementById('terminal');
+  const cur = document.getElementById('cur');
+  let li = 0;
+  function typeLine(){
+    if(li >= BOOT_LINES.length){
+      setTimeout(finishBoot, 500);
+      return;
+    }
+    const line = BOOT_LINES[li];
+    const div = document.createElement('div');
+    div.className = 'tl';
+    term.insertBefore(div, cur);
+    let ci = 0;
+    const txt = line.t;
+    const iv = setInterval(()=>{
+      div.textContent = txt.slice(0, ci+1);
+      ci++;
+      if(ci >= txt.length){
+        clearInterval(iv);
+        if(line.c) div.innerHTML = `<span class="${line.c}">${txt}</span>`;
+        li++;
+        setTimeout(typeLine, 220);
+      }
+    }, 14);
+  }
+  typeLine();
+}
+function finishBoot(){
+  const boot = document.getElementById('boot');
+  const app = document.getElementById('app');
+  boot.classList.add('out');
+  app.classList.add('on');
+  setTimeout(()=>{ boot.style.display='none'; }, 950);
+  initApp();
+}
+
+/* ═══════════════ SCENE NAVIGATION ═══════════════ */
+function goScene(id){
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nv').forEach(n=>n.classList.remove('on'));
+  const target = document.getElementById(id);
+  if(target) target.classList.add('active');
+  const navItem = document.querySelector(`.nv[data-s="${id}"]`);
+  if(navItem) navItem.classList.add('on');
+  closeSchema();
+  
+  // Trigger scene-specific animations
+  if(id === 'sc-eng-a') animateStateMachine();
+  if(id === 'sc-atlas') animateSchemaGraph();
+}
+
+/* ═══════════════ GALAXY LAYER TOGGLE ═══════════════ */
+function showLayer(name){
+  document.querySelectorAll('.lr').forEach(r=>r.classList.toggle('sel', r.dataset.l===name));
+  document.querySelectorAll('.layer-detail').forEach(d=>d.classList.toggle('show', d.id==='ld-'+name));
+}
+
+/* ═══════════════ STATE MACHINE ANIMATION (ENGINE A) ═══════════════ */
+let smAnimationId = null;
+function animateStateMachine(){
+  if(smAnimationId) cancelAnimationFrame(smAnimationId);
+  const cards = document.querySelectorAll('.tix-card');
+  if(cards.length === 0) return;
+  
+  let time = 0;
+  function animate(){
+    time += 0.015;
+    cards.forEach((card, i) => {
+      const offset = Math.sin(time + i * 0.5) * 2;
+      card.style.transform = `translateX(${offset}px)`;
+      const pulse = (Math.sin(time * 2 + i) + 1) / 2;
+      card.style.borderColor = `rgba(245,158,11,${0.3 + pulse * 0.4})`;
+    });
+    smAnimationId = requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+/* ═══════════════ APP INIT ═══════════════ */
+function initApp(){
+  renderGalaxy();
+  initEngineVisualizations();
+  renderSecurity();
+  renderRealtime();
+  renderSchema();
+  renderConvergence();
+}
+document.addEventListener('DOMContentLoaded', runBoot);
+
+/* ═══════════════ GALAXY ═══════════════ */
+function renderGalaxy(){
+  // Galaxy scene is static HTML, no dynamic rendering needed
+}
+
+/* ═══════════════ ENGINE VISUALIZATIONS ═══════════════ */
+function initEngineVisualizations(){
+  renderCalendar();
+  renderGauges();
+  renderWheel();
+  renderRadar();
+}
+
+/* Engine B - Calendar */
+function renderCalendar(){
+  const grid = document.getElementById('cal-grid');
+  if(!grid) return;
+  let html = '<div class="cal-cell cal-day-lbl"></div>';
+  for(let i=0;i<10;i++) html += `<div class="cal-cell cal-day-lbl">Day ${i+1}</div>`;
+  const units = ['Unit A','Unit B','Unit C','Unit D','Unit E','Unit F'];
+  units.forEach((u,ri)=>{
+    html += `<div class="cal-cell cal-row-lbl">${u}</div>`;
+    for(let i=0;i<10;i++){
+      const hasBooking = Math.random() > 0.5;
+      if(hasBooking){
+        const len = Math.floor(Math.random()*4)+1;
+        const start = Math.floor(Math.random()*(10-len));
+        html += `<div class="cal-cell"><div class="cal-block" style="left:2px;width:${(len*100/10)-4}%">BK-${ri+1}</div></div>`;
+      } else {
+        html += '<div class="cal-cell"></div>';
+      }
+    }
+  });
+  grid.innerHTML = html;
+}
+
+/* Engine C - Gauges */
+function renderGauges(){
+  const grid = document.getElementById('gauge-grid');
+  if(!grid) return;
+  const facilities = [
+    {name:'Pool',cap:50,curr:32},
+    {name:'Spa',cap:20,curr:15},
+    {name:'Gym',cap:30,curr:8},
+    {name:'Cinema',cap:40,curr:28}
+  ];
+  grid.innerHTML = facilities.map(f=>{
+    const pct = f.curr/f.cap;
+    const dash = 2*Math.PI*40;
+    const offset = dash - (pct*dash);
+    return `
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" width="100" height="100" viewBox="0 0 100 100">
+          <circle class="bg" cx="50" cy="50" r="40" fill="none" stroke-width="8"/>
+          <circle class="fg" cx="50" cy="50" r="40" fill="none" stroke-width="8" stroke-dasharray="${dash}" stroke-dashoffset="${offset}"/>
+        </svg>
+        <div class="gauge-val">${f.curr}/${f.cap}</div>
+        <div class="gauge-lbl">${f.name}</div>
+      </div>`;
+  }).join('');
+}
+
+/* Engine D - Wheel */
+function renderWheel(){
+  const svg = document.getElementById('wheel-svg');
+  if(!svg) return;
+  const cx=50, cy=50, r=35;
+  let html = '';
+  for(let i=0;i<12;i++){
+    const a1 = (i/12)*Math.PI*2 - Math.PI/2;
+    const a2 = ((i+1)/12)*Math.PI*2 - Math.PI/2;
+    const x1 = cx + Math.cos(a1)*r, y1 = cy + Math.sin(a1)*r;
+    const x2 = cx + Math.cos(a2)*r, y2 = cy + Math.sin(a2)*r;
+    const active = i < 9 ? 'active' : '';
+    html += `<path class="seg ${active}" d="M${cx},${cy}L${x1},${y1}A${r},${r}0 0,1 ${x2},${y2}Z"/>`;
+  }
+  html += `<circle class="marker" cx="50" cy="15" r="4" fill="#FFD700"/>`;
+  svg.innerHTML = html;
+}
+
+/* Engine E - Radar */
+function renderRadar(){
+  const board = document.getElementById('radar-board');
+  if(!board) return;
+  const statuses = ['active','active','active','past_due','suspended','trialing'];
+  let html = '';
+  for(let i=0;i<4;i++){
+    html += `<div class="radar-col"><div class="radar-col-h">Cluster ${i+1}</div>`;
+    statuses.forEach((s,si)=>{
+      const drift = s==='past_due' || s==='suspended' ? 'drift' : '';
+      html += `<div class="radar-chip ${drift}">${s}</div>`;
+    });
+    html += '</div>';
+  }
+  board.innerHTML = html;
+}
+
+/* ═══════════════ CONVERGENCE ═══════════════ */
+function renderConvergence(){
+  const track = document.getElementById('conv-track');
+  if(!track) return;
+  const engines = [
+    {ico:'🛒',eng:'A',name:'Instant'},
+    {ico:'🗓️',eng:'B',name:'Reservation'},
+    {ico:'🎫',eng:'C',name:'Capacity'},
+    {ico:'♾️',eng:'D',name:'Entitlement'},
+    {ico:'👑',eng:'E',name:'Platform'}
+  ];
+  track.innerHTML = engines.map(e=>`
+    <div class="conv-node">
+      <div class="ce-ico">${e.ico}</div>
+      <div class="ce-eng">Engine ${e.eng}</div>
+      <div style="font-size:10px;color:var(--muted)">${e.name}</div>
+    </div>`).join('');
+}
+
+/* ═══════════════ SECURITY ═══════════════ */
+const SECURITY_LAYERS = [
+  {name:'CSRF Protection',role:'Token-based',desc:'Prevent cross-site requests',color:'#FB7185'},
+  {name:'Property Resolution',role:'Header validation',desc:'Ensure property context',color:'#8B5CF6'},
+  {name:'Tenant Isolation',role:'Database-level (RLS)',desc:'Data separation per tenant',color:'#00E5FF'},
+  {name:'Authorization',role:'Role-based access',desc:'Determine what user can do',color:'#F59E0B'},
+  {name:'API Keys',role:'Platform-level',desc:'External integrations',color:'#FFD700'},
+  {name:'Audit Logs',role:'All mutations',desc:'Track who did what',color:'#94A3B8'}
+];
+function renderSecurity(){
+  const list = document.getElementById('sec-list');
+  if(!list) return;
+  list.innerHTML = SECURITY_LAYERS.map((l,i)=>`
+    <div class="sli" data-i="${i}" onclick="highlightLayer(${i})">
+      <div class="sli-n">${i+1}</div>
+      <div class="sli-dot" style="background:${l.color}"></div>
+      <div class="sli-name">${l.name}</div>
+      <div class="sli-role">${l.role}</div>
+    </div>`).join('');
+  renderShieldSVG();
+}
+function highlightLayer(idx){
+  document.querySelectorAll('.sli').forEach((s,i)=>s.classList.toggle('hl', i===idx));
+}
+function renderShieldSVG(){
+  const svg = document.getElementById('shield-svg');
+  if(!svg) return;
+  const cx=190, cy=190, r=150;
+  let html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2"/>`;
+  SECURITY_LAYERS.forEach((l,i)=>{
+    const a = (i/SECURITY_LAYERS.length)*Math.PI*2 - Math.PI/2;
+    const x = cx + Math.cos(a)*(r-20), y = cy + Math.sin(a)*(r-20);
+    html += `<circle cx="${x}" cy="${y}" r="8" fill="${l.color}"/>`;
+    html += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${l.color}" stroke-width="1" opacity="0.3"/>`;
+  });
+  html += `<circle cx="${cx}" cy="${cy}" r="30" fill="rgba(0,229,255,0.2)" stroke="#00E5FF" stroke-width="2"/>`;
+  svg.innerHTML = html;
+}
+function simulateRequest(type){
+  const result = document.getElementById('sec-result');
+  if(!result) return;
+  const outcomes = {
+    admin: {success:true,msg:'✅ All layers passed — admin access granted'},
+    guest: {success:false,msg:'❌ Blocked at Authorization — no valid session'},
+    webhook: {success:true,msg:'✅ Bypassed auth layers — webhook signature verified'}
+  };
+  const o = outcomes[type];
+  result.innerHTML = o.msg;
+  result.style.color = o.success ? 'var(--eng-c)' : 'var(--cross)';
+}
+
+/* ═══════════════ REALTIME ═══════════════ */
+function renderRealtime(){
+  const svg = document.getElementById('rt-svg');
+  if(!svg) return;
+  const cx=180, cy=190, r=140;
+  let html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,229,255,0.2)" stroke-width="2"/>`;
+  html += `<circle cx="${cx}" cy="${cy}" r="60" fill="rgba(0,229,255,0.1)" stroke="#00E5FF" stroke-width="2"/>`;
+  html += `<text x="${cx}" y="${cy}" text-anchor="middle" fill="#00E5FF" font-family="var(--fm)" font-size="12">/admin</text>`;
+  const rooms = ['prop1','prop2','prop3','prop4'];
+  rooms.forEach((rm,i)=>{
+    const a = (i/rooms.length)*Math.PI*2 - Math.PI/2;
+    const x = cx + Math.cos(a)*(r-30), y = cy + Math.sin(a)*(r-30);
+    html += `<circle id="rtroom-${rm}" cx="${x}" cy="${y}" r="15" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.13)"/>`;
+    html += `<text x="${x}" y="${y}" text-anchor="middle" fill="var(--dim)" font-family="var(--fm)" font-size="8">${rm}</text>`;
+  });
+  svg.innerHTML = html;
+  
+  const events = document.getElementById('rt-events');
+  if(events){
+    events.innerHTML = `
+      <button class="btn btn-c" onclick="emitEvent('order:new')">order:new</button>
+      <button class="btn" onclick="emitEvent('booking:check-in')">booking:check-in</button>
+      <button class="btn" onclick="emitEvent('task:assigned')">task:assigned</button>
+    `;
+  }
+  
+  // Auto-emit events
+  setInterval(()=>emitEvent('order:new'), 5000);
+}
+function emitEvent(type){
+  const log = document.getElementById('ev-log');
+  if(!log) return;
+  const ts = new Date().toLocaleTimeString();
+  const rooms = ['prop1','prop2','prop3'];
+  const roomList = rooms.map(r => `<span class="el-rm">${r}</span>`).join(', ');
+  log.insertAdjacentHTML('afterbegin', `<div class="el"><span class="el-ts">[${ts}]</span><span class="el-ev">${type}</span><span>→ ${roomList}</span></div>`);
+  rooms.forEach(r => {
+    const el = document.getElementById('rtroom-'+r);
+    if(el){
+      el.style.filter = 'drop-shadow(0 0 10px var(--tenant))';
+      el.setAttribute('stroke', 'var(--tenant)');
+      setTimeout(() => { el.style.filter = ''; el.setAttribute('stroke', 'rgba(255,255,255,0.13)'); }, 700);
+    }
+  });
+}
+
+/* ═══════════════ DATA ATLAS ═══════════════ */
+const SCHEMA_TABLES = [
+  {name:'tenants',x:100,y:100,w:100,h:120,cols:['id','name','stripe_customer_id','stripe_subscription_id','plan_id']},
+  {name:'properties',x:300,y:100,w:120,h:120,cols:['id','tenant_id','name','slug','settings']},
+  {name:'modules',x:500,y:100,w:100,h:120,cols:['id','property_id','engine_type','slug','config']},
+  {name:'transactions',x:300,y:300,w:140,h:140,cols:['id','module_id','engine_type','status','amount','created_at']},
+  {name:'users',x:500,y:300,w:100,h:120,cols:['id','property_id','email','role','created_at']},
+  {name:'plans',x:100,y:300,w:100,h:100,cols:['id','name','price','interval','features']}
+];
+const FK_CONNECTIONS = [
+  {from:'tenants',to:'properties',x1:200,y1:160,x2:300,y2:160},
+  {from:'properties',to:'modules',x1:420,y1:160,x2:500,y2:160},
+  {from:'modules',to:'transactions',x1:370,y1:220,x2:370,y2:300},
+  {from:'transactions',to:'users',x1:440,y1:370,x2:500,y2:370},
+  {from:'tenants',to:'plans',x1:150,y1:220,x2:150,y2:300}
+];
+let schemaAnimationId = null;
+function renderSchema(){
+  const svg = document.getElementById('schema-svg');
+  if(!svg) return;
+  let html = '';
+  SCHEMA_TABLES.forEach(t=>{
+    html += `<g class="tn" data-t="${t.name}" onclick="showTable('${t.name}')">
+      <rect id="rect-${t.name}" x="${t.x}" y="${t.y}" width="${t.w}" height="${t.h}" fill="rgba(0,0,0,0.3)" stroke="rgba(255,255,255,0.2)" rx="6"/>
+      <text x="${t.x+10}" y="${t.y+20}" fill="var(--text)" font-family="var(--fh)" font-size="12">${t.name}</text>
+    </g>`;
+  });
+  // FK lines with animation
+  FK_CONNECTIONS.forEach((fk,i)=>{
+    html += `<line id="fk-${i}" x1="${fk.x1}" y1="${fk.y1}" x2="${fk.x2}" y2="${fk.y2}" stroke="rgba(0,229,255,0.3)" stroke-width="2" stroke-dasharray="5,5"/>`;
+    html += `<circle id="fk-dot-${i}" cx="${fk.x1}" cy="${fk.y1}" r="3" fill="#00E5FF"/>`;
+  });
+  svg.innerHTML = html;
+}
+function animateSchemaGraph(){
+  if(schemaAnimationId) cancelAnimationFrame(schemaAnimationId);
+  let time = 0;
+  function animate(){
+    time += 0.02;
+    FK_CONNECTIONS.forEach((fk,i)=>{
+      const line = document.getElementById(`fk-${i}`);
+      const dot = document.getElementById(`fk-dot-${i}`);
+      if(line && dot){
+        const progress = (Math.sin(time + i) + 1) / 2;
+        const x = fk.x1 + (fk.x2 - fk.x1) * progress;
+        const y = fk.y1 + (fk.y2 - fk.y1) * progress;
+        dot.setAttribute('cx', x);
+        dot.setAttribute('cy', y);
+        line.style.strokeDashoffset = -time * 20;
+      }
+    });
+    schemaAnimationId = requestAnimationFrame(animate);
+  }
+  animate();
+}
+function showTable(name){
+  const t = SCHEMA_TABLES.find(x=>x.name===name);
+  if(!t) return;
+  document.getElementById('sd-title').textContent = t.name;
+  document.getElementById('sd-cols').innerHTML = t.cols.map(c=>`
+    <div class="sd-col">
+      <span class="sd-cname">${c}</span>
+      <span class="sd-ctype">text</span>
+    </div>`).join('');
+  document.getElementById('schema-detail').classList.add('open');
+  document.querySelectorAll('.tn').forEach(n=>n.classList.toggle('sel', n.dataset.t===name));
+  
+  // Highlight connected tables
+  FK_CONNECTIONS.forEach(fk=>{
+    if(fk.from === name || fk.to === name){
+      const other = fk.from === name ? fk.to : fk.from;
+      const rect = document.getElementById(`rect-${other}`);
+      if(rect) rect.style.stroke = 'var(--tenant)';
+    }
+  });
+}
+function closeSchema(){
+  document.getElementById('schema-detail').classList.remove('open');
+  document.querySelectorAll('.tn').forEach(n=>n.classList.remove('sel'));
+  SCHEMA_TABLES.forEach(t=>{
+    const rect = document.getElementById(`rect-${t.name}`);
+    if(rect) rect.style.stroke = 'rgba(255,255,255,0.2)';
+  });
+}
+</script>
+</body>
+</html>

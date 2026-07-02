@@ -108,7 +108,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import StaffDashboard from '../../src/app/staff/page';
+import StaffDashboard from '../../src/app/[property]/staff/page';
 
 describe('Staff dashboard route coverage', () => {
   beforeEach(() => {

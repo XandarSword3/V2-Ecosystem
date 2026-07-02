@@ -1,6 +1,17 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Shared token state that survives vi.resetModules() because vi.mock factories are preserved
+const tokenState = vi.hoisted(() => ({ token: null as string | null }));
+
+vi.mock('../../src/lib/api', () => ({
+  memoryTokenStore: {
+    get: () => tokenState.token,
+    set: (t: string | null) => { tokenState.token = t; },
+    clear: () => { tokenState.token = null; },
+  },
+}));
+
 type Handler = (...args: unknown[]) => void;
 
 interface SocketMock {
@@ -126,12 +137,13 @@ describe('socket hooks', () => {
   beforeEach(() => {
     ioMock.mockReset();
     localStorage.clear();
+    tokenState.token = null;
   });
 
   it('creates singleton socket, handles connection, room join/leave, and reconnect', async () => {
     const harness = createSocketHarness();
     ioMock.mockReturnValue(harness.socket);
-    localStorage.setItem('accessToken', 'socket-token');
+    tokenState.token = 'socket-token';
 
     const mod = await loadModule();
 

@@ -34,7 +34,7 @@ function authCookieOptions(path: string) {
   };
 }
 
-function setAuthCookies(res: Response, refreshTokenValue: string) {
+export function setAuthCookies(res: Response, refreshTokenValue: string) {
   res.cookie(REFRESH_TOKEN_COOKIE, refreshTokenValue, {
     ...authCookieOptions('/api/v1/auth'),
     httpOnly: true,
@@ -45,7 +45,7 @@ function setAuthCookies(res: Response, refreshTokenValue: string) {
   });
 }
 
-function clearAuthCookies(res: Response) {
+export function clearAuthCookies(res: Response) {
   res.clearCookie(REFRESH_TOKEN_COOKIE, { path: '/api/v1/auth' });
   res.clearCookie(SESSION_MARKER_COOKIE, { path: '/' });
 }

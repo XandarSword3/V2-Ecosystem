@@ -78,7 +78,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import DynamicMenuPage from '../../src/app/admin/[slug]/menu/page';
+import DynamicMenuPage from '../../src/app/[property]/admin/[slug]/menu/page';
 
 const categoriesSeed = [
   {

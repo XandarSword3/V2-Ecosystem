@@ -57,7 +57,7 @@ vi.mock('@/context/PropertyContext', () => ({
   PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import GiftCardsAdminPage from '../../src/app/admin/giftcards/page';
+import GiftCardsAdminPage from '../../src/app/[property]/admin/giftcards/page';
 
 const giftCardsSeed = [
   {

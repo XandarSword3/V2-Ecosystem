@@ -796,7 +796,7 @@ export async function runFullParityCheck(propertyId: string): Promise<{ checks: 
 
     .from('room_rates')
 
-    .select('metadata_id, rate')
+    .select('room_type_id, rate')
 
     .in('room_type_id', roomTypes.map(rt => rt.id))
 
@@ -814,7 +814,7 @@ export async function runFullParityCheck(propertyId: string): Promise<{ checks: 
 
   for (const roomType of roomTypes) {
 
-    const rate = rates?.find(r => (metadata as any)?.room_type_id === roomType.id);
+    const rate = rates?.find(r => r.room_type_id === roomType.id);
 
     if (!rate) continue;
 

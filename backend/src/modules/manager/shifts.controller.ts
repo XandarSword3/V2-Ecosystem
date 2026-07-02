@@ -24,7 +24,7 @@ export class ShiftsController {
   private async calculateShiftFinancials(staffId: string, start: string, end: string, propertyId?: string): Promise<{ ordersProcessed: number; revenueHandled: number }> {
     const supabase = getSupabase();
     const sumRows = (rows: Array<{ total_amount?: string | number | null }> | null | undefined) =>
-      (rows || []).reduce((sum, row) => sum + Number(amount || 0), 0);
+      (rows || []).reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
 
     let query = supabase.from('transactions').select('id,total_amount:amount').eq('staff_id', staffId).gte('created_at', start).lte('created_at', end);
     if (propertyId) {

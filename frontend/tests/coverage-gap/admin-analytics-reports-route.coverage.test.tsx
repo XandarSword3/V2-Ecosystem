@@ -70,7 +70,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import AnalyticsReportsPage from '../../src/app/admin/reports/analytics/page';
+import AnalyticsReportsPage from '../../src/app/[property]/admin/reports/analytics/page';
 
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 let anchorClickSpy: ReturnType<typeof vi.spyOn>;

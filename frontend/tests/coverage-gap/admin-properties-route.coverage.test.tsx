@@ -69,7 +69,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import MultiPropertyPage from '../../src/app/admin/properties/page';
+import MultiPropertyPage from '../../src/app/[property]/admin/properties/page';
 
 function renderPage() {
   const queryClient = new QueryClient({

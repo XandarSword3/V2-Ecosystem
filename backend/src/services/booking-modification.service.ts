@@ -146,8 +146,9 @@ export async function cancelReservation(
       return { success: false, message: 'Cannot cancel a booking after check-in', refundAmount: 0, refundType: RefundType.NONE };
     }
 
-    const checkInDate = booking.metadata?.check_in_date
-      ? new Date(booking.(metadata as any)?.check_in_date_date)
+    const meta = (booking.metadata ?? {}) as Record<string, unknown>;
+    const checkInDate = meta.check_in_date
+      ? new Date(meta.check_in_date as string)
       : new Date();
     const policy = getCancellationPolicy(checkInDate);
     const { refundAmount, creditAmount } = calculateRefund(Number(booking.amount || 0), policy);

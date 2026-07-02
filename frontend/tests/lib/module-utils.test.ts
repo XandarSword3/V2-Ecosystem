@@ -45,9 +45,9 @@ import {
 function createModule(overrides: Partial<Module> = {}): Module {
   return {
     id: 'mod-1',
-    template_type: 'instant_transaction',
+    engine_type: 'instant_transaction',
     name: 'MenuService',
-    slug: 'instant_transaction',
+    slug: 'menu-service',
     is_active: true,
     sort_order: 1,
     ...overrides,
@@ -64,7 +64,7 @@ describe('module-utils', () => {
   });
 
   it('falls back to template type icon when slug is unknown', () => {
-    const module = createModule({ slug: 'unknown-module', template_type: 'shared_capacity_access' });
+    const module = createModule({ slug: 'unknown-module', engine_type: 'shared_capacity_access' });
 
     expect(getModuleIcon(module).displayName).toBe('Ticket');
   });
@@ -98,9 +98,9 @@ describe('module-utils', () => {
   });
 
   it('returns template-specific descriptions and stats', () => {
-    const menuModule = createModule({ name: 'KioskItem Bar', template_type: 'instant_transaction' });
-    const bookingModule = createModule({ name: 'AccommodationUnits', template_type: 'time_exclusive_reservation' });
-    const sessionModule = createModule({ name: 'Pool', template_type: 'shared_capacity_access' });
+    const menuModule = createModule({ name: 'KioskItem Bar', engine_type: 'instant_transaction' });
+    const bookingModule = createModule({ name: 'AccommodationUnits', engine_type: 'time_exclusive_reservation' });
+    const sessionModule = createModule({ name: 'Pool', engine_type: 'shared_capacity_access' });
 
     expect(getModuleDefaultDescription(menuModule)).toContain('menu and place orders');
     expect(getModuleDefaultDescription(bookingModule)).toContain('Book your stay');

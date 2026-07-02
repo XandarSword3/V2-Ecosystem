@@ -34,7 +34,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import UserDetailsPage from '../../src/app/admin/users/[id]/page';
+import UserDetailsPage from '../../src/app/[property]/admin/users/[id]/page';
 
 describe('Admin user details route coverage', () => {
   beforeEach(() => {

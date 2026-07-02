@@ -42,6 +42,7 @@ vi.mock('framer-motion', async () => {
 
 vi.mock('next/navigation', () => ({
   usePathname: () => pathnameState.pathname,
+  useParams: () => ({}),
 }));
 
 vi.mock('next/link', () => ({

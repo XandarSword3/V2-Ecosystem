@@ -51,8 +51,8 @@ describe('offline hydration service', () => {
         return Promise.resolve({
           data: {
             modules: [
-              { id: 'm1', slug: 'menu_service', name: 'MenuService', template_type: 'menu_service', is_active: true },
-              { id: 'm2', slug: 'cabanas', name: 'Cabanas', template_type: 'multi_day_booking', is_active: true }
+              { id: 'm1', slug: 'menu_service', name: 'MenuService', engine_type: 'menu_service', is_active: true },
+              { id: 'm2', slug: 'cabanas', name: 'Cabanas', engine_type: 'multi_day_booking', is_active: true }
             ]
           }
         });
@@ -89,7 +89,7 @@ describe('offline hydration service', () => {
       if (url.includes('/admin/modules')) {
         return Promise.resolve({
           data: {
-            modules: [{ id: 'm1', slug: 'test', template_type: 'menu_service', is_active: true }]
+            modules: [{ id: 'm1', slug: 'test', engine_type: 'menu_service', is_active: true }]
           }
         });
       }
@@ -109,8 +109,8 @@ describe('offline hydration service', () => {
         return Promise.resolve({
           data: {
             modules: [
-              { id: 'fail_mod', slug: 'fail', template_type: 'menu_service', is_active: true },
-              { id: 'ok_mod', slug: 'ok', template_type: 'session_access', is_active: true }
+              { id: 'fail_mod', slug: 'fail', engine_type: 'menu_service', is_active: true },
+              { id: 'ok_mod', slug: 'ok', engine_type: 'session_access', is_active: true }
             ]
           }
         });

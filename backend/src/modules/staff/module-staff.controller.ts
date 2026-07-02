@@ -77,7 +77,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       const meta = (order.metadata ?? {}) as Record<string, unknown>;
       return {
         id: order.id,
-        orderNumber: (metadata as any)?.order_number ?? null,
+        orderNumber: (meta.order_number as string | undefined) ?? null,
         customerName: (meta.customer_name as string) || 'Guest',
         customerId: order.customer_id,
         orderType: order.engine_type,
@@ -359,6 +359,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
         resource_type: 'order',
         resource_id: orderId,
         details: { newStatus: status, moduleSlug: slug },
+        tenant_id: req.user?.tenantId,
       });
     } catch (logError: any) {
       logger.warn('Failed to log activity:', logError.message);
@@ -433,18 +434,20 @@ export async function getModuleBookings(req: Request, res: Response) {
     // Transform for frontend
     const transformedBookings = (bookings || []).map(booking => {
       const meta = (booking.metadata ?? {}) as Record<string, unknown>;
-      const userRow = Array.isArray((booking as any).user) ? (booking as any).user[0] : (booking as any).user;
-      const unitRow = Array.isArray((booking as any).unit) ? (booking as any).unit[0] : (booking as any).unit;
+      const rawUser = (booking as Record<string, unknown>)['user'] as Record<string, unknown> | Record<string, unknown>[] | null | undefined;
+      const rawUnit = (booking as Record<string, unknown>)['unit'] as Record<string, unknown> | Record<string, unknown>[] | null | undefined;
+      const userRow = Array.isArray(rawUser) ? rawUser[0] : rawUser;
+      const unitRow = Array.isArray(rawUnit) ? rawUnit[0] : rawUnit;
       return {
         id: booking.id,
-        bookingNumber: (metadata as any)?.booking_number || id ?? null,
-        guestName: (meta.customer_name as string) || userRow?.full_name || 'Guest',
-        guestEmail: (meta.customer_email as string) || userRow?.email,
-        guestPhone: userRow?.phone,
+        bookingNumber: (meta.booking_number as string | undefined) ?? booking.id,
+        guestName: (meta.customer_name as string) || (userRow?.['full_name'] as string | undefined) || 'Guest',
+        guestEmail: (meta.customer_email as string) || (userRow?.['email'] as string | undefined),
+        guestPhone: userRow?.['phone'] as string | undefined,
         unitId: booking.reference_id,
-        unitName: unitRow?.name || 'Unit',
-        checkIn: (metadata as any)?.check_in_date_date ?? null,
-        checkOut: (metadata as any)?.check_out_date_date ?? null,
+        unitName: (unitRow?.['name'] as string | undefined) || 'Unit',
+        checkIn: (meta.check_in_date as string | undefined) ?? null,
+        checkOut: (meta.check_out_date as string | undefined) ?? null,
         status: booking.status,
         totalPrice: booking.amount,
         guestCount: meta.number_of_guests,
@@ -552,7 +555,8 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
           status: 'pending',
           notes: `Auto-generated from checkout. Booking #${(currentBooking?.metadata as Record<string, unknown>)?.booking_number ?? bookingId}`,
           reference_id: bookingId,
-          reference_table: 'transactions'
+          reference_table: 'transactions',
+          tenant_id: req.user?.tenantId,
         });
 
         await supabase.from('accommodation_units').update({
@@ -571,6 +575,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
       resource_type: 'booking',
       resource_id: bookingId,
       details: { oldStatus: currentBooking?.status, newStatus: status, moduleSlug: slug },
+      tenant_id: req.user?.tenantId,
     });
 
     res.json({ success: true, data: booking });
@@ -692,7 +697,7 @@ export async function validateModuleTicket(req: Request, res: Response) {
         valid: true,
         ticket: {
           id: ticket.id,
-          ticketNumber: (metadata as any)?.ticket_number ?? null,
+          ticketNumber: (meta.ticket_number as string | undefined) ?? null,
           status: ticket.status,
           guestName: (meta.customer_name as string) || 'Guest',
           sessionName: session?.name,
@@ -939,10 +944,11 @@ export async function getTodaysTickets(req: Request, res: Response) {
       success: true,
       data: (tickets || []).map(t => {
         const tMeta = (t.metadata ?? {}) as Record<string, unknown>;
-        const sess = Array.isArray((t as any).session) ? (t as any).session[0] : (t as any).session;
+        const rawSession = (t as Record<string, unknown>)['session'] as Record<string, unknown> | Record<string, unknown>[] | null | undefined;
+        const sess = Array.isArray(rawSession) ? rawSession[0] : rawSession;
         return {
           id: t.id,
-          ticketNumber: (metadata as any)?.ticket_number ?? null,
+          ticketNumber: (tMeta.ticket_number as string | undefined) ?? null,
           customerName: (tMeta.customer_name as string) ?? null,
           customerPhone: (tMeta.customer_phone as string) ?? null,
           guests: tMeta.number_of_guests,
@@ -1128,25 +1134,25 @@ export async function searchCustomers(req: Request, res: Response) {
     const membershipByCustomer: Record<string, string> = {};
     const tierByCustomer: Record<string, string> = {};
 
-    const rollupFinancialRows = (items: Array<{ customer_id: string; total_amount?: string | number; created_at?: string }> = []) => {
-    items.forEach((row) => {
-    const amount = Number(amount || 0);
-    spendByCustomer[row.customer_id] = (spendByCustomer[row.customer_id] || 0) + amount;
-    if (row.created_at) {
-    const existing = recentOrderByCustomer[row.customer_id];
-    if (!existing || new Date(row.created_at) > new Date(existing)) {
-    recentOrderByCustomer[row.customer_id] = row.created_at;
-    }
-    }
-    });
+    const rollupFinancialRows = (items: Array<{ customer_id: string; amount?: string | number; created_at?: string }> = []) => {
+      items.forEach((row) => {
+        const amount = Number(row.amount || 0);
+        spendByCustomer[row.customer_id] = (spendByCustomer[row.customer_id] || 0) + amount;
+        if (row.created_at) {
+          const existing = recentOrderByCustomer[row.customer_id];
+          if (!existing || new Date(row.created_at) > new Date(existing)) {
+            recentOrderByCustomer[row.customer_id] = row.created_at;
+          }
+        }
+      });
     };
 
-    rollupFinancialRows((orderHistory.data as any[]) || []);
+    rollupFinancialRows((orderHistory.data as Array<{ customer_id: string; amount?: string | number; created_at?: string }>) || []);
 
-    ((entitlements.data as any[]) || []).forEach((m) => {
-    if (!membershipByCustomer[m.customer_id]) membershipByCustomer[m.customer_id] = m.status || 'inactive';
+    ((entitlements.data as Array<{ customer_id: string; status?: string }>) || []).forEach((m) => {
+      if (!membershipByCustomer[m.customer_id]) membershipByCustomer[m.customer_id] = m.status || 'inactive';
     });
-    ((loyaltyAccounts.data as any[]) || []).forEach((l) => {
+    ((loyaltyAccounts.data as Array<{ user_id: string; tier_name?: string }>) || []).forEach((l) => {
       if (!tierByCustomer[l.user_id]) tierByCustomer[l.user_id] = l.tier_name || 'Standard';
     });
 

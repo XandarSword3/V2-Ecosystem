@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Mail, Lock, Loader2, Eye, EyeOff, AlertCircle, Shield, KeyRound } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { useSiteSettings } from '@/lib/settings-context';
 import { Container } from '@/components/layout/Container';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const tCommon = useTranslations('common');
   const router = useRouter();
   const { user, isAuthenticated, login, verify2FA } = useAuth();
+  const { settings } = useSiteSettings();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,7 +46,7 @@ export default function LoginPage() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && settings.propertySlug) {
       const redirectPath = getRedirectPath();
       if (redirectPath) {
         router.replace(redirectPath);
@@ -52,15 +54,17 @@ export default function LoginPage() {
       }
 
       const roles = user.roles || [];
-      if (roles.includes('super_admin') || roles.includes('admin')) {
-        router.replace('/admin');
+      if (user.is_platform_admin) {
+        router.replace('/platform-admin');
+      } else if (roles.includes('super_admin') || roles.includes('admin')) {
+        router.replace(`/${settings.propertySlug}/admin`);
       } else if (roles.some((r: string) => r.includes('staff') || r.includes('manager'))) {
-        router.replace('/staff');
+        router.replace(`/${settings.propertySlug}/staff`);
       } else {
         router.replace('/');
       }
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, settings.propertySlug]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +84,7 @@ export default function LoginPage() {
       }
 
       // Normal login success - result is a User at this point
-      const userData = result as { id: string; email: string; fullName: string; roles: string[] };
+      const userData = result as { id: string; email: string; fullName: string; roles: string[]; is_platform_admin?: boolean };
 
       // Check for redirect parameter first
       const redirectPath = getRedirectPath();
@@ -93,10 +97,12 @@ export default function LoginPage() {
       const roles = userData.roles || [];
 
       // Use replace instead of push for cleaner navigation
-      if (roles.includes('super_admin') || roles.includes('admin')) {
-        window.location.href = '/admin'; // Force full page navigation
+      if (userData.is_platform_admin) {
+        window.location.href = '/platform-admin';
+      } else if (roles.includes('super_admin') || roles.includes('admin')) {
+        window.location.href = `/${settings.propertySlug}/admin`; // Force full page navigation
       } else if (roles.some((r: string) => r.includes('staff') || r.includes('manager'))) {
-        window.location.href = '/staff';
+        window.location.href = `/${settings.propertySlug}/staff`;
       } else {
         window.location.href = '/';
       }
@@ -115,7 +121,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const userData = await verify2FA(pending2FAUserId, twoFactorCode);
+      const userData = (await verify2FA(pending2FAUserId, twoFactorCode)) as { id: string; email: string; fullName: string; roles: string[]; is_platform_admin?: boolean };
 
       // Check for redirect parameter first
       const redirectPath = getRedirectPath();
@@ -127,10 +133,12 @@ export default function LoginPage() {
       // Determine redirect based on roles
       const roles = userData.roles || [];
 
-      if (roles.includes('super_admin') || roles.includes('admin')) {
-        window.location.href = '/admin';
+      if (userData.is_platform_admin) {
+        window.location.href = '/platform-admin';
+      } else if (roles.includes('super_admin') || roles.includes('admin')) {
+        window.location.href = `/${settings.propertySlug}/admin`;
       } else if (roles.some((r: string) => r.includes('staff') || r.includes('manager'))) {
-        window.location.href = '/staff';
+        window.location.href = `/${settings.propertySlug}/staff`;
       } else {
         window.location.href = '/';
       }

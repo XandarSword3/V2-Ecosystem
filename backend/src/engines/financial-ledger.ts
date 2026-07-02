@@ -610,7 +610,7 @@ export class FinancialLedgerService {
 
     for (const entry of entries) {
 
-      const amount = parseFloat(amount) || 0;
+      const amount = parseFloat(entry.total_amount as string) || 0;
 
       switch (entry.transaction_type) {
 
@@ -720,7 +720,7 @@ export class FinancialLedgerService {
 
     if (params.tenantId) query = query.eq('tenant_id', params.tenantId);
 
-    if (params.moduleId) query = query.eq('metadata_id', params.moduleId);
+    if (params.moduleId) query = query.eq('module_id', params.moduleId);
 
     if (params.engineType) query = query.eq('engine_type', params.engineType);
 

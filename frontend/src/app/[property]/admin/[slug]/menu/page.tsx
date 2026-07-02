@@ -136,7 +136,7 @@ export default function DynamicMenuPage() {
     try {
       setLoading(true);
       const [menuRes, catRes, ingredientsRes, groupsRes] = await Promise.all([
-        api.get(`/${slug}/items`, { params: { moduleId: currentModule.id } }),
+        api.get(`/${slug}/admin/items`, { params: { moduleId: currentModule.id } }),
         api.get(`/${slug}/categories`, { params: { moduleId: currentModule.id } }),
         api.get('/inventory/items', { params: { moduleId: currentModule.id } }).catch((e) => {
           console.warn('[Menu Page] Inventory items fetch failed:', e.message);
@@ -147,7 +147,26 @@ export default function DynamicMenuPage() {
           return { data: { data: [] } };
         }),
       ]);
-      setItems(menuRes.data.data || []);
+      // Transform backend items to match frontend interface
+      const transformedItems = (menuRes.data.data || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        name_ar: item.metadata?.name_ar,
+        description: item.description,
+        description_ar: item.metadata?.description_ar,
+        price: item.price,
+        category_id: item.category,
+        image_url: item.metadata?.image_url,
+        is_available: item.is_available,
+        is_featured: item.metadata?.is_featured || false,
+        is_vegetarian: item.metadata?.is_vegetarian || false,
+        is_spicy: item.metadata?.is_spicy || false,
+        preparation_time: item.metadata?.preparation_time_minutes,
+        allergens: item.metadata?.allergens,
+        recipe: item.metadata?.recipe,
+        customization_group_ids: item.metadata?.customization_group_ids,
+      }));
+      setItems(transformedItems);
       setCategories(catRes.data.data || []);
       setIngredients(ingredientsRes.data.data || []);
       setCustomizationGroups(groupsRes.data.data || []);
@@ -223,7 +242,7 @@ export default function DynamicMenuPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.price || !formData.category_id) {
+    if (!formData.name || formData.price == null || !formData.category_id) {
       toast.error('Please fill in all required fields');
       return;
     }

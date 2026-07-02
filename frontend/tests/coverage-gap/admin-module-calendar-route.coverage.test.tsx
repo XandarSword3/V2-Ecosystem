@@ -55,7 +55,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import AdminCalendarPage from '../../src/app/admin/[slug]/calendar/page';
+import AdminCalendarPage from '../../src/app/[property]/admin/[slug]/calendar/page';
 
 const bookingsSeed = [
   {

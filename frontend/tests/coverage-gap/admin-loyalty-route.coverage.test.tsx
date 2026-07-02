@@ -57,7 +57,7 @@ vi.mock('@/context/PropertyContext', () => ({
   PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import LoyaltyAdminPage from '../../src/app/admin/loyalty/page';
+import LoyaltyAdminPage from '../../src/app/[property]/admin/loyalty/page';
 
 const tiersSeed = [
   {

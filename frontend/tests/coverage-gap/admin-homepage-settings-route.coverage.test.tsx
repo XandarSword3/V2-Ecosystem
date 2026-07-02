@@ -52,7 +52,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import HomepageSettingsPage from '../../src/app/admin/settings/homepage/page';
+import HomepageSettingsPage from '../../src/app/[property]/admin/settings/homepage/page';
 
 describe('Admin homepage settings route coverage', () => {
   beforeEach(() => {

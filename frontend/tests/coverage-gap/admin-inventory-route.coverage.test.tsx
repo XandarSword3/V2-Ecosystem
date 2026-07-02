@@ -60,7 +60,7 @@ vi.mock('@/context/PropertyContext', () => ({
   PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import InventoryAdminPage from '../../src/app/admin/inventory/page';
+import InventoryAdminPage from '../../src/app/[property]/admin/inventory/page';
 
 const itemsSeed = [
   {

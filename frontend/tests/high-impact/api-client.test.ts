@@ -107,11 +107,11 @@ describe('api client', () => {
   });
 
   it('adds auth and csrf headers in request interceptor', async () => {
-    await loadModule();
+    const mod = await loadModule();
     const api = apiInstanceMock as unknown as ApiMock;
     const requestHandler = api.interceptors.request.use.mock.calls[0][0] as (config: RequestConfig) => Promise<RequestConfig>;
 
-    localStorage.setItem('accessToken', 'token-a');
+    mod.memoryTokenStore.set('token-a');
     document.cookie = 'csrf-token=cookie-csrf';
 
     const config = await requestHandler({ method: 'post', headers: {} });
@@ -120,19 +120,17 @@ describe('api client', () => {
   });
 
   it('fetches csrf token and refreshes near-expiring access tokens', async () => {
-    await loadModule();
+    const mod = await loadModule();
     const api = apiInstanceMock as unknown as ApiMock;
     const requestHandler = api.interceptors.request.use.mock.calls[0][0] as (config: RequestConfig) => Promise<RequestConfig>;
 
     const expiring = makeTokenWithExp(Date.now() + 30_000);
-    localStorage.setItem('accessToken', expiring);
-    localStorage.setItem('refreshToken', 'refresh-1');
+    mod.memoryTokenStore.set(expiring);
 
     axiosPostMock.mockResolvedValue({
       data: {
         data: {
           accessToken: 'new-access',
-          refreshToken: 'new-refresh',
         },
       },
     });
@@ -141,8 +139,7 @@ describe('api client', () => {
 
     const config = await requestHandler({ method: 'post', headers: {} });
 
-    expect(localStorage.getItem('accessToken')).toBe('new-access');
-    expect(localStorage.getItem('refreshToken')).toBe('new-refresh');
+    expect(mod.memoryTokenStore.get()).toBe('new-access');
     expect(config.headers.Authorization).toBe('Bearer new-access');
     expect(config.headers['X-CSRF-Token']).toBe('fetched-csrf');
     expect(axiosGetMock).toHaveBeenCalledWith(expect.stringContaining('/api/csrf-token'), expect.any(Object));
@@ -174,12 +171,10 @@ describe('api client', () => {
     await vi.runAllTimersAsync();
     await expect(retryPromise).resolves.toEqual({ retryOk: true });
 
-    localStorage.setItem('refreshToken', 'refresh-401');
     axiosPostMock.mockResolvedValue({
       data: {
         data: {
           accessToken: 'a401',
-          refreshToken: 'r401',
         },
       },
     });
@@ -192,12 +187,11 @@ describe('api client', () => {
       })
     ).resolves.toEqual({ refreshed: true });
 
-    expect(axiosPostMock).toHaveBeenCalledWith(expect.stringContaining('/auth/refresh'), { refreshToken: 'refresh-401' });
-    expect(localStorage.getItem('accessToken')).toBe('a401');
+    expect(axiosPostMock).toHaveBeenCalledWith(expect.stringContaining('/auth/refresh'), {}, { withCredentials: true });
   });
 
   it('rejects 401 when no refresh token is available', async () => {
-    await loadModule();
+    const mod = await loadModule();
     const api = apiInstanceMock as unknown as ApiMock;
     const responseHandler = api.interceptors.response.use.mock.calls[0][1] as (error: ResponseError) => Promise<unknown>;
 
@@ -207,8 +201,7 @@ describe('api client', () => {
     };
 
     await expect(responseHandler(error)).rejects.toBe(error);
-    expect(localStorage.getItem('accessToken')).toBeNull();
-    expect(localStorage.getItem('refreshToken')).toBeNull();
+    expect(mod.memoryTokenStore.get()).toBeNull();
   });
 
   it('routes all domain api wrappers to the expected endpoints', async () => {
@@ -236,7 +229,7 @@ describe('api client', () => {
 
     await mod.modulesApi.getAll(true);
     await mod.modulesApi.getById('module-1');
-    await mod.modulesApi.create({ template_type: 'menu_service', name: 'Module 1' });
+    await mod.modulesApi.create({ engine_type: 'instant_transaction', name: 'Module 1' });
     await mod.modulesApi.update('module-1', { name: 'Module Updated' });
     await mod.modulesApi.delete('module-1', true);
 
