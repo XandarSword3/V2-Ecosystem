@@ -240,7 +240,430 @@ Each module is defined by exactly **ONE** engine type. The engine determines the
 
 ---
 
-## 🔐 Security & Permissions
+## Complete Engine Mapping - Detailed Component Inventory
+
+### 🔧 Engine A: Instant Transaction - Full Map
+
+**Core Definition**
+- **File**: `backend/src/engines/definitions/instant-transaction.ts` (189 lines)
+- **Type**: `instant_transaction`
+- **Commercial Entity**: Order
+- **Pattern**: Order → Prepare → Deliver → Done
+- **Examples**: Menu service, kiosk, room service, any catalog-based instant ordering
+
+**State Machine Transitions**
+- `confirm`: pending → confirmed (staff, system) - Payment validated
+- `start_preparation`: confirmed → preparing (staff, system) - Kitchen accepted
+- `mark_ready`: preparing → ready (staff) - All items prepared
+- `deliver`: ready → delivered (staff) - Handed to customer
+- `complete`: delivered → completed (staff, system) - Customer confirmed
+- `complete`: ready → completed (staff, system) - Quick-serve shortcut
+- `cancel`: pending → cancelled (customer, staff, admin) - Free cancellation
+- `cancel`: confirmed → cancelled (staff, admin) - Triggers refund
+- `cancel`: preparing → cancelled (admin) - Refund + inventory reversal
+
+**Pricing Configuration**
+- Tax: ✅ Enabled
+- Service Charge: ✅ Enabled (condition: orderType=dine_in)
+- Delivery Fee: ✅ Enabled (condition: orderType=delivery)
+- Coupons: ✅ Supported
+- Gift Cards: ✅ Supported
+- Loyalty Redemption: ✅ Supported
+- Loyalty Earning: ✅ Enabled
+- Inventory Deduction: ✅ Enabled
+- Rounding: round
+- Decimal Places: 2
+
+**Interaction Contracts**
+1. `earn_loyalty_on_purchase`: Trigger on_payment, idempotent, log_and_continue failure
+2. `deduct_inventory_on_purchase`: Trigger on_purchase, idempotent, log_and_continue failure
+3. `notify_kitchen_on_confirm`: Trigger on_purchase, idempotent, log_and_continue failure
+
+**Template Mapping**
+- Legacy Alias: `menu_service` → `instant_transaction`
+- Canonical: `instant_transaction` → `instant_transaction`
+
+**Database Tables**
+- `catalog_items` - Menu/kiosk catalog items
+- `catalog_categories` - Item categories
+- `transactions` - Unified transactions table (engine_type = 'instant_transaction')
+
+**Core Engine Files**
+- `backend/src/engines/definitions/instant-transaction.ts` - Definition
+- `backend/src/engines/types.ts` - Type system (TEMPLATE_TO_ENGINE mapping)
+- `backend/src/engines/registry.ts` - Engine registry (lines 19, 30, 75-80)
+- `backend/src/engines/engine-service.ts` - High-level service API
+- `shared/types/engines.ts` - Shared FE/BE types
+- `backend/src/engines/state-machine.ts` - Generic state machine enforcer
+- `backend/src/engines/pricing-pipeline.ts` - Universal pricing calculator
+- `backend/src/engines/inventory-side-effects.ts` - Inventory deduction/restore
+
+**Related Services**
+- `backend/src/services/tax.service.ts` - Tax calculation
+- `backend/src/services/order-config.service.ts` - Order configuration
+- `backend/src/modules/inventory/inventory.controller.ts` - Inventory management
+- `backend/src/modules/pos/pos-hardware.controller.ts` - POS hardware integration
+
+**Frontend Components**
+- `frontend/src/components/KitchenDisplayBoard.tsx` - KDS interface
+- `frontend/src/components/pos-templates/StaffPOSTemplate.tsx` - Staff POS
+- `frontend/src/components/pos-templates/AdminPOSTemplate.tsx` - Admin POS
+- `frontend/src/lib/module-utils.ts` - Module utilities
+
+**Routing**
+- `backend/src/routes/dynamic-module.router.ts` - Dynamic module routing
+- `backend/src/modules/staff/module-staff.controller.ts` - Staff module controller
+
+**Data Extraction Capabilities**
+- `staffAttribution`: Staff sales performance and tips
+- `promoEffectiveness`: Promotion effectiveness on POS orders
+- `orderMetrics`: Transaction sizes and fulfillment speed
+
+**Test Files**
+- `backend/tests/unit/engines/engine-service.test.ts` (26 matches)
+- `backend/tests/unit/engines/workflow-integration.test.ts` (20 matches)
+- `backend/tests/unit/engines/registry.test.ts` (8 matches)
+- `backend/tests/unit/engines/pricing-pipeline.test.ts` (2 matches)
+- `backend/tests/unit/engines/state-machine.test.ts` (2 matches)
+- `archive/tests/phase3/01-engine-a-instant-transactions.spec.ts` (3 matches)
+- `archive/tests/phase3/20-journey-engine-a.spec.ts` (9 matches)
+- `frontend/tests/high-impact/kitchen-display-board.behavior.test.tsx` (20 matches)
+- `frontend/tests/high-impact/staff-pos-template.behavior.test.tsx` (9 matches)
+
+**Migrations**
+- `supabase/migrations/20260523100000_generic_engine_config_tables.sql` - catalog_items/catalog_categories
+- `supabase/migrations/20260606000001_rename_menu_categories_to_catalog_categories.sql` - Category rename
+- `supabase/migrations/20260522000000_clean_transactions_table.sql` - Unified transactions
+
+**Integration Points**
+- Payments: Stripe integration via payment routes
+- Loyalty: Cross-cutting loyalty system
+- Coupons: Promotion/discount system
+- Gift Cards: Gift card redemption
+- Inventory: Real-time inventory tracking
+- KDS: Kitchen Display System real-time updates
+- Analytics: Economics data extraction for reporting
+
+---
+
+### 🏨 Engine B: Time-Exclusive Reservation - Full Map
+
+**Core Definition**
+- **File**: `backend/src/engines/definitions/time-exclusive-reservation.ts` (189 lines)
+- **Type**: `time_exclusive_reservation`
+- **Commercial Entity**: Booking
+- **Pattern**: Reserve → Confirm → Check-In → Occupy → Check-Out
+- **Examples**: Accommodation units, hotel rooms, villas, private cabanas
+
+**State Machine Transitions**
+- `confirm`: pending → confirmed (staff, system) - Payment/deposit received
+- `check_in`: confirmed → checked_in (staff) - Check-in date arrived, unit ready
+- `check_in`: pending → checked_in (staff, admin) - Walk-in/direct check-in
+- `check_out`: checked_in → checked_out (staff) - Guest vacated, balance settled
+- `cancel`: pending → cancelled (customer, staff, admin) - Free cancellation within policy
+- `cancel`: confirmed → cancelled (customer, staff, admin) - May incur cancellation fee
+- `mark_no_show`: pending → no_show (staff, system) - Check-in date passed without arrival
+- `mark_no_show`: confirmed → no_show (staff, system) - Auto-detected or manual no-show
+
+**Pricing Configuration**
+- Tax: ✅ Enabled
+- Service Charge: ❌ Disabled
+- Delivery Fee: ❌ Disabled
+- Coupons: ✅ Supported
+- Gift Cards: ✅ Supported
+- Loyalty Redemption: ✅ Supported
+- Loyalty Earning: ✅ Enabled
+- Inventory Deduction: ❌ Disabled (availability checked instead)
+- Rounding: round
+- Decimal Places: 2
+
+**Interaction Contracts**
+1. `earn_loyalty_on_payment`: Trigger on_payment, idempotent, log_and_continue failure
+2. `trigger_housekeeping_on_checkout`: Trigger on_check_out, idempotent, log_and_continue failure
+3. `block_availability_on_purchase`: Trigger on_purchase, idempotent, block failure
+4. `release_availability_on_cancel`: Trigger on_cancel, idempotent, log_and_continue failure
+
+**Template Mapping**
+- Legacy Alias: `multi_day_booking` → `time_exclusive_reservation`
+- Legacy Alias: `appointment_booking` → `time_exclusive_reservation`
+- Canonical: `time_exclusive_reservation` → `time_exclusive_reservation`
+
+**Database Tables**
+- `accommodation_units` - Bookable units (rooms, chalets, tables)
+- `transactions` - Unified transactions table (engine_type = 'time_exclusive_reservation')
+
+**Core Engine Files**
+- `backend/src/engines/definitions/time-exclusive-reservation.ts` - Definition
+- `backend/src/engines/types.ts` - Type system (TEMPLATE_TO_ENGINE mapping)
+- `backend/src/engines/registry.ts` - Engine registry (lines 20, 31)
+- `backend/src/engines/engine-service.ts` - High-level service API
+- `backend/src/engines/state-machine.ts` - Generic state machine enforcer
+- `backend/src/engines/pricing-pipeline.ts` - Universal pricing calculator
+
+**Related Services**
+- `backend/src/services/seasonal-pricing.service.ts` - Night-by-night seasonal pricing
+- `backend/src/modules/housekeeping/housekeeping.routes.ts` - Housekeeping integration
+
+**Data Extraction Capabilities**
+- `staffAttribution`: Staff performance for check-ins/check-outs
+- `cancellationTracking`: Booking cancellations and lead times
+- `bookingPatterns`: Length of stay and booking windows
+
+**Test Files**
+- `backend/tests/unit/engines/engine-service.test.ts` (26 matches)
+- `backend/tests/unit/engines/workflow-integration.test.ts` (20 matches)
+- `backend/tests/unit/engines/registry.test.ts` (8 matches)
+
+**Migrations**
+- `supabase/migrations/00000000000001_base_schema_shim.sql` - accommodation_units CREATE TABLE (line 6)
+
+**Integration Points**
+- Payments: Stripe integration for deposits and full payments
+- Loyalty: Cross-cutting loyalty system
+- Coupons: Promotion/discount system
+- Gift Cards: Gift card redemption
+- Housekeeping: Integration on checkout
+- Availability: Real-time availability blocking
+
+---
+
+### 🏊 Engine C: Shared Capacity Access - Full Map
+
+**Core Definition**
+- **File**: `backend/src/engines/definitions/shared-capacity-access.ts` (171 lines)
+- **Type**: `shared_capacity_access`
+- **Commercial Entity**: Ticket
+- **Pattern**: Purchase → Validate → Enter → Exit
+- **Examples**: Pool, Fitness Center, Spa, Waterpark, Game Room, Cinema
+
+**State Machine Transitions**
+- `validate_entry`: valid → active (staff, system) - NOW() between starts_at/ends_at, capacity not exceeded, personal_duration_minutes sets personal_expires_at
+- `record_exit`: active → used (staff, system) - Guest inside, capacity decremented
+- `cancel`: valid → cancelled (customer, staff, admin) - Future date cancellation
+- `expire`: valid → expired (system) - NOW() > ends_at, never validated
+- `expire_personal`: active → expired (system) - personal_duration_minutes timer ran out
+
+**Pricing Configuration**
+- Tax: ✅ Enabled
+- Service Charge: ❌ Disabled
+- Delivery Fee: ❌ Disabled
+- Coupons: ✅ Supported
+- Gift Cards: ✅ Supported
+- Loyalty Redemption: ✅ Supported
+- Loyalty Earning: ✅ Enabled
+- Inventory Deduction: ❌ Disabled (capacity checked instead)
+- Rounding: round
+- Decimal Places: 2
+
+**Interaction Contracts**
+1. `earn_loyalty_on_purchase`: Trigger on_purchase, idempotent, log_and_continue failure
+2. `check_capacity_on_entry`: Trigger on_check_in, idempotent, block failure
+3. `decrement_capacity_on_exit`: Trigger on_check_out, idempotent, log_and_continue failure
+4. `set_personal_expiry_on_entry`: Trigger on_check_in, idempotent, log_and_continue failure
+
+**Template Mapping**
+- Legacy Alias: `session_access` → `shared_capacity_access`
+- Legacy Alias: `class_scheduling` → `shared_capacity_access`
+- Canonical: `shared_capacity_access` → `shared_capacity_access`
+
+**Database Tables**
+- `capacity_windows` - Session time slots with TIMESTAMPTZ
+- `transactions` - Unified transactions table (engine_type = 'shared_capacity_access')
+
+**Core Engine Files**
+- `backend/src/engines/definitions/shared-capacity-access.ts` - Definition
+- `backend/src/engines/types.ts` - Type system (TEMPLATE_TO_ENGINE mapping)
+- `backend/src/engines/registry.ts` - Engine registry (lines 21, 32)
+- `backend/src/engines/engine-service.ts` - High-level service API
+- `backend/src/engines/state-machine.ts` - Generic state machine enforcer
+- `backend/src/engines/pricing-pipeline.ts` - Universal pricing calculator
+
+**Data Extraction Capabilities**
+- `capacityUtilization`: Peak hours and capacity limits
+- `cancellationTracking`: Ticket cancellations and no-shows
+- `salesPatterns`: Ticket purchasing behavior
+
+**Test Files**
+- `backend/tests/unit/engines/engine-service.test.ts` (26 matches)
+- `backend/tests/unit/engines/workflow-integration.test.ts` (20 matches)
+- `backend/tests/unit/engines/registry.test.ts` (8 matches)
+
+**Migrations**
+- `supabase/migrations/00000000000001_base_schema_shim.sql` - capacity_windows CREATE TABLE (line 23)
+- `supabase/migrations/20260613000000_capacity_windows_timestamptz.sql` - Schema upgrade TIME → TIMESTAMPTZ
+
+**Integration Points**
+- Payments: Stripe integration for ticket purchases
+- Loyalty: Cross-cutting loyalty system
+- Coupons: Promotion/discount system
+- Gift Cards: Gift card redemption
+- Capacity: Real-time capacity management
+- QR Codes: Ticket validation
+
+---
+
+### 💎 Engine D: Ongoing Entitlement - Full Map
+
+**Core Definition**
+- **File**: `backend/src/engines/definitions/ongoing-entitlement.ts` (211 lines)
+- **Type**: `ongoing_entitlement`
+- **Commercial Entity**: Subscription/Membership
+- **Pattern**: Subscribe → Activate → Use → Renew/Cancel
+- **Examples**: Pool Membership, Facility Membership, VIP Club, Season Pass
+
+**State Machine Transitions**
+- `activate`: pending → active (system, admin, staff) - Initial payment verified
+- `pause`: active → paused (admin, staff) - Membership paused
+- `resume`: paused → active (admin, staff) - Membership resumed
+- `cancel`: active → cancelled (customer, staff, admin) - Cancellation while active
+- `cancel`: paused → cancelled (customer, staff, admin) - Cancellation while paused
+- `expire`: active → expired (system) - Expiration via renewal failure/cron
+- `renew`: active → active (system) - Successful renewal extends end_date
+- `change_plan`: active → active (admin, staff) - Plan tier changed, Stripe proration
+- `resubscribe`: expired → pending (customer, system) - New billing cycle on expired membership
+
+**Pricing Configuration**
+- Tax: ✅ Enabled
+- Service Charge: ❌ Disabled
+- Delivery Fee: ❌ Disabled
+- Coupons: ❌ Disabled
+- Gift Cards: ❌ Disabled
+- Loyalty Redemption: ❌ Disabled
+- Loyalty Earning: ✅ Enabled
+- Inventory Deduction: ❌ Disabled
+- Rounding: round
+- Decimal Places: 2
+
+**Interaction Contracts**
+1. `earn_loyalty_per_billing_cycle`: Trigger on_payment, idempotent, log_and_continue failure
+2. `grant_facility_access_on_activate`: Trigger on_check_in, idempotent, block failure
+3. `setup_recurring_billing`: Trigger on_purchase, idempotent, block failure
+4. `prorate_plan_change`: Trigger on_plan_change, idempotent, block failure
+
+**Template Mapping**
+- Legacy Alias: `subscription` → `ongoing_entitlement`
+- Legacy Alias: `membership_access` → `ongoing_entitlement`
+- Canonical: `ongoing_entitlement` → `ongoing_entitlement`
+
+**Database Tables**
+- `membership_plans` - Subscription plan definitions
+- `memberships` - Active membership records
+- `transactions` - Unified transactions table (engine_type = 'ongoing_entitlement')
+
+**Core Engine Files**
+- `backend/src/engines/definitions/ongoing-entitlement.ts` - Definition
+- `backend/src/engines/types.ts` - Type system (TEMPLATE_TO_ENGINE mapping)
+- `backend/src/engines/registry.ts` - Engine registry (lines 22, 33)
+- `backend/src/engines/engine-service.ts` - High-level service API
+- `backend/src/engines/state-machine.ts` - Generic state machine enforcer
+- `backend/src/engines/pricing-pipeline.ts` - Universal pricing calculator
+
+**Related Services**
+- `backend/src/services/stripe-platform.service.ts` - Stripe recurring billing
+- `backend/src/services/pool-membership.service.ts` - Pool membership management
+
+**Data Extraction Capabilities**
+- `churnTracking`: Subscription cancellations and customer retention
+- `renewalPatterns`: Subscription term lengths
+- `engagementTracking`: Member engagement with entitlement
+
+**Test Files**
+- `backend/tests/unit/engines/engine-service.test.ts` (26 matches)
+- `backend/tests/unit/engines/workflow-integration.test.ts` (20 matches)
+- `backend/tests/unit/engines/registry.test.ts` (8 matches)
+
+**Migrations**
+- `supabase/migrations/20260624020000_engine_d_tables.sql` - membership_plans (line 19), memberships (line 47)
+
+**Integration Points**
+- Payments: Stripe recurring billing
+- Loyalty: Cross-cutting loyalty system (earning only)
+- Facility Access: Gate checks for active memberships
+- Usage Tracking: Visits, sessions consumed
+
+---
+
+### 🌐 Engine E: Platform Entitlement - Full Map
+
+**Core Definition**
+- **File**: `backend/src/engines/definitions/platform-entitlement.ts` (216 lines)
+- **Type**: `platform_entitlement`
+- **Commercial Entity**: SaaS Subscription (B2B)
+- **Pattern**: Sign-up → Trial → Activate → Renew/Dunning/Cancel
+- **Examples**: Starter plan, Growth plan, Enterprise plan
+
+**State Machine Transitions**
+- `activate`: trialing → active (system) - Stripe invoice.paid or admin conversion
+- `cancel`: trialing → cancelled (system, admin) - Trial abandoned
+- `renew`: active → active (system) - Stripe invoice.paid for renewal
+- `payment_failed`: active → past_due (system) - Stripe invoice.payment_failed
+- `payment_recovered`: past_due → active (system) - Stripe invoice.paid after failure
+- `suspend`: past_due → suspended (system, admin) - Dunning exhausted
+- `reactivate`: suspended → active (system, admin) - Payment updated and collected
+- `cancel`: suspended → cancelled (system, admin) - Customer gives up or admin terminates
+- `cancel`: active → cancelled (admin) - Voluntary cancellation
+
+**Pricing Configuration**
+- Tax: ❌ Disabled (handled by Stripe Tax in billing jurisdiction)
+- Service Charge: ❌ Disabled
+- Delivery Fee: ❌ Disabled
+- Coupons: ❌ Disabled
+- Gift Cards: ❌ Disabled
+- Loyalty Redemption: ❌ Disabled
+- Loyalty Earning: ❌ Disabled
+- Inventory Deduction: ❌ Disabled
+- Rounding: round
+- Decimal Places: 2
+
+**Interaction Contracts**
+1. `provision_tenant_on_activate`: Trigger on_purchase, idempotent, retry failure
+2. `send_dunning_notification`: Trigger on_payment, idempotent, log_and_continue failure
+3. `block_write_access_on_suspend`: Trigger on_cancel, idempotent, block failure
+4. `deprovision_on_cancel`: Trigger on_cancel, idempotent, log_and_continue failure
+
+**Template Mapping**
+- Legacy Alias: `saas_subscription` → `platform_entitlement`
+- Canonical: `platform_entitlement` → `platform_entitlement`
+
+**Database Tables**
+- `plans` - Platform subscription plans
+- `tenants` - Tenant records with stripe_customer_id/stripe_subscription_id columns
+- `transactions` - Unified transactions table (engine_type = 'platform_entitlement')
+
+**Core Engine Files**
+- `backend/src/engines/definitions/platform-entitlement.ts` - Definition
+- `backend/src/engines/types.ts` - Type system (TEMPLATE_TO_ENGINE mapping)
+- `backend/src/engines/registry.ts` - Engine registry (lines 23, 34)
+- `backend/src/engines/engine-service.ts` - High-level service API
+- `backend/src/engines/state-machine.ts` - Generic state machine enforcer
+- `backend/src/engines/pricing-pipeline.ts` - Universal pricing calculator
+
+**Related Services**
+- `backend/src/services/stripe-platform.service.ts` - Platform Stripe integration
+- `backend/src/modules/platform/platform.routes.ts` - Platform admin routes
+
+**Data Extraction Capabilities**
+- `mrr`: Monthly Recurring Revenue by tier
+- `churn`: Trial-to-paid conversion and voluntary/involuntary churn
+- `dunning`: Dunning effectiveness and payment recovery rates
+
+**Test Files**
+- `backend/tests/unit/engines/engine-service.test.ts` (26 matches)
+- `backend/tests/unit/engines/workflow-integration.test.ts` (20 matches)
+- `backend/tests/unit/engines/registry.test.ts` (8 matches)
+
+**Migrations**
+- `supabase/migrations/20260621000001_create_plans_table.sql` - plans CREATE TABLE (line 29)
+
+**Integration Points**
+- Payments: Stripe platform billing
+- Provisioning: Automatic tenant creation on signup
+- Dunning: Payment failure handling and recovery
+- Access Control: Write blocking on suspend
+
+---
+
+## Security & Permissions
 
 ### Authentication Flow
 

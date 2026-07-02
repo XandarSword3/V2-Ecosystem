@@ -42,7 +42,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import HousekeepingAdminPage from '../../src/app/admin/housekeeping/page';
+import HousekeepingAdminPage from '../../src/app/[property]/admin/housekeeping/page';
 
 function seedEndpoints() {
   apiGetMock.mockImplementation((url: string) => {

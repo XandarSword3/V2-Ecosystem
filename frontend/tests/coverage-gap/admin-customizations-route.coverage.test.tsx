@@ -65,7 +65,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import AdminCustomizationsPage from '../../src/app/admin/customizations/page';
+import AdminCustomizationsPage from '../../src/app/[property]/admin/customizations/page';
 
 const groupsSeed = [
   {

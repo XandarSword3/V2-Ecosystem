@@ -24,6 +24,7 @@ export interface SiteSettings {
   serviceChargeRate: number; // e.g. 0.10 for 10%
   deliveryFee: number; // Flat fee in currency units
   timezone: string;
+  propertySlug?: string;
 
   // Contact
   phone: string;
@@ -231,6 +232,7 @@ const defaultSettings: SiteSettings = {
   serviceChargeRate: 0.10,
   deliveryFee: 5,
   timezone: 'UTC',
+  propertySlug: undefined,
   phone: '',
   email: '',
   address: '',
@@ -342,7 +344,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
         // If we are on the admin path, pass the active property ID to get the correct admin settings preview.
         // This is safe and avoids any guest context contamination because it only triggers on /admin URLs.
-        if (window.location.pathname.startsWith('/admin')) {
+        if (/\/(?:admin|staff)(\/?$|\/)/.test(window.location.pathname)) {
           const activePropertyId = getStoredPropertyId();
           if (activePropertyId) {
             headers['x-property-id'] = activePropertyId;

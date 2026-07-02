@@ -41,7 +41,7 @@ vi.mock('@/lib/socket', () => ({
   useWaitlistUpdates: vi.fn(),
 }));
 
-import DynamicWaitlistPage from '../../src/app/admin/[slug]/waitlist/page';
+import DynamicWaitlistPage from '../../src/app/[property]/admin/[slug]/waitlist/page';
 
 const waitlistEntries = [
   {

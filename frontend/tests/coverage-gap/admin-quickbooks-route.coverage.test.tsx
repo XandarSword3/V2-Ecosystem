@@ -29,7 +29,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import QuickBooksIntegrationPage from '../../src/app/admin/integrations/quickbooks/page';
+import QuickBooksIntegrationPage from '../../src/app/[property]/admin/integrations/quickbooks/page';
 
 describe('QuickBooks integration route coverage', () => {
   beforeEach(() => {

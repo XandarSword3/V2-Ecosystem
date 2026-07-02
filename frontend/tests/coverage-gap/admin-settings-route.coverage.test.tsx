@@ -103,7 +103,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import AdminSettingsPage from '../../src/app/admin/settings/page';
+import AdminSettingsPage from '../../src/app/[property]/admin/settings/page';
 
 describe('Admin settings route coverage', () => {
   beforeEach(() => {

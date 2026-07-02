@@ -37,7 +37,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import AdminAuditPage from '../../src/app/admin/audit/page';
+import AdminAuditPage from '../../src/app/[property]/admin/audit/page';
 
 const logSeed = [
   {

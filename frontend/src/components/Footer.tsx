@@ -61,7 +61,7 @@ export default function Footer() {
     }, [activeModules, tFooter, propertySlug]);
 
     // Don't show footer on admin or staff pages
-    if (pathname?.startsWith('/admin') || pathname?.startsWith('/staff')) {
+    if (pathname && /\/(?:admin|staff)(\/?$|\/)/.test(pathname)) {
         return null;
     }
 

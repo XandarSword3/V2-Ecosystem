@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import MenuImportPage from '../../src/app/admin/[slug]/menu/import/page';
+import MenuImportPage from '../../src/app/[property]/admin/[slug]/menu/import/page';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useParams, useRouter } from 'next/navigation';

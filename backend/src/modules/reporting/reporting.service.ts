@@ -1318,7 +1318,7 @@ class ReportingService {
 
       .from('rooms')
 
-      .select('id, metadata_id')
+      .select('id, room_type_id')
 
       .eq('property_id', propertyId)
 
@@ -1390,7 +1390,7 @@ class ReportingService {
 
     for (const rt of (roomTypes || [])) {
 
-      const typeRooms = (rooms || []).filter(r => (metadata as any)?.room_type_id === rt.id);
+      const typeRooms = (rooms || []).filter(r => r.room_type_id === rt.id);
 
       const typeBookings = (bookings || []).filter((b: any) => {
 

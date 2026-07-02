@@ -57,7 +57,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import AdminNotificationsPage from '../../src/app/admin/settings/notifications/page';
+import AdminNotificationsPage from '../../src/app/[property]/admin/settings/notifications/page';
 
 const notificationSeed = [
   {

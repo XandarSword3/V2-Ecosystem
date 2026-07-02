@@ -12,6 +12,7 @@ interface ActiveModuleRow {
   engine_type: string;
   template_type?: string; // Backward compatibility
   property_id?: string | null;
+  tenant_id?: string | null;
 }
 
 export function getDynamicModulesRouter(): express.Router {
@@ -23,7 +24,7 @@ export async function loadDynamicModules(): Promise<void> {
 
   const { data: modules, error } = await supabase
     .from('modules')
-    .select('id, slug, engine_type, property_id')
+    .select('id, slug, engine_type, property_id, tenant_id')
     .eq('is_active', true)
     .not('slug', 'is', null)
     .not('engine_type', 'is', null);
@@ -44,12 +45,13 @@ export async function loadDynamicModules(): Promise<void> {
       `/${module.slug}`,
       (req, _res, next) => {
         (req as express.Request & {
-          mountedModule?: { id: string; slug: string; engine_type: string; property_id?: string | null };
+          mountedModule?: { id: string; slug: string; engine_type: string; property_id?: string | null; tenant_id?: string | null };
         }).mountedModule = {
           id: module.id,
           slug: module.slug,
           engine_type: module.engine_type,
           property_id: module.property_id,
+          tenant_id: module.tenant_id,
         };
         next();
       },

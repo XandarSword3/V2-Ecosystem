@@ -22,6 +22,7 @@ interface MountedModuleContext {
   slug: string;
   engine_type: string;
   property_id?: string | null;
+  tenant_id?: string | null;
 }
 
 interface DynamicRequest extends Request {
@@ -38,6 +39,20 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 function getMountedModule(req: Request): MountedModuleContext | null {
   const dynamicReq = req as DynamicRequest;
   return dynamicReq.mountedModule ?? null;
+}
+
+async function getTenantIdForMountedModule(mounted: MountedModuleContext): Promise<string | null> {
+  if (mounted.tenant_id) return mounted.tenant_id;
+  if (mounted.property_id) {
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('properties')
+      .select('tenant_id')
+      .eq('id', mounted.property_id)
+      .maybeSingle();
+    return data?.tenant_id ?? null;
+  }
+  return null;
 }
 
 function requireMountedModule(req: Request, res: Response, next: NextFunction): void {
@@ -188,11 +203,14 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(400).json({ success: false, error: 'name is required' });
       }
 
+      const tenant_id = await getTenantIdForMountedModule(mounted);
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('catalog_categories')
         .insert({
           module_id: mounted.id,
+          tenant_id,
+          property_id: mounted.property_id,
           name,
           description: description ?? null,
           sort_order: 0,
@@ -257,6 +275,188 @@ function buildInstantTransactionRouter(router: Router): void {
     } catch (error) {
       logger.error('[Dynamic Router] DELETE /admin/categories/:id failed', error);
       res.status(500).json({ success: false, error: 'Failed to delete category' });
+    }
+  });
+
+  // Admin Items endpoints
+  router.get('/admin/items', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('catalog_items')
+        .select('*')
+        .eq('module_id', mounted.id)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /admin/items failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list items' });
+    }
+  });
+
+  router.post('/admin/items', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const tenant_id = await getTenantIdForMountedModule(mounted);
+      const supabase = getSupabase();
+      
+      const { 
+        name, 
+        name_ar, 
+        description, 
+        description_ar, 
+        price, 
+        category_id, 
+        image_url, 
+        is_available, 
+        is_featured, 
+        is_vegetarian, 
+        is_spicy, 
+        preparation_time,
+        recipe,
+        customization_group_ids,
+        ...otherFields
+      } = req.body ?? {};
+
+      if (!name || price == null) {
+        return res.status(400).json({ success: false, error: 'Name and price are required' });
+      }
+
+      const { data, error } = await supabase
+        .from('catalog_items')
+        .insert({
+          name,
+          price,
+          description,
+          category: category_id,
+          is_available: is_available ?? true,
+          module_id: mounted.id,
+          tenant_id,
+          property_id: mounted.property_id,
+          metadata: {
+            name_ar,
+            description_ar,
+            image_url,
+            is_featured,
+            is_vegetarian,
+            is_spicy,
+            preparation_time_minutes: preparation_time,
+            recipe,
+            customization_group_ids,
+            ...otherFields
+          }
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /admin/items failed', error);
+      res.status(500).json({ success: false, error: 'Failed to create item' });
+    }
+  });
+
+  router.put('/admin/items/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      
+      const { 
+        name, 
+        name_ar, 
+        description, 
+        description_ar, 
+        price, 
+        category_id, 
+        image_url, 
+        is_available, 
+        is_featured, 
+        is_vegetarian, 
+        is_spicy, 
+        preparation_time,
+        recipe,
+        customization_group_ids,
+        ...otherFields
+      } = req.body ?? {};
+
+      // First, get the existing item to preserve metadata
+      const { data: existingItem } = await supabase
+        .from('catalog_items')
+        .select('metadata')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .maybeSingle();
+
+      const { data, error } = await supabase
+        .from('catalog_items')
+        .update({
+          ...(name !== undefined && { name }),
+          ...(price !== undefined && { price }),
+          ...(description !== undefined && { description }),
+          ...(category_id !== undefined && { category: category_id }),
+          ...(is_available !== undefined && { is_available }),
+          metadata: {
+            ...(existingItem?.metadata || {}),
+            ...(name_ar !== undefined && { name_ar }),
+            ...(description_ar !== undefined && { description_ar }),
+            ...(image_url !== undefined && { image_url }),
+            ...(is_featured !== undefined && { is_featured }),
+            ...(is_vegetarian !== undefined && { is_vegetarian }),
+            ...(is_spicy !== undefined && { is_spicy }),
+            ...(preparation_time !== undefined && { preparation_time_minutes: preparation_time }),
+            ...(recipe !== undefined && { recipe }),
+            ...(customization_group_ids !== undefined && { customization_group_ids }),
+            ...otherFields
+          }
+        })
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] PUT /admin/items/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to update item' });
+    }
+  });
+
+  router.delete('/admin/items/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('catalog_items')
+        .delete()
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('[Dynamic Router] DELETE /admin/items/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to delete item' });
     }
   });
 
@@ -1866,6 +2066,25 @@ async function commitImportForEngine(
         errors: [] as string[],
       };
 
+      // First, get the module to find tenant_id
+      const { data: module } = await supabase
+        .from('modules')
+        .select('tenant_id, property_id')
+        .eq('id', moduleId)
+        .maybeSingle();
+      
+      const moduleTenantId = module?.tenant_id ?? null;
+      let tenant_id = moduleTenantId;
+      
+      if (!tenant_id && module?.property_id) {
+        const { data: prop } = await supabase
+          .from('properties')
+          .select('tenant_id')
+          .eq('id', module.property_id)
+          .maybeSingle();
+        tenant_id = prop?.tenant_id ?? null;
+      }
+
       for (const item of items as Array<{
         name: string;
         price: number;
@@ -1883,6 +2102,8 @@ async function commitImportForEngine(
           category: item.category ?? null,
           is_available: item.is_available ?? true,
           module_id: moduleId,
+          tenant_id,
+          property_id: module?.property_id,
           metadata: {
             preparation_time_minutes: item.preparation_time,
             calories: item.calories,
@@ -1909,6 +2130,25 @@ async function commitImportForEngine(
         errors: [] as string[],
       };
 
+      // First, get the module to find tenant_id
+      const { data: module } = await supabase
+        .from('modules')
+        .select('tenant_id, property_id')
+        .eq('id', moduleId)
+        .maybeSingle();
+      
+      const moduleTenantId = module?.tenant_id ?? null;
+      let tenant_id = moduleTenantId;
+      
+      if (!tenant_id && module?.property_id) {
+        const { data: prop } = await supabase
+          .from('properties')
+          .select('tenant_id')
+          .eq('id', module.property_id)
+          .maybeSingle();
+        tenant_id = prop?.tenant_id ?? null;
+      }
+
       for (const item of items as Array<{
         name: string;
         startTime: string;
@@ -1930,6 +2170,8 @@ async function commitImportForEngine(
           price: item.adultPrice,
           is_active: item.isActive ?? true,
           module_id: moduleId,
+          tenant_id,
+          property_id: module?.property_id,
           metadata: {
             adult_price: item.adultPrice,
             child_price: item.childPrice ?? 0,
@@ -1955,6 +2197,25 @@ async function commitImportForEngine(
         failed: 0,
         errors: [] as string[],
       };
+
+      // First, get the module to find tenant_id
+      const { data: module } = await supabase
+        .from('modules')
+        .select('tenant_id, property_id')
+        .eq('id', moduleId)
+        .maybeSingle();
+      
+      const moduleTenantId = module?.tenant_id ?? null;
+      let tenant_id = moduleTenantId;
+      
+      if (!tenant_id && module?.property_id) {
+        const { data: prop } = await supabase
+          .from('properties')
+          .select('tenant_id')
+          .eq('id', module.property_id)
+          .maybeSingle();
+        tenant_id = prop?.tenant_id ?? null;
+      }
 
       for (const item of items as Array<{
         name: string;
@@ -1983,6 +2244,8 @@ async function commitImportForEngine(
           capacity: item.maxGuests,   // bookable_units view maps to accommodation_units.capacity
           is_active: item.isActive ?? true,
           module_id: moduleId,
+          tenant_id,
+          property_id: module?.property_id,
         });
 
         if (error) {

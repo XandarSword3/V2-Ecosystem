@@ -123,9 +123,9 @@ export default function Header() {
   const locale = useLocale();
   const pathname = usePathname();
   const params = useParams();
-  // Property slug from current URL (present when inside a [property] segment).
-  // Used to prefix module links so they resolve to /{property}/{slug}.
-  const propertySlug = (params?.property as string) || '';
+  // Property slug from current URL (present when inside a [property] segment)
+  // Used to prefix module links so they resolve to /{property}/{slug}
+  const propertySlug = (params?.property as string) || settings.propertySlug;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -280,12 +280,12 @@ export default function Header() {
       icon: getIconForModule(m)
       }))
     ];
-  }, [settings.navbar?.links, modules, locale, t]);
+  }, [settings.navbar?.links, modules, locale, t, propertySlug]);
 
   // ...existing code...
 
   // Don't show header on admin or staff pages (now nested at /{property}/admin, /{property}/staff)
-  if (pathname && /\/[^/]+\/(admin|staff)(\/?$|\/)/.test(pathname)) {
+  if (pathname && /\/(?:admin|staff)(\/?$|\/)/.test(pathname)) {
     return null;
   }
 

@@ -177,9 +177,18 @@ export class PromotionsController {
    */
   async recordCouponUsage(couponId: string, userId: string, orderId?: string, bookingId?: string, discountAmount?: number) {
     const supabase = getSupabase();
-    
+
+    // First, get coupon's tenant and property info
+    const { data: coupon } = await supabase
+      .from('coupons')
+      .select('tenant_id, property_id')
+      .eq('id', couponId)
+      .maybeSingle();
+
     await supabase.from('coupon_usage').insert({
       coupon_id: couponId,
+      tenant_id: coupon?.tenant_id,
+      property_id: coupon?.property_id,
       user_id: userId,
       order_id: orderId,
       booking_id: bookingId,
@@ -272,6 +281,8 @@ export class PromotionsController {
         .from('gift_cards')
         .insert({
           code,
+          tenant_id: req.user?.tenantId,
+          property_id: (req as any).propertyId,
           initial_balance: data.initialBalance,
           current_balance: data.initialBalance,
           purchased_by: data.purchasedBy,
@@ -289,6 +300,8 @@ export class PromotionsController {
       // Record liability
       await supabase.from('gift_card_ledger').insert({
         gift_card_id: giftCard.id,
+        tenant_id: req.user?.tenantId,
+        property_id: (req as any).propertyId,
         transaction_type: 'issuance',
         amount: data.initialBalance,
         balance_after: data.initialBalance,
@@ -403,6 +416,8 @@ export class PromotionsController {
       // Record transaction
       await supabase.from('gift_card_ledger').insert({
         gift_card_id: giftCard.id,
+        tenant_id: giftCard.tenant_id,
+        property_id: giftCard.property_id,
         transaction_type: 'redemption',
         amount: -data.amount,
         balance_after: newBalance,
@@ -515,6 +530,8 @@ export class PromotionsController {
       const { data: batch, error: batchError } = await supabase
         .from('loyalty_point_batches')
         .insert({
+          tenant_id: req.user?.tenantId,
+          property_id: (req as any).propertyId,
           user_id: data.userId,
           points_earned: data.points,
           points_remaining: data.points,
@@ -540,6 +557,8 @@ export class PromotionsController {
 
       // Record transaction
       await supabase.from('loyalty_transactions').insert({
+        tenant_id: req.user?.tenantId,
+        property_id: (req as any).propertyId,
         user_id: data.userId,
         transaction_type: 'earn',
         points: data.points,
@@ -645,6 +664,8 @@ export class PromotionsController {
 
       // Record transaction (users.loyalty_points sync removed — column dropped in schema normalization)
       await supabase.from('loyalty_transactions').insert({
+        tenant_id: req.user?.tenantId,
+        property_id: (req as any).propertyId,
         user_id: data.userId,
         transaction_type: 'redeem',
         points: -data.points,
@@ -749,6 +770,8 @@ export class PromotionsController {
 
       // Record in fraud flags table (users.fraud_flag/fraud_reason dropped in schema normalization)
       await supabase.from('loyalty_fraud_flags').insert({
+        tenant_id: req.user?.tenantId,
+        property_id: (req as any).propertyId,
         user_id: userId,
         flag_type: 'manual',
         reason,
@@ -794,6 +817,8 @@ export class PromotionsController {
 
         // Record transaction (users.loyalty_points sync removed — balance tracked via loyalty_point_batches)
         await supabase.from('loyalty_transactions').insert({
+          tenant_id: batch.tenant_id,
+          property_id: batch.property_id,
           user_id: batch.user_id,
           transaction_type: 'expire',
           points: -batch.points_remaining,

@@ -90,30 +90,24 @@ const moduleData = {
 
 const menuQueryData = {
   data: {
-    data: {
-      categories: [
-        { id: 'cat-1', name: 'Main' },
-        { id: 'cat-2', name: 'Drinks' },
-      ],
-      items: [
-        {
-          id: 'item-1',
-          name: 'Pizza',
-          description: 'Stone-baked',
-          price: 15,
-          category_id: 'cat-1',
-          is_available: true,
-        },
-        {
-          id: 'item-2',
-          name: 'Cola',
-          description: 'Cold drink',
-          price: 4,
-          category_id: 'cat-2',
-          is_available: true,
-        },
-      ],
-    },
+    data: [
+      {
+        id: 'item-1',
+        name: 'Pizza',
+        description: 'Stone-baked',
+        price: 15,
+        category: 'Main',
+        is_available: true,
+      },
+      {
+        id: 'item-2',
+        name: 'Cola',
+        description: 'Cold drink',
+        price: 4,
+        category: 'Drinks',
+        is_available: true,
+      },
+    ],
   },
 };
 
@@ -163,7 +157,7 @@ describe('DynamicModuleRenderer behavior', () => {
     expect(screen.getByText('Module content format is incompatible.')).toBeInTheDocument();
 
     rerender(<DynamicModuleRenderer layout={[]} module={moduleData as never} />);
-    expect(screen.getByText('No layout defined for this module.')).toBeInTheDocument();
+    expect(screen.getByText('Design Your Page')).toBeInTheDocument();
   });
 
   it('renders core block types including hero, container, text, image, button, testimonials, and pricing table', () => {

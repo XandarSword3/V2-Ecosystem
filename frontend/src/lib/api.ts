@@ -111,10 +111,22 @@ interface CreateModuleData {
 }
 
 // API_URL should NOT include /api - we add it in baseURL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+const getApiUrl = (): string => {
+  const defaultUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const isDev = hostname.endsWith('.localhost') || 
+                  hostname === 'localhost' || 
+                  hostname.endsWith('.v2platform.local');
+    if (isDev) {
+      return `${window.location.protocol}//${hostname}:3005`;
+    }
+  }
+  return defaultUrl;
+};
 
 // Ensure we don't double up on /api
-const cleanUrl = API_URL.replace(/\/api\/?$/, '');
+const cleanUrl = getApiUrl().replace(/\/api\/?$/, '');
 
 // Export the base API URL for use in other files
 export const API_BASE_URL = `${cleanUrl}/api/v1`;

@@ -78,7 +78,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import DynamicModifiersPage from '../../src/app/admin/[slug]/modifiers/page';
+import DynamicModifiersPage from '../../src/app/[property]/admin/[slug]/modifiers/page';
 
 const groupsSeed = [
   {

@@ -63,7 +63,7 @@ vi.mock('@/context/PropertyContext', () => ({
   PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import NavbarSettingsPage from '../../src/app/admin/settings/navbar/page';
+import NavbarSettingsPage from '../../src/app/[property]/admin/settings/navbar/page';
 
 describe('Admin navbar settings route coverage', () => {
   beforeEach(() => {

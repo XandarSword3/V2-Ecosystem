@@ -37,7 +37,7 @@ vi.mock('socket.io-client', () => ({
   io: ioMock,
 }));
 
-import LiveUsersPage from '../../src/app/admin/users/live/page';
+import LiveUsersPage from '../../src/app/[property]/admin/users/live/page';
 
 function createSocketMock() {
   const socket = {

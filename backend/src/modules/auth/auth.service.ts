@@ -191,6 +191,7 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     .from('sessions')
     .insert({
       user_id: user.id,
+      tenant_id: user.tenant_id,
       token: tokens.accessToken,
       refresh_token: tokens.refreshToken,
       expires_at: expiresAt.toISOString(),
@@ -273,6 +274,7 @@ export async function completeLoginAfter2FA(userId: string, meta: SessionMeta) {
     .from('sessions')
     .insert({
       user_id: user.id,
+      tenant_id: user.tenant_id,
       token: tokens.accessToken,
       refresh_token: tokens.refreshToken,
       expires_at: expiresAt.toISOString(),
@@ -567,7 +569,7 @@ export async function sendPasswordResetEmail(email: string) {
   // Find user
   const { data: user, error: userError } = await supabase
     .from('users')
-    .select('id, full_name, email')
+    .select('id, full_name, email, tenant_id')
     .eq('email', email.toLowerCase())
     .single();
 
@@ -592,6 +594,7 @@ export async function sendPasswordResetEmail(email: string) {
     .from('sessions')
     .insert({
       user_id: user.id,
+      tenant_id: user.tenant_id,
       token: resetToken,
       refresh_token: resetToken,
       expires_at: expiresAt.toISOString(),
@@ -702,11 +705,19 @@ export async function sendVerificationEmail(userId: string, email: string, fullN
     .eq('user_id', userId)
     .eq('session_type', 'email_verification');
 
+  // Get user's tenant_id
+  const { data: user } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', userId)
+    .single();
+
   // Store token in sessions table
   await supabase
     .from('sessions')
     .insert({
       user_id: userId,
+      tenant_id: user?.tenant_id,
       token: verificationToken,
       refresh_token: verificationToken,
       expires_at: expiresAt.toISOString(),

@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, API_BASE_URL } from './api';
+import { api, API_BASE_URL, memoryTokenStore } from './api';
 import { useCartStore } from '@/stores/cartStore';
 import { authLogger } from './logger';
 
@@ -61,8 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (oauth === 'success' && accessToken && refreshToken) {
         // Store tokens from OAuth callback
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
+        memoryTokenStore.set(accessToken);
+        // localStorage.setItem('accessToken', accessToken); // Deprecated
+        // localStorage.setItem('refreshToken', refreshToken); // Deprecated
         // Set accessToken cookie for middleware to read
         document.cookie = `accessToken=${accessToken}; path=/; max-age=604800; SameSite=Lax`;
 
@@ -82,9 +83,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const oauthHandled = handleOAuthCallback();
 
       const storedUser = localStorage.getItem('user');
-      const accessToken = localStorage.getItem('accessToken');
+      let accessToken = memoryTokenStore.get();
 
-      // If no access token (and OAuth didn't just set one), nothing to validate
+      // Backward compatibility: if memory store is empty, check localStorage
+      if (!accessToken) {
+        accessToken = localStorage.getItem('accessToken');
+        if (accessToken) {
+          memoryTokenStore.set(accessToken);
+        }
+      }
+
+      // If we have a stored user but no access token, try to refresh using the httpOnly refresh token cookie
+      if (!accessToken && storedUser) {
+        try {
+          const refreshResponse = await api.post('/auth/refresh');
+          if (refreshResponse.data.success && refreshResponse.data.data?.tokens?.accessToken) {
+            accessToken = refreshResponse.data.data.tokens.accessToken;
+            memoryTokenStore.set(accessToken);
+            // Also update user from refresh response if available
+            if (refreshResponse.data.data.user) {
+              const refreshedUser: User = {
+                id: refreshResponse.data.data.user.id,
+                email: refreshResponse.data.data.user.email,
+                fullName: refreshResponse.data.data.user.full_name || refreshResponse.data.data.user.fullName,
+                phone: refreshResponse.data.data.user.phone,
+                profileImageUrl: refreshResponse.data.data.user.profile_image_url || refreshResponse.data.data.user.profileImageUrl,
+                preferredLanguage: refreshResponse.data.data.user.preferred_language || refreshResponse.data.data.user.preferredLanguage || 'en',
+                scope: refreshResponse.data.data.user.scope,
+                roles: refreshResponse.data.data.user.roles || [],
+                is_platform_admin: refreshResponse.data.data.user.is_platform_admin || false
+              };
+              setUser(refreshedUser);
+              localStorage.setItem('user', JSON.stringify(refreshedUser));
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (refreshError) {
+          authLogger.warn('Token refresh failed, clearing credentials');
+          localStorage.removeItem('user');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // If no access token (and OAuth didn't just set one, and refresh didn't work), nothing to validate
       if (!accessToken) {
         setIsLoading(false);
         return;
@@ -156,14 +202,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Invalid login response - missing tokens');
     }
 
-    localStorage.setItem('accessToken', tokens.accessToken);
-    localStorage.setItem('refreshToken', tokens.refreshToken);
-    localStorage.setItem('user', JSON.stringify(userData));
+    memoryTokenStore.set(tokens.accessToken);
+      // localStorage.setItem('accessToken', tokens.accessToken); // Deprecated - use memory store
+      // localStorage.setItem('refreshToken', tokens.refreshToken); // Deprecated - refresh token is httpOnly cookie
+      localStorage.setItem('user', JSON.stringify(userData));
 
-    // Set accessToken cookie for middleware to read
-    document.cookie = `accessToken=${tokens.accessToken}; path=/; max-age=604800; SameSite=Lax`;
+      // Set accessToken cookie for middleware to read (if needed)
+      document.cookie = `accessToken=${tokens.accessToken}; path=/; max-age=604800; SameSite=Lax`;
 
-    setUser(userData);
+      setUser(userData);
 
     return userData;
   };
@@ -182,14 +229,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Invalid response - missing tokens');
     }
 
-    localStorage.setItem('accessToken', tokens.accessToken);
-    localStorage.setItem('refreshToken', tokens.refreshToken);
-    localStorage.setItem('user', JSON.stringify(userData));
+    memoryTokenStore.set(tokens.accessToken);
+      // localStorage.setItem('accessToken', tokens.accessToken); // Deprecated - use memory store
+      // localStorage.setItem('refreshToken', tokens.refreshToken); // Deprecated - refresh token is httpOnly cookie
+      localStorage.setItem('user', JSON.stringify(userData));
 
-    // Set accessToken cookie for middleware to read
-    document.cookie = `accessToken=${tokens.accessToken}; path=/; max-age=604800; SameSite=Lax`;
+      // Set accessToken cookie for middleware to read (if needed)
+      document.cookie = `accessToken=${tokens.accessToken}; path=/; max-age=604800; SameSite=Lax`;
 
-    setUser(userData);
+      setUser(userData);
 
     return userData;
   };
@@ -200,6 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.post('/auth/logout', { refreshToken }).catch(() => {
       // Best-effort: still clear client state even if API call fails
     });
+    memoryTokenStore.clear();
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');

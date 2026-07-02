@@ -916,7 +916,7 @@ export async function syncDailySales(
 
         // Determine category based on payment type/source
 
-        const category = (metadata as any)?.source_type || 'service_revenue';
+        const category = payment.metadata?.source_type || 'service_revenue';
 
         
 

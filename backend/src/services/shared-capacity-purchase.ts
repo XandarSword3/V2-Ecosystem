@@ -100,7 +100,7 @@ export async function purchaseSharedCapacityAtomic(
 
     transactionId: row.transaction_id ?? undefined,
 
-    totalAmount: amount != null ? Number(amount) : undefined,
+    totalAmount: input.amount != null ? Number(input.amount) : undefined,
 
     availableCapacity:
 

@@ -52,7 +52,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import BackupsPage from '../../src/app/admin/settings/backups/page';
+import BackupsPage from '../../src/app/[property]/admin/settings/backups/page';
 
 const backupsSeed = [
   {

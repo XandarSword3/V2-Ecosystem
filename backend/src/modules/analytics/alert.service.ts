@@ -1448,7 +1448,7 @@ export class AlertService {
 
         for (const r of rooms || []) {
 
-          const rt = (metadata as any)?.room_types as unknown as { name?: string } | null;
+          const rt = r.metadatas as unknown as { name?: string } | null;
 
           const typeName = rt?.name || 'Unknown';
 

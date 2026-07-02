@@ -33,7 +33,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import TaxConfigurationPage from '../../src/app/admin/settings/tax/page';
+import TaxConfigurationPage from '../../src/app/[property]/admin/settings/tax/page';
 
 const taxConfigSeed = {
   default_rate: 11,

@@ -811,12 +811,12 @@ export class MetricsLayerService {
       const meta = (b.metadata ?? {}) as Record<string, unknown>;
       return {
         id: b.id,
-        check_in_date:  (metadata as any)?.check_in_date_date  ?? b.created_at,
-        guest_name:     meta.guest_name     ?? meta.customer_name ?? null,
-        unit_id:        meta.unit_id        ?? null,
-        booking_number: (metadata as any)?.booking_number || id ?? null,
+        check_in_date:  (meta.check_in_date_date as string)  ?? b.created_at,
+        guest_name:     (meta.guest_name as string)     ?? (meta.customer_name as string) ?? null,
+        unit_id:        (meta.unit_id as string)        ?? null,
+        booking_number: (meta.booking_number as string) ?? b.id ?? null,
         amount: b.amount,
-        source: (metadata as any)?.source ?? null,
+        source: (meta.source as string) ?? null,
         status: b.status,
       };
     });
