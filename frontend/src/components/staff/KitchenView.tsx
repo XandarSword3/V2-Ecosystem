@@ -166,9 +166,9 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
       };
 
       try {
-        await api.post(`/${slug}/staff/orders`, {
+        await api.post(`/${slug}/orders`, {
           table_number: tableNumber,
-          items: [{ item_id: itemId, quantity }],
+          items: [{ catalog_item_id: itemId, quantity }],
         });
         toast.success('Staff order created');
         loadOrders();
