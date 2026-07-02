@@ -94,7 +94,7 @@ vi.mock('@/context/PropertyContext', () => ({
   PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import AdminReviewsPage from '../../src/app/admin/reviews/page';
+import AdminReviewsPage from '../../src/app/[property]/admin/reviews/page';
 
 describe('Admin reviews route coverage', () => {
   beforeEach(() => {

@@ -49,6 +49,7 @@ vi.mock('next/navigation', () => ({
     back: vi.fn(),
     prefetch: vi.fn(),
   }),
+  useParams: () => ({}),
 }));
 
 vi.mock('next-intl', () => ({
@@ -81,7 +82,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import StaffLayout from '../../src/app/staff/layout';
+import StaffLayout from '../../src/app/[property]/staff/layout';
 
 describe('Staff layout route coverage', () => {
   beforeEach(() => {

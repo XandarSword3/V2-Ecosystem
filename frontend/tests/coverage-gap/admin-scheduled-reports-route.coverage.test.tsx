@@ -54,7 +54,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import ScheduledReportsPage from '../../src/app/admin/reports/scheduled/page';
+import ScheduledReportsPage from '../../src/app/[property]/admin/reports/scheduled/page';
 
 const scheduledReportsSeed = [
   {

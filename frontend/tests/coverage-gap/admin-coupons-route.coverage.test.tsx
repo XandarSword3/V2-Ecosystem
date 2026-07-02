@@ -57,7 +57,7 @@ vi.mock('@/context/PropertyContext', () => ({
   PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import CouponsAdminPage from '../../src/app/admin/coupons/page';
+import CouponsAdminPage from '../../src/app/[property]/admin/coupons/page';
 
 const couponSeed = [
   {

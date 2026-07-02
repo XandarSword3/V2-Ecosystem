@@ -614,7 +614,7 @@ export class MobileCheckinService {
           lastErr = err;
           if (attempt < MAX_ATTEMPTS) {
             const delayMs = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms
-            logger.warn(`[MobileKey] ${label} attempt ${attempt} failed — retrying in ${delayMs}ms`, { err });
+            console.warn(`[MobileKey] ${label} attempt ${attempt} failed — retrying in ${delayMs}ms`, { err });
             await new Promise(r => setTimeout(r, delayMs));
           }
         }

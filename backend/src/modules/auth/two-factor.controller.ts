@@ -9,6 +9,7 @@ import { twoFactorService } from '../../services/two-factor.service.js';
 import { logActivity } from '../../utils/activityLogger.js';
 import { logger } from '../../utils/logger.js';
 import { completeLoginAfter2FA } from './auth.service.js';
+import { setAuthCookies } from './auth.controller.js';
 
 /**
  * Get 2FA status for current user
@@ -175,6 +176,14 @@ export const verifyTwoFactor = asyncHandler(async (req: Request, res: Response) 
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     });
+
+    // SECURITY FIX (HIGH-009): Rotate CSRF token after successful login to prevent session fixation
+    const { generateCsrfToken, setCsrfCookie } = await import('../../middleware/csrf.middleware.js');
+    const newCsrfToken = generateCsrfToken();
+    setCsrfCookie(res, newCsrfToken);
+
+    // SECURITY FIX (C-1): refresh token never leaves the server as JSON.
+    setAuthCookies(res, loginResult.tokens.refreshToken);
     
     await logActivity({
       user_id: userId,

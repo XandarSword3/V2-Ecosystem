@@ -452,35 +452,32 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
     ]);
 
     const rows = [
-      ...(transactions.data || []).map((row: any) => {
+      ...(transactions.data || []).map((row: Record<string, unknown>) => {
         const meta = (row.metadata ?? {}) as Record<string, unknown>;
         return {
-          type: row.engine_type === 'instant_transaction' ? 'restaurant_order'
-              : row.engine_type === 'shared_capacity_access' ? 'pool_ticket'
-              : row.engine_type === 'time_exclusive_reservation' ? 'booking'
-              : 'transaction',
-          id: row.id,
-          engine_type: row.engine_type,
-          amount: row.amount,
-          net_amount: row.net_amount,
-          status: row.status,
-          created_at: row.created_at,
-          reference_id: row.reference_id,
-          reference_table: row.reference_table,
+          type: row.engine_type as string,
+          id: row.id as string,
+          engine_type: row.engine_type as string,
+          amount: row.amount as number,
+          net_amount: row.net_amount as number | undefined,
+          status: row.status as string,
+          created_at: row.created_at as string,
+          reference_id: row.reference_id as string | undefined,
+          reference_table: row.reference_table as string | undefined,
           // Unpack display fields from metadata (canonical location post-clean-transactions)
-          order_number:   (metadata as any)?.order_number   ?? null,
-          ticket_number:  (metadata as any)?.ticket_number  ?? null,
-          booking_number: (metadata as any)?.booking_number || id ?? null,
-          customer_name:  meta.customer_name  ?? null,
-          table_number:   meta.table_number   ?? null,
-          session_id:     meta.session_id     ?? null,
-          unit_id:        meta.unit_id        ?? null,
-          check_in_date:  (metadata as any)?.check_in_date_date  ?? null,
-          check_out_date: (metadata as any)?.check_out_date_date ?? null,
+          order_number:   (meta.order_number as string | undefined)   ?? null,
+          ticket_number:  (meta.ticket_number as string | undefined)  ?? null,
+          booking_number: (meta.booking_number as string | undefined) || (row.id as string),
+          customer_name:  (meta.customer_name as string | undefined)  ?? null,
+          table_number:   (meta.table_number as string | undefined)   ?? null,
+          session_id:     (meta.session_id as string | undefined)     ?? null,
+          unit_id:        (meta.unit_id as string | undefined)        ?? null,
+          check_in_date:  (meta.check_in_date as string | undefined)  ?? null,
+          check_out_date: (meta.check_out_date as string | undefined) ?? null,
         };
       }),
-      ...(loyalty.data || []).map((row: any) => ({ type: 'loyalty_transaction', ...row })),
-      ...(giftcards.data || []).map((row: any) => ({ type: 'gift_card_transaction', ...row })),
+      ...(loyalty.data || []).map((row: Record<string, unknown>) => ({ type: 'loyalty_transaction', created_at: row.created_at as string, ...row })),
+      ...(giftcards.data || []).map((row: Record<string, unknown>) => ({ type: 'gift_card_transaction', created_at: row.created_at as string, ...row })),
     ].sort((a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime());
 
     res.json({ success: true, data: rows });

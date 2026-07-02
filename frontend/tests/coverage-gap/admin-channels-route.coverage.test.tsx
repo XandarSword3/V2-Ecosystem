@@ -62,7 +62,7 @@ vi.mock('@/context/PropertyContext', () => ({
   }),
 }));
 
-import ChannelManagerPage from '../../src/app/admin/channels/page';
+import ChannelManagerPage from '../../src/app/[property]/admin/channels/page';
 
 function renderPage() {
   const queryClient = new QueryClient({

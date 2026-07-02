@@ -52,7 +52,7 @@ vi.mock('@/context/PropertyContext', () => ({
   PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import FooterSettingsPage from '../../src/app/admin/settings/footer/page';
+import FooterSettingsPage from '../../src/app/[property]/admin/settings/footer/page';
 
 describe('Admin footer settings route coverage', () => {
   beforeEach(() => {

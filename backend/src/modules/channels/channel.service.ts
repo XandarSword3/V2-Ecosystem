@@ -760,7 +760,7 @@ export async function pushAvailability(
 
   const roomMappingMap = new Map(
 
-    roomMappings.map(m => [(metadata as any)?.room_type_id, m])
+    roomMappings.map(m => [m.room_type_id, m])
 
   );
 
@@ -976,13 +976,13 @@ export async function pushAvailabilityForDateRange(
 
     .from('room_availability')
 
-    .select('metadata_id, date, available_units')
+    .select('room_type_id, date, available_units')
 
     .gte('date', startDate.toISOString().split('T')[0])
 
     .lte('date', endDate.toISOString().split('T')[0])
 
-    .in('room_type_id', mappings.map(m => (metadata as any)?.room_type_id));
+    .in('room_type_id', mappings.map(m => m.room_type_id));
 
 
 
@@ -990,7 +990,7 @@ export async function pushAvailabilityForDateRange(
 
   const updates: AvailabilityUpdate[] = (availability || []).map(a => {
 
-    const mapping = mappings.find(m => (metadata as any)?.room_type_id === (metadata as any)?.room_type_id);
+    const mapping = mappings.find(m => m.room_type_id === a.room_type_id);
 
     return {
 
@@ -1438,7 +1438,7 @@ export async function processInboundReservation(
 
           guest_id: guestId,
 
-          room_type_id: (metadata as any)?.room_type_id,
+          room_type_id: roomMapping.room_type_id,
 
           check_in: reservation.checkIn,
 
@@ -1650,11 +1650,11 @@ export async function handleSiteMinderWebhook(
 
     guestPhone: payload.phone,
 
-    checkIn: (metadata as any)?.check_in_date || payload.arrival_date,
+    checkIn: payload.arrival_date,
 
-    checkOut: (metadata as any)?.check_out_date || payload.departure_date,
+    checkOut: payload.departure_date,
 
-    roomTypeCode: (metadata as any)?.room_type_code || payload.room_code,
+    roomTypeCode: payload.room_code,
 
     rateCode: payload.rate_code,
 
@@ -1662,7 +1662,7 @@ export async function handleSiteMinderWebhook(
 
     numChildren: payload.children || payload.num_children || 0,
 
-    totalAmount: payload.total || amount || 0,
+    totalAmount: payload.total || 0,
 
     currency: payload.currency || 'USD',
 
@@ -1859,9 +1859,7 @@ export async function getChannelReservations(
   }
 
   if (options?.endDate) {
-
-    query = query.filter('metadata->>check_in_date', 'lte', options.endDate);
-
+    query = query.lte('check_in', options.endDate);
   }
 
   if (options?.status) {

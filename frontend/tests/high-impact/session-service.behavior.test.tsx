@@ -57,6 +57,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: pushMock,
   }),
+  useParams: () => ({}),
 }));
 
 vi.mock('sonner', () => ({

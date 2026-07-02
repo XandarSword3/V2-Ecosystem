@@ -28,7 +28,7 @@ vi.mock('framer-motion', async () => {
   return { motion: motionProxy };
 });
 
-import AppearanceSettingsPage from '../../src/app/admin/settings/appearance/page';
+import AppearanceSettingsPage from '../../src/app/[property]/admin/settings/appearance/page';
 
 describe('Admin appearance settings route coverage', () => {
   beforeEach(() => {

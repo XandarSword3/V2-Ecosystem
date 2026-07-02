@@ -62,6 +62,7 @@ vi.mock('next/navigation', () => ({
     prefetch: vi.fn(),
     back: vi.fn(),
   }),
+  useParams: () => ({}),
 }));
 
 vi.mock('next-intl', () => ({

@@ -32,6 +32,7 @@ vi.mock('framer-motion', async () => {
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
+  useParams: () => ({ property: 'test-property' }),
 }));
 
 vi.mock('@/lib/auth-context', () => ({
@@ -45,7 +46,7 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-import CustomerLoyaltyPage from '../../src/app/account/loyalty/page';
+import CustomerLoyaltyPage from '../../src/app/[property]/account/loyalty/page';
 
 describe('Customer loyalty route behavior', () => {
   beforeEach(() => {
@@ -62,7 +63,7 @@ describe('Customer loyalty route behavior', () => {
     render(<CustomerLoyaltyPage />);
 
     await waitFor(() => {
-      expect(pushMock).toHaveBeenCalledWith('/login?redirect=/account/loyalty');
+      expect(pushMock).toHaveBeenCalledWith('/login?redirect=/test-property/account/loyalty');
     });
   });
 

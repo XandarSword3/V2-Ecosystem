@@ -25,11 +25,25 @@ interface NewOrderNotification {
 type OrderUpdateCallback = (data: OrderStatusUpdate) => void;
 type NewOrderCallback = (data: NewOrderNotification) => void;
 
+import { memoryTokenStore } from './api';
+
 // SOCKET_URL should NOT include /api
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3005';
+const getSocketUrl = (): string => {
+  const defaultUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3005';
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const isDev = hostname.endsWith('.localhost') || 
+                  hostname === 'localhost' || 
+                  hostname.endsWith('.v2platform.local');
+    if (isDev) {
+      return `${window.location.protocol}//${hostname}:3005`;
+    }
+  }
+  return defaultUrl;
+};
 
 // Ensure we don't have /api suffix for socket connection
-const cleanSocketUrl = SOCKET_URL.replace(/\/api\/?$/, '');
+const cleanSocketUrl = getSocketUrl().replace(/\/api\/?$/, '');
 
 // Singleton socket instance to prevent multiple connections
 let globalSocket: Socket | null = null;
@@ -37,8 +51,7 @@ let socketRefCount = 0;
 let heartbeatInterval: NodeJS.Timeout | null = null;
 
 function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('accessToken');
+  return memoryTokenStore.get();
 }
 
 function createSocket(): Socket {
@@ -46,7 +59,7 @@ function createSocket(): Socket {
   
   // Don't connect without a token - backend requires auth on all namespaces (Item 15)
   if (!token) {
-    socketLogger.warn('No auth token available - socket connection skipped');
+    socketLogger.debug('No auth token available - socket connection skipped');
     // Return a disconnected socket that will reconnect when token becomes available
     const socket = io(cleanSocketUrl, {
       transports: ['websocket', 'polling'],

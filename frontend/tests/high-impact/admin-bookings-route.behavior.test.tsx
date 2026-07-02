@@ -51,7 +51,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import DynamicBookingsPage from '../../src/app/admin/[slug]/bookings/page';
+import DynamicBookingsPage from '../../src/app/[property]/admin/[slug]/bookings/page';
 
 const bookingsPayload = [
   {

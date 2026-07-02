@@ -55,7 +55,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import AdminPaymentsPage from '../../src/app/admin/settings/payments/page';
+import AdminPaymentsPage from '../../src/app/[property]/admin/settings/payments/page';
 
 const payments = [
   {

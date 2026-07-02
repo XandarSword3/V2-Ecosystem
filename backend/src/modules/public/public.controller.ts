@@ -21,6 +21,7 @@ export async function getSettings(req: Request, res: Response) {
         // localStorage-cached activePropertyId leak into what the public
         // storefront rendered.
         let resolvedPropertyId = req.property?.id;
+        let resolvedPropertySlug = req.property?.property_code;
 
         // When no property was resolved by middleware (e.g. localhost with
         // multiple properties and no tenant/slug to disambiguate), fall back
@@ -29,13 +30,14 @@ export async function getSettings(req: Request, res: Response) {
         if (!resolvedPropertyId) {
             const { data: defaultProp } = await supabase
                 .from('properties')
-                .select('id')
+                .select('id, property_code')
                 .order('created_at', { ascending: true })
                 .limit(1)
                 .maybeSingle();
             if (defaultProp) {
                 resolvedPropertyId = defaultProp.id;
-                logger.info('Public controller - no property resolved, using default property', { propertyId: resolvedPropertyId });
+                resolvedPropertySlug = defaultProp.property_code || 'default'; // Fallback to 'default' if property_code is null/empty
+                logger.info('Public controller - no property resolved, using default property', { propertyId: resolvedPropertyId, propertySlug: resolvedPropertySlug });
             }
         }
 
@@ -59,7 +61,8 @@ export async function getSettings(req: Request, res: Response) {
         // Build response from database settings
         const result: Record<string, unknown> = {
             theme: 'default',
-            contact: { email: null }
+            contact: { email: null },
+            propertySlug: resolvedPropertySlug
         };
 
         if (settings) {

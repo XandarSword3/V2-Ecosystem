@@ -56,7 +56,7 @@ vi.mock('next-intl', () => ({
   useTranslations: () => translateMock,
 }));
 
-import TranslationsPage from '../../src/app/admin/settings/translations/page';
+import TranslationsPage from '../../src/app/[property]/admin/settings/translations/page';
 
 const statsSeed = {
   overall: { total: 10, translated: 4, missing: 6 },

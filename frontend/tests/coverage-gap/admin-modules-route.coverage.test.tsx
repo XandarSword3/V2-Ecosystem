@@ -38,6 +38,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: pushMock,
   }),
+  useParams: () => ({ property: 'test-property' }),
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -56,7 +57,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import ModulesPage from '../../src/app/admin/modules/page';
+import ModulesPage from '../../src/app/[property]/admin/modules/page';
 
 function renderPage() {
   const queryClient = new QueryClient({
@@ -102,7 +103,7 @@ describe('Admin modules route coverage', () => {
     expect(screen.getByText('Pool Club')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Builder/i }));
-    expect(pushMock).toHaveBeenCalledWith('/admin/modules/builder/mod-1');
+    expect(pushMock).toHaveBeenCalledWith('/test-property/admin/modules/builder/mod-1');
 
     await user.click(screen.getByTitle('Edit Module Settings'));
     expect(await screen.findByText('Edit Module')).toBeInTheDocument();
@@ -124,13 +125,8 @@ describe('Admin modules route coverage', () => {
 
     expect(toastSuccessMock).toHaveBeenCalledWith('Module updated successfully');
 
-    // Creation: click Add Module → template picker → pick Blank → Use this template → form
-    await user.click(screen.getByRole('button', { name: /Add Module/i }));
-    expect(await screen.findByText('Choose a starting template')).toBeInTheDocument();
-
-    // Select the Blank template
-    await user.click(screen.getByRole('button', { name: /Blank/i }));
-    await user.click(screen.getByRole('button', { name: /Use this template/i }));
+    // Creation: click Blank Module → goes directly to form
+    await user.click(screen.getByRole('button', { name: /Blank Module/i }));
 
     expect(await screen.findByText('Configure Module')).toBeInTheDocument();
 
@@ -175,11 +171,7 @@ describe('Admin modules route coverage', () => {
 
     await screen.findByText('Module Management');
 
-    await user.click(screen.getByRole('button', { name: /Add Module/i }));
-    await screen.findByText('Choose a starting template');
-
-    await user.click(screen.getByRole('button', { name: /Blank/i }));
-    await user.click(screen.getByRole('button', { name: /Use this template/i }));
+    await user.click(screen.getByRole('button', { name: /Blank Module/i }));
 
     const createNameInput = (await screen.findAllByRole('textbox'))[0];
     await user.clear(createNameInput);
