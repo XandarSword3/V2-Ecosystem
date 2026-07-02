@@ -1,5 +1,6 @@
 import { getSupabase } from '../../../database/connection.js';
 import { logger } from '../../../utils/logger.js';
+import { AppError } from '../../../utils/AppError.js';
 
 // ==========================================
 // TYPES (mirror shared types for backend use)
@@ -248,7 +249,10 @@ class CustomizationService {
   /**
    * Create a new customization group
    */
-  async createGroup(data: CreateCustomizationGroupRequest): Promise<CustomizationGroup> {
+  async createGroup(
+    data: CreateCustomizationGroupRequest,
+    ownerContext?: { tenantId?: string | null; propertyId?: string | null }
+  ): Promise<CustomizationGroup> {
     const supabase = getSupabase();
     
     const { data: group, error } = await supabase
@@ -271,7 +275,9 @@ class CustomizationService {
         available_until: data.availableUntil,
         available_days: data.availableDays,
         display_conditions: data.displayConditions ?? {},
-        sort_order: data.sortOrder ?? 0
+        sort_order: data.sortOrder ?? 0,
+        tenant_id: ownerContext?.tenantId ?? null,
+        property_id: ownerContext?.propertyId ?? null,
       })
       .select()
       .single();
@@ -287,7 +293,11 @@ class CustomizationService {
   /**
    * Update an existing customization group
    */
-  async updateGroup(id: string, data: UpdateCustomizationGroupRequest): Promise<CustomizationGroup> {
+  async updateGroup(
+    id: string,
+    data: UpdateCustomizationGroupRequest,
+    tenantId?: string | null
+  ): Promise<CustomizationGroup> {
     const supabase = getSupabase();
     
     const updateData: Record<string, unknown> = {
@@ -314,17 +324,21 @@ class CustomizationService {
     if (data.displayConditions !== undefined) updateData.display_conditions = data.displayConditions;
     if (data.sortOrder !== undefined) updateData.sort_order = data.sortOrder;
 
-    const { data: group, error } = await supabase
+    let updateQuery = supabase
       .from('customization_groups')
       .update(updateData)
       .eq('id', id)
-      .is('deleted_at', null)
-      .select()
-      .single();
+      .is('deleted_at', null);
+    if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+
+    const { data: group, error } = await updateQuery.select().maybeSingle();
 
     if (error) {
       logger.error('Failed to update customization group', { error, id, data });
       throw new Error(`Failed to update customization group: ${error.message}`);
+    }
+    if (!group) {
+      throw new AppError('Customization group not found', 404);
     }
 
     return this.mapGroupFromDb(group);
@@ -333,33 +347,41 @@ class CustomizationService {
   /**
    * Soft delete a customization group
    */
-  async deleteGroup(id: string): Promise<void> {
+  async deleteGroup(id: string, tenantId?: string | null): Promise<void> {
     const supabase = getSupabase();
     
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from('customization_groups')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
+    if (tenantId) deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+
+    const { data, error } = await deleteQuery.select('id').maybeSingle();
 
     if (error) {
       logger.error('Failed to delete customization group', { error, id });
       throw new Error(`Failed to delete customization group: ${error.message}`);
+    }
+    if (!data) {
+      throw new AppError('Customization group not found', 404);
     }
   }
 
   /**
    * Get a single customization group by ID
    */
-  async getGroup(id: string, includeOptions = false): Promise<CustomizationGroup | null> {
+  async getGroup(id: string, includeOptions = false, tenantId?: string | null): Promise<CustomizationGroup | null> {
     const supabase = getSupabase();
     
     const selectQuery = includeOptions ? '*, customization_options(*)' : '*';
-    const { data: group, error } = await supabase
+    let query = supabase
       .from('customization_groups')
       .select(selectQuery)
       .eq('id', id)
-      .is('deleted_at', null)
-      .single();
+      .is('deleted_at', null);
+    if (tenantId) query = query.eq('tenant_id', tenantId);
+
+    const { data: group, error } = await query.single();
 
     if (error) {
       if (error.code === 'PGRST116') return null;
@@ -383,6 +405,7 @@ class CustomizationService {
     entityType?: CustomizableEntityType;
     isGlobal?: boolean;
     includeOptions?: boolean;
+    tenantId?: string | null;
   }): Promise<CustomizationGroup[]> {
     const supabase = getSupabase();
     
@@ -399,6 +422,13 @@ class CustomizationService {
 
     if (filters?.entityType) {
       query = query.contains('applicable_entity_types', [filters.entityType]);
+    }
+
+    // Tenant isolation: scoped callers (anyone but super_admin) only ever see
+    // their own tenant's groups. super_admin passes tenantId=null/undefined
+    // and intentionally sees everything (platform-admin surface).
+    if (filters?.tenantId) {
+      query = query.eq('tenant_id', filters.tenantId);
     }
 
     const { data: groups, error } = await query;
@@ -426,8 +456,35 @@ class CustomizationService {
   /**
    * Create a new customization option
    */
-  async createOption(data: CreateCustomizationOptionRequest): Promise<CustomizationOption> {
+  async createOption(
+    data: CreateCustomizationOptionRequest,
+    tenantId?: string | null
+  ): Promise<CustomizationOption> {
     const supabase = getSupabase();
+
+    // Options inherit tenancy from their parent group — never trust a
+    // client-supplied tenant_id here. Also blocks attaching an option to a
+    // group_id that belongs to a different tenant.
+    let optionTenantId: string | null = null;
+    let optionPropertyId: string | null = null;
+    if (data.groupId) {
+      const { data: parentGroup, error: parentError } = await supabase
+        .from('customization_groups')
+        .select('tenant_id, property_id')
+        .eq('id', data.groupId)
+        .maybeSingle();
+      if (parentError) {
+        throw new Error(`Failed to verify parent group: ${parentError.message}`);
+      }
+      if (!parentGroup) {
+        throw new AppError('Customization group not found', 404);
+      }
+      if (tenantId && parentGroup.tenant_id && parentGroup.tenant_id !== tenantId) {
+        throw new AppError('Customization group not found', 404);
+      }
+      optionTenantId = parentGroup.tenant_id ?? tenantId ?? null;
+      optionPropertyId = parentGroup.property_id ?? null;
+    }
     
     const { data: option, error } = await supabase
       .from('customization_options')
@@ -452,7 +509,9 @@ class CustomizationService {
         badge_color: data.badgeColor,
         image_url: data.imageUrl,
         available_stock: data.availableStock,
-        sort_order: data.sortOrder ?? 0
+        sort_order: data.sortOrder ?? 0,
+        tenant_id: optionTenantId,
+        property_id: optionPropertyId,
       })
       .select()
       .single();
@@ -468,7 +527,11 @@ class CustomizationService {
   /**
    * Update an existing customization option
    */
-  async updateOption(id: string, data: UpdateCustomizationOptionRequest): Promise<CustomizationOption> {
+  async updateOption(
+    id: string,
+    data: UpdateCustomizationOptionRequest,
+    tenantId?: string | null
+  ): Promise<CustomizationOption> {
     const supabase = getSupabase();
     
     const updateData: Record<string, unknown> = {
@@ -497,17 +560,21 @@ class CustomizationService {
     if (data.availableStock !== undefined) updateData.available_stock = data.availableStock;
     if (data.sortOrder !== undefined) updateData.sort_order = data.sortOrder;
 
-    const { data: option, error } = await supabase
+    let updateQuery = supabase
       .from('customization_options')
       .update(updateData)
       .eq('id', id)
-      .is('deleted_at', null)
-      .select()
-      .single();
+      .is('deleted_at', null);
+    if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+
+    const { data: option, error } = await updateQuery.select().maybeSingle();
 
     if (error) {
       logger.error('Failed to update customization option', { error, id, data });
       throw new Error(`Failed to update customization option: ${error.message}`);
+    }
+    if (!option) {
+      throw new AppError('Customization option not found', 404);
     }
 
     return this.mapOptionFromDb(option);
@@ -516,32 +583,41 @@ class CustomizationService {
   /**
    * Soft delete a customization option
    */
-  async deleteOption(id: string): Promise<void> {
+  async deleteOption(id: string, tenantId?: string | null): Promise<void> {
     const supabase = getSupabase();
     
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from('customization_options')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
+    if (tenantId) deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+
+    const { data, error } = await deleteQuery.select('id').maybeSingle();
 
     if (error) {
       logger.error('Failed to delete customization option', { error, id });
       throw new Error(`Failed to delete customization option: ${error.message}`);
+    }
+    if (!data) {
+      throw new AppError('Customization option not found', 404);
     }
   }
 
   /**
    * Get options for a group
    */
-  async getOptionsForGroup(groupId: string): Promise<CustomizationOption[]> {
+  async getOptionsForGroup(groupId: string, tenantId?: string | null): Promise<CustomizationOption[]> {
     const supabase = getSupabase();
     
-    const { data: options, error } = await supabase
+    let query = supabase
       .from('customization_options')
       .select('*')
       .eq('group_id', groupId)
       .is('deleted_at', null)
       .order('sort_order', { ascending: true });
+    if (tenantId) query = query.eq('tenant_id', tenantId);
+
+    const { data: options, error } = await query;
 
     if (error) {
       throw new Error(`Failed to get options: ${error.message}`);
