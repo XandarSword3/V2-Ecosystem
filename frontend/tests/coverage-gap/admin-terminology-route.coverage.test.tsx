@@ -27,7 +27,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-import TerminologyPage from '../../src/app/admin/terminology/page';
+import TerminologyPage from '../../src/app/[property]/admin/terminology/page';
 
 describe('Admin terminology route coverage', () => {
   beforeEach(() => {
