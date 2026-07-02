@@ -67,11 +67,25 @@ export async function validatePropertyAccess(req: Request, res: Response, next: 
   // tenant_owner and tenant_admin have implicit access to all properties within
   // their tenant — scoped user_property_access rows are optional for these scopes.
   // Default-deny for everyone else (property_staff, property_manager, customer).
+  //
+  // CRITICAL: this bypass is only valid when the resolved tenant (req.tenant.id,
+  // which comes from the client-supplied X-Tenant-ID/X-Tenant-Slug header via
+  // resolveTenant) actually matches the user's OWN tenant (req.user.tenantId,
+  // which comes from the verified JWT and cannot be spoofed by the caller).
+  // Without this comparison, any tenant_owner/tenant_admin could send another
+  // tenant's slug/ID header alongside a property_id from that tenant and pass
+  // straight through — the "tenant ownership guard" above only checks that the
+  // property belongs to req.tenant.id, not that req.tenant.id belongs to this
+  // user. Fixed 2026-07-02: previously missing, confirmed exploitable cross-tenant
+  // privilege escalation reaching admin/reporting/revenue/users/loyalty/manager/
+  // analytics routes (see CONTEXT.md).
   const userScope = req.user?.scope;
+  const tenantMatchesUser = !!req.tenant?.id && !!req.user?.tenantId && req.tenant.id === req.user.tenantId;
   if (
-    userScope === 'tenant_owner' ||
-    userScope === 'tenant_admin' ||
-    req.user?.roles?.includes('tenant_admin')
+    tenantMatchesUser &&
+    (userScope === 'tenant_owner' ||
+      userScope === 'tenant_admin' ||
+      req.user?.roles?.includes('tenant_admin'))
   ) {
     (req as any).propertyId = propertyId;
     return next();
