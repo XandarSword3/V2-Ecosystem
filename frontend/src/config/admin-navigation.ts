@@ -99,7 +99,6 @@ export function getModuleChildren(
         { name: t('nav.categories'), href: `${base}/${safeSlug}/categories`, translationKey: 'nav.categories' },
         { name: t('nav.orders'), href: `${base}/${safeSlug}/orders`, translationKey: 'nav.orders' },
         { name: t('nav.tables'), href: `${base}/${safeSlug}/tables`, translationKey: 'nav.tables' },
-        { name: t('nav.reservations') || 'Reservations', href: `${base}/${safeSlug}/reservations`, translationKey: 'nav.reservations' },
         { name: t('nav.waitlist') || 'Waitlist', href: `${base}/${safeSlug}/waitlist`, translationKey: 'nav.waitlist' },
         { name: t('nav.modifiers') || 'Modifiers', href: `${base}/${safeSlug}/modifiers`, translationKey: 'nav.modifiers' },
       ];
