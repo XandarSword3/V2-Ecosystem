@@ -665,7 +665,8 @@
       "location": "Posizione",
       "markedOccupied": "Tavolo segnato come occupato",
       "markedAvailable": "Tavolo segnato come disponibile",
-      "tableNumberRequired": "Il numero del tavolo è obbligatorio"
+      "tableNumberRequired": "Il numero del tavolo è obbligatorio",
+      "nameRequired": "Il nome è obbligatorio"
     },
     "pagination": {
       "previous": "Precedente",

@@ -297,7 +297,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     // Get current order to determine state transition
     const { data: currentOrder, error: fetchError } = await supabase
       .from('transactions')
-      .select('status, module_id')
+      .select('status, module_id, metadata')
       .eq('engine_type', 'instant_transaction')
       .eq('id', orderId)
       .single();
@@ -341,12 +341,40 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
         ...(status === 'cancelled' ? { cancelled_at: new Date().toISOString() } : {}),
       }
     );
-    
-    // Get updated order
+
+    // transitionState only validates + runs in-memory side effects — it never
+    // touches the database. Both of these were previously missing: the
+    // .allowed check (a rejected transition was silently treated as success)
+    // and the actual write-back (the row was re-selected unchanged and
+    // returned as if the update had happened). Fixed 2026-07-02 — see
+    // CONTEXT.md. This also makes Phase 3 occupancy derivation
+    // (service_locations) trustworthy, since it reads this same status column.
+    if (!transitionResult.allowed) {
+      return res.status(400).json({
+        success: false,
+        error: transitionResult.error || `Cannot transition order from '${currentOrder.status}' to '${status}'`,
+      });
+    }
+
+    const existingMetadata = (currentOrder as { metadata?: Record<string, unknown> }).metadata ?? {};
+    const now = new Date().toISOString();
+    const timestampFields: Record<string, string> = {
+      ...(status === 'preparing' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
+      ...(status === 'ready' ? { actual_ready_time: now } : {}),
+      ...(status === 'served' ? { served_at: now } : {}),
+      ...(status === 'cancelled' ? { cancelled_at: now } : {}),
+    };
+
     const { data: order, error: updateError } = await supabase
       .from('transactions')
-      .select('*')
+      .update({
+        status: transitionResult.targetState,
+        updated_at: now,
+        ...(status === 'completed' ? { completed_at: now } : {}),
+        metadata: { ...existingMetadata, ...timestampFields },
+      })
       .eq('id', orderId)
+      .select('*')
       .single();
 
     if (updateError) throw updateError;
