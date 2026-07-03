@@ -674,6 +674,7 @@
       "markedOccupied": "Table marked as occupied",
       "markedAvailable": "Table marked as available",
       "tableNumberRequired": "Table number is required",
+      "nameRequired": "Name is required",
       "total": "Total",
       "amount": "Amount",
       "totalAmount": "Total Amount"

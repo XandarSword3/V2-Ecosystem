@@ -665,7 +665,8 @@
       "location": "Standort",
       "markedOccupied": "Tisch als besetzt markiert",
       "markedAvailable": "Tisch als verfügbar markiert",
-      "tableNumberRequired": "Tischnummer ist erforderlich"
+      "tableNumberRequired": "Tischnummer ist erforderlich",
+      "nameRequired": "Name ist erforderlich"
     },
     "pagination": {
       "previous": "Zurück",

@@ -592,6 +592,7 @@
       "markedOccupied": "تم تحديد الطاولة كمشغولة",
       "markedAvailable": "تم تحديد الطاولة كمتاحة",
       "tableNumberRequired": "رقم الطاولة مطلوب",
+      "nameRequired": "الاسم مطلوب",
       "total": "المجموع",
       "amount": "المبلغ"
     },
