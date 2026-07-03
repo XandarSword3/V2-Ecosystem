@@ -673,6 +673,7 @@
       "markedOccupied": "Table marquée comme occupée",
       "markedAvailable": "Table marquée comme disponible",
       "tableNumberRequired": "Le numéro de table est requis",
+      "nameRequired": "Le nom est requis",
       "total": "Total",
       "amount": "Montant"
     },

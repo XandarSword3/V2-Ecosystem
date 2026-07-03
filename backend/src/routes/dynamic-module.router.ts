@@ -107,6 +107,81 @@ function enforceMountedModulePropertyAccess(req: Request, res: Response, next: N
   });
 }
 
+/**
+ * Defense-in-depth ownership check for write routes on the dynamic module
+ * router. `enforceMountedModulePropertyAccess` above already runs for every
+ * route via router.use(), but it is a no-op (calls next() unconditionally)
+ * whenever the mounted module has no property_id — which is a real,
+ * reachable state per dynamic-modules.loader.ts (property_id is read
+ * straight from the nullable `modules.property_id` column). For write
+ * routes specifically, that gap means any authenticated staff account from
+ * any tenant could otherwise create/update/delete rows on someone else's
+ * module by slug.
+ *
+ * This does not retrofit the other ~15 pre-existing dynamic-router routes
+ * (out of scope for Phase 3 — see REFIT_PLAN.md open question). It only
+ * covers the new service_locations routes.
+ *
+ * When property_id IS set, this duplicates enforceMountedModulePropertyAccess's
+ * check — intentional belt-and-suspenders, not a substitute for fixing the
+ * router-level gap itself.
+ *
+ * Deliberately compares against req.user.tenantId (from the verified JWT),
+ * never req.tenant.id (resolved from the client-supplied X-Tenant-ID /
+ * X-Tenant-Slug header) — see the 2026-07-02 validatePropertyAccess fix for
+ * why trusting the latter for authorization is unsafe.
+ */
+function enforceServiceLocationOwnership(req: Request, res: Response, next: NextFunction): void {
+  const mounted = getMountedModule(req);
+  if (!mounted) {
+    res.status(500).json({ success: false, error: 'Mounted module context is missing' });
+    return;
+  }
+
+  if (req.user?.roles?.includes('super_admin')) {
+    next();
+    return;
+  }
+
+  if (mounted.property_id) {
+    requirePropertyAccess(mounted.property_id)(req, res, next).catch((error: unknown) => {
+      logger.error('[Dynamic Router] service_locations property ownership check failed', {
+        slug: mounted.slug,
+        propertyId: mounted.property_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(403).json({ success: false, error: 'Access denied for this property' });
+    });
+    return;
+  }
+
+  // No property_id on this module — fall back to a tenant-level check.
+  getTenantIdForMountedModule(mounted)
+    .then((tenantId) => {
+      if (!tenantId) {
+        res.status(403).json({ success: false, error: 'Access denied: module has no resolvable tenant or property scope' });
+        return;
+      }
+      if (req.user?.tenantId && req.user.tenantId === tenantId) {
+        next();
+        return;
+      }
+      logger.warn('[Dynamic Router] service_locations tenant ownership denied', {
+        slug: mounted.slug,
+        moduleTenantId: tenantId,
+        userTenantId: req.user?.tenantId,
+      });
+      res.status(403).json({ success: false, error: 'Access denied for this tenant' });
+    })
+    .catch((error: unknown) => {
+      logger.error('[Dynamic Router] service_locations tenant ownership check failed', {
+        slug: mounted.slug,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      res.status(500).json({ success: false, error: 'Unable to validate module access' });
+    });
+}
+
 function actorForUser(req: Request): 'system' | 'staff' | 'customer' | 'admin' {
   const roles = req.user?.roles ?? [];
   if (roles.includes('super_admin') || roles.includes('admin') || roles.includes('manager')) {
@@ -165,6 +240,58 @@ function resolveAction(
 function asNumber(input: unknown, fallback = 0): number {
   const value = Number(input);
   return Number.isFinite(value) ? value : fallback;
+}
+
+// instant_transaction terminal states (engines/definitions/instant-transaction.ts).
+// A location counts as occupied when it has any order NOT in one of these.
+const INSTANT_TRANSACTION_TERMINAL_STATES = ['completed', 'cancelled'];
+
+interface ServiceLocationRow {
+  id: string;
+  name: string;
+  qr_code: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Fetch a module's service_locations with occupancy derived from active
+ * (non-terminal) transactions, in two queries total regardless of how many
+ * locations exist (no N+1).
+ */
+async function fetchServiceLocationsWithOccupancy(moduleId: string) {
+  const supabase = getSupabase();
+
+  const { data: locations, error: locationsError } = await supabase
+    .from('service_locations')
+    .select('id, name, qr_code, is_active, sort_order, created_at, updated_at')
+    .eq('module_id', moduleId)
+    .order('sort_order', { ascending: true });
+
+  if (locationsError) throw locationsError;
+
+  const rows = (locations ?? []) as ServiceLocationRow[];
+  if (rows.length === 0) return [];
+
+  const locationIds = rows.map((row) => row.id);
+  const { data: activeOrders, error: ordersError } = await supabase
+    .from('transactions')
+    .select('service_location_id')
+    .eq('module_id', moduleId)
+    .eq('engine_type', 'instant_transaction')
+    .in('service_location_id', locationIds)
+    .not('status', 'in', `(${INSTANT_TRANSACTION_TERMINAL_STATES.join(',')})`);
+
+  if (ordersError) throw ordersError;
+
+  const occupiedIds = new Set((activeOrders ?? []).map((row) => row.service_location_id as string));
+
+  return rows.map((row) => ({
+    ...row,
+    is_occupied: occupiedIds.has(row.id),
+  }));
 }
 
 function buildInstantTransactionRouter(router: Router): void {
@@ -460,19 +587,120 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  // Tables endpoints
-  router.get('/tables', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+  // Service locations (Engine A Refit Phase 3 — see REFIT_PLAN.md).
+  // Replaces the dead /tables stub. "Occupied" is derived, not stored —
+  // see fetchServiceLocationsWithOccupancy.
+  router.get('/service-locations', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
 
-      // restaurant_tables was dropped in the legacy purge — no canonical replacement yet
-      res.json({ success: true, data: [] });
+      const data = await fetchServiceLocationsWithOccupancy(mounted.id);
+      res.json({ success: true, data });
     } catch (error) {
-      logger.error('[Dynamic Router] GET /tables failed', error);
-      res.status(500).json({ success: false, error: 'Failed to list tables' });
+      logger.error('[Dynamic Router] GET /service-locations failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list service locations' });
+    }
+  });
+
+  router.post('/admin/service-locations', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+      if (!name) {
+        return res.status(400).json({ success: false, error: 'name is required' });
+      }
+
+      const tenant_id = await getTenantIdForMountedModule(mounted);
+      if (!tenant_id) {
+        return res.status(422).json({ success: false, error: 'Unable to resolve tenant for this module' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('service_locations')
+        .insert({
+          module_id: mounted.id,
+          tenant_id,
+          property_id: mounted.property_id ?? null,
+          name,
+          qr_code: typeof req.body?.qr_code === 'string' ? req.body.qr_code : null,
+          is_active: req.body?.is_active ?? true,
+          sort_order: asNumber(req.body?.sort_order, 0),
+        })
+        .select('id, name, qr_code, is_active, sort_order, created_at, updated_at')
+        .single();
+
+      if (error) throw error;
+      res.status(201).json({ success: true, data: { ...data, is_occupied: false } });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /admin/service-locations failed', error);
+      res.status(500).json({ success: false, error: 'Failed to create service location' });
+    }
+  });
+
+  router.put('/admin/service-locations/:id', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const updates: Record<string, unknown> = {};
+      if (typeof req.body?.name === 'string' && req.body.name.trim()) updates.name = req.body.name.trim();
+      if (typeof req.body?.qr_code === 'string') updates.qr_code = req.body.qr_code;
+      if (typeof req.body?.is_active === 'boolean') updates.is_active = req.body.is_active;
+      if (req.body?.sort_order !== undefined) updates.sort_order = asNumber(req.body.sort_order, 0);
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ success: false, error: 'No valid fields to update' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('service_locations')
+        .update(updates)
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .select('id, name, qr_code, is_active, sort_order, created_at, updated_at')
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        return res.status(404).json({ success: false, error: 'Service location not found' });
+      }
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] PUT /admin/service-locations/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to update service location' });
+    }
+  });
+
+  router.delete('/admin/service-locations/:id', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('service_locations')
+        .delete()
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('[Dynamic Router] DELETE /admin/service-locations/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to delete service location' });
     }
   });
 
@@ -560,6 +788,24 @@ function buildInstantTransactionRouter(router: Router): void {
         customerId: req.user?.userId ?? undefined,
       });
 
+      // Validate service_location_id belongs to this module before trusting it —
+      // otherwise a caller could tag an order to another module's location.
+      let serviceLocationId: string | null = null;
+      const requestedLocationId = req.body?.service_location_id;
+      if (typeof requestedLocationId === 'string' && requestedLocationId.length > 0) {
+        const { data: locationRow, error: locationError } = await supabase
+          .from('service_locations')
+          .select('id')
+          .eq('id', requestedLocationId)
+          .eq('module_id', mounted.id)
+          .maybeSingle();
+        if (locationError) throw locationError;
+        if (!locationRow) {
+          return res.status(400).json({ success: false, error: 'service_location_id does not belong to this module' });
+        }
+        serviceLocationId = locationRow.id;
+      }
+
       const { data: created, error: createError } = await supabase
         .from('transactions')
         .insert({
@@ -568,6 +814,7 @@ function buildInstantTransactionRouter(router: Router): void {
           customer_id: req.user?.userId ?? null,
           status: 'pending',
           amount: pricing.totalAmount,
+          service_location_id: serviceLocationId,
           metadata: {
             notes: req.body?.notes ?? req.body?.metadata?.notes ?? null,
             payment_method: req.body?.metadata?.payment_method ?? req.body?.payment_method ?? null,
@@ -576,7 +823,7 @@ function buildInstantTransactionRouter(router: Router): void {
             customer_name: req.body?.metadata?.customer_name ?? req.body?.customer_name ?? null,
           },
         })
-        .select('id, module_id, customer_id, status, amount, created_at, metadata')
+        .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
         .single();
 
       if (createError) throw createError;
@@ -740,18 +987,18 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.get('/staff/tables', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.get('/staff/service-locations', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
 
-      // restaurant_tables was dropped in the legacy purge — no canonical replacement yet
-      res.json({ success: true, data: [] });
+      const data = await fetchServiceLocationsWithOccupancy(mounted.id);
+      res.json({ success: true, data });
     } catch (error) {
-      logger.error('[Dynamic Router] GET /staff/tables failed', error);
-      res.status(500).json({ success: false, error: 'Failed to list tables' });
+      logger.error('[Dynamic Router] GET /staff/service-locations failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list service locations' });
     }
   });
 }
