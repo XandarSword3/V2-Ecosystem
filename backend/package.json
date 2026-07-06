@@ -80,7 +80,7 @@
     "uuid": "^11.1.1",
     "winston": "^3.19.0",
     "xss": "^1.0.15",
-    "zod": "^3.25.76"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
