@@ -36,6 +36,17 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
   const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [showNewBookingModal, setShowNewBookingModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingBookingId, setPendingBookingId] = useState<string | null>(null);
+  const [outstandingAmount, setOutstandingAmount] = useState(0);
+  const [newBookingForm, setNewBookingForm] = useState({
+    unitId: '',
+    customerName: '',
+    customerPhone: '',
+    checkInDate: '',
+    checkOutDate: '',
+  });
   const { socket } = useSocket();
 
   const fetchBookings = useCallback(async () => {
@@ -79,22 +90,10 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
     } catch (error: any) {
       if (status === 'checked_in' && error?.response?.status === 402) {
         const outstanding = Number(error?.response?.data?.outstanding || 0);
-        const shouldRecord = window.confirm(
-          `Outstanding balance: ${outstanding.toFixed(2)}. Record cash payment now?`,
-        );
-        if (shouldRecord) {
-          await api.post('/payments/record-cash', {
-            referenceType: 'chalet_booking',
-            referenceId: bookingId,
-            amount: outstanding,
-            notes: 'Recorded during check-in',
-          });
-          await api.patch(`/staff/modules/${slug}/bookings/${bookingId}/status`, { status: 'checked_in' });
-          setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'checked_in' } : b)));
-          toast.success('Payment recorded and guest checked in');
-          setSelectedBooking(null);
-          return;
-        }
+        setPendingBookingId(bookingId);
+        setOutstandingAmount(outstanding);
+        setShowPaymentModal(true);
+        return;
       }
       toast.error(error?.response?.data?.error || 'Failed to update booking');
     }
@@ -102,28 +101,47 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
 
   const createStaffBooking = async () => {
     try {
-      const chaletId = window.prompt('Unit ID');
-      if (!chaletId) return;
-      const customerName = window.prompt('Guest name') || 'Walk-in Guest';
-      const customerPhone = window.prompt('Guest phone') || '';
-      const checkIn = window.prompt('Check-in date (YYYY-MM-DD)');
-      const checkOut = window.prompt('Check-out date (YYYY-MM-DD)');
-      if (!checkIn || !checkOut) {
-        toast.error('Check-in and check-out are required');
-        return;
-      }
       await api.post(`/staff/modules/${slug}/bookings`, {
-        unit_id: chaletId,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        check_in_date: checkIn,
-        check_out_date: checkOut,
+        unit_id: newBookingForm.unitId,
+        customer_name: newBookingForm.customerName || 'Walk-in Guest',
+        customer_phone: newBookingForm.customerPhone,
+        check_in_date: newBookingForm.checkInDate,
+        check_out_date: newBookingForm.checkOutDate,
         payment_method: 'cash',
       });
       toast.success('Staff booking created');
+      setShowNewBookingModal(false);
+      setNewBookingForm({
+        unitId: '',
+        customerName: '',
+        customerPhone: '',
+        checkInDate: '',
+        checkOutDate: '',
+      });
       fetchBookings();
     } catch (error) {
       toast.error('Failed to create booking');
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!pendingBookingId) return;
+    try {
+      await api.post('/payments/record-cash', {
+        referenceType: 'chalet_booking',
+        referenceId: pendingBookingId,
+        amount: outstandingAmount,
+        notes: 'Recorded during check-in',
+      });
+      await api.patch(`/staff/modules/${slug}/bookings/${pendingBookingId}/status`, { status: 'checked_in' });
+      setBookings((prev) => prev.map((b) => (b.id === pendingBookingId ? { ...b, status: 'checked_in' } : b)));
+      toast.success('Payment recorded and guest checked in');
+      setShowPaymentModal(false);
+      setPendingBookingId(null);
+      setOutstandingAmount(0);
+      setSelectedBooking(null);
+    } catch (error) {
+      toast.error('Failed to record payment');
     }
   };
 
@@ -196,7 +214,7 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={createStaffBooking}>New Booking</Button>
+          <Button onClick={() => setShowNewBookingModal(true)}>New Booking</Button>
           <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-sm">
             <button
               onClick={() => setView('list')}
@@ -475,6 +493,119 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
               {selectedBooking.status === 'checked_in' && (
                 <Button className="flex-1" onClick={() => updateBookingStatus(selectedBooking.id, 'checked_out')}>Check Out</Button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Booking Modal */}
+      {showNewBookingModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-booking-title"
+          onClick={() => setShowNewBookingModal(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowNewBookingModal(false); }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 id="new-booking-title" className="text-xl font-semibold">New Walk-in Booking</h3>
+              <Button variant="ghost" size="icon" aria-label="Close" onClick={() => setShowNewBookingModal(false)}>
+                <XCircle className="w-5 h-5" />
+              </Button>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); createStaffBooking(); }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit ID</label>
+                <input
+                  type="text"
+                  value={newBookingForm.unitId}
+                  onChange={(e) => setNewBookingForm({ ...newBookingForm, unitId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Guest Name</label>
+                <input
+                  type="text"
+                  value={newBookingForm.customerName}
+                  onChange={(e) => setNewBookingForm({ ...newBookingForm, customerName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="Walk-in Guest"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Guest Phone</label>
+                <input
+                  type="tel"
+                  value={newBookingForm.customerPhone}
+                  onChange={(e) => setNewBookingForm({ ...newBookingForm, customerPhone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Check-in</label>
+                  <input
+                    type="date"
+                    value={newBookingForm.checkInDate}
+                    onChange={(e) => setNewBookingForm({ ...newBookingForm, checkInDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Check-out</label>
+                  <input
+                    type="date"
+                    value={newBookingForm.checkOutDate}
+                    onChange={(e) => setNewBookingForm({ ...newBookingForm, checkOutDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowNewBookingModal(false)}>Cancel</Button>
+                <Button type="submit" className="flex-1">Create Booking</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Recording Modal */}
+      {showPaymentModal && pendingBookingId && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payment-title"
+          onClick={() => setShowPaymentModal(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowPaymentModal(false); }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 id="payment-title" className="text-xl font-semibold">Record Payment</h3>
+              <Button variant="ghost" size="icon" aria-label="Close" onClick={() => setShowPaymentModal(false)}>
+                <XCircle className="w-5 h-5" />
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  Outstanding balance: <span className="font-bold">{formatCurrency(outstandingAmount)}</span>
+                </p>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Record cash payment now to complete check-in?
+              </p>
+              <div className="flex gap-3 mt-6">
+                <Button variant="outline" className="flex-1" onClick={() => setShowPaymentModal(false)}>Cancel</Button>
+                <Button className="flex-1" onClick={handleRecordPayment}>Record Payment</Button>
+              </div>
             </div>
           </div>
         </div>
