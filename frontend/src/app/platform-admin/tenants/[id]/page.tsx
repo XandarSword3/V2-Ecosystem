@@ -128,9 +128,9 @@ export default function TenantDetailPage() {
         <div style={{ background: '#0B0F14', border: '1px solid #1A222C' }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #1A222C', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Building2 size={14} style={{ color: '#3A8DFF' }} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Properties ({tenant.properties.length})</span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>Properties ({(tenant.properties ?? []).length})</span>
           </div>
-          {tenant.properties.length === 0 ? (
+          {!tenant.properties || tenant.properties.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#5B6B7F', fontSize: 12 }}>No properties yet.</div>
           ) : tenant.properties.map(p => (
             <div key={p.id} style={{ padding: '12px 18px', borderBottom: '1px solid #1A222C', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -152,9 +152,9 @@ export default function TenantDetailPage() {
             <Package size={14} style={{ color: '#9B5DE5' }} />
             <span style={{ fontSize: 13, fontWeight: 600 }}>Feature Limits</span>
           </div>
-          {Object.entries(tenant.feature_limits).length === 0 ? (
+          {Object.entries(tenant.feature_limits ?? {}).length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#5B6B7F', fontSize: 12 }}>Default limits apply.</div>
-          ) : Object.entries(tenant.feature_limits).map(([key, val]) => (
+          ) : Object.entries(tenant.feature_limits ?? {}).map(([key, val]) => (
             <div key={key} style={{ padding: '10px 18px', borderBottom: '1px solid #1A222C', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 12, color: '#8A95A5', textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}</span>
               <span style={{ fontSize: 12, color: '#E8ECF1', fontVariantNumeric: 'tabular-nums' }}>{String(val)}</span>

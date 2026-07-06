@@ -40,6 +40,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
+import { cache } from '../utils/cache.js';
 
 // ============================================
 // Types
@@ -62,33 +63,43 @@ declare global {
 }
 
 // ============================================
-// Short-lived in-process cache (mirrors tenantCache's TTL/shape)
+// Redis cache
 // ============================================
 
-const CACHE_TTL_MS = 30_000;
-interface CacheEntry {
-  property: PropertyRecord | null;
-  fetchedAt: number;
-}
-const propertyCache = new Map<string, CacheEntry>();
+const CACHE_TTL = 30; // 30 seconds
+const CACHE_KEY_PREFIX = 'property:';
 
-function getCached(key: string): PropertyRecord | null | undefined {
-  const cached = propertyCache.get(key);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+async function getCached(key: string): Promise<PropertyRecord | null | undefined> {
+  try {
+    // Same fix as tenantAccess.middleware.ts: cache.get() returns null for
+    // both "miss" and "Redis unavailable", which is indistinguishable from a
+    // legitimately-cached negative lookup. Wrap the value so a genuine miss
+    // resolves to undefined ("go check the DB") instead of false-negative null.
+    const cached = await cache.get<{ property: PropertyRecord | null }>(`${CACHE_KEY_PREFIX}${key}`);
+    if (cached === null) return undefined;
     return cached.property;
+  } catch {
+    return undefined;
   }
-  return undefined;
 }
 
-function setCached(key: string, property: PropertyRecord | null): void {
-  propertyCache.set(key, { property, fetchedAt: Date.now() });
+async function setCached(key: string, property: PropertyRecord | null): Promise<void> {
+  try {
+    await cache.set(`${CACHE_KEY_PREFIX}${key}`, { property }, CACHE_TTL);
+  } catch {
+    // Silent fail - cache is best-effort
+  }
 }
 
 /** Invalidate cached property lookups (call after a property is created/renamed/re-slugged). */
-export function invalidatePropertyCache(groupId?: string | null, code?: string | null): void {
-  if (groupId && code) propertyCache.delete(`slug:${groupId}:${code}`);
-  if (groupId) propertyCache.delete(`single:${groupId}`);
-  propertyCache.delete('single:__global__');
+export async function invalidatePropertyCache(groupId?: string | null, code?: string | null): Promise<void> {
+  try {
+    if (groupId && code) await cache.del(`${CACHE_KEY_PREFIX}slug:${groupId}:${code}`);
+    if (groupId) await cache.del(`${CACHE_KEY_PREFIX}single:${groupId}`);
+    await cache.del(`${CACHE_KEY_PREFIX}single:__global__`);
+  } catch {
+    // Silent fail
+  }
 }
 
 // ============================================
@@ -97,7 +108,7 @@ export function invalidatePropertyCache(groupId?: string | null, code?: string |
 
 async function lookupBySlug(groupId: string, slug: string): Promise<PropertyRecord | null> {
   const cacheKey = `slug:${groupId}:${slug}`;
-  const cached = getCached(cacheKey);
+  const cached = await getCached(cacheKey);
   if (cached !== undefined) return cached;
 
   try {
@@ -111,12 +122,12 @@ async function lookupBySlug(groupId: string, slug: string): Promise<PropertyReco
 
     if (error) {
       logger.warn('[PROPERTY] Slug lookup error', { groupId, slug, error: error.message });
-      setCached(cacheKey, null);
+      await setCached(cacheKey, null);
       return null;
     }
 
     const property = (data as PropertyRecord) ?? null;
-    setCached(cacheKey, property);
+    await setCached(cacheKey, property);
     return property;
   } catch (err) {
     logger.error('[PROPERTY] Unexpected slug lookup failure', { groupId, slug, err });
@@ -133,7 +144,7 @@ async function lookupBySlug(groupId: string, slug: string): Promise<PropertyReco
  */
 async function lookupSingleProperty(groupId: string | null): Promise<PropertyRecord | null> {
   const cacheKey = groupId ? `single:${groupId}` : 'single:__global__';
-  const cached = getCached(cacheKey);
+  const cached = await getCached(cacheKey);
   if (cached !== undefined) return cached;
 
   try {
@@ -145,13 +156,13 @@ async function lookupSingleProperty(groupId: string | null): Promise<PropertyRec
 
     if (error) {
       logger.warn('[PROPERTY] Single-property lookup error', { groupId, error: error.message });
-      setCached(cacheKey, null);
+      await setCached(cacheKey, null);
       return null;
     }
 
     const rows = (data as PropertyRecord[]) ?? [];
     const property = rows.length === 1 ? rows[0] : null;
-    setCached(cacheKey, property);
+    await setCached(cacheKey, property);
     return property;
   } catch (err) {
     logger.error('[PROPERTY] Unexpected single-property lookup failure', { groupId, err });

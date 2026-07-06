@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
 import { isTokenBlacklisted } from '../services/token-blacklist.service.js';
-import { verifyToken } from '../modules/auth/auth.utils.js';
+import { verifyToken, verifyTwoFactorSetupToken } from '../modules/auth/auth.utils.js';
 
 interface JwtPayload {
   userId: string;
@@ -18,7 +19,16 @@ interface JwtPayload {
 }
 
 async function resolveUserFromToken(token: string): Promise<JwtPayload> {
-  const payload = verifyToken(token) as JwtPayload;
+  const payload = verifyToken(token) as JwtPayload & { purpose?: string };
+
+  // Special-purpose tokens (e.g. the 2FA-enrollment setup token — see
+  // generateTwoFactorSetupToken in auth.utils.ts) are signed with the same
+  // secret but must never work as a general bearer access token. Normal
+  // access tokens never carry a `purpose` claim, so any token that does is
+  // rejected here unconditionally.
+  if (payload.purpose) {
+    throw new Error('Invalid or expired token');
+  }
 
   if (payload.userId && payload.tokenVersion !== undefined) {
     const supabase = getSupabase();
@@ -156,3 +166,101 @@ export function authorize(...roles: string[]) {
 
 // Alias used by several route files
 export const optionalAuth = optionalAuthenticate;
+
+/**
+ * Accepts ONLY the short-lived 2FA-enrollment setup token (see
+ * generateTwoFactorSetupToken, auth.utils.ts) — issued by login() in place
+ * of real session tokens when a privileged account is blocked pending
+ * mandatory 2FA setup. Scoped narrowly: it authenticates the request but
+ * grants no general permissions (scope is deliberately left empty), and it
+ * refuses outright once 2FA is already enabled, since the token has
+ * nothing left to do at that point.
+ */
+export async function authenticateTwoFactorSetup(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      res.status(401).json({ success: false, error: 'No token provided' });
+      return;
+    }
+
+    const token = authHeader.slice(7);
+
+    let payload: { userId: string; email: string; purpose: string };
+    try {
+      payload = verifyTwoFactorSetupToken(token);
+    } catch {
+      res.status(401).json({ success: false, error: 'Invalid or expired setup token. Please log in again to restart 2FA enrollment.' });
+      return;
+    }
+
+    const supabase = getSupabase();
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, email, two_factor_enabled, is_active')
+      .eq('id', payload.userId)
+      .maybeSingle();
+
+    if (!user || !user.is_active) {
+      res.status(401).json({ success: false, error: 'Account not found or deactivated' });
+      return;
+    }
+
+    // Defense in depth: if 2FA got enabled through some other path since
+    // this token was issued, it has nothing left to authorize.
+    if (user.two_factor_enabled) {
+      res.status(400).json({ success: false, error: '2FA is already enabled. Please log in normally.' });
+      return;
+    }
+
+    req.user = {
+      userId: user.id,
+      id: user.id,
+      email: user.email,
+      scope: '', // deliberately empty — no general API scope, enrollment routes only
+      roles: [],
+      isPlatformAdmin: false,
+    };
+
+    next();
+  } catch (err) {
+    logger.error('2FA-setup authentication error:', err);
+    res.status(401).json({ success: false, error: 'Authentication failed' });
+  }
+}
+
+/**
+ * Used only by the /2fa/setup and /2fa/enable routes, which need to work
+ * for two different callers:
+ *   1. An already-logged-in user voluntarily enabling 2FA from account
+ *      settings — a normal access token, verified by `authenticate`.
+ *   2. A freshly-provisioned privileged account blocked at login pending
+ *      mandatory 2FA (Q103) — the short-lived setup token from
+ *      generateTwoFactorSetupToken, verified by `authenticateTwoFactorSetup`.
+ * jwt.decode() (unverified) is used only to pick which path to verify
+ * through — the actual trust decision still happens inside whichever of
+ * the two functions below actually runs.
+ */
+export async function authenticateForTwoFactorEnrollment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ success: false, error: 'No token provided' });
+    return;
+  }
+
+  const token = authHeader.slice(7);
+  let purpose: string | undefined;
+  try {
+    const decoded = jwt.decode(token) as { purpose?: string } | null;
+    purpose = decoded?.purpose;
+  } catch {
+    // Malformed token — fall through to `authenticate`, which will reject it properly.
+  }
+
+  if (purpose === 'twofa_setup') {
+    await authenticateTwoFactorSetup(req, res, next);
+    return;
+  }
+
+  await authenticate(req, res, next);
+}

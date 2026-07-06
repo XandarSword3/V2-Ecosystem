@@ -225,7 +225,7 @@ export class SchedulerService {
   private static scheduleDashboardMetricPush() {
     setInterval(async () => {
       try {
-        const metrics = await businessMetricsService.getDashboardMetrics();
+        const metrics = await businessMetricsService.getDashboardMetrics(true); // Bypass cache to reduce Redis reads
         // Don't use emitToRole for platform-wide metrics - it requires tenantId
         // Super admins get platform metrics via the role:super_admin room
         const io = getIO();
@@ -234,7 +234,7 @@ export class SchedulerService {
         // Silently ignore — dashboard is best-effort
       }
     }, 30_000);
-    logger.info('Dashboard real-time metric push started (every 30s)');
+    logger.info('Dashboard real-time metric push started (every 30s, bypassing cache)');
   }
 
   /**

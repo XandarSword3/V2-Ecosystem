@@ -22,6 +22,7 @@ export const uuidSchema = z.string().uuid('Invalid ID format');
  * Phone number validation (international format)
  */
 export const phoneSchema = z.string()
+  .max(20, 'Phone number must be 20 characters or less')
   .regex(/^\+?[0-9\s\-()]{7,20}$/, 'Invalid phone number format')
   .optional()
   .nullable();

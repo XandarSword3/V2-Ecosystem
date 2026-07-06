@@ -25,6 +25,15 @@ interface TwoFactorRequired {
   email: string;
 }
 
+// Privileged account with no 2FA enrolled yet — login() is blocked (403)
+// until the user completes setup using twoFactorSetupToken.
+interface TwoFactorSetupRequired {
+  requiresTwoFactorSetup: true;
+  userId: string;
+  email: string;
+  twoFactorSetupToken: string;
+}
+
 interface LoginResult {
   user: User;
   requiresTwoFactor?: false;
@@ -34,8 +43,9 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<User | TwoFactorRequired>;
+  login: (email: string, password: string) => Promise<User | TwoFactorRequired | TwoFactorSetupRequired>;
   verify2FA: (userId: string, code: string) => Promise<User>;
+  completeTwoFactorSetupLogin: (user: User, accessToken: string) => void;
   logout: () => void;
   refreshUser: () => void;
 }
@@ -119,12 +129,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               return;
             }
           }
-        } catch (refreshError) {
-          authLogger.warn('Token refresh failed, clearing credentials');
-          localStorage.removeItem('user');
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          setUser(null);
+        } catch (refreshError: any) {
+          const status = refreshError?.response?.status;
+          // Only a definitive rejection from the auth server (401/403) means
+          // the refresh token is actually invalid. 429 (rate limited), 5xx,
+          // and network errors are transient — treating them as "session
+          // invalid" caused a login -> refresh -> 429 -> logout loop
+          // whenever the refresh-endpoint rate limiter was already warm
+          // (e.g. right after a prior loop, or concurrent mounts). Keep the
+          // stored session in those cases; the api.ts response interceptor
+          // will retry/refresh again on the next real request.
+          if (status === 401 || status === 403) {
+            authLogger.warn('Token refresh rejected, clearing credentials', { status });
+            localStorage.removeItem('user');
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            setUser(null);
+          } else {
+            authLogger.warn('Token refresh unavailable (transient), keeping session', { status });
+          }
           setIsLoading(false);
           return;
         }
@@ -167,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         // Clear invalid session data
         authLogger.warn('Session validation failed, clearing credentials');
+        memoryTokenStore.clear();
         localStorage.removeItem('user');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
@@ -179,8 +203,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     validateSession();
   }, []);
 
-  const login = async (email: string, password: string): Promise<User | TwoFactorRequired> => {
-    const response = await api.post('/auth/login', { email, password });
+  const login = async (email: string, password: string): Promise<User | TwoFactorRequired | TwoFactorSetupRequired> => {
+    let response;
+    try {
+      response = await api.post('/auth/login', { email, password });
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { data?: { requiresTwoFactorSetup?: boolean; userId?: string; email?: string; twoFactorSetupToken?: string } } } };
+      const errData = axiosErr.response?.data?.data;
+      if (axiosErr.response?.status === 403 && errData?.requiresTwoFactorSetup) {
+        return {
+          requiresTwoFactorSetup: true,
+          userId: errData.userId!,
+          email: errData.email!,
+          twoFactorSetupToken: errData.twoFactorSetupToken!,
+        };
+      }
+      throw err;
+    }
     const data = response.data;
 
     if (!data.success) {
@@ -198,8 +237,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { user: userData, tokens } = data.data;
 
-    if (!tokens?.accessToken || !tokens?.refreshToken) {
-      throw new Error('Invalid login response - missing tokens');
+    if (!tokens?.accessToken) {
+      throw new Error('Invalid login response - missing access token');
     }
 
     memoryTokenStore.set(tokens.accessToken);
@@ -225,8 +264,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { user: userData, tokens } = data.data;
 
-    if (!tokens?.accessToken || !tokens?.refreshToken) {
-      throw new Error('Invalid response - missing tokens');
+    if (!tokens?.accessToken) {
+      throw new Error('Invalid response - missing access token');
     }
 
     memoryTokenStore.set(tokens.accessToken);
@@ -240,6 +279,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData);
 
     return userData;
+  };
+
+  const completeTwoFactorSetupLogin = (userData: User, accessToken: string) => {
+    memoryTokenStore.set(accessToken);
+    localStorage.setItem('user', JSON.stringify(userData));
+    document.cookie = `accessToken=${accessToken}; path=/; max-age=604800; SameSite=Lax`;
+    setUser(userData);
   };
 
   const logout = () => {
@@ -276,6 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         verify2FA,
+        completeTwoFactorSetupLogin,
         logout,
         refreshUser,
       }}

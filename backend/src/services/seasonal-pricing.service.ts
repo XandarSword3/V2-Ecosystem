@@ -1,6 +1,7 @@
 import { getSupabase } from '../lib/supabase.js';
 const supabase = getSupabase();
 import { logger } from '../utils/logger.js';
+import { AppError } from '../utils/AppError.js';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -50,11 +51,25 @@ interface PriceCalculationResult {
 
 class SeasonalPricingService {
   // Get all seasonal pricing rules
-  async getSeasonalRules(): Promise<SeasonalPricingRule[]> {
-    const { data, error } = await supabase
+  // Tenant isolation (0.6 read-leak follow-up): when called with a tenant context and the
+  // caller is NOT super_admin, only return that tenant's own rules plus any unscoped/global
+  // (tenant_id IS NULL) rules — mirrors the getModules() tenant-scoping pattern in
+  // modules.controller.ts. Internal call sites (calculatePrice/getPricingCalendar) call this
+  // with no arguments and deliberately keep the old unfiltered behavior for now — see the
+  // note added above calculatePrice().
+  async getSeasonalRules(callerTenantId?: string | null, isSuperAdmin: boolean = true): Promise<SeasonalPricingRule[]> {
+    let query = supabase
       .from('seasonal_pricing_rules')
       .select('*')
       .order('priority', { ascending: false });
+
+    if (!isSuperAdmin) {
+      query = callerTenantId
+        ? query.or(`tenant_id.eq.${callerTenantId},tenant_id.is.null`)
+        : query.is('tenant_id', null);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       logger.error('Failed to fetch seasonal pricing rules', error);
@@ -76,7 +91,9 @@ class SeasonalPricingService {
 
   // Create a new seasonal pricing rule
   async createSeasonalRule(
-    rule: Omit<SeasonalPricingRule, 'id'>
+    rule: Omit<SeasonalPricingRule, 'id'>,
+    tenantId?: string,
+    propertyId?: string
   ): Promise<SeasonalPricingRule> {
     const { data, error } = await supabase
       .from('seasonal_pricing_rules')
@@ -89,6 +106,8 @@ class SeasonalPricingService {
         specific_items: rule.specificItems,
         priority: rule.priority,
         is_active: rule.isActive,
+        tenant_id: tenantId ?? null,
+        property_id: propertyId ?? null,
       })
       .select()
       .single();
@@ -112,10 +131,30 @@ class SeasonalPricingService {
   }
 
   // Update a seasonal pricing rule
+  // Tenant isolation (0.6 fix): fetch the rule first and confirm it belongs to the
+  // caller's tenant (or is an unscoped/global rule, editable only by super_admin)
+  // before allowing any mutation — mirrors the modules.controller.ts 0.5 fix.
+  // 404 (not 403) is used on mismatch so a caller can't confirm another tenant's rule exists.
   async updateSeasonalRule(
     ruleId: string,
-    updates: Partial<Omit<SeasonalPricingRule, 'id'>>
+    updates: Partial<Omit<SeasonalPricingRule, 'id'>>,
+    callerTenantId?: string | null,
+    isSuperAdmin: boolean = false
   ): Promise<void> {
+    const { data: existingRule, error: fetchError } = await supabase
+      .from('seasonal_pricing_rules')
+      .select('id, tenant_id')
+      .eq('id', ruleId)
+      .single();
+
+    if (fetchError || !existingRule) {
+      throw new AppError('Seasonal pricing rule not found', 404);
+    }
+
+    if (!isSuperAdmin && existingRule.tenant_id !== (callerTenantId ?? null)) {
+      throw new AppError('Seasonal pricing rule not found', 404);
+    }
+
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.startDate !== undefined) updateData.start_date = updates.startDate;
@@ -126,10 +165,14 @@ class SeasonalPricingService {
     if (updates.priority !== undefined) updateData.priority = updates.priority;
     if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
 
-    const { error } = await supabase
-      .from('seasonal_pricing_rules')
-      .update(updateData)
-      .eq('id', ruleId);
+    // Scope the mutation itself by tenant_id (belt-and-suspenders against a
+    // race between the ownership check above and this write).
+    let query = supabase.from('seasonal_pricing_rules').update(updateData).eq('id', ruleId);
+    query = existingRule.tenant_id
+      ? query.eq('tenant_id', existingRule.tenant_id)
+      : query.is('tenant_id', null);
+
+    const { error } = await query;
 
     if (error) {
       logger.error('Failed to update seasonal pricing rule', error);
@@ -138,11 +181,32 @@ class SeasonalPricingService {
   }
 
   // Delete a seasonal pricing rule
-  async deleteSeasonalRule(ruleId: string): Promise<void> {
-    const { error } = await supabase
+  // Same tenant-isolation pattern as updateSeasonalRule above (0.6 fix).
+  async deleteSeasonalRule(
+    ruleId: string,
+    callerTenantId?: string | null,
+    isSuperAdmin: boolean = false
+  ): Promise<void> {
+    const { data: existingRule, error: fetchError } = await supabase
       .from('seasonal_pricing_rules')
-      .delete()
-      .eq('id', ruleId);
+      .select('id, tenant_id')
+      .eq('id', ruleId)
+      .single();
+
+    if (fetchError || !existingRule) {
+      throw new AppError('Seasonal pricing rule not found', 404);
+    }
+
+    if (!isSuperAdmin && existingRule.tenant_id !== (callerTenantId ?? null)) {
+      throw new AppError('Seasonal pricing rule not found', 404);
+    }
+
+    let query = supabase.from('seasonal_pricing_rules').delete().eq('id', ruleId);
+    query = existingRule.tenant_id
+      ? query.eq('tenant_id', existingRule.tenant_id)
+      : query.is('tenant_id', null);
+
+    const { error } = await query;
 
     if (error) {
       logger.error('Failed to delete seasonal pricing rule', error);

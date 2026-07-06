@@ -3,23 +3,16 @@
  * Prevents email flooding and ensures deliverability
  */
 
-import Redis from 'ioredis';
 import { getSupabase } from "../database/connection.js";
 const supabase = getSupabase();
 import { Request, Response, NextFunction } from 'express';
+import { cache } from '../utils/cache.js';
 
-// Redis client for rate limiting
-let redis: Redis | null = null;
-
-const getRedis = (): Redis | null => {
-  if (process.env.REDIS_ENABLED === 'false') return null;
-  if (!redis) {
-    redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-      maxRetriesPerRequest: 3,
-      retryStrategy: (times) => Math.min(times * 50, 2000),
-    });
-  }
-  return redis;
+// Shared Redis client — see utils/cache.ts. Rate limiting no longer opens
+// its own connection; it reuses the single backend-wide client.
+const getRedis = () => {
+  if (process.env.REDIS_ENABLED !== 'true') return null;
+  return cache.getClient();
 };
 
 export interface RateLimitConfig {
@@ -396,14 +389,11 @@ class EmailRateLimiter {
   }
 
   /**
-   * Close Redis connection
+   * No-op: this service uses the shared Redis client (utils/cache.ts).
+   * Closing the connection is handled once, centrally, in index.ts's
+   * shutdown sequence via cache.disconnect() — not per-consumer.
    */
-  async close(): Promise<void> {
-    if (redis) {
-      await redis.quit();
-      redis = null;
-    }
-  }
+  async close(): Promise<void> {}
 }
 
 export const emailRateLimiter = new EmailRateLimiter();

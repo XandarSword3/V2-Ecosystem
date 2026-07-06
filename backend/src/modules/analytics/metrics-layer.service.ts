@@ -10,7 +10,11 @@
 
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
+import { cache } from '../../utils/cache.js';
 import dayjs from 'dayjs';
+
+const CACHE_KEY_PREFIX = 'metrics:';
+const CACHE_TTL = 60; // 1 minute
 
 // =============================================
 // METRIC DEFINITIONS (The Single Source of Truth)
@@ -322,8 +326,6 @@ export function resolveEngineType(templateType: string | null | undefined): stri
 
 export class MetricsLayerService {
   private supabase = getSupabase();
-  private metricCache: Map<string, { value: unknown; timestamp: Date }> = new Map();
-  private cacheTTL = 60000; // 1 minute
 
   /**
    * Get a single metric value with full context
@@ -591,11 +593,15 @@ export class MetricsLayerService {
     metricCode: string,
     period: string
   ): Promise<number> {
-    const cacheKey = `${propertyId}:${metricCode}:${period}`;
-    const cached = this.metricCache.get(cacheKey);
+    const cacheKey = `${CACHE_KEY_PREFIX}${propertyId}:${metricCode}:${period}`;
     
-    if (cached && Date.now() - cached.timestamp.getTime() < this.cacheTTL) {
-      return cached.value as number;
+    try {
+      const cached = await cache.get(cacheKey);
+      if (cached !== null) {
+        return cached as number;
+      }
+    } catch {
+      // Cache miss or error, continue
     }
 
     const metricDef = await this.getMetricDefinition(metricCode);
@@ -699,8 +705,12 @@ export class MetricsLayerService {
         value = 0;
     }
 
-    // Cache the result
-    this.metricCache.set(cacheKey, { value, timestamp: new Date() });
+    // Cache the result in Redis
+    try {
+      await cache.set(cacheKey, value, CACHE_TTL);
+    } catch {
+      // Silent fail - cache is best-effort
+    }
 
     return Math.round(value * 100) / 100;
   }

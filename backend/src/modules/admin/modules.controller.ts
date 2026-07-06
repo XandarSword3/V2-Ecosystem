@@ -158,6 +158,21 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
 
     const legacyTemplateType = ENGINE_TO_LEGACY_TEMPLATE_TYPE[engine_type as keyof typeof ENGINE_TO_LEGACY_TEMPLATE_TYPE] ?? null;
 
+    // Property context: same dual-source resolution as getModules() above —
+    // prefer req.property (resolveProperty), fall back to req.propertyId
+    // (validatePropertyAccess). modules.property_id is NOT NULL, so unlike
+    // the GET's "fall back to global" behavior, a create with no resolvable
+    // property must fail loudly here rather than send null into the insert
+    // and surface as a raw 23502 constraint violation.
+    const propertyId = req.property?.id ?? ((req as any).propertyId as string | undefined);
+    if (!propertyId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Property context required',
+        message: 'Could not resolve an active property for this request. Select a property and try again.',
+      });
+    }
+
     const { data, error } = await supabase
       .from('modules')
       .insert({
@@ -170,7 +185,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         settings_version: SETTINGS_VERSION,
         is_active: true,
         show_in_main: true,
-        property_id: (req as any).propertyId ?? null,
+        property_id: propertyId,
         tenant_id: (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null,
       })
       .select()
@@ -360,11 +375,16 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
 
     const supabase = getSupabase();
     const { id } = req.params;
+    const user = req.user;
+    if (!user) throw new Error('Authentication required');
+    const isSuperAdmin = user.roles.includes('super_admin');
+    // Same tenant resolution createModule() uses when stamping the row on insert.
+    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
 
-    // 1. Fetch current module to check permissions and version
+    // 1. Fetch current module to check permissions, tenant ownership, and version
     const { data: currentModule, error: fetchError } = await supabase
       .from('modules')
-      .select('slug, engine_type, settings_version')
+      .select('slug, engine_type, settings_version, tenant_id')
       .eq('id', id)
       .single();
 
@@ -372,11 +392,15 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
+    // 1b. Tenant isolation: a module belonging to another tenant must be invisible to
+    // this caller, not just unwritable. 404 rather than 403 avoids confirming it exists.
+    if (!isSuperAdmin && currentModule.tenant_id !== callerTenantId) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
     // 2. Enforce Permissions (RBAC)
     // Check for `module:{slug}:manage` permission via app_role_permissions
     // Or super_admin bypass
-    const user = req.user;
-    if (!user) throw new Error('Authentication required');
     if (!user.roles.includes('super_admin')) {
          const requiredPerm = `module:${currentModule.slug}:manage`;
          const { data: permData, error: permError } = await supabase
@@ -415,12 +439,10 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
         updateData.settings_version = (currentModule.settings_version || 0) + 1;
     }
 
-    const { data, error } = await supabase
-      .from('modules')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await (currentModule.tenant_id
+      ? supabase.from('modules').update(updateData).eq('id', id).eq('tenant_id', currentModule.tenant_id)
+      : supabase.from('modules').update(updateData).eq('id', id).is('tenant_id', null)
+    ).select().single();
 
     if (error) throw error;
 
@@ -451,7 +473,7 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
     // 1. Fetch module for Permission Check
     const { data: moduleData } = await supabase
       .from('modules')
-      .select('id, slug, name')
+      .select('id, slug, name, tenant_id')
       .eq('id', id)
       .single();
 
@@ -459,9 +481,17 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    // 2. Enforce Permissions
+    // 1b. Tenant isolation: a module belonging to another tenant must be invisible to
+    // this caller, not just undeletable. 404 rather than 403 avoids confirming it exists.
     const user = req.user;
     if (!user) throw new Error('Authentication required');
+    const isSuperAdmin = user.roles.includes('super_admin');
+    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    if (!isSuperAdmin && moduleData.tenant_id !== callerTenantId) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
+    // 2. Enforce Permissions
     const hasPermission = user.roles.includes('super_admin') || 
                          user.roles.includes(`${moduleData.slug}_admin`);
 
@@ -569,10 +599,10 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
       }
 
       // Now delete the module itself
-      const { error: delErr } = await supabase
-        .from('modules')
-        .delete()
-        .eq('id', id);
+      const { error: delErr } = await (moduleData.tenant_id
+        ? supabase.from('modules').delete().eq('id', id).eq('tenant_id', moduleData.tenant_id)
+        : supabase.from('modules').delete().eq('id', id).is('tenant_id', null)
+      );
 
       if (delErr) {
         return res.status(400).json({ 
@@ -609,12 +639,10 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
     }
 
     // Soft delete: mark as inactive
-    const { data, error } = await supabase
-      .from('modules')
-      .update({ is_active: false })
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await (moduleData.tenant_id
+      ? supabase.from('modules').update({ is_active: false }).eq('id', id).eq('tenant_id', moduleData.tenant_id)
+      : supabase.from('modules').update({ is_active: false }).eq('id', id).is('tenant_id', null)
+    ).select().single();
 
     if (error) throw error;
 

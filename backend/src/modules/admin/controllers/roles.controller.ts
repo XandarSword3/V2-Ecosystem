@@ -16,7 +16,13 @@ export const getRoles = asyncHandler(async (req: Request, res: Response) => {
 
     if (error) throw error;
 
-    const roles = rolesList || [];
+    // Never expose platform-level role rows (or their UUIDs) to a caller who isn't
+    // already super_admin — otherwise a tenant_owner can read the super_admin role's
+    // id and submit it straight to assignUserRoles().
+    const isSuperAdmin = req.user?.scope === 'super_admin';
+    const roles = (rolesList || []).filter((r: { name?: string }) =>
+      isSuperAdmin || !['super_admin', 'platform_admin'].includes(r.name || '')
+    );
 
     if (roles.length === 0) {
       return res.json({ success: true, data: [] });

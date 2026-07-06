@@ -98,6 +98,16 @@ class RedisCache {
   }
 
   /**
+   * Get the underlying ioredis client. Used by consumers that need raw
+   * commands this wrapper doesn't expose (express-session store, rate
+   * limiters) — this is the SINGLE shared Redis connection for the whole
+   * backend. Do not instantiate a separate `new Redis(...)` anywhere else.
+   */
+  getClient(): Redis | null {
+    return this.client;
+  }
+
+  /**
    * Get a value from cache
    */
   async get<T>(key: string): Promise<T | null> {
@@ -290,8 +300,8 @@ class RedisCache {
 // Singleton instance
 export const cache = new RedisCache();
 
-// Initialize on module load if REDIS_URL is set
-if (process.env.REDIS_URL) {
+// Initialize on module load if Redis is enabled and configured
+if (process.env.REDIS_ENABLED === 'true' && process.env.REDIS_URL) {
   cache.connect().catch(err => {
     logger.error('Redis initial connection failed:', err);
   });

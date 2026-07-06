@@ -5,6 +5,8 @@ import { validateBody } from '../../validation/schemas.js';
 import { emitToUnit } from '../../socket/index.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
+import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
+import dayjs from 'dayjs';
 
 /**
  * Dynamic Module Staff Controller
@@ -610,6 +612,153 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
   } catch (error: any) {
     logger.error('Error updating booking status:', error);
     res.status(500).json({ success: false, error: 'Failed to update booking', message: error.message });
+  }
+}
+
+/**
+ * Create a staff booking for a module (walk-in booking)
+ * Works for: any multi_day_booking module
+ * Server-side price calculation — never trust client-supplied totals
+ */
+export async function createStaffBooking(req: Request, res: Response) {
+  try {
+    const { slug } = req.params;
+    const { unit_id, customer_name, customer_phone, check_in_date, check_out_date, payment_method } = req.body;
+    const userId = req.user?.userId;
+    const supabase = getSupabase();
+
+    // Verify module exists and is correct type
+    const { data: module, error: moduleError } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (moduleError || !module) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
+    if (module.engine_type !== 'time_exclusive_reservation' && module.engine_type !== 'multi_day_booking') {
+      return res.status(400).json({ success: false, error: 'Module is not a booking service' });
+    }
+
+    // Validate required fields
+    if (!unit_id || !check_in_date || !check_out_date) {
+      return res.status(400).json({ success: false, error: 'unit_id, check_in_date, and check_out_date are required' });
+    }
+
+    // Parse dates
+    const checkIn = dayjs(check_in_date);
+    const checkOut = dayjs(check_out_date);
+
+    if (!checkIn.isValid() || !checkOut.isValid()) {
+      return res.status(400).json({ success: false, error: 'Invalid date format. Use YYYY-MM-DD' });
+    }
+
+    if (checkIn.isAfter(checkOut) || checkIn.isSame(checkOut)) {
+      return res.status(400).json({ success: false, error: 'Check-out date must be after check-in date' });
+    }
+
+    // Fetch unit for pricing
+    const { data: unit, error: unitError } = await supabase
+      .from('accommodation_units')
+      .select('id, name, base_price, weekend_price, capacity')
+      .eq('id', unit_id)
+      .eq('module_id', module.id)
+      .maybeSingle();
+
+    if (unitError || !unit) {
+      return res.status(404).json({ success: false, error: 'Unit not found or does not belong to this module' });
+    }
+
+    // Fetch active unit price rules for seasonal pricing
+    const { data: priceRules } = await supabase
+      .from('unit_price_rules')
+      .select('start_date, end_date, price, price_multiplier')
+      .eq('unit_id', unit_id)
+      .eq('is_active', true)
+      .order('priority', { ascending: true });
+
+    // Calculate server-side price
+    const basePrice = parseFloat(unit.base_price || '0');
+    const weekendPrice = parseFloat(unit.weekend_price || unit.base_price || '0');
+    const totalAmount = computeStayBaseAmount(
+      checkIn,
+      checkOut,
+      basePrice,
+      weekendPrice,
+      priceRules || [],
+    );
+
+    if (totalAmount <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid pricing calculation' });
+    }
+
+    // Generate booking number
+    const bookingNumber = `BK${Date.now().toString().slice(-8)}`;
+
+    // Create the transaction
+    const { data: booking, error: createError } = await supabase
+      .from('transactions')
+      .insert({
+        engine_type: 'time_exclusive_reservation',
+        status: 'confirmed',
+        customer_id: null, // Walk-in, no customer account
+        module_id: module.id,
+        reference_id: unit_id,
+        reference_table: 'accommodation_units',
+        amount: totalAmount,
+        metadata: {
+          booking_number: bookingNumber,
+          customer_name: customer_name || 'Walk-in Guest',
+          customer_phone: customer_phone || '',
+          check_in_date: check_in_date,
+          check_out_date: check_out_date,
+          number_of_guests: 1,
+          payment_method: payment_method || 'cash',
+          created_by_staff: userId,
+        },
+      })
+      .select(`
+        id,
+        status,
+        amount,
+        metadata,
+        created_at,
+        unit:accommodation_units!reference_id(id, name, capacity)
+      `)
+      .single();
+
+    if (createError) throw createError;
+
+    // Emit socket event for real-time updates
+    emitToUnit(req.user?.tenantId || 'default', 'accommodation_units', 'booking:new', {
+      bookingId: booking.id,
+      unitId: unit_id,
+      moduleName: module.engine_type,
+    });
+
+    // Log activity
+    await supabase.from('activity_logs').insert({
+      user_id: userId,
+      action: 'staff_booking_created',
+      resource_type: 'booking',
+      resource_id: booking.id,
+      details: { 
+        bookingNumber, 
+        unitId: unit_id, 
+        checkIn: check_in_date, 
+        checkOut: check_out_date,
+        amount: totalAmount,
+        moduleSlug: slug 
+      },
+      tenant_id: req.user?.tenantId,
+    });
+
+    res.status(201).json({ success: true, data: booking });
+  } catch (error: any) {
+    logger.error('Error creating staff booking:', error);
+    res.status(500).json({ success: false, error: 'Failed to create booking', message: error.message });
   }
 }
 

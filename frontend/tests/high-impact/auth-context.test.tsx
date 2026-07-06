@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const apiGetMock = vi.hoisted(() => vi.fn());
 const apiPostMock = vi.hoisted(() => vi.fn());
 const routerPushMock = vi.hoisted(() => vi.fn());
+const memoryTokenStoreGet = vi.hoisted(() => vi.fn());
+const memoryTokenStoreSet = vi.hoisted(() => vi.fn());
+const memoryTokenStoreClear = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/lib/api', () => ({
   api: {
@@ -12,6 +15,11 @@ vi.mock('../../src/lib/api', () => ({
     post: apiPostMock,
   },
   API_BASE_URL: 'http://localhost:3005/api/v1',
+  memoryTokenStore: {
+    get: memoryTokenStoreGet,
+    set: memoryTokenStoreSet,
+    clear: memoryTokenStoreClear,
+  },
 }));
 
 vi.mock('../../src/lib/logger', () => ({
@@ -64,13 +72,15 @@ describe('auth context', () => {
     apiGetMock.mockReset();
     apiPostMock.mockReset();
     routerPushMock.mockReset();
+    memoryTokenStoreGet.mockReset();
+    memoryTokenStoreSet.mockReset();
+    memoryTokenStoreClear.mockReset();
     localStorage.clear();
     window.history.replaceState({}, '', '/');
   });
 
   it('validates stored session and hydrates user from server', async () => {
-    localStorage.setItem('accessToken', 'token-1');
-    localStorage.setItem('refreshToken', 'refresh-1');
+    memoryTokenStoreGet.mockReturnValue('token-1');
     localStorage.setItem('user', JSON.stringify({ id: 'stale' }));
 
     apiGetMock.mockResolvedValueOnce({
@@ -133,15 +143,13 @@ describe('auth context', () => {
 
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
 
-    expect(localStorage.getItem('accessToken')).toBe('oauth-a');
-    expect(localStorage.getItem('refreshToken')).toBe('oauth-r');
+    expect(memoryTokenStoreSet).toHaveBeenCalledWith('oauth-a');
     expect(window.location.search).toBe('');
     expect(window.location.pathname).toBe('/staff');
   });
 
   it('clears invalid session data when validation fails', async () => {
-    localStorage.setItem('accessToken', 'bad-token');
-    localStorage.setItem('refreshToken', 'bad-refresh');
+    memoryTokenStoreGet.mockReturnValue('bad-token');
     localStorage.setItem('user', JSON.stringify({ id: 'u-bad' }));
 
     apiGetMock.mockRejectedValueOnce(new Error('unauthorized'));
@@ -157,8 +165,7 @@ describe('auth context', () => {
 
     expect(hook.result.current.isAuthenticated).toBe(false);
     expect(hook.result.current.user).toBeNull();
-    expect(localStorage.getItem('accessToken')).toBeNull();
-    expect(localStorage.getItem('refreshToken')).toBeNull();
+    expect(memoryTokenStoreClear).toHaveBeenCalled();
     expect(localStorage.getItem('user')).toBeNull();
   });
 
@@ -192,7 +199,7 @@ describe('auth context', () => {
       userId: 'u-2fa',
       email: '2fa@v2-hub.test',
     });
-    expect(localStorage.getItem('accessToken')).toBeNull();
+    expect(memoryTokenStoreSet).not.toHaveBeenCalled();
   });
 
   it('stores tokens and user on successful login and verify2FA', async () => {
@@ -227,8 +234,7 @@ describe('auth context', () => {
       await hook.result.current.login('login@v2-hub.test', 'secret');
     });
 
-    expect(localStorage.getItem('accessToken')).toBe('acc-login');
-    expect(localStorage.getItem('refreshToken')).toBe('ref-login');
+    expect(memoryTokenStoreSet).toHaveBeenCalledWith('acc-login');
     expect(hook.result.current.isAuthenticated).toBe(true);
 
     apiPostMock.mockResolvedValueOnce({
@@ -254,8 +260,7 @@ describe('auth context', () => {
       await hook.result.current.verify2FA('u-2fa', '123456');
     });
 
-    expect(localStorage.getItem('accessToken')).toBe('acc-verified');
-    expect(localStorage.getItem('refreshToken')).toBe('ref-verified');
+    expect(memoryTokenStoreSet).toHaveBeenCalledWith('acc-verified');
     expect(hook.result.current.user?.id).toBe('u-verified');
   });
 
@@ -282,7 +287,7 @@ describe('auth context', () => {
 
     expect(hook.result.current.user?.id).toBe('u-refresh');
 
-    localStorage.setItem('accessToken', 'logout-access');
+    memoryTokenStoreGet.mockReturnValue('logout-access');
     localStorage.setItem('refreshToken', 'logout-refresh');
     apiPostMock.mockResolvedValueOnce({ data: { success: true } });
 
@@ -291,8 +296,7 @@ describe('auth context', () => {
     });
 
     expect(apiPostMock).toHaveBeenCalledWith('/auth/logout', { refreshToken: 'logout-refresh' });
-    expect(localStorage.getItem('accessToken')).toBeNull();
-    expect(localStorage.getItem('refreshToken')).toBeNull();
+    expect(memoryTokenStoreClear).toHaveBeenCalled();
     expect(localStorage.getItem('user')).toBeNull();
     expect(hook.result.current.user).toBeNull();
     expect(routerPushMock).toHaveBeenCalledWith('/');

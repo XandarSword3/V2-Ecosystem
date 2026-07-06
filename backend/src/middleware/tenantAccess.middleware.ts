@@ -31,6 +31,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
+import { cache } from '../utils/cache.js';
 
 // ============================================
 // Types
@@ -125,22 +126,40 @@ function extractSubdomain(host: string | undefined): string | null {
 }
 
 // ============================================
-// Tenant lookup (with short-lived in-process cache)
+// Tenant lookup (with Redis cache)
 // ============================================
 
-const CACHE_TTL_MS = 30_000; // 30 s — short enough to pick up billing_status changes
-interface CacheEntry {
-  tenant: TenantRecord | null;
-  fetchedAt: number;
+const CACHE_TTL = 30; // 30 seconds
+const CACHE_KEY_PREFIX = 'tenant:';
+
+async function getCached(key: string): Promise<TenantRecord | null | undefined> {
+  try {
+    // cache.get() returns null for BOTH "cache miss" and "Redis unavailable" —
+    // that's indistinguishable from a legitimately-cached negative result
+    // ("we looked this tenant up before and confirmed it doesn't exist").
+    // Wrap the stored value so we can tell those apart: an actual miss comes
+    // back as `null` here (undefined-equivalent, "go check the DB"), while a
+    // real cache hit — positive or negative — comes back as `{ tenant }`.
+    const cached = await cache.get<{ tenant: TenantRecord | null }>(`${CACHE_KEY_PREFIX}${key}`);
+    if (cached === null) return undefined;
+    return cached.tenant;
+  } catch {
+    return undefined;
+  }
 }
-const tenantCache = new Map<string, CacheEntry>();
+
+async function setCached(key: string, tenant: TenantRecord | null): Promise<void> {
+  try {
+    await cache.set(`${CACHE_KEY_PREFIX}${key}`, { tenant }, CACHE_TTL);
+  } catch {
+    // Silent fail - cache is best-effort
+  }
+}
 
 async function lookupTenant(key: string, field: 'id' | 'subdomain'): Promise<TenantRecord | null> {
   const cacheKey = `${field}:${key}`;
-  const cached = tenantCache.get(cacheKey);
-  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-    return cached.tenant;
-  }
+  const cached = await getCached(cacheKey);
+  if (cached !== undefined) return cached;
 
   try {
     const supabase = getSupabase();
@@ -172,7 +191,7 @@ async function lookupTenant(key: string, field: 'id' | 'subdomain'): Promise<Ten
       };
     }
 
-    tenantCache.set(cacheKey, { tenant, fetchedAt: Date.now() });
+    await setCached(cacheKey, tenant);
     return tenant;
   } catch (err) {
     logger.error('[TENANT] Unexpected lookup failure', { field, key, err });
@@ -181,9 +200,13 @@ async function lookupTenant(key: string, field: 'id' | 'subdomain'): Promise<Ten
 }
 
 /** Invalidate cache for a tenant (call after billing_status updates). */
-export function invalidateTenantCache(tenantId: string, subdomain?: string): void {
-  tenantCache.delete(`id:${tenantId}`);
-  if (subdomain) tenantCache.delete(`subdomain:${subdomain}`);
+export async function invalidateTenantCache(tenantId: string, subdomain?: string): Promise<void> {
+  try {
+    await cache.del(`${CACHE_KEY_PREFIX}id:${tenantId}`);
+    if (subdomain) await cache.del(`${CACHE_KEY_PREFIX}subdomain:${subdomain}`);
+  } catch {
+    // Silent fail
+  }
 }
 
 // ============================================

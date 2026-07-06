@@ -32,14 +32,22 @@ const CSRF_COOKIE_SECURE = process.env.NODE_ENV === 'production' || CSRF_COOKIE_
 // Get cookie domain for cross-subdomain cookie sharing.
 // Falls back to the hard-coded platform domains so existing deploys keep working,
 // but operators with custom domains must set CSRF_COOKIE_DOMAIN explicitly.
-const getCookieDomain = (): string | undefined => {
+// Only sets a Domain attribute for actual subdomain scenarios; on plain localhost,
+// omit Domain entirely to make the cookie host-only.
+const getCookieDomain = (req: Request): string | undefined => {
   if (process.env.CSRF_COOKIE_DOMAIN) {
     return process.env.CSRF_COOKIE_DOMAIN;
   }
+
+  const host = req.hostname; // Express strips port already
+
   if (process.env.NODE_ENV === 'production') {
-    return '.v2platform.com';
+    return host.endsWith('v2platform.com') ? '.v2platform.com' : undefined;
   }
-  return '.v2platform.local';
+  if (host.endsWith('v2platform.local')) return '.v2platform.local';
+  // Plain localhost or *.localhost — no Domain attribute, browser scopes
+  // the cookie to the exact host, which is what actually works here.
+  return undefined;
 };
 
 // Methods that don't require CSRF protection (safe methods)
@@ -78,12 +86,12 @@ export function generateCsrfToken(): string {
 /**
  * Set CSRF token cookie on response
  */
-export function setCsrfCookie(res: Response, token: string): void {
+export function setCsrfCookie(res: Response, token: string, req: Request): void {
   res.cookie(CSRF_COOKIE_NAME, token, {
     httpOnly: false, // Must be readable by JavaScript to include in header
     secure: CSRF_COOKIE_SECURE,
     sameSite: CSRF_COOKIE_SAME_SITE,
-    domain: getCookieDomain(), // Share cookie across subdomains
+    domain: getCookieDomain(req), // Share cookie across subdomains
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     path: '/',
   });
@@ -116,7 +124,7 @@ function isExemptPath(path: string): boolean {
  */
 export function csrfTokenHandler(req: Request, res: Response): void {
   const token = generateCsrfToken();
-  setCsrfCookie(res, token);
+  setCsrfCookie(res, token, req);
   res.json({ success: true, csrfToken: token });
 }
 
@@ -159,7 +167,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
   // If no cookie token exists, generate one and require retry
   if (!cookieToken) {
     const newToken = generateCsrfToken();
-    setCsrfCookie(res, newToken);
+    setCsrfCookie(res, newToken, req);
     logger.warn(`CSRF: No token cookie present for ${req.method} ${req.path}`);
     res.status(403).json({
       success: false,
@@ -204,7 +212,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
 export function ensureCsrfToken(req: Request, res: Response, next: NextFunction): void {
   if (!getCsrfTokenFromCookie(req)) {
     const token = generateCsrfToken();
-    setCsrfCookie(res, token);
+    setCsrfCookie(res, token, req);
   }
   next();
 }

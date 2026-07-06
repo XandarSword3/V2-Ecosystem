@@ -31,8 +31,10 @@ import bcrypt from 'bcryptjs';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { emailService } from '../../services/email.service.js';
+import { generateSecurePassword } from '../../services/password-policy.service.js';
 import type { SubscriptionTier, BillingStatus } from '../../middleware/tenantAccess.middleware.js';
 import { invalidateTenantCache } from '../../middleware/tenantAccess.middleware.js';
+import { buildTenantUrl } from '../../utils/tenant-url.js';
 
 // ============================================
 // Types
@@ -186,10 +188,15 @@ export class ProvisioningService {
         .limit(1)
         .maybeSingle();
 
+      // Scoped by tenant_id: email is now only unique per-tenant (see
+      // 20260704010000_scope_users_email_uniqueness_per_tenant.sql), so an
+      // unscoped lookup here could match a different tenant's user row
+      // sharing the same email and return the wrong owner id.
       const { data: owner } = await supabase
         .from('users')
         .select('id')
         .eq('email', operatorEmail)
+        .eq('tenant_id', existing.id)
         .maybeSingle();
 
       return {
@@ -225,7 +232,7 @@ export class ProvisioningService {
     // row yet. plan_id stays null in that case — tenantAccess.middleware.ts
     // already falls back to the tenants.feature_limits snapshot when plan_id
     // is null, so this degrades safely either way.
-    const { plan_id: resolvedPlanId, feature_limits: resolvedFeatureLimits } = await resolvePlanForTier(tier);
+    const { plan_id: resolvedPlanId, feature_limits: resolvedFeatureLimits, code: resolvedTierCode } = await resolvePlanForTier(tier);
 
     const tenantId = crypto.randomUUID();
     const { error: tenantErr } = await supabase
@@ -234,7 +241,7 @@ export class ProvisioningService {
         id: tenantId,
         subdomain,
         property_group_id: group.id,
-        subscription_tier: tier,
+        subscription_tier: resolvedTierCode || tier, // Use the resolved tier code from database
         plan_id: resolvedPlanId,
         billing_status: billingStatus,
         stripe_customer_id: stripeCustomerId,
@@ -256,6 +263,7 @@ export class ProvisioningService {
       .insert({
         name: propertyName,
         group_id: group.id,
+        tenant_id: tenantId,
         public_slug: publicSlug,
         is_active: true,
       })
@@ -267,22 +275,29 @@ export class ProvisioningService {
     }
 
     // ---- Step 5: Seed roles (tenant-scoped) ----
-    const rolesToInsert = DEFAULT_ROLES.map((r) => ({
-      ...r,
-      tenant_id: tenantId,
-      permissions: r.permissions,
-    }));
+    // Insert roles one by one to handle unique constraint conflicts gracefully
+    for (const role of DEFAULT_ROLES) {
+      const { error: roleErr } = await supabase
+        .from('roles')
+        .insert({
+          ...role,
+          tenant_id: tenantId,
+          permissions: role.permissions,
+        });
 
-    const { error: rolesErr } = await supabase
-      .from('roles')
-      .upsert(rolesToInsert, { onConflict: 'tenant_id,name', ignoreDuplicates: true });
-
-    if (rolesErr) {
-      logger.warn('[PROVISIONING] Role seeding had errors (non-fatal)', { error: rolesErr.message });
+      if (roleErr) {
+        logger.warn('[PROVISIONING] Role seeding had error (non-fatal)', { role: role.name, error: roleErr.message });
+      }
     }
 
     // ---- Step 6: Create owner user ----
-    const tempPassword = crypto.randomBytes(12).toString('base64url');
+    // FIX: crypto.randomBytes(...).toString('base64url') only ever produces
+    // [A-Za-z0-9-_] — it can never contain a special character, so a temp
+    // password generated that way can fail this very platform's own
+    // requireSpecialChars policy (password-policy.service.ts) despite being
+    // the credential we email to a brand-new paying customer. generateSecurePassword()
+    // already guarantees one of each required character class.
+    const tempPassword = generateSecurePassword(16);
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
     const { data: user, error: userErr } = await supabase
@@ -292,9 +307,14 @@ export class ProvisioningService {
         full_name: operatorName,
         password_hash: passwordHash,
         is_active: true,
-        email_verified: false,
+        email_verified: true, // Auto-verify email for new tenant provisioning
         tenant_id: tenantId,
         must_change_password: true,
+        // scope defaults to 'customer' at the DB level — without this explicit
+        // override, every newly provisioned tenant owner silently became a
+        // 'customer' in the one column the rest of the app (auth.service.ts)
+        // treats as the actual source of truth for authorization.
+        scope: 'tenant_owner',
       })
       .select('id')
       .single();
@@ -316,7 +336,7 @@ export class ProvisioningService {
       .in('name', ['tenant_owner', 'admin']);
 
     if (ownerRoles && ownerRoles.length > 0) {
-      const roleAssignments = ownerRoles.map((r) => ({ user_id: user.id, role_id: r.id }));
+      const roleAssignments = ownerRoles.map((r) => ({ user_id: user.id, role_id: r.id, tenant_id: tenantId }));
       const { error: roleAssignErr } = await supabase
         .from('user_roles')
         .insert(roleAssignments)
@@ -416,7 +436,7 @@ export class ProvisioningService {
     subdomain: string,
     tempPassword: string,
   ): Promise<void> {
-    const loginUrl = `https://${subdomain}.v2platform.com/login`;
+    const loginUrl = buildTenantUrl(subdomain, '/login');
 
     const sent = await emailService.sendEmail({
       to: email,
@@ -475,30 +495,34 @@ export class ProvisioningService {
  */
 async function resolvePlanForTier(
   tier: SubscriptionTier,
-): Promise<{ plan_id: string | null; feature_limits: Record<string, unknown> }> {
+): Promise<{ plan_id: string | null; feature_limits: Record<string, unknown>; code: string | null }> {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
       .from('plans')
-      .select('id, feature_limits')
+      .select('id, feature_limits, code')
       .eq('code', tier)
       .eq('is_active', true)
       .maybeSingle();
 
     if (error) {
       logger.warn('[PROVISIONING] plans table lookup failed, falling back to hardcoded feature_limits', { tier, error: error.message });
-      return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier] };
+      return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier], code: tier };
     }
 
     if (!data) {
       logger.warn('[PROVISIONING] No active plan row found for tier, falling back to hardcoded feature_limits', { tier });
-      return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier] };
+      return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier], code: tier };
     }
 
-    return { plan_id: data.id, feature_limits: (data.feature_limits as Record<string, unknown>) ?? FALLBACK_FEATURE_LIMITS[tier] };
+    return { 
+      plan_id: data.id, 
+      feature_limits: (data.feature_limits as Record<string, unknown>) ?? FALLBACK_FEATURE_LIMITS[tier],
+      code: data.code 
+    };
   } catch (err) {
     logger.error('[PROVISIONING] Unexpected error resolving plan for tier, falling back to hardcoded feature_limits', { tier, err });
-    return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier] };
+    return { plan_id: null, feature_limits: FALLBACK_FEATURE_LIMITS[tier], code: tier };
   }
 }
 
