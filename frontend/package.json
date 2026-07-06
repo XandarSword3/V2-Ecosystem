@@ -42,7 +42,7 @@
     "@stripe/stripe-js": "^3.0.6",
     "@stripe/terminal-js": "^0.26.0",
     "@supabase/supabase-js": "^2.91.1",
-    "@tanstack/react-query": "^5.28.0",
+    "@tanstack/react-query": "^5.101.2",
     "axios": "^1.6.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
