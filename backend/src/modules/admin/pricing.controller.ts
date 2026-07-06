@@ -15,7 +15,13 @@ router.get(
   authenticate,
   authorize('admin', 'staff'),
   asyncHandler(async (req: Request, res: Response) => {
-    const rules = await seasonalPricingService.getSeasonalRules();
+    // Tenant isolation (0.6 read-leak fix): non-super_admin callers only see their own
+    // tenant's rules plus unscoped/global ones — this endpoint was previously returning
+    // every tenant's pricing rules to any admin/staff caller.
+    const isSuperAdmin = (req.user as any)?.roles?.includes('super_admin') ?? false;
+    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+
+    const rules = await seasonalPricingService.getSeasonalRules(callerTenantId, isSuperAdmin);
 
     res.json({
       success: true,
@@ -48,15 +54,24 @@ router.post(
       throw new AppError('Price multiplier must be between 0.1 and 3', 400);
     }
 
-    const rule = await seasonalPricingService.createSeasonalRule({
-      name,
-      startDate,
-      endDate,
-      priceMultiplier,
-      applicableTo: applicableTo || ['accommodation'],
-      priority: priority || 0,
-      isActive: isActive ?? true,
-    });
+    // 0.6 fix: stamp the rule with the caller's tenant/property so it isn't created as an
+    // unscoped/global rule by default — matches the tenant resolution used in modules.controller.ts.
+    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    const callerPropertyId = (req as any).property?.id ?? ((req as any).propertyId as string | undefined) ?? null;
+
+    const rule = await seasonalPricingService.createSeasonalRule(
+      {
+        name,
+        startDate,
+        endDate,
+        priceMultiplier,
+        applicableTo: applicableTo || ['accommodation'],
+        priority: priority || 0,
+        isActive: isActive ?? true,
+      },
+      callerTenantId ?? undefined,
+      callerPropertyId ?? undefined
+    );
 
     logger.info(`Seasonal pricing rule created: ${name}`);
 
@@ -92,7 +107,11 @@ router.put(
       }
     }
 
-    await seasonalPricingService.updateSeasonalRule(ruleId, updates);
+    // 0.6 fix: resolve caller tenant context so the service can reject cross-tenant writes.
+    const isSuperAdmin = (req.user as any)?.roles?.includes('super_admin') ?? false;
+    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+
+    await seasonalPricingService.updateSeasonalRule(ruleId, updates, callerTenantId, isSuperAdmin);
 
     logger.info(`Seasonal pricing rule updated: ${ruleId}`);
 
@@ -111,7 +130,11 @@ router.delete(
   asyncHandler(async (req: Request, res: Response) => {
     const { ruleId } = req.params;
 
-    await seasonalPricingService.deleteSeasonalRule(ruleId);
+    // 0.6 fix: resolve caller tenant context so the service can reject cross-tenant deletes.
+    const isSuperAdmin = (req.user as any)?.roles?.includes('super_admin') ?? false;
+    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+
+    await seasonalPricingService.deleteSeasonalRule(ruleId, callerTenantId, isSuperAdmin);
 
     logger.info(`Seasonal pricing rule deleted: ${ruleId}`);
 

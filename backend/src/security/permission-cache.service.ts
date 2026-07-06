@@ -1,9 +1,13 @@
 import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
+import { cache } from '../utils/cache.js';
 import { Permissions, RolePermissions, type Permission, type Role } from './permissions.js';
 
 type PermissionSlug = string;
 type RoleName = string;
+
+const CACHE_KEY = 'permissions:cache';
+const CACHE_TTL = 300; // 5 minutes
 
 class PermissionCacheService {
   private permissionByRole = new Map<RoleName, Set<PermissionSlug>>();
@@ -11,7 +15,11 @@ class PermissionCacheService {
   private lastRefreshAt: string | null = null;
 
   async initialize(): Promise<void> {
-    await this.refreshCache();
+    // Try loading from Redis first
+    const loadedFromRedis = await this.loadFromRedis();
+    if (!loadedFromRedis) {
+      await this.refreshCache();
+    }
   }
 
   hasPermission(roleName: string, permissionSlug: string): boolean {
@@ -73,10 +81,39 @@ class PermissionCacheService {
       this.loaded = true;
       this.lastRefreshAt = new Date().toISOString();
       logger.info(`[Permission Cache] Refreshed from database at ${this.lastRefreshAt}`);
+
+      // Cache in Redis
+      try {
+        const cacheData = Array.from(nextMap.entries()).map(([role, perms]) => [role, Array.from(perms)]);
+        await cache.set(CACHE_KEY, cacheData, CACHE_TTL);
+      } catch (error) {
+        logger.warn('[Permission Cache] Failed to cache in Redis, using in-memory fallback', error);
+      }
     } catch (error) {
       logger.warn('[Permission Cache] Failed to refresh from database, using static permissions fallback.', error);
       this.loadFallbackFromStaticPermissions();
     }
+  }
+
+  async loadFromRedis(): Promise<boolean> {
+    try {
+      const cached = await cache.get(CACHE_KEY);
+      if (cached) {
+        const cacheData = cached as [RoleName, PermissionSlug[]][];
+        const nextMap = new Map<RoleName, Set<PermissionSlug>>();
+        cacheData.forEach(([role, perms]) => {
+          nextMap.set(role, new Set(perms));
+        });
+        this.permissionByRole = nextMap;
+        this.loaded = true;
+        this.lastRefreshAt = new Date().toISOString();
+        logger.info('[Permission Cache] Loaded from Redis cache');
+        return true;
+      }
+    } catch (error) {
+      logger.warn('[Permission Cache] Failed to load from Redis', error);
+    }
+    return false;
   }
 
   getStatus(): { loaded: boolean; lastRefreshAt: string | null; roleCount: number } {

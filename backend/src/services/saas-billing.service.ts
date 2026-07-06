@@ -25,6 +25,7 @@ import Stripe from 'stripe';
 import { logger } from '../utils/logger.js';
 import { getSupabase } from '../database/connection.js';
 import type { SubscriptionTier, BillingStatus } from '../middleware/tenantAccess.middleware.js';
+import { buildTenantUrl } from '../utils/tenant-url.js';
 
 // ============================================
 // Stripe client (lazy singleton)
@@ -187,8 +188,8 @@ export class SaasBillingService {
         subdomain,
         tier,
       },
-      success_url: `${this.frontendUrl}/setup/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.frontendUrl}/pricing?cancelled=1`,
+      success_url: buildTenantUrl(subdomain, `/setup/success?session_id={CHECKOUT_SESSION_ID}`),
+      cancel_url: buildTenantUrl(subdomain, '/pricing?cancelled=1'),
       allow_promotion_codes: true,
       billing_address_collection: 'required',
     });

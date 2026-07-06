@@ -228,6 +228,14 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
 
     const passwordHash = await bcrypt.hash(adminPassword, 12);
 
+    // 0.7 re-verification finding: `scope` defaults to 'customer' at the DB level
+    // (see provisioning.service.ts). login() treats users.scope as the sole source
+    // of truth — it derives both the JWT `roles` claim and the mandatory-2FA
+    // requirement from this column alone, not from user_roles. Without this explicit
+    // override, the installer's own account would authenticate as super_admin only
+    // for the one-shot JWT this endpoint hands back directly; their very next real
+    // login would read scope='customer', silently demote them to a customer, and
+    // skip the mandatory-2FA-for-privileged-scopes check entirely.
     const { data: newUser, error: userError } = await supabase
       .from('users')
       .insert({
@@ -236,6 +244,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
         full_name:      adminFullName,
         email_verified: true,
         is_active:      true,
+        scope:          'super_admin',
       })
       .select('id, email, full_name')
       .single();

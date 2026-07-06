@@ -18,6 +18,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { cache } from '../utils/cache.js';
 
 // Provider configuration
 const TRANSLATION_PROVIDER = process.env.TRANSLATION_PROVIDER || 'auto'; // 'google', 'libre', 'fallback', 'auto'
@@ -25,14 +26,14 @@ const GOOGLE_TRANSLATE_API_KEY = process.env.GOOGLE_TRANSLATE_API_KEY || '';
 const LIBRE_TRANSLATE_URL = process.env.LIBRE_TRANSLATE_URL || 'https://libretranslate.com/translate';
 const LIBRE_TRANSLATE_KEY = process.env.LIBRE_TRANSLATE_KEY || '';
 
+const CACHE_KEY_PREFIX = 'translation:';
+const CACHE_TTL = 3600; // 1 hour
+
 interface TranslationResult {
   en: string;
   ar: string;
   fr: string;
 }
-
-// Basic translation cache to avoid repeated API calls
-const translationCache = new Map<string, TranslationResult>();
 
 // Common words/phrases translation mapping for fallback
 const fallbackTranslations: Record<string, { ar: string; fr: string }> = {
@@ -76,9 +77,14 @@ const fallbackTranslations: Record<string, { ar: string; fr: string }> = {
 
 export async function translateText(text: string, sourceLang: string = 'en'): Promise<TranslationResult> {
   // Check cache first
-  const cacheKey = `${text}-${sourceLang}`;
-  if (translationCache.has(cacheKey)) {
-    return translationCache.get(cacheKey)!;
+  const cacheKey = `${CACHE_KEY_PREFIX}${text}-${sourceLang}`;
+  try {
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return cached as TranslationResult;
+    }
+  } catch {
+    // Cache miss or error, continue
   }
 
   const result: TranslationResult = {
@@ -118,8 +124,13 @@ export async function translateText(text: string, sourceLang: string = 'en'): Pr
     }
   }
 
-  // Cache the result
-  translationCache.set(cacheKey, result);
+  // Cache the result in Redis
+  try {
+    await cache.set(cacheKey, result, CACHE_TTL);
+  } catch {
+    // Silent fail - cache is best-effort
+  }
+
   return result;
 }
 

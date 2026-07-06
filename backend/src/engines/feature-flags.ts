@@ -19,6 +19,10 @@
 
 import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
+import { cache } from '../utils/cache.js';
+
+const CACHE_KEY_PREFIX = 'feature-flag:';
+const CACHE_TTL = 60; // 1 minute
 
 // ============================================
 // Types
@@ -42,11 +46,10 @@ interface FlagCacheEntry {
 // ============================================
 
 export class FeatureFlagService {
-  private cache: Map<string, FlagCacheEntry> = new Map();
-  private readonly cacheTtlMs: number;
+  private readonly cacheTtl: number;
 
-  constructor(cacheTtlMs: number = 60_000) { // 1 minute TTL
-    this.cacheTtlMs = cacheTtlMs;
+  constructor(cacheTtl: number = 60_000) { // 1 minute TTL
+    this.cacheTtl = cacheTtl;
   }
 
   /**
@@ -64,11 +67,18 @@ export class FeatureFlagService {
       if (fullEnabled) return true;
     }
 
-    const cacheKey = `${tenantId}:${flag}`;
-    const cached = this.cache.get(cacheKey);
+    const cacheKey = `${CACHE_KEY_PREFIX}${tenantId}:${flag}`;
 
-    if (cached && Date.now() - cached.fetchedAt < this.cacheTtlMs) {
-      return cached.enabled;
+    try {
+      const cached = await cache.get(cacheKey);
+      if (cached !== null) {
+        const entry = cached as FlagCacheEntry;
+        if (Date.now() - entry.fetchedAt < this.cacheTtl) {
+          return entry.enabled;
+        }
+      }
+    } catch {
+      // Cache miss or error, continue
     }
 
     // Fetch from database
@@ -83,11 +93,16 @@ export class FeatureFlagService {
 
       if (error || !data) {
         // Flag not found — default to disabled
-        this.cache.set(cacheKey, {
+        const entry: FlagCacheEntry = {
           enabled: false,
           rolloutPercentage: 0,
           fetchedAt: Date.now(),
-        });
+        };
+        try {
+          await cache.set(cacheKey, entry, CACHE_TTL);
+        } catch {
+          // Silent fail
+        }
         return false;
       }
 
@@ -97,7 +112,11 @@ export class FeatureFlagService {
         fetchedAt: Date.now(),
       };
 
-      this.cache.set(cacheKey, entry);
+      try {
+        await cache.set(cacheKey, entry, CACHE_TTL);
+      } catch {
+        // Silent fail
+      }
       return entry.enabled;
     } catch (err) {
       logger.warn('[FEATURE FLAGS] Failed to check flag, defaulting to disabled', {
@@ -157,7 +176,11 @@ export class FeatureFlagService {
     }
 
     // Invalidate cache
-    this.cache.delete(`${tenantId}:${flag}`);
+    try {
+      await cache.del(`${CACHE_KEY_PREFIX}${tenantId}:${flag}`);
+    } catch {
+      // Silent fail
+    }
 
     logger.info('[FEATURE FLAGS] Flag enabled', { tenantId, flag });
   }
@@ -182,7 +205,11 @@ export class FeatureFlagService {
     }
 
     // Invalidate cache
-    this.cache.delete(`${tenantId}:${flag}`);
+    try {
+      await cache.del(`${CACHE_KEY_PREFIX}${tenantId}:${flag}`);
+    } catch {
+      // Silent fail
+    }
 
     logger.info('[FEATURE FLAGS] Flag disabled', { tenantId, flag });
   }
@@ -190,8 +217,18 @@ export class FeatureFlagService {
   /**
    * Clear the cache (for testing or forced refresh).
    */
-  clearCache(): void {
-    this.cache.clear();
+  async clearCache(): Promise<void> {
+    try {
+      const redis = cache.getClient();
+      if (redis) {
+        const keys = await redis.keys(`${CACHE_KEY_PREFIX}*`);
+        if (keys.length > 0) {
+          await redis.del(...keys);
+        }
+      }
+    } catch {
+      // Silent fail
+    }
   }
 }
 

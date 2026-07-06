@@ -98,7 +98,16 @@ export const config = {
   corsOrigins: resolveCorsOrigins(),
 
   database: {
-    url: process.env.DATABASE_URL || '',
+    url: (() => {
+      // Use the correct approach from apply-migrations-verbose.mjs: 
+      // use SUPABASE_DB_PASSWORD and properly encode it!
+      if (process.env.SUPABASE_DB_PASSWORD) {
+        const password = process.env.SUPABASE_DB_PASSWORD;
+        const encoded = encodeURIComponent(password);
+        return `postgresql://postgres.qxtmesddgwmwspejnbvc:${encoded}@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres`;
+      }
+      return process.env.DATABASE_URL || '';
+    })(),
   },
 
   supabase: {

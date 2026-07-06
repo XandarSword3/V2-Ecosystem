@@ -397,6 +397,16 @@ api.interceptors.response.use(
       } catch (refreshError: any) {
         processQueue(refreshError, null);
         memoryTokenStore.clear();
+        // Genuine refresh rejection (401/403 from /auth/refresh) means the
+        // refresh token is actually invalid — clear the stale 'user' marker
+        // too, otherwise auth-context's mount-time validateSession() will
+        // keep trying to refresh on every future load using a dead session.
+        const refreshStatus = refreshError?.response?.status;
+        if (typeof window !== 'undefined' && (refreshStatus === 401 || refreshStatus === 403)) {
+          localStorage.removeItem('user');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        }
       } finally {
         isRefreshing = false;
       }
@@ -434,6 +444,22 @@ export const authApi = {
   setup2FA: () => api.post('/auth/2fa/setup'),
 
   enable2FA: (code: string) => api.post('/auth/2fa/enable', { code }),
+
+  // Mandatory-enrollment variants: called with the short-lived
+  // twoFactorSetupToken issued by login() (403 TWO_FACTOR_SETUP_REQUIRED),
+  // not the normal session token. The account has no session yet, so the
+  // Authorization header must be set explicitly here rather than relying
+  // on the request interceptor's memoryTokenStore token (which is empty/
+  // irrelevant at this point in the flow).
+  setup2FAWithToken: (setupToken: string) =>
+    api.post('/auth/2fa/setup', undefined, {
+      headers: { Authorization: `Bearer ${setupToken}` },
+    }),
+
+  enable2FAWithToken: (setupToken: string, code: string) =>
+    api.post('/auth/2fa/enable', { code }, {
+      headers: { Authorization: `Bearer ${setupToken}` },
+    }),
 
   disable2FA: (code: string) => api.post('/auth/2fa/disable', { code }),
 

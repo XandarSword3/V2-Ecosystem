@@ -14,6 +14,8 @@ import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { PaymentDiscounts, AppliedDiscount } from '@/components/customer/PaymentDiscounts';
+import StripePayment from '@/components/payments/StripePayment';
 import {
   Loader2,
   Home,
@@ -32,6 +34,9 @@ import {
   Plus,
   Minus,
   ArrowLeft,
+  CreditCard,
+  Banknote,
+  CheckCircle2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -97,6 +102,11 @@ export default function DynamicUnitDetailPage() {
   const [customerEmail, setCustomerEmail] = useState(user?.email || '');
   const [customerPhone, setCustomerPhone] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
+  const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
+  const [finalTotal, setFinalTotal] = useState(0);
+  const [showStripePayment, setShowStripePayment] = useState(false);
+  const [pendingBookingId, setPendingBookingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
 
@@ -171,6 +181,14 @@ export default function DynamicUnitDetailPage() {
 
   const pricing = calculatePricing();
 
+  // Update final total when pricing or discounts change
+  useEffect(() => {
+    if (pricing) {
+      const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
+      setFinalTotal(Math.max(0, pricing.totalAmount - totalDiscount));
+    }
+  }, [pricing, appliedDiscounts]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unit || !pricing) { toast.error('Please select valid dates'); return; }
@@ -178,21 +196,61 @@ export default function DynamicUnitDetailPage() {
 
     setIsSubmitting(true);
     try {
+      // Build discount data from applied discounts
+      const couponDiscount = appliedDiscounts.find(d => d.type === 'coupon');
+      const giftCardDiscounts = appliedDiscounts.filter(d => d.type === 'giftcard');
+      const loyaltyDiscount = appliedDiscounts.find(d => d.type === 'loyalty');
+
       const response = await api.post(`/${slug}/bookings`, {
         unitId: unit.id,
         customerName, customerEmail, customerPhone,
         checkInDate, checkOutDate, numberOfGuests,
         addOns: selectedAddOns, specialRequests,
-        paymentMethod: 'cash',
+        paymentMethod,
+        // Pass discount information to backend
+        couponCode: couponDiscount?.code,
+        giftCardRedemptions: giftCardDiscounts.length > 0 
+          ? giftCardDiscounts.map(gc => ({ code: gc.code!, amount: gc.amount }))
+          : undefined,
+        loyaltyPointsToRedeem: loyaltyDiscount 
+          ? parseInt(loyaltyDiscount.details?.replace(/[^\d]/g, '') || '0')
+          : undefined,
+        loyaltyPointsDollarValue: loyaltyDiscount?.amount,
       });
-      toast.success('Booking submitted successfully!');
-      router.push(`/${propertySlug}/${slug}/confirmation?type=booking&id=${response.data.data.id}`);
+
+      const bookingId = response.data.data.id;
+
+      // For card payments, show Stripe checkout instead of redirecting
+      if (paymentMethod === 'card' && finalTotal > 0) {
+        setPendingBookingId(bookingId);
+        setShowStripePayment(true);
+        toast.info('Complete your card payment');
+      } else {
+        // For cash payments or zero total, redirect directly
+        toast.success('Booking submitted successfully!');
+        router.push(`/${propertySlug}/${slug}/confirmation?type=booking&id=${bookingId}`);
+      }
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { error?: string } } };
       toast.error(axiosError.response?.data?.error || 'Failed to submit booking');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Stripe payment handlers
+  const handleStripePaymentSuccess = () => {
+    toast.success('Booking submitted successfully!');
+    router.push(`/${propertySlug}/${slug}/confirmation?type=booking&id=${pendingBookingId}`);
+  };
+
+  const handleStripePaymentError = (error: string) => {
+    toast.error(`Payment failed: ${error}`);
+  };
+
+  const handleStripePaymentCancel = () => {
+    setShowStripePayment(false);
+    toast.info('Payment cancelled. Your booking is still saved.');
   };
 
   if (isLoading) {
@@ -402,6 +460,21 @@ export default function DynamicUnitDetailPage() {
                       </div>
                     )}
 
+                    {/* Discounts Section */}
+                    {pricing && (
+                      <div className="border-t pt-4">
+                        <PaymentDiscounts
+                          orderTotal={pricing.totalAmount}
+                          orderType="multi_day_booking"
+                          moduleId={moduleId}
+                          onTotalChange={(newTotal, discounts) => {
+                            setAppliedDiscounts(discounts);
+                            setFinalTotal(newTotal);
+                          }}
+                        />
+                      </div>
+                    )}
+
                     {/* Pricing Summary */}
                     {pricing && (
                       <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2">
@@ -423,6 +496,56 @@ export default function DynamicUnitDetailPage() {
                       </div>
                     )}
 
+                    {/* Payment Method Selector */}
+                    <div className="border-t pt-4">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3 block">Payment Method</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('cash')}
+                          className={`relative p-4 rounded-xl border-2 transition-all ${
+                            paymentMethod === 'cash'
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          {paymentMethod === 'cash' && (
+                            <div className="absolute top-2 right-2">
+                              <CheckCircle2 className="w-4 h-4 text-primary-500" />
+                            </div>
+                          )}
+                          <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-2">
+                            <Banknote className={`w-5 h-5 ${paymentMethod === 'cash' ? 'text-green-600' : 'text-slate-400'}`} />
+                          </div>
+                          <p className={`text-sm font-medium text-center ${paymentMethod === 'cash' ? 'text-primary-600 dark:text-primary-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                            Pay with Cash
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod('card')}
+                          className={`relative p-4 rounded-xl border-2 transition-all ${
+                            paymentMethod === 'card'
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          {paymentMethod === 'card' && (
+                            <div className="absolute top-2 right-2">
+                              <CheckCircle2 className="w-4 h-4 text-primary-500" />
+                            </div>
+                          )}
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-2">
+                            <CreditCard className={`w-5 h-5 ${paymentMethod === 'card' ? 'text-blue-600' : 'text-slate-400'}`} />
+                          </div>
+                          <p className={`text-sm font-medium text-center ${paymentMethod === 'card' ? 'text-primary-600 dark:text-primary-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                            Pay with Card
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+
                     <Button type="submit" className="w-full" disabled={isSubmitting || !pricing}>
                       {isSubmitting ? (
                         <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Submitting...</>
@@ -437,6 +560,35 @@ export default function DynamicUnitDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Stripe Payment Modal */}
+      {showStripePayment && pendingBookingId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-full flex items-center justify-center">
+                <CreditCard className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                Complete Payment
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 mt-1">
+                Enter your card details to complete your booking
+              </p>
+            </div>
+
+            <StripePayment
+              amount={finalTotal}
+              currency="USD"
+              referenceType="time_exclusive_reservation"
+              referenceId={pendingBookingId}
+              onSuccess={handleStripePaymentSuccess}
+              onError={handleStripePaymentError}
+              onCancel={handleStripePaymentCancel}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

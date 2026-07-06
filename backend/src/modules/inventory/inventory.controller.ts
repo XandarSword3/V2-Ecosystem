@@ -1,7 +1,23 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
+import { AppError } from '../../utils/AppError.js';
 import { z } from 'zod';
+
+/**
+ * Resolve the tenant scope a request should be limited to.
+ * super_admin is the platform-wide operator role and intentionally sees
+ * everything; every other scope is confined to its own tenant.
+ * Mirrors the convention in customization.controller.ts / auth.middleware's
+ * authorize() guard.
+ */
+function tenantScopeFor(req: Request): string | null {
+  if (req.user?.scope === 'super_admin') return null;
+  if (!req.user?.tenantId) {
+    throw new AppError('No tenant associated with this account', 403);
+  }
+  return req.user.tenantId;
+}
 
 // Validation schemas
 const createItemSchema = z.object({
@@ -110,6 +126,7 @@ export class InventoryController {
     try {
       const { moduleId } = req.query;
       const propertyId = (req as any).propertyId as string | undefined;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
       // Resolve property-scoped module list before building the query.
@@ -130,6 +147,7 @@ export class InventoryController {
         .select('*')
         .order('name', { ascending: true });
 
+      if (tenantId) catQuery = catQuery.eq('tenant_id', tenantId);
       if (moduleIds !== null) {
         // Property-scoped: filter to allowed modules
         catQuery = catQuery.in('module_id', moduleIds);
@@ -147,6 +165,7 @@ export class InventoryController {
         .from('inventory_items')
         .select('category_id, current_stock')
         .eq('is_active', true);
+      if (tenantId) itemsCountQuery = itemsCountQuery.eq('tenant_id', tenantId);
       if (moduleIds !== null) {
         itemsCountQuery = itemsCountQuery.in('module_id', moduleIds);
       } else if (moduleId) {
@@ -168,6 +187,9 @@ export class InventoryController {
         data: categoryStats,
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error fetching categories:', error);
       res.status(500).json({
         success: false,
@@ -192,6 +214,8 @@ export class InventoryController {
       }
 
       const data = validation.data;
+      const tenantId = tenantScopeFor(req);
+      const propertyId = (req as any).propertyId as string | undefined;
       const supabase = getSupabase();
 
       const { data: result, error } = await supabase
@@ -200,6 +224,8 @@ export class InventoryController {
           name: data.name,
           description: data.description,
           color: data.color,
+          tenant_id: tenantId,
+          property_id: propertyId ?? null,
         })
         .select()
         .single();
@@ -211,6 +237,9 @@ export class InventoryController {
         data: result,
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error creating category:', error);
       res.status(500).json({
         success: false,
@@ -237,6 +266,7 @@ export class InventoryController {
       }
 
       const data = validation.data;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
       const updates: Record<string, any> = {
@@ -251,12 +281,12 @@ export class InventoryController {
         return res.status(400).json({ success: false, error: 'No fields to update' });
       }
 
-      const { data: result, error } = await supabase
+      let updateQuery = supabase
         .from('inventory_categories')
         .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
+      if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+      const { data: result, error } = await updateQuery.select().maybeSingle();
 
       if (error || !result) {
         return res.status(404).json({ success: false, error: 'Category not found' });
@@ -267,6 +297,9 @@ export class InventoryController {
         data: result,
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error updating category:', error);
       res.status(500).json({
         success: false,
@@ -282,7 +315,17 @@ export class InventoryController {
   async deleteCategory(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
+
+      // Confirm the category itself belongs to the caller's tenant before
+      // touching it or counting its items.
+      let ownerQuery = supabase.from('inventory_categories').select('id').eq('id', id);
+      if (tenantId) ownerQuery = ownerQuery.eq('tenant_id', tenantId);
+      const { data: owned } = await ownerQuery.maybeSingle();
+      if (!owned) {
+        return res.status(404).json({ success: false, error: 'Category not found' });
+      }
 
       // Check if category has items
       const { count, error: countError } = await supabase
@@ -302,10 +345,12 @@ export class InventoryController {
         });
       }
 
-      const { error } = await supabase
+      let deleteQuery = supabase
         .from('inventory_categories')
         .delete()
         .eq('id', id);
+      if (tenantId) deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+      const { error } = await deleteQuery;
 
       if (error) {
         return res.status(500).json({ success: false, error: 'Failed to delete category' });
@@ -313,6 +358,9 @@ export class InventoryController {
 
       res.json({ success: true, message: 'Category deleted successfully' });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error deleting category:', error);
       res.status(500).json({
         success: false,
@@ -341,6 +389,7 @@ export class InventoryController {
       } = req.query;
 
       const propertyId = (req as any).propertyId as string | undefined;
+      const tenantId = tenantScopeFor(req);
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
       const supabase = getSupabase();
 
@@ -363,7 +412,16 @@ export class InventoryController {
         .select('*', { count: 'exact' })
         .eq('is_active', true);
 
-      // Module filtering not applicable - inventory_items doesn't have module_id column
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+
+      // module_id was added to inventory_items in 20260625000002 — this filter
+      // was previously a no-op because the column didn't exist yet when this
+      // comment was written; it does now, so actually apply the scope.
+      if (moduleIds !== null) {
+        query = query.in('module_id', moduleIds);
+      } else if (moduleId) {
+        query = query.eq('module_id', moduleId as string);
+      }
 
       if (categoryId) {
         query = query.eq('category_id', categoryId as string);
@@ -437,6 +495,9 @@ export class InventoryController {
         },
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error fetching items:', error);
       res.status(500).json({
         success: false,
@@ -452,13 +513,15 @@ export class InventoryController {
   async getItem(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
-      const { data: item, error } = await supabase
+      let itemQuery = supabase
         .from('inventory_items')
         .select('*')
-        .eq('id', id)
-        .single();
+        .eq('id', id);
+      if (tenantId) itemQuery = itemQuery.eq('tenant_id', tenantId);
+      const { data: item, error } = await itemQuery.maybeSingle();
 
       if (error || !item) {
         return res.status(404).json({ success: false, error: 'Item not found' });
@@ -545,6 +608,9 @@ export class InventoryController {
         },
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error fetching item:', error);
       res.status(500).json({
         success: false,
@@ -570,7 +636,23 @@ export class InventoryController {
 
       const data = validation.data;
       const userId = req.user?.id;
+      const tenantId = tenantScopeFor(req);
+      const propertyId = (req as any).propertyId as string | undefined;
       const supabase = getSupabase();
+
+      // categoryId is caller-supplied — confirm it actually belongs to this
+      // tenant before attaching a new item to it.
+      if (tenantId) {
+        const { data: cat } = await supabase
+          .from('inventory_categories')
+          .select('id')
+          .eq('id', data.categoryId)
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+        if (!cat) {
+          return res.status(404).json({ success: false, error: 'Category not found' });
+        }
+      }
 
       // Generate SKU if not provided
       let sku = data.sku;
@@ -598,6 +680,8 @@ export class InventoryController {
           expiry_date: data.expiryDate,
           notes: data.notes,
           created_by: userId,
+          tenant_id: tenantId,
+          property_id: propertyId ?? null,
         })
         .select()
         .single();
@@ -615,12 +699,13 @@ export class InventoryController {
           reference_type: 'manual',
           notes: 'Initial stock',
           performed_by: userId,
+          tenant_id: tenantId,
         });
       }
 
       // Check for low stock alert
       if (data.currentStock <= data.reorderPoint) {
-        await this.createStockAlert(result.id, 'low_stock', data.currentStock);
+        await this.createStockAlert(result.id, 'low_stock', data.currentStock, 'medium', tenantId);
       }
 
       res.status(201).json({
@@ -628,6 +713,9 @@ export class InventoryController {
         data: result,
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error creating item:', error);
       res.status(500).json({
         success: false,
@@ -654,6 +742,7 @@ export class InventoryController {
       }
 
       const data = validation.data;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
       const updates: Record<string, any> = {
@@ -679,12 +768,12 @@ export class InventoryController {
         return res.status(400).json({ success: false, error: 'No fields to update' });
       }
 
-      const { data: result, error } = await supabase
+      let updateQuery = supabase
         .from('inventory_items')
         .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
+      if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+      const { data: result, error } = await updateQuery.select().maybeSingle();
 
       if (error || !result) {
         return res.status(404).json({ success: false, error: 'Item not found' });
@@ -695,6 +784,9 @@ export class InventoryController {
         data: result,
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error updating item:', error);
       res.status(500).json({
         success: false,
@@ -710,24 +802,33 @@ export class InventoryController {
   async deleteItem(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
       // Soft delete
-      const { error } = await supabase
+      let deleteQuery = supabase
         .from('inventory_items')
         .update({ 
           is_active: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);
+      if (tenantId) deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+      const { data: result, error } = await deleteQuery.select().maybeSingle();
 
       if (error) throw error;
+      if (!result) {
+        return res.status(404).json({ success: false, error: 'Item not found' });
+      }
 
       res.json({
         success: true,
         message: 'Item deactivated successfully',
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error deleting item:', error);
       res.status(500).json({
         success: false,
@@ -753,14 +854,16 @@ export class InventoryController {
 
       const data = validation.data;
       const userId = req.user?.id;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
       // Get current stock
-      const { data: item, error: itemError } = await supabase
+      let itemQuery = supabase
         .from('inventory_items')
         .select('*')
-        .eq('id', data.itemId)
-        .single();
+        .eq('id', data.itemId);
+      if (tenantId) itemQuery = itemQuery.eq('tenant_id', tenantId);
+      const { data: item, error: itemError } = await itemQuery.maybeSingle();
 
       if (itemError || !item) {
         return res.status(404).json({ success: false, error: 'Item not found' });
@@ -806,6 +909,7 @@ export class InventoryController {
           reference_id: data.referenceId,
           notes: data.notes || data.reason,
           performed_by: userId,
+          tenant_id: item.tenant_id,
         })
         .select()
         .single();
@@ -867,14 +971,20 @@ export class InventoryController {
 
       const { transactions } = validation.data;
       const userId = req.user?.id;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
       // --- Step 1: One batch SELECT for all unique items (replaces n individual SELECTs) ---
+      // Tenant-scoped: items outside the caller's tenant simply won't come back here,
+      // so they fall through to the existing "Item not found" branch below instead of
+      // letting a caller manipulate another tenant's stock via a crafted itemId list.
       const uniqueItemIds = [...new Set(transactions.map(t => t.itemId))];
-      const { data: fetchedItems, error: fetchError } = await supabase
+      let fetchQuery = supabase
         .from('inventory_items')
         .select('*')
         .in('id', uniqueItemIds);
+      if (tenantId) fetchQuery = fetchQuery.eq('tenant_id', tenantId);
+      const { data: fetchedItems, error: fetchError } = await fetchQuery;
 
       if (fetchError) throw fetchError;
 
@@ -933,6 +1043,7 @@ export class InventoryController {
           reference_type: txn.referenceType,
           notes: txn.notes,
           performed_by: userId,
+          tenant_id: item.tenant_id,
         });
 
         results.push({ itemId: txn.itemId, newStock });
@@ -966,6 +1077,9 @@ export class InventoryController {
         },
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error in bulk transaction:', error);
       res.status(500).json({
         success: false,
@@ -982,11 +1096,14 @@ export class InventoryController {
     try {
       const { page = '1', limit = '50', itemId, type, startDate, endDate } = req.query;
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
       let query = supabase
         .from('inventory_transactions')
         .select('*');
+
+      if (tenantId) query = query.eq('tenant_id', tenantId);
 
       if (itemId) {
         query = query.eq('item_id', itemId as string);
@@ -1063,6 +1180,9 @@ export class InventoryController {
         },
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error fetching transactions:', error);
       res.status(500).json({
         success: false,
@@ -1078,13 +1198,16 @@ export class InventoryController {
   async getAlerts(req: Request, res: Response) {
     try {
       const { resolved = 'false' } = req.query;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
-      const { data: alerts, error } = await supabase
+      let alertsQuery = supabase
         .from('inventory_alerts')
         .select('*')
         .eq('is_resolved', resolved === 'true')
         .order('created_at', { ascending: false });
+      if (tenantId) alertsQuery = alertsQuery.eq('tenant_id', tenantId);
+      const { data: alerts, error } = await alertsQuery;
 
       if (error) throw error;
 
@@ -1118,6 +1241,9 @@ export class InventoryController {
         data: enrichedAlerts,
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error fetching alerts:', error);
       res.status(500).json({
         success: false,
@@ -1134,9 +1260,10 @@ export class InventoryController {
     try {
       const { id } = req.params;
       const userId = req.user?.id;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
-      const { error } = await supabase
+      let updateQuery = supabase
         .from('inventory_alerts')
         .update({
           is_resolved: true,
@@ -1144,14 +1271,22 @@ export class InventoryController {
           resolved_by: userId,
         })
         .eq('id', id);
+      if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+      const { data: result, error } = await updateQuery.select().maybeSingle();
 
       if (error) throw error;
+      if (!result) {
+        return res.status(404).json({ success: false, error: 'Alert not found' });
+      }
 
       res.json({
         success: true,
         message: 'Alert resolved',
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error resolving alert:', error);
       res.status(500).json({
         success: false,
@@ -1168,6 +1303,7 @@ export class InventoryController {
     try {
       const { moduleId } = req.query;
       const propertyId = (req as any).propertyId as string | undefined;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
       // Resolve property-scoped module list.
@@ -1181,11 +1317,12 @@ export class InventoryController {
         return res.json({ success: true, data: { summary: { total_items: 0, out_of_stock: 0, low_stock: 0, overstock: 0, total_value: 0, unresolvedAlerts: 0 }, categoryBreakdown: [], recentActivity: [], expiringItems: [] } });
       }
 
-      // Get all items, scoped to property/module
+      // Get all items, scoped to tenant/property/module
       let itemsQuery = supabase
         .from('inventory_items')
         .select('*')
         .eq('is_active', true);
+      if (tenantId) itemsQuery = itemsQuery.eq('tenant_id', tenantId);
       if (moduleIds !== null) {
         itemsQuery = itemsQuery.in('module_id', moduleIds);
       } else if (moduleId) {
@@ -1211,8 +1348,9 @@ export class InventoryController {
         ),
       };
 
-      // Get categories, scoped to same property/module
+      // Get categories, scoped to same tenant/property/module
       let categoriesQuery = supabase.from('inventory_categories').select('*');
+      if (tenantId) categoriesQuery = categoriesQuery.eq('tenant_id', tenantId);
       if (moduleIds !== null) {
         categoriesQuery = categoriesQuery.in('module_id', moduleIds);
       } else if (moduleId) {
@@ -1238,10 +1376,12 @@ export class InventoryController {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
       // FIX: Iteration 11 - Column is 'transaction_type' not 'type'; DB stores 'purchase'/'sale' not 'in'/'out'
-      const { data: recentTransactions } = await supabase
+      let recentTxQuery = supabase
         .from('inventory_transactions')
         .select('transaction_type, created_at')
         .gte('created_at', sevenDaysAgo.toISOString());
+      if (tenantId) recentTxQuery = recentTxQuery.eq('tenant_id', tenantId);
+      const { data: recentTransactions } = await recentTxQuery;
 
       // Group by date
       const activityByDate: Record<string, any> = {};
@@ -1275,10 +1415,12 @@ export class InventoryController {
         }));
 
       // Get unresolved alerts count
-      const { count: unresolvedAlerts } = await supabase
+      let unresolvedAlertsQuery = supabase
         .from('inventory_alerts')
         .select('*', { count: 'exact', head: true })
         .eq('is_resolved', false);
+      if (tenantId) unresolvedAlertsQuery = unresolvedAlertsQuery.eq('tenant_id', tenantId);
+      const { count: unresolvedAlerts } = await unresolvedAlertsQuery;
 
       res.json({
         success: true,
@@ -1293,6 +1435,9 @@ export class InventoryController {
         },
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error fetching stats:', error);
       res.status(500).json({
         success: false,
@@ -1307,13 +1452,41 @@ export class InventoryController {
    */
   async generateReport(req: Request, res: Response) {
     try {
-      const { format = 'json', categoryId } = req.query;
+      const { format = 'json', categoryId, moduleId } = req.query;
+      const propertyId = (req as any).propertyId as string | undefined;
+      const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
+
+      // Resolve property-scoped module list before building the query — this
+      // report previously had zero tenant/property scoping and would dump
+      // every tenant's full inventory.
+      const { moduleIds, denied } = await this.resolvePropertyScope(
+        propertyId, moduleId as string | undefined
+      );
+      if (denied) {
+        return res.status(403).json({ success: false, error: denied });
+      }
+      if (moduleIds !== null && moduleIds.length === 0) {
+        const empty = { generatedAt: new Date().toISOString(), itemCount: 0, items: [] };
+        if (format === 'csv') {
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', `attachment; filename="inventory-report-${new Date().toISOString().split('T')[0]}.csv"`);
+          return res.send('Name,SKU,Category,Unit,Stock,Min Level,Reorder Point,Cost,Value,Status');
+        }
+        return res.json({ success: true, data: empty });
+      }
 
       let query = supabase
         .from('inventory_items')
         .select('*')
         .eq('is_active', true);
+
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+      if (moduleIds !== null) {
+        query = query.in('module_id', moduleIds);
+      } else if (moduleId) {
+        query = query.eq('module_id', moduleId as string);
+      }
 
       if (categoryId) {
         query = query.eq('category_id', categoryId as string);
@@ -1375,6 +1548,9 @@ export class InventoryController {
         },
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error generating report:', error);
       res.status(500).json({
         success: false,
@@ -1464,6 +1640,55 @@ export class InventoryController {
       const { itemId } = req.params;
       const { catalogItemId, quantityNeeded } = req.body;
       const supabase = getSupabase();
+      const propertyId = (req as any).propertyId as string | undefined;
+
+      // Tenant-scope check: neither catalogItemId nor itemId are trusted as-is.
+      // Both must resolve to real rows owned by the caller's tenant before we
+      // touch menu_item_ingredients — otherwise this endpoint lets any tenant
+      // link (and later auto-deduct stock against) another tenant's inventory
+      // or catalog rows.
+      const tenantId = tenantScopeFor(req);
+
+      let invItemQuery = supabase
+        .from('inventory_items')
+        .select('id, tenant_id, module_id')
+        .eq('id', itemId);
+      if (tenantId) invItemQuery = invItemQuery.eq('tenant_id', tenantId);
+      const { data: invItem, error: invItemError } = await invItemQuery.maybeSingle();
+      if (invItemError) throw invItemError;
+      if (!invItem) {
+        return res.status(404).json({ success: false, error: 'Inventory item not found' });
+      }
+
+      let catalogItemQuery = supabase
+        .from('catalog_items')
+        .select('id, tenant_id, module_id')
+        .eq('id', catalogItemId);
+      if (tenantId) catalogItemQuery = catalogItemQuery.eq('tenant_id', tenantId);
+      const { data: catalogItem, error: catalogItemError } = await catalogItemQuery.maybeSingle();
+      if (catalogItemError) throw catalogItemError;
+      if (!catalogItem) {
+        return res.status(404).json({ success: false, error: 'Catalog item not found' });
+      }
+
+      // Property-scope check: tenant scoping alone isn't enough for multi-property
+      // tenants — a caller scoped to Property A could still pair an inventory item
+      // and catalog item that both happen to belong to Property B under the same
+      // tenant. Resolve the property's module set and require both rows' module_id
+      // to fall inside it. No propertyId header (single-property/dev) is a no-op,
+      // matching resolvePropertyScope's existing fail-open convention.
+      if (propertyId) {
+        const { moduleIds, denied } = await this.resolvePropertyScope(propertyId, undefined);
+        if (denied) {
+          return res.status(403).json({ success: false, error: denied });
+        }
+        if (moduleIds !== null) {
+          const allowed = new Set(moduleIds);
+          if (!allowed.has(invItem.module_id) || !allowed.has(catalogItem.module_id)) {
+            return res.status(403).json({ success: false, error: 'Item does not belong to this property' });
+          }
+        }
+      }
 
       // Check if link exists
       const { data: existing } = await supabase
@@ -1471,7 +1696,7 @@ export class InventoryController {
         .select('id')
         .eq('catalog_item_id', catalogItemId)
         .eq('inventory_item_id', itemId)
-        .single();
+        .maybeSingle();
 
       if (existing) {
         // Update
@@ -1497,6 +1722,9 @@ export class InventoryController {
         message: 'Linked successfully',
       });
     } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
       console.error('Error linking items:', error);
       res.status(500).json({
         success: false,
@@ -1513,7 +1741,8 @@ export class InventoryController {
     itemId: string, 
     alertType: string, 
     stockOrDate: any,
-    priority: string = 'medium'
+    priority: string = 'medium',
+    tenantId: string | null = null,
   ) {
     let message = '';
     

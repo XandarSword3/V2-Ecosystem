@@ -79,7 +79,26 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
       toast.success(`Booking ${status.replace('_', ' ')}`);
       setSelectedBooking(null);
-    } catch (error) {
+    } catch (error: any) {
+      if (status === 'checked_in' && error?.response?.status === 402) {
+        const outstanding = Number(error?.response?.data?.outstanding || 0);
+        const shouldRecord = window.confirm(
+          `Outstanding balance: ${outstanding.toFixed(2)}. Record cash payment now?`,
+        );
+        if (shouldRecord) {
+          await api.post('/payments/record-cash', {
+            referenceType: 'chalet_booking',
+            referenceId: bookingId,
+            amount: outstanding,
+            notes: 'Recorded during check-in',
+          });
+          await api.patch(`/staff/modules/${slug}/bookings/${bookingId}/status`, { status: 'checked_in' });
+          setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status: 'checked_in' } : b)));
+          toast.success('Payment recorded and guest checked in');
+          setSelectedBooking(null);
+          return;
+        }
+      }
       if (!isOnline()) {
         await createOfflineBookingStatusUpdate(bookingId, status);
         setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
@@ -88,6 +107,33 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
         return;
       }
       toast.error('Failed to update booking');
+    }
+  };
+
+  const createStaffBooking = async () => {
+    try {
+      const unitId = window.prompt('Unit ID');
+      if (!unitId) return;
+      const customerName = window.prompt('Guest name') || 'Walk-in Guest';
+      const customerPhone = window.prompt('Guest phone') || '';
+      const checkIn = window.prompt('Check-in date (YYYY-MM-DD)');
+      const checkOut = window.prompt('Check-out date (YYYY-MM-DD)');
+      if (!checkIn || !checkOut) {
+        toast.error('Check-in and check-out are required');
+        return;
+      }
+      await api.post(`/staff/modules/${slug}/bookings`, {
+        unit_id: unitId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        payment_method: 'cash',
+      });
+      toast.success('Staff booking created');
+      fetchBookings();
+    } catch (error) {
+      toast.error('Failed to create booking');
     }
   };
 
@@ -160,6 +206,7 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button onClick={createStaffBooking}>New Booking</Button>
           <div className="flex bg-white dark:bg-gray-800 rounded-lg shadow-sm">
             <button
               onClick={() => setView('list')}

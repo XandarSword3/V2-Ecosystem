@@ -9,6 +9,7 @@ import { getEngineService } from '../engines/engine-service.js';
 import { logger } from '../utils/logger.js';
 import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.js';
 import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purchase.js';
+import { computeStayBaseAmount } from '../utils/stay-pricing.js';
 
 // Import parsers
 import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
@@ -783,9 +784,17 @@ function buildInstantTransactionRouter(router: Router): void {
         };
       });
 
+      const giftCardRedemptions = Array.isArray(req.body?.giftCardRedemptions) ? req.body.giftCardRedemptions : [];
+      const giftCardCodes = giftCardRedemptions
+        .map((r: unknown) => (r as { code?: string }).code)
+        .filter((code: unknown): code is string => typeof code === 'string' && code.length > 0);
+
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
         customerId: req.user?.userId ?? undefined,
+        couponCode: typeof req.body?.couponCode === 'string' ? req.body.couponCode : undefined,
+        giftCardCodes: giftCardCodes.length > 0 ? giftCardCodes : undefined,
+        loyaltyPointsToRedeem: typeof req.body?.loyaltyPointsToRedeem === 'number' ? req.body.loyaltyPointsToRedeem : undefined,
       });
 
       // Validate service_location_id belongs to this module before trusting it —
@@ -814,6 +823,8 @@ function buildInstantTransactionRouter(router: Router): void {
           customer_id: req.user?.userId ?? null,
           status: 'pending',
           amount: pricing.totalAmount,
+          discount_amount: pricing.totalDiscount ?? 0,
+          tax_amount: pricing.taxAmount ?? 0,
           service_location_id: serviceLocationId,
           metadata: {
             notes: req.body?.notes ?? req.body?.metadata?.notes ?? null,
@@ -1040,7 +1051,7 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
       }
 
       const supabase = getSupabase();
-      const { unit_id, check_in_date, check_out_date, total_amount } = req.body ?? {};
+      const { unit_id, check_in_date, check_out_date } = req.body ?? {};
       if (!unit_id || !check_in_date || !check_out_date) {
         return res.status(400).json({ success: false, error: 'unit_id, check_in_date and check_out_date are required' });
       }
@@ -1051,10 +1062,11 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         return res.status(400).json({ success: false, error: 'Invalid check-in/check-out dates' });
       }
 
-      // Validate unit exists for this module
+      // Validate unit exists for this module. Client-supplied price is never trusted —
+      // total is computed server-side below from base_price/weekend_price/unit_price_rules.
       const { data: unitRow, error: unitError } = await supabase
         .from('bookable_units')
-        .select('id')
+        .select('id, base_price, weekend_price')
         .eq('id', String(unit_id))
         .eq('module_id', mounted.id)
         .maybeSingle();
@@ -1064,9 +1076,23 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         return res.status(404).json({ success: false, error: 'Unit not found' });
       }
 
+      const { data: priceRules } = await supabase
+        .from('unit_price_rules')
+        .select('*')
+        .eq('unit_id', String(unit_id))
+        .eq('is_active', true);
+
+      const baseAmount = computeStayBaseAmount(
+        checkIn,
+        checkOut,
+        parseFloat(unitRow.base_price),
+        parseFloat(unitRow.weekend_price ?? unitRow.base_price),
+        priceRules || [],
+      );
+
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
-        [{ itemId: String(unit_id), name: 'booking', quantity: 1, unitPrice: asNumber(total_amount, 0) }],
+        [{ itemId: String(unit_id), name: 'booking', quantity: 1, unitPrice: baseAmount }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
 
@@ -1079,6 +1105,8 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         p_customer_id:    req.user?.userId ?? null,
         p_amount:         pricing.totalAmount,
         p_metadata:       {},
+        p_discount_amount: pricing.totalDiscount ?? 0,
+        p_tax_amount:      pricing.taxAmount ?? 0,
       });
 
       if (rpcError) throw rpcError;

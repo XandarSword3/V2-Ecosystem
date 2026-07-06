@@ -9,6 +9,7 @@ import { SchedulerService } from './services/scheduler.service.js';
 import { registerEngineCleanupJobs } from './jobs/engine-cleanup.job.js';
 import http from 'http';
 import { permissionCache } from './security/permission-cache.service.js';
+import { cache } from './utils/cache.js';
 
 // Track server state for graceful shutdown
 let isShuttingDown = false;
@@ -85,6 +86,14 @@ async function main() {
           logger.info('Database connections closed');
         } catch (err) {
           logger.warn('Error closing database:', err);
+        }
+
+        // Close Redis (shared client used by cache, sessions, rate limiters)
+        try {
+          await cache.disconnect();
+          logger.info('Redis connection closed');
+        } catch (err) {
+          logger.warn('Error closing Redis:', err);
         }
 
         clearTimeout(forceExitTimeout);

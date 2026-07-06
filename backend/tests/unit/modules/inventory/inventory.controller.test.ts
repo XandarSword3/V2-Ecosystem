@@ -37,7 +37,10 @@ function mockReq(overrides: Record<string, any> = {}): Request {
     params: {},
     query: {},
     body: {},
-    user: { id: 'user-uuid-1' },
+    // tenantScopeFor() throws AppError(403) for any non-super_admin caller
+    // with no tenantId — every default-path test needs one to reach its
+    // assertions instead of dying at the tenant-scope check.
+    user: { id: 'user-uuid-1', tenantId: 'tenant-1', scope: 'admin' },
     ...overrides,
   } as unknown as Request;
 }
@@ -848,21 +851,29 @@ describe('InventoryController', () => {
    *  linkToMenuItem
    * ============================================================ */
   describe('linkToMenuItem', () => {
-    const linkReq = (existing: boolean) =>
+    const linkReq = (overrides: Record<string, any> = {}) =>
       mockReq({
         params: { itemId: 'inv1' },
-        body: { menuItemId: 'menu1', quantityNeeded: 2 },
+        body: { catalogItemId: 'menu1', quantityNeeded: 2 },
+        ...overrides,
       });
 
+    const invItemRow = (moduleId = 'mod-1') =>
+      ({ data: { id: 'inv1', tenant_id: 'tenant-1', module_id: moduleId }, error: null });
+    const catalogItemRow = (moduleId = 'mod-1') =>
+      ({ data: { id: 'menu1', tenant_id: 'tenant-1', module_id: moduleId }, error: null });
+
     it('creates new link when none exists', async () => {
-      // 1. check existing  2. insert
+      // 1. inventory item lookup  2. catalog item lookup  3. existing-link check  4. insert
       resolveQueue.push(
+        invItemRow(),
+        catalogItemRow(),
         { data: null, error: null },
         { data: null, error: null },
       );
 
       const res = mockRes();
-      await ctrl.linkToMenuItem(linkReq(false), res);
+      await ctrl.linkToMenuItem(linkReq(), res);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
@@ -871,14 +882,16 @@ describe('InventoryController', () => {
     });
 
     it('updates existing link', async () => {
-      // 1. check existing  2. update
+      // 1. inventory item lookup  2. catalog item lookup  3. existing-link check (found)  4. update
       resolveQueue.push(
+        invItemRow(),
+        catalogItemRow(),
         { data: { id: 'link1' }, error: null },
         { data: null, error: null },
       );
 
       const res = mockRes();
-      await ctrl.linkToMenuItem(linkReq(true), res);
+      await ctrl.linkToMenuItem(linkReq(), res);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
@@ -886,22 +899,94 @@ describe('InventoryController', () => {
       }));
     });
 
-    it('returns 500 on error', async () => {
-      // Make the proxy throw by having the first call succeed but the second throw
-      // Actually the proxy never throws, but we can test catch by an outer error
-      // Instead test by triggering a JS error—we'll skip and test just the path
-      resolveQueue.length = 0; // no queue → default { data: null, error: null }
+    it('rejects when itemId does not resolve inside the caller tenant', async () => {
+      // tenantScopeFor filters the inventory_items lookup by tenant_id, so a
+      // cross-tenant itemId simply comes back empty — this is the Phase 1
+      // security-prereq regression guard.
+      resolveQueue.push({ data: null, error: null });
 
       const res = mockRes();
-      // Pass bad req that causes runtime error
-      await ctrl.linkToMenuItem(
-        { params: {}, body: {}, user: {} } as any,
-        res,
+      await ctrl.linkToMenuItem(linkReq(), res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: 'Inventory item not found',
+      }));
+    });
+
+    it('rejects when catalogItemId does not resolve inside the caller tenant', async () => {
+      resolveQueue.push(
+        invItemRow(),
+        { data: null, error: null },
       );
 
-      // Should still succeed since the controller doesn't validate linkToMenuItem body
-      // and the proxy swallows everything. Just verify it doesn't crash.
-      expect(res.json).toHaveBeenCalled();
+      const res = mockRes();
+      await ctrl.linkToMenuItem(linkReq(), res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: 'Catalog item not found',
+      }));
+    });
+
+    it('rejects when items resolve in-tenant but to a different property', async () => {
+      // Both rows pass the tenant check but belong to a module outside the
+      // caller's property — resolvePropertyScope's module list won't include
+      // catalogItem's module_id, so the pairing must be denied.
+      resolveQueue.push(
+        invItemRow('mod-a'),
+        catalogItemRow('mod-b'),
+        { data: [{ id: 'mod-a' }], error: null }, // resolvePropertyScope: modules for this property
+      );
+
+      const res = mockRes();
+      await ctrl.linkToMenuItem(linkReq({ propertyId: 'prop-1' }), res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: 'Item does not belong to this property',
+      }));
+    });
+
+    it('allows the pairing when both items are in the caller property', async () => {
+      resolveQueue.push(
+        invItemRow('mod-a'),
+        catalogItemRow('mod-a'),
+        { data: [{ id: 'mod-a' }], error: null }, // resolvePropertyScope
+        { data: null, error: null }, // existing-link check
+        { data: null, error: null }, // insert
+      );
+
+      const res = mockRes();
+      await ctrl.linkToMenuItem(linkReq({ propertyId: 'prop-1' }), res);
+
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        message: 'Linked successfully',
+      }));
+    });
+
+    it('returns 500 on a real query error', async () => {
+      resolveQueue.push({ data: null, error: { message: 'DB down' } });
+
+      const res = mockRes();
+      await ctrl.linkToMenuItem(linkReq(), res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+    });
+
+    it('returns 403 when the caller has no tenant', async () => {
+      const res = mockRes();
+      await ctrl.linkToMenuItem(linkReq({ user: { id: 'u1' } }), res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: 'No tenant associated with this account',
+      }));
     });
   });
 });

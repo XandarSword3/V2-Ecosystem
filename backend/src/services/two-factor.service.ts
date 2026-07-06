@@ -40,6 +40,49 @@ interface TwoFactorStatus {
 
 class TwoFactorService {
   private readonly APP_NAME = 'V2 Ecosystem';
+
+  /**
+   * two_factor_pending.tenant_id and two_factor_auth.{tenant_id,property_id}
+   * are NOT NULL (added later by the audit-isolation migration, which loops
+   * over every table with these columns rather than 2FA being intentionally
+   * property-scoped). property_id has no real meaning for a user-level
+   * security feature, so we resolve the enrolling user's own tenant's
+   * headquarters property (falling back to their oldest active property)
+   * rather than inventing a value — reusing another tenant's property row
+   * here would be a cross-tenant leak of exactly the kind this codebase's
+   * isolation work has been fixing.
+   */
+  private async resolveTenantId(userId: string): Promise<string> {
+    const supabase = getSupabase();
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', userId)
+      .single();
+
+    if (error || !user?.tenant_id) {
+      throw new Error(`Unable to resolve tenant for user ${userId} during 2FA setup`);
+    }
+    return user.tenant_id;
+  }
+
+  private async resolveDefaultPropertyId(tenantId: string): Promise<string> {
+    const supabase = getSupabase();
+    const { data: property, error } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .order('is_headquarters', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !property?.id) {
+      throw new Error(`Unable to resolve a default property for tenant ${tenantId} during 2FA setup`);
+    }
+    return property.id;
+  }
   
   /**
    * Generate a new 2FA secret and QR code for setup
@@ -68,13 +111,16 @@ class TwoFactorService {
     
     // Generate backup codes
     const backupCodes = this.generateBackupCodes(8);
-    
+
+    const tenantId = await this.resolveTenantId(userId);
+
     // Store pending setup in database (not yet verified)
     const supabase = getSupabase();
-    await supabase
+    const { error: upsertError } = await supabase
       .from('two_factor_pending')
       .upsert({
         user_id: userId,
+        tenant_id: tenantId,
         secret: this.encryptSecret(secret),
         backup_codes: backupCodes.map(code => this.hashBackupCode(code)),
         created_at: new Date().toISOString(),
@@ -82,6 +128,11 @@ class TwoFactorService {
       }, {
         onConflict: 'user_id',
       });
+
+    if (upsertError) {
+      logger.error(`Failed to persist 2FA pending setup for user ${userId}: ${upsertError.message}`);
+      throw new Error('Failed to initialize 2FA setup. Please try again.');
+    }
     
     logger.info(`2FA setup initiated for user: ${userId}`);
     
@@ -112,7 +163,13 @@ class TwoFactorService {
     
     // Check expiry
     if (new Date(pending.expires_at) < new Date()) {
-      await supabase.from('two_factor_pending').delete().eq('user_id', userId);
+      const { error: expireDeleteError } = await supabase
+        .from('two_factor_pending')
+        .delete()
+        .eq('user_id', userId);
+      if (expireDeleteError) {
+        logger.warn(`Failed to clean up expired 2FA pending setup for user ${userId}: ${expireDeleteError.message}`);
+      }
       logger.warn(`2FA setup expired for user: ${userId}`);
       return false;
     }
@@ -126,24 +183,47 @@ class TwoFactorService {
       return false;
     }
     
-    // Move to active 2FA
-    await supabase.from('two_factor_auth').upsert({
+    // Move to active 2FA. tenant_id is reused from the already-resolved
+    // pending record; property_id is resolved fresh since two_factor_pending
+    // has no property_id column (see class comment above resolveTenantId).
+    const propertyId = await this.resolveDefaultPropertyId(pending.tenant_id);
+
+    const { error: activateError } = await supabase.from('two_factor_auth').upsert({
       user_id: userId,
+      tenant_id: pending.tenant_id,
+      property_id: propertyId,
       secret: pending.secret,
       backup_codes: pending.backup_codes,
       enabled_at: new Date().toISOString(),
     }, {
       onConflict: 'user_id',
     });
+
+    if (activateError) {
+      logger.error(`Failed to activate 2FA for user ${userId}: ${activateError.message}`);
+      throw new Error('Failed to enable 2FA. Please try again.');
+    }
     
     // Update user record
-    await supabase
+    const { error: userUpdateError } = await supabase
       .from('users')
       .update({ two_factor_enabled: true })
       .eq('id', userId);
+
+    if (userUpdateError) {
+      logger.error(`2FA activated for user ${userId} but failed to set two_factor_enabled flag: ${userUpdateError.message}`);
+      throw new Error('2FA was enabled but the account flag failed to update. Please contact support.');
+    }
     
-    // Delete pending setup
-    await supabase.from('two_factor_pending').delete().eq('user_id', userId);
+    // Delete pending setup (non-critical: 2FA is already active at this point,
+    // a leftover pending row is harmless and gets overwritten on next setup)
+    const { error: cleanupError } = await supabase
+      .from('two_factor_pending')
+      .delete()
+      .eq('user_id', userId);
+    if (cleanupError) {
+      logger.warn(`2FA enabled for user ${userId} but failed to clean up pending setup row: ${cleanupError.message}`);
+    }
     
     logger.info(`2FA enabled for user: ${userId}`);
     return true;
@@ -184,12 +264,19 @@ class TwoFactorService {
     if (codeIndex !== -1) {
       // Remove used backup code
       backupCodes.splice(codeIndex, 1);
-      await supabase
+      const { error: backupUpdateError } = await supabase
         .from('two_factor_auth')
         .update({ backup_codes: backupCodes })
         .eq('user_id', userId);
-      
-      logger.info(`Backup code used for user: ${userId}. Remaining: ${backupCodes.length}`);
+
+      if (backupUpdateError) {
+        // The code itself was valid, so we still let the user in — but log
+        // loudly, since a failed write here means this backup code stays
+        // usable again instead of being single-use.
+        logger.error(`Backup code verified for user ${userId} but failed to persist as consumed: ${backupUpdateError.message}`);
+      } else {
+        logger.info(`Backup code used for user: ${userId}. Remaining: ${backupCodes.length}`);
+      }
       return true;
     }
     
@@ -209,14 +296,28 @@ class TwoFactorService {
     
     const supabase = getSupabase();
     
-    // Delete 2FA record
-    await supabase.from('two_factor_auth').delete().eq('user_id', userId);
-    
-    // Update user record
-    await supabase
+    // Update user record first: if this fails we abort before touching the
+    // two_factor_auth row, so we never end up with two_factor_enabled=true
+    // and no matching row — that combination would permanently lock the
+    // user out, since verifyCode would have nothing left to check against.
+    const { error: userUpdateError } = await supabase
       .from('users')
       .update({ two_factor_enabled: false })
       .eq('id', userId);
+
+    if (userUpdateError) {
+      logger.error(`Failed to disable 2FA flag for user ${userId}: ${userUpdateError.message}`);
+      return false;
+    }
+
+    // Delete 2FA record
+    const { error: deleteError } = await supabase
+      .from('two_factor_auth')
+      .delete()
+      .eq('user_id', userId);
+    if (deleteError) {
+      logger.error(`2FA disabled for user ${userId} but failed to remove two_factor_auth row: ${deleteError.message}`);
+    }
     
     logger.info(`2FA disabled for user: ${userId}`);
     return true;
@@ -258,12 +359,17 @@ class TwoFactorService {
     const backupCodes = this.generateBackupCodes(8);
     
     const supabase = getSupabase();
-    await supabase
+    const { error } = await supabase
       .from('two_factor_auth')
       .update({
         backup_codes: backupCodes.map(c => this.hashBackupCode(c)),
       })
       .eq('user_id', userId);
+
+    if (error) {
+      logger.error(`Failed to persist regenerated backup codes for user ${userId}: ${error.message}`);
+      return null;
+    }
     
     logger.info(`Backup codes regenerated for user: ${userId}`);
     return backupCodes;

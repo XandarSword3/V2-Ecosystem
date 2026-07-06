@@ -120,3 +120,48 @@ export function verifyToken(token: string): {
     isPlatformAdmin?: boolean;
   };
 }
+
+/**
+ * Short-lived, single-purpose token issued instead of real session tokens
+ * when login() blocks a privileged account for mandatory 2FA enrollment
+ * (see auth.service.ts login(), Q103). Without this, a freshly-provisioned
+ * tenant_owner/admin account could never get in at all: /2fa/setup and
+ * /2fa/enable normally require a real access token, but login() refuses to
+ * issue one until 2FA is already enabled — a chicken-and-egg deadlock.
+ *
+ * This token carries a `purpose` claim specifically so the general
+ * `authenticate` middleware can and does reject it outright (see
+ * auth.middleware.ts) — it must never work as a substitute access token
+ * anywhere except the dedicated 2FA-enrollment routes.
+ */
+export function generateTwoFactorSetupToken(userId: string, email: string): { token: string; expiresIn: number } {
+  const expiresIn = 10 * 60; // 10 minutes — long enough to scan a QR code and enter one code
+  const token = jwt.sign(
+    { userId, email, purpose: 'twofa_setup' },
+    config.jwt.secret,
+    { expiresIn },
+  );
+  return { token, expiresIn };
+}
+
+export function verifyTwoFactorSetupToken(token: string): {
+  userId:  string;
+  email:   string;
+  purpose: string;
+  iat?:    number;
+  exp?:    number;
+} {
+  const decoded = jwt.verify(token, config.jwt.secret) as {
+    userId:  string;
+    email:   string;
+    purpose: string;
+    iat?:    number;
+    exp?:    number;
+  };
+
+  if (decoded.purpose !== 'twofa_setup') {
+    throw new Error('Invalid token purpose');
+  }
+
+  return decoded;
+}
