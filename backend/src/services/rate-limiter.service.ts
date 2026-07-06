@@ -3,6 +3,7 @@
  * Implements token bucket algorithm with Redis support and endpoint-specific limits
  */
 import { Request, Response, NextFunction } from 'express';
+import { cache } from '../utils/cache.js';
 
 interface RateLimitConfig {
   windowMs: number;
@@ -23,6 +24,40 @@ interface RateLimitStore {
   get(key: string): Promise<TokenBucket | null>;
   set(key: string, bucket: TokenBucket, ttlMs: number): Promise<void>;
   increment(key: string): Promise<number>;
+}
+
+// Redis store (for distributed rate limiting)
+class RedisStore implements RateLimitStore {
+  async get(key: string): Promise<TokenBucket | null> {
+    try {
+      const redis = cache.getClient();
+      if (!redis) return null;
+      const data = await redis.get(key);
+      return data ? JSON.parse(data) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async set(key: string, bucket: TokenBucket, ttlMs: number): Promise<void> {
+    try {
+      const redis = cache.getClient();
+      if (!redis) return;
+      await redis.set(key, JSON.stringify(bucket), 'PX', ttlMs);
+    } catch {
+      // Silent fail - rate limiting is best-effort
+    }
+  }
+
+  async increment(key: string): Promise<number> {
+    try {
+      const redis = cache.getClient();
+      if (!redis) return 0;
+      return await redis.incr(key);
+    } catch {
+      return 0;
+    }
+  }
 }
 
 // In-memory store (for single instance)
@@ -46,7 +81,7 @@ class MemoryStore implements RateLimitStore {
   }
 }
 
-// Endpoint-specific configurations
+// Endpoint-specific configurations (production limits)
 const ENDPOINT_LIMITS: Record<string, Partial<RateLimitConfig>> = {
   // Auth endpoints - stricter limits
   '/api/auth/login': { windowMs: 60000, maxRequests: 5 },
@@ -66,6 +101,9 @@ const ENDPOINT_LIMITS: Record<string, Partial<RateLimitConfig>> = {
   '/api': { windowMs: 60000, maxRequests: 100 },
 };
 
+// Dev mode multiplier
+const DEV_MULTIPLIER = process.env.NODE_ENV === 'development' ? 2 : 1;
+
 // User tier multipliers
 const TIER_MULTIPLIERS: Record<string, number> = {
   anonymous: 1.0,
@@ -80,7 +118,9 @@ export class RateLimiterService {
   private defaultConfig: RateLimitConfig;
 
   constructor(store?: RateLimitStore, defaultConfig?: Partial<RateLimitConfig>) {
-    this.store = store || new MemoryStore();
+    // Use Redis store by default, fall back to memory if Redis unavailable
+    const redisClient = cache.getClient();
+    this.store = store || (redisClient ? new RedisStore() : new MemoryStore());
     this.defaultConfig = {
       windowMs: 60000,
       maxRequests: 100,
@@ -106,7 +146,14 @@ export class RateLimiterService {
       }
     }
 
-    return { ...this.defaultConfig, ...matchedConfig };
+    const finalConfig = { ...this.defaultConfig, ...matchedConfig };
+    
+    // Apply dev mode multiplier
+    if (DEV_MULTIPLIER > 1) {
+      finalConfig.maxRequests = Math.floor(finalConfig.maxRequests * DEV_MULTIPLIER);
+    }
+    
+    return finalConfig;
   }
 
   /**

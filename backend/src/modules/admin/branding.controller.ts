@@ -166,75 +166,19 @@ const upload = multer({
 
 // ── CSS generation helpers ───────────────────────────────────────────
 
-function hexToHSL(hex: string): { h: number; s: number; l: number } {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!m) return { h: 0, s: 0, l: 0 };
-  const r = parseInt(m[1], 16) / 255;
-  const g = parseInt(m[2], 16) / 255;
-  const b = parseInt(m[3], 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      case b: h = ((r - g) / d + 4) / 6; break;
-    }
-  }
-  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
-}
-
-const FONT_MAP: Record<string, string> = {
-  'inter': 'Inter', 'roboto': 'Roboto', 'open-sans': 'Open Sans',
-  'lato': 'Lato', 'poppins': 'Poppins', 'montserrat': 'Montserrat',
-  'playfair-display': 'Playfair Display', 'merriweather': 'Merriweather',
-  'lora': 'Lora', 'nunito': 'Nunito', 'raleway': 'Raleway',
-  'dm-sans': 'DM Sans', 'system-ui': 'system-ui',
-};
-
-/**
- * Regenerate the CSS custom-properties string from the current colors + fonts
- * sections and persist it to property_settings as `branding.css`.
- */
-async function regenerateBrandingCSS(propertyId: string): Promise<void> {
-  try {
-    const { resolveSettings, setPropertySetting } = await import(
-      '../multi-property/settings-resolution.service.js'
-    );
-    const resolved = await resolveSettings(propertyId, [
-      sectionKey('colors'),
-      sectionKey('fonts'),
-    ]);
-    const colors = (resolved[sectionKey('colors')]?.value as Record<string, string>) || {};
-    const fonts  = (resolved[sectionKey('fonts')]?.value as Record<string, string>) || {};
-
-    const primary   = colors.primaryColor   || '#0891b2';
-    const secondary = colors.secondaryColor || '#64748b';
-    const accent    = colors.accentColor    || '#f59e0b';
-    const heading   = (fonts.headingFont    || 'inter').toLowerCase().replace(/\s+/g, '-');
-    const body      = (fonts.bodyFont       || 'inter').toLowerCase().replace(/\s+/g, '-');
-
-    const ph = hexToHSL(primary), sh = hexToHSL(secondary), ah = hexToHSL(accent);
-
-    const css = `:root {
-  --brand-primary: ${primary};
-  --brand-secondary: ${secondary};
-  --brand-accent: ${accent};
-  --brand-primary-h: ${ph.h}; --brand-primary-s: ${ph.s}%; --brand-primary-l: ${ph.l}%;
-  --brand-secondary-h: ${sh.h}; --brand-secondary-s: ${sh.s}%; --brand-secondary-l: ${sh.l}%;
-  --brand-accent-h: ${ah.h}; --brand-accent-s: ${ah.s}%; --brand-accent-l: ${ah.l}%;
-  --font-heading: '${FONT_MAP[heading] || 'Inter'}', system-ui, sans-serif;
-  --font-body: '${FONT_MAP[body] || 'Inter'}', system-ui, sans-serif;
-}`;
-
-    await setPropertySetting(propertyId, sectionKey('css'), { css }, 'branding');
-  } catch (err) {
-    logger.error('Failed to regenerate branding CSS', { propertyId, err });
-  }
-}
+// NOTE: A `regenerateBrandingCSS()` helper used to run here on every
+// colors/fonts PATCH — it wrote a `:root { --brand-primary: ...; }` CSS
+// block into property_settings under key `branding.css`. Removed 2026-07-04:
+// grepped the entire frontend and backend and found zero consumers of
+// `--brand-primary` or the `branding.css` key anywhere — the actual live
+// theming is done client-side by ThemeInjector.tsx via `--color-primary`
+// etc., a completely separate variable namespace. This function was pure
+// dead weight: ~4-5 extra sequential Supabase round trips (resolveSettings
+// + setPropertySetting) per save, for a value nothing ever reads. That
+// accounted for roughly half the 7-9s PATCH latency on colors/fonts saves.
+// If server-rendered CSS custom properties are wanted later (e.g. to kill
+// FOUC on first paint), rebuild this as a read path in layout.tsx's SSR,
+// not as a write-time side effect nobody consumes.
 
 // ══════════════════════════════════════════════════════════════════════
 // Routes
@@ -317,11 +261,6 @@ router.patch(
       changedKeys: Object.keys(incoming),
     });
 
-    // Regenerate CSS when visual sections change
-    if (section === 'colors' || section === 'fonts') {
-      await regenerateBrandingCSS(propertyId);
-    }
-    
     // Emit socket event to notify frontend to refetch settings
     const { emitToAll } = await import('../../socket/index.js');
     emitToAll('settings.updated', { brandingUpdated: true });

@@ -98,7 +98,34 @@ export const enableTwoFactor = asyncHandler(async (req: Request, res: Response) 
       action: 'ENABLE',
       resource: 'two_factor_auth',
     });
-    
+
+    // If this request came in on the short-lived post-login setup token
+    // (authenticateTwoFactorSetup sets scope to '' — see auth.middleware.ts),
+    // the account still has no real session. Finish login right now instead
+    // of forcing a redundant second login + 2FA-code round trip: this is
+    // the exact moment mandatory-2FA enrollment completes.
+    if (req.user?.scope === '') {
+      const loginResult = await completeLoginAfter2FA(userId, {
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      const { generateCsrfToken, setCsrfCookie } = await import('../../middleware/csrf.middleware.js');
+      const newCsrfToken = generateCsrfToken();
+      setCsrfCookie(res, newCsrfToken, req);
+      setAuthCookies(res, loginResult.tokens.refreshToken);
+
+      return res.json({
+        success: true,
+        data: {
+          user: loginResult.user,
+          tokens: { accessToken: loginResult.tokens.accessToken },
+        },
+        csrfToken: newCsrfToken,
+        message: 'Two-factor authentication enabled. You are now logged in.',
+      });
+    }
+
     res.json({
       success: true,
       message: 'Two-factor authentication has been enabled successfully.',
@@ -180,7 +207,7 @@ export const verifyTwoFactor = asyncHandler(async (req: Request, res: Response) 
     // SECURITY FIX (HIGH-009): Rotate CSRF token after successful login to prevent session fixation
     const { generateCsrfToken, setCsrfCookie } = await import('../../middleware/csrf.middleware.js');
     const newCsrfToken = generateCsrfToken();
-    setCsrfCookie(res, newCsrfToken);
+    setCsrfCookie(res, newCsrfToken, req);
 
     // SECURITY FIX (C-1): refresh token never leaves the server as JSON.
     setAuthCookies(res, loginResult.tokens.refreshToken);

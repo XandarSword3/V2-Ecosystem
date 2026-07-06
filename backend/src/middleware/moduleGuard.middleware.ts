@@ -19,9 +19,10 @@ interface ModuleCache {
 const moduleCache: ModuleCache = {};
 const CACHE_TTL = 60000; // 1 minute cache
 
-async function getModuleStatus(slug: string): Promise<boolean> {
+async function getModuleStatus(slug: string, tenantId: string | null): Promise<boolean> {
+  const cacheKey = tenantId ? `${tenantId}:${slug}` : `global:${slug}`;
   const now = Date.now();
-  const cached = moduleCache[slug];
+  const cached = moduleCache[cacheKey];
 
   // Return cached value if still valid
   if (cached && (now - cached.cachedAt) < CACHE_TTL) {
@@ -29,25 +30,55 @@ async function getModuleStatus(slug: string): Promise<boolean> {
   }
 
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('modules')
-    .select('is_active')
-    .eq('slug', slug)
-    .single();
+
+  // Two different tenants may legitimately create modules that share a slug
+  // (see modules.controller.ts createModule, "Q171 — scope slug uniqueness
+  // to tenant"). Querying by slug alone with .single() is unsafe once that
+  // happens: Postgres/PostgREST throws the same PGRST116 code for "0 rows"
+  // and "more than 1 row", so a cross-tenant slug collision was previously
+  // indistinguishable from "module doesn't exist" and failed closed for
+  // BOTH tenants. Fix: resolve tenant-scoped first, then fall back to an
+  // unscoped/global module (tenant_id IS NULL) — same precedence used by
+  // getModules() in modules.controller.ts — using maybeSingle() so a clean
+  // zero-row miss returns (null, null) instead of throwing.
+  let data: { is_active: boolean } | null = null;
+  let error: { code?: string; message: string } | null = null;
+
+  if (tenantId) {
+    ({ data, error } = await supabase
+      .from('modules')
+      .select('is_active')
+      .eq('slug', slug)
+      .eq('tenant_id', tenantId)
+      .maybeSingle());
+  }
+
+  if (!error && !data) {
+    ({ data, error } = await supabase
+      .from('modules')
+      .select('is_active')
+      .eq('slug', slug)
+      .is('tenant_id', null)
+      .maybeSingle());
+  }
 
   if (error) {
-    if (error.code === 'PGRST116') {
-      // Module slug not registered in DB — fail closed. Unknown modules are not active.
-      logger.warn(`Module '${slug}' not found in database — treating as inactive (fail-closed).`);
-      moduleCache[slug] = { isActive: false, cachedAt: now };
-      return false;
-    }
-    // Any other DB error — throw so the caller catches it and returns 503.
+    // A real DB error, or a genuine duplicate WITHIN one scope (e.g. two
+    // null-tenant global rows with the same slug) — that's an actual data
+    // integrity problem, not a cross-tenant collision, so fail closed and
+    // let the caller's catch block report it as a check failure.
     throw error;
   }
 
-  const isActive = data?.is_active ?? false;
-  moduleCache[slug] = { isActive, cachedAt: now };
+  if (!data) {
+    // Confirmed absent in both the tenant-scoped and global scope.
+    logger.warn(`Module '${slug}' not found in database (tenant=${tenantId ?? 'none'}) — treating as inactive (fail-closed).`);
+    moduleCache[cacheKey] = { isActive: false, cachedAt: now };
+    return false;
+  }
+
+  const isActive = data.is_active ?? false;
+  moduleCache[cacheKey] = { isActive, cachedAt: now };
   return isActive;
 }
 
@@ -56,7 +87,13 @@ async function getModuleStatus(slug: string): Promise<boolean> {
  */
 export function clearModuleCache(slug?: string): void {
   if (slug) {
-    delete moduleCache[slug];
+    // Cache keys are now `${tenantId}:${slug}` or `global:${slug}` (see
+    // getModuleStatus) — clear every variant for this slug regardless of
+    // which tenant's row triggered the update, since callers here
+    // (modules.controller.ts create/update/delete) only have the slug.
+    Object.keys(moduleCache).forEach(key => {
+      if (key.endsWith(`:${slug}`)) delete moduleCache[key];
+    });
   } else {
     Object.keys(moduleCache).forEach(key => delete moduleCache[key]);
   }
@@ -70,7 +107,12 @@ export function clearModuleCache(slug?: string): void {
 export function requireModule(moduleSlug: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const isActive = await getModuleStatus(moduleSlug);
+      // Same dual-source tenant resolution used elsewhere (tenantAccess
+      // middleware sets req.tenant; internal callers may send the header
+      // directly). A missing tenant is valid — legacy/global modules have
+      // tenant_id IS NULL — getModuleStatus handles that fallback.
+      const tenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string | undefined) || null;
+      const isActive = await getModuleStatus(moduleSlug, tenantId);
 
       if (!isActive) {
         logger.info(`Blocked request to disabled module: ${moduleSlug}, path: ${req.path}`);

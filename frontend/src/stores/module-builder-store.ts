@@ -14,6 +14,20 @@ const findNode = (nodes: UIBlock[], id: string): UIBlock | undefined => {
   return undefined;
 };
 
+/** Find the parent array and index of a node with given ID. Returns { parent, index, path } */
+const findParentAndIndex = (nodes: UIBlock[], id: string, path: UIBlock[] = []): { parent: UIBlock[], index: number, path: UIBlock[] } | null => {
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].id === id) {
+      return { parent: nodes, index: i, path };
+    }
+    if (nodes[i].children) {
+      const result = findParentAndIndex(nodes[i].children!, id, [...path, nodes[i]]);
+      if (result) return result;
+    }
+  }
+  return null;
+};
+
 /** Parse a position dimension (e.g. '400px', '50%', 400) into a pixel number. Falls back to `fallback`. */
 const parsePx = (val: string | number | undefined, fallback = 200): number => {
   if (val === undefined || val === null) return fallback;
@@ -255,6 +269,37 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
             ? []
             : undefined,
       };
+
+      // If a container is selected, add as child of that container
+      const selectedBlock = state.selectedBlockId ? findNode(state.layout, state.selectedBlockId) : null;
+      const isContainer = selectedBlock && (
+        selectedBlock.type === 'container' || 
+        selectedBlock.type === 'grid' || 
+        selectedBlock.type === 'form_container'
+      );
+
+      if (isContainer && selectedBlock.children) {
+        // Add to nested container
+        const addRecursive = (nodes: UIBlock[]): UIBlock[] => {
+          return nodes.map((node) => {
+            if (node.id === state.selectedBlockId) {
+              return {
+                ...node,
+                children: [...(node.children || []), newBlock],
+              };
+            }
+            if (node.children) {
+              return { ...node, children: addRecursive(node.children) };
+            }
+            return node;
+          });
+        };
+        const newLayout = addRecursive(state.layout);
+        const newHistory = [...state.history, [...state.layout]].slice(-50);
+        return { layout: newLayout, history: newHistory, _futureStates: [] };
+      }
+
+      // Default: add to root layout
       const newLayout = [...state.layout, newBlock];
       const newHistory = [...state.history, [...state.layout]].slice(-50);
       return { layout: newLayout, history: newHistory, _futureStates: [] };
@@ -293,12 +338,103 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
 
   moveBlock: (activeId, overId) =>
     set((state) => {
-      const oldIndex = state.layout.findIndex((x) => x.id === activeId);
-      const newIndex = state.layout.findIndex((x) => x.id === overId);
-      if (oldIndex === -1 || newIndex === -1) return state;
-      const newLayout = [...state.layout];
-      const [moved] = newLayout.splice(oldIndex, 1);
-      newLayout.splice(newIndex, 0, moved);
+      if (activeId === overId) return state;
+
+      const activeInfo = findParentAndIndex(state.layout, activeId);
+      const overInfo = findParentAndIndex(state.layout, overId);
+
+      if (!activeInfo || !overInfo) return state;
+
+      const activeBlock = findNode(state.layout, activeId);
+      const overBlock = findNode(state.layout, overId);
+
+      if (!activeBlock || !overBlock) return state;
+
+      // Check if overBlock is a container and we should move into it
+      const isOverContainer = overBlock.type === 'container' || 
+                            overBlock.type === 'grid' || 
+                            overBlock.type === 'form_container';
+
+      // If moving into a container (and not already a child of it)
+      if (isOverContainer && activeInfo.parent !== overInfo.parent) {
+        // Remove from current parent
+        const removeFromParent = (nodes: UIBlock[]): UIBlock[] => {
+          return nodes
+            .filter((n) => n.id !== activeId)
+            .map((n) => ({ ...n, children: n.children ? removeFromParent(n.children) : undefined }));
+        };
+
+        // Add to container's children
+        const addToContainer = (nodes: UIBlock[]): UIBlock[] => {
+          return nodes.map((node) => {
+            if (node.id === overId) {
+              return {
+                ...node,
+                children: [...(node.children || []), activeBlock],
+              };
+            }
+            if (node.children) {
+              return { ...node, children: addToContainer(node.children) };
+            }
+            return node;
+          });
+        };
+
+        const newLayout = addToContainer(removeFromParent(state.layout));
+        const newHistory = [...state.history, [...state.layout]].slice(-50);
+        return { layout: newLayout, history: newHistory, _futureStates: [] };
+      }
+
+      // If same parent, just reorder
+      if (activeInfo.parent === overInfo.parent) {
+        const newLayout = [...state.layout];
+        const parent = activeInfo.parent;
+        const oldIndex = activeInfo.index;
+        const newIndex = overInfo.index;
+        
+        // Adjust index if moving down
+        const adjustedNewIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
+        
+        const [moved] = parent.splice(oldIndex, 1);
+        parent.splice(adjustedNewIndex, 0, moved);
+        
+        const newHistory = [...state.history, [...state.layout]].slice(-50);
+        return { layout: newLayout, history: newHistory, _futureStates: [] };
+      }
+
+      // Moving between different parents (both at root or nested)
+      // Helper to rebuild layout with modified parent at given path
+      const rebuildLayout = (nodes: UIBlock[], path: UIBlock[], newParent: UIBlock[]): UIBlock[] => {
+        if (path.length === 0) return newParent;
+        const [first, ...rest] = path;
+        return nodes.map((node) => {
+          if (node.id === first.id) {
+            return { ...node, children: rebuildLayout(node.children || [], rest, newParent) };
+          }
+          if (node.children) {
+            return { ...node, children: rebuildLayout(node.children, path, newParent) };
+          }
+          return node;
+        });
+      };
+
+      // Remove from old parent
+      const layoutWithoutActive = (() => {
+        const removeFromParent = (nodes: UIBlock[]): UIBlock[] => {
+          return nodes
+            .filter((n) => n.id !== activeId)
+            .map((n) => ({ ...n, children: n.children ? removeFromParent(n.children) : undefined }));
+        };
+        return removeFromParent(state.layout);
+      })();
+
+      // Add to new parent (at the position of overId)
+      const newParent = [...overInfo.parent];
+      const insertIndex = overInfo.index;
+      newParent.splice(insertIndex, 0, activeBlock);
+
+      // Rebuild layout with the modified parent
+      const newLayout = rebuildLayout(layoutWithoutActive, overInfo.path, newParent);
       const newHistory = [...state.history, [...state.layout]].slice(-50);
       return { layout: newLayout, history: newHistory, _futureStates: [] };
     }),

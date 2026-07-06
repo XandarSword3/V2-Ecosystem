@@ -100,7 +100,7 @@ export function getModuleChildren(
         { name: t('nav.orders'), href: `${base}/${safeSlug}/orders`, translationKey: 'nav.orders' },
         { name: t('nav.tables'), href: `${base}/${safeSlug}/tables`, translationKey: 'nav.tables' },
         { name: t('nav.waitlist') || 'Waitlist', href: `${base}/${safeSlug}/waitlist`, translationKey: 'nav.waitlist' },
-        { name: t('nav.modifiers') || 'Modifiers', href: `${base}/${safeSlug}/modifiers`, translationKey: 'nav.modifiers' },
+        { name: t('nav.modifiers') || 'Customizations', href: `${base}/customizations`, translationKey: 'nav.modifiers' },
       ];
     case 'time_exclusive_reservation':
       return [

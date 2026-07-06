@@ -108,10 +108,14 @@ export async function login(req: Request, res: Response, next: NextFunction) {
   try {
     const data = loginSchema.parse(req.body);
 
+    // Same tenant context register() uses — req.tenant is populated by
+    // tenantAccess middleware from the subdomain/X-Tenant-Slug header.
+    // Required now that email is scoped per-tenant, not platform-wide
+    // (20260704010000_scope_users_email_uniqueness_per_tenant.sql).
     const result = await authService.login(data.email, data.password, {
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
-    });
+    }, req.tenant?.id);
 
     // Check if 2FA is required (existing enrolled 2FA)
     if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
@@ -134,6 +138,10 @@ export async function login(req: Request, res: Response, next: NextFunction) {
           requiresTwoFactorSetup: true,
           userId: result.userId,
           email: result.email,
+          // Short-lived token that authenticateForTwoFactorEnrollment (auth.middleware.ts)
+          // will accept for /2fa/setup and /2fa/enable ONLY — the account
+          // has no real session yet, this is the only way in.
+          twoFactorSetupToken: (result as any).twoFactorSetupToken,
         },
         message: result.message || 'Two-factor authentication is mandatory for admin accounts. Please enrol in 2FA before logging in.',
         code: 'TWO_FACTOR_SETUP_REQUIRED',
@@ -146,7 +154,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     // SECURITY FIX (HIGH-009): Rotate CSRF token after successful login to prevent session fixation
     const { generateCsrfToken, setCsrfCookie } = await import('../../middleware/csrf.middleware.js');
     const newCsrfToken = generateCsrfToken();
-    setCsrfCookie(res, newCsrfToken);
+    setCsrfCookie(res, newCsrfToken, req);
 
     // SECURITY FIX (C-1): refresh token never leaves the server as JSON.
     setAuthCookies(res, loginResult.tokens.refreshToken);
@@ -282,7 +290,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
 export async function forgotPassword(req: Request, res: Response, next: NextFunction) {
   try {
     const { email } = req.body;
-    await authService.sendPasswordResetEmail(email);
+    await authService.sendPasswordResetEmail(email, req.tenant?.id);
     res.json({ success: true, message: 'If the email exists, a reset link has been sent' });
   } catch (error) {
     // Don't reveal if email exists

@@ -47,6 +47,9 @@ router.patch('/modules/:slug/orders/:orderId/status', authorize(...staffRoles), 
 // Get bookings for a module
 router.get('/modules/:slug/bookings', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.getModuleBookings);
 
+// Create a staff booking (walk-in)
+router.post('/modules/:slug/bookings', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.createStaffBooking);
+
 // Update booking status (check-in, check-out, etc.)
 router.put('/modules/:slug/bookings/:bookingId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleBookingStatus);
 router.patch('/modules/:slug/bookings/:bookingId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleBookingStatus);

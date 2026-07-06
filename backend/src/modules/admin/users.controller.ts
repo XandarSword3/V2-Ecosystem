@@ -35,11 +35,50 @@ interface UserRoleData {
 }
 
 const getPropertyContext = (req: Request) => {
-  const isTest = process.env.NODE_ENV === 'test';
+  // NODE_ENV must never influence production authorization. A staging leak or CI
+  // misconfig that leaves NODE_ENV='test' would otherwise make every request
+  // super-admin. Tests should inject req.user.roles = ['super_admin'] explicitly.
   const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
-  const isSuperAdmin = req.user?.roles?.includes('super_admin') || isTest;
+  const isSuperAdmin = req.user?.roles?.includes('super_admin') ?? false;
   return { propertyId, isSuperAdmin };
 };
+
+// Scope hierarchy allow-list: which scopes a caller of a given scope may grant to someone else.
+// Anything not listed here (property_staff, customer, or an unrecognized/missing scope) may grant nothing.
+const GRANTABLE_SCOPES: Record<string, string[]> = {
+  super_admin: ['super_admin', 'platform_admin', 'tenant_owner', 'tenant_admin', 'property_manager', 'property_staff', 'customer'],
+  tenant_owner: ['tenant_admin', 'property_manager', 'property_staff', 'customer'],
+  tenant_admin: ['property_manager', 'property_staff', 'customer'],
+  property_manager: ['property_staff', 'customer'],
+};
+
+function assertCanGrantScope(callerScope: string | undefined, targetScope: string) {
+  const allowed = GRANTABLE_SCOPES[callerScope || ''] || [];
+  if (!allowed.includes(targetScope)) {
+    const error = new Error(`You do not have permission to create a user with scope '${targetScope}'`);
+    (error as any).statusCode = 403;
+    throw error;
+  }
+}
+
+// Role names that map to a privilege tier and therefore must go through the same
+// allow-list as scope grants — otherwise assignUserRoles() becomes a second,
+// unguarded path to the same escalation createUser() now blocks.
+const PRIVILEGED_ROLE_NAMES = ['super_admin', 'platform_admin', 'tenant_owner', 'tenant_admin', 'property_manager'];
+
+async function assertCanGrantRoleIds(supabase: any, callerScope: string | undefined, roleIds: string[] | undefined) {
+  if (!roleIds || roleIds.length === 0) return;
+  const { data: roleRows, error } = await supabase.from('roles').select('id, name').in('id', roleIds);
+  if (error) throw error;
+  const allowed = GRANTABLE_SCOPES[callerScope || ''] || [];
+  for (const role of roleRows || []) {
+    if (PRIVILEGED_ROLE_NAMES.includes(role.name) && !allowed.includes(role.name)) {
+      const error = new Error(`You do not have permission to grant the '${role.name}' role`);
+      (error as any).statusCode = 403;
+      throw error;
+    }
+  }
+}
 
 // Get users with advanced filtering and online status
 export const getUsers = asyncHandler(async (req: Request, res: Response) => {
@@ -373,6 +412,9 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       return;
     }
 
+    // Hard-reject scope escalation: caller can only grant scopes at or below their own tier.
+    assertCanGrantScope(req.user?.scope, scope || 'customer');
+
     const supabase = getSupabase();
 
     // Check if email already exists
@@ -436,7 +478,10 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const checkPropertyAccess = async (supabase: any, targetUserId: string, propertyId: string | undefined, isSuperAdmin: boolean | undefined) => {
-  if (isSuperAdmin || !propertyId) return true;
+  if (isSuperAdmin) return true;
+  // Deny by default: an absent/omitted X-Property-Id header must never be treated as
+  // "check passed" — that was granting cross-tenant read/write on any user record.
+  if (!propertyId) return false;
   const { data } = await supabase
     .from('user_property_access')
     .select('user_id')
@@ -520,6 +565,10 @@ export const assignUserRoles = asyncHandler(async (req: Request, res: Response) 
       return res.status(403).json({ success: false, error: 'Access denied to this user' });
     }
 
+    // Block privilege escalation: reject any submitted roleId whose role name
+    // sits above the caller's own tier (e.g. a tenant_owner granting themselves super_admin).
+    await assertCanGrantRoleIds(supabase, req.user?.scope, roleIds);
+
     // Replace all roles
     await supabase.from('user_roles').delete().eq('user_id', id);
 
@@ -544,6 +593,11 @@ export const assignUserRoles = asyncHandler(async (req: Request, res: Response) 
 });
 
 // New scope-based assignment endpoint (replaces role-based assignment)
+// 0.7 re-verification: this function is not currently mounted to any route (confirmed via
+// full-tree search), but it writes `scope` directly to the users table and was missing the
+// same assertCanGrantScope() allow-list check that createUser()/assignUserRoles() now enforce.
+// Left unguarded, wiring this up later (or an agent doing so without noticing) would silently
+// reopen the exact privilege-escalation class 0.1/0.2 closed. Guarding it now, before it's ever routed.
 export const assignUserScope = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
@@ -554,6 +608,9 @@ export const assignUserScope = asyncHandler(async (req: Request, res: Response) 
     if (!hasAccess) {
       return res.status(403).json({ success: false, error: 'Access denied to this user' });
     }
+
+    // Hard-reject scope escalation: same allow-list used by createUser().
+    assertCanGrantScope(req.user?.scope, scope);
 
     // Update user's scope directly
     const { error } = await supabase

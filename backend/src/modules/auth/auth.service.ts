@@ -1,10 +1,11 @@
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { getSupabase } from "../../database/connection.js";
-import { generateTokens, verifyRefreshToken } from "./auth.utils.js";
+import { generateTokens, verifyRefreshToken, generateTwoFactorSetupToken } from "./auth.utils.js";
 import { config } from "../../config/index";
 import { logger } from "../../utils/logger.js";
 import { emailService } from "../../services/email.service.js";
+import { buildTenantUrl } from "../../utils/tenant-url.js";
 import { AppError } from "../../utils/errors.js";
 import { validatePassword } from "../../services/password-policy.service.js";
 import { isAccountLocked, recordFailedAttempt, recordSuccessfulLogin } from "./lockout.service.js";
@@ -28,12 +29,18 @@ export interface RegisterData {
 export async function register(data: RegisterData) {
   const supabase = getSupabase();
 
-  // Check if email exists
-  const { data: existing, error: checkError } = await supabase
+  // Check if email exists — scoped to this tenant. Email is unique
+  // per-tenant, not platform-wide (20260704010000_scope_users_email_uniqueness_per_tenant.sql),
+  // so the same address can already be registered under a different tenant
+  // without blocking registration here.
+  const existingQuery = supabase
     .from('users')
     .select('id')
     .eq('email', data.email.toLowerCase())
     .limit(1);
+  const { data: existing, error: checkError } = data.tenantId
+    ? await existingQuery.eq('tenant_id', data.tenantId)
+    : await existingQuery.is('tenant_id', null);
 
   if (checkError) {
     logger.error('Error checking email during registration:', checkError.message);
@@ -90,15 +97,20 @@ export async function register(data: RegisterData) {
   return { user };
 }
 
-export async function login(email: string, password: string, meta: SessionMeta) {
+export async function login(email: string, password: string, meta: SessionMeta, tenantId?: string) {
   const supabase = getSupabase();
 
-  // Find user
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('email', email.toLowerCase())
-    .single();
+  // Find user — scoped to the resolved tenant (req.tenant?.id, set by
+  // tenantAccess.middleware.ts from the subdomain, same as register() does).
+  // Email is only unique per-tenant now (20260704010000_scope_users_email_uniqueness_per_tenant.sql),
+  // so an unscoped lookup could match a different tenant's row with the
+  // same email. When no tenant is resolved (bare platform domain), only
+  // platform-level accounts (tenant_id IS NULL) are eligible — a
+  // tenant-scoped user must log in through their tenant's subdomain.
+  const userQuery = supabase.from('users').select('*').eq('email', email.toLowerCase());
+  const { data: user, error: userError } = await (
+    tenantId ? userQuery.eq('tenant_id', tenantId) : userQuery.is('tenant_id', null)
+  ).single();
 
   if (userError || !user) {
     throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
@@ -164,10 +176,19 @@ export async function login(email: string, password: string, meta: SessionMeta) 
     userScope === 'platform_admin' ||
     userScope === 'tenant_owner';
   if (requiresMandatory2FA && !user.two_factor_enabled) {
+    // Without this token, a freshly-provisioned tenant_owner/admin account
+    // could never log in at all: /2fa/setup and /2fa/enable normally
+    // require a real access token, and login() (here) refuses to issue one
+    // until 2FA is already enabled. This short-lived, single-purpose token
+    // (rejected by the general `authenticate` middleware — see
+    // auth.middleware.ts) is the only thing that lets them reach the
+    // enrollment endpoints at all.
+    const { token: twoFactorSetupToken } = generateTwoFactorSetupToken(user.id, user.email);
     return {
       requiresTwoFactorSetup: true,
       userId: user.id,
       email: user.email,
+      twoFactorSetupToken,
       message: 'Two-factor authentication is mandatory for admin accounts. Please enrol in 2FA before logging in.',
     };
   }
@@ -563,15 +584,15 @@ export async function disable2FA(userId: string) {
     .eq('user_id', userId);
 }
 
-export async function sendPasswordResetEmail(email: string) {
+export async function sendPasswordResetEmail(email: string, tenantId?: string) {
   const supabase = getSupabase();
 
-  // Find user
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('id, full_name, email, tenant_id')
-    .eq('email', email.toLowerCase())
-    .single();
+  // Find user — scoped the same way login() is, since email is only
+  // unique per-tenant now (20260704010000_scope_users_email_uniqueness_per_tenant.sql).
+  const resetUserQuery = supabase.from('users').select('id, full_name, email, tenant_id').eq('email', email.toLowerCase());
+  const { data: user, error: userError } = await (
+    tenantId ? resetUserQuery.eq('tenant_id', tenantId) : resetUserQuery.is('tenant_id', null)
+  ).single();
 
   if (userError || !user) {
     // Don't reveal if email exists - just return silently
@@ -588,6 +609,19 @@ export async function sendPasswordResetEmail(email: string) {
     .delete()
     .eq('user_id', user.id)
     .eq('session_type', 'password_reset');
+
+  // Get tenant subdomain for URL construction
+  let subdomain = 'app';
+  if (user.tenant_id) {
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('subdomain')
+      .eq('id', user.tenant_id)
+      .single();
+    if (tenant?.subdomain) {
+      subdomain = tenant.subdomain;
+    }
+  }
 
   // Store token in sessions table
   const { error: insertError } = await supabase
@@ -607,8 +641,8 @@ export async function sendPasswordResetEmail(email: string) {
     throw new Error('Failed to initiate password reset');
   }
 
-  // Send email with reset link
-  const resetUrl = `${config.frontendUrl}/reset-password?token=${resetToken}`;
+  // Send email with tenant-scoped reset link
+  const resetUrl = buildTenantUrl(subdomain, `/reset-password?token=${resetToken}`);
 
   await emailService.sendEmail({
     to: user.email,
@@ -705,12 +739,24 @@ export async function sendVerificationEmail(userId: string, email: string, fullN
     .eq('user_id', userId)
     .eq('session_type', 'email_verification');
 
-  // Get user's tenant_id
+  // Get user's tenant_id and subdomain
   const { data: user } = await supabase
     .from('users')
     .select('tenant_id')
     .eq('id', userId)
     .single();
+
+  let subdomain = 'app';
+  if (user?.tenant_id) {
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('subdomain')
+      .eq('id', user.tenant_id)
+      .single();
+    if (tenant?.subdomain) {
+      subdomain = tenant.subdomain;
+    }
+  }
 
   // Store token in sessions table
   await supabase
@@ -725,8 +771,8 @@ export async function sendVerificationEmail(userId: string, email: string, fullN
       session_type: 'email_verification',
     });
 
-  // Send verification email
-  const verifyUrl = `${config.frontendUrl}/verify-email?token=${verificationToken}`;
+  // Send verification email with tenant-scoped URL
+  const verifyUrl = buildTenantUrl(subdomain, `/verify-email?token=${verificationToken}`);
 
   await emailService.sendEmail({
     to: email,

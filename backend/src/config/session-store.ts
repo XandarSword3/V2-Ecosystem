@@ -3,13 +3,11 @@
  * Enables stateless backend instances with Redis-backed sessions
  */
 
-import Redis from 'ioredis';
 import session from 'express-session';
 import { RedisStore } from 'connect-redis';
+import { cache } from '../utils/cache.js';
 
 // Environment configuration
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-const REDIS_CLUSTER_NODES = process.env.REDIS_CLUSTER_NODES?.split(',') || [];
 const REDIS_ENABLED = process.env.REDIS_ENABLED === 'true';
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -25,61 +23,15 @@ if (!SESSION_SECRET && NODE_ENV === 'production') {
 const FALLBACK_SECRET = require('crypto').randomBytes(32).toString('hex');
 const FINAL_SESSION_SECRET = SESSION_SECRET || FALLBACK_SECRET;
 
-// Redis connection options
-const redisOptions = {
-  maxRetriesPerRequest: 3,
-  enableReadyCheck: true,
-  retryDelayOnFailover: 100,
-  retryDelayOnClusterDown: 100,
-  retryDelayOnTryAgain: 100,
-  scaleReads: 'slave' as const,
-  lazyConnect: true,
-  showFriendlyErrorStack: NODE_ENV !== 'production',
-};
-
-// Create Redis client (single instance or cluster)
-let redisInstance: any = null;
-
-export const createRedisClient = () => {
-  if (REDIS_CLUSTER_NODES.length > 0) {
-    // Cluster mode for production
-    const nodes = REDIS_CLUSTER_NODES.map((node) => {
-      const [host, port] = node.split(':');
-      return { host, port: parseInt(port, 10) };
-    });
-
-    return new Redis.Cluster(nodes, {
-      redisOptions: {
-        ...redisOptions,
-      } as any,
-      clusterRetryStrategy: (times) => {
-        if (times > 10) return null;
-        return Math.min(times * 100, 3000);
-      },
-    });
-  }
-
-  return new Redis(REDIS_URL, redisOptions);
-};
-
+// Shared Redis client — see utils/cache.ts. Session store no longer opens
+// its own connection; it reuses the single backend-wide client so we don't
+// multiply persistent TLS connections to Upstash per instance.
 export const getRedis = () => {
   if (!REDIS_ENABLED) return null;
-  if (!redisInstance) {
-    redisInstance = createRedisClient();
-  }
-  return redisInstance;
+  return cache.getClient();
 };
 
-// Session store for horizontal scaling
-export const redisClient = REDIS_ENABLED ? createRedisClient() : null;
-
-// Setup event handlers only if redis is enabled
-if (REDIS_ENABLED && redisClient) {
-  redisClient.on('connect', () => { console.log('[Redis] Connected to session store'); });
-  redisClient.on('error', (err: any) => { console.error('[Redis] Session store error:', err.message); });
-  redisClient.on('ready', () => { console.log('[Redis] Session store ready'); });
-  redisClient.on('reconnecting', () => { console.log('[Redis] Reconnecting to session store...'); });
-}
+export const redisClient = getRedis();
 
 // Create Redis session store
 export const createSessionStore = () => {
@@ -242,10 +194,11 @@ export const checkSessionStoreHealth = async (): Promise<{
   }
 };
 
-// Graceful shutdown
+// Graceful shutdown — delegates to the shared client owner (utils/cache.ts).
+// Does NOT call redisClient.quit() directly: this is the same connection
+// used by the cache layer and rate limiters, so only cache.disconnect()
+// (called once, from index.ts's shutdown sequence) should close it.
 export const closeSessionStore = async (): Promise<void> => {
-  if (!REDIS_ENABLED || !redisClient) return;
-  console.log('[Redis] Closing session store connection...');
-  await redisClient.quit();
-  console.log('[Redis] Session store connection closed');
+  if (!REDIS_ENABLED) return;
+  await cache.disconnect();
 };

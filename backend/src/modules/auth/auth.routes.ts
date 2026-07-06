@@ -3,7 +3,7 @@ import * as authController from "./auth.controller";
 import * as twoFactorController from "./two-factor.controller";
 import * as oauthController from "./oauth.controller";
 import * as biometricController from "./biometric.controller";
-import { authenticate } from "../../middleware/auth.middleware";
+import { authenticate, authenticateForTwoFactorEnrollment } from "../../middleware/auth.middleware";
 import userRateLimit from "../../middleware/userRateLimit.middleware.js";
 
 const router = Router();
@@ -64,9 +64,12 @@ router.put('/change-password', authenticate, authController.changePassword);
 router.post('/resend-verification', authenticate, authController.resendVerification);
 
 // 2FA management (protected)
+// setup/enable accept EITHER a normal access token (self-service, from
+// account settings) OR the short-lived post-login setup token issued when
+// mandatory 2FA blocks a privileged account — see authenticateForTwoFactorEnrollment.
 router.get('/2fa/status', authenticate, twoFactorController.getTwoFactorStatus);
-router.post('/2fa/setup', authenticate, twoFactorController.initializeTwoFactor);
-router.post('/2fa/enable', authenticate, twoFactorController.enableTwoFactor);
+router.post('/2fa/setup', authenticateForTwoFactorEnrollment, twoFactorController.initializeTwoFactor);
+router.post('/2fa/enable', authenticateForTwoFactorEnrollment, twoFactorController.enableTwoFactor);
 router.post('/2fa/disable', authenticate, twoFactorController.disableTwoFactor);
 router.post('/2fa/backup-codes', authenticate, twoFactorController.regenerateBackupCodes);
 

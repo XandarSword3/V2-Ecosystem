@@ -15,6 +15,7 @@
 import { Request, Response } from 'express';
 import { getSaasBillingService, SaasBillingService } from '../../services/saas-billing.service.js';
 import { getProvisioningService } from './provisioning.service.js';
+import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import type { SubscriptionTier } from '../../middleware/tenantAccess.middleware.js';
 import Stripe from 'stripe';
@@ -48,7 +49,11 @@ export async function handleSaasStripeWebhook(req: Request, res: Response): Prom
 
   // Process asynchronously so we never block the response
   processWebhookEvent(event).catch((err) =>
-    logger.error('[SAAS WEBHOOK] Unhandled processing error', { eventId: event.id, eventType: event.type, err }),
+    logger.error('[SAAS WEBHOOK] Unhandled processing error', { 
+      eventId: event.id, 
+      eventType: event.type, 
+      err: err instanceof Error ? { message: err.message, stack: err.stack } : err 
+    }),
   );
 }
 
@@ -92,7 +97,7 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       const subscription = await resolveSubscription(session.subscription as string);
       if (!subscription) break;
 
-      await provisioning.provision({
+      const provisionResult = await provisioning.provision({
         stripeSubscriptionId: subscription.id,
         stripeCustomerId: subscription.customer as string,
         tier,
@@ -101,6 +106,15 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
         operatorName: session.customer_details?.name ?? '',
         subdomain,
         trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+      });
+
+      await recordBillingHistory({
+        tenantId: provisionResult.tenantId,
+        eventType: 'subscription_created',
+        amount: session.amount_total ?? 0,
+        currency: session.currency ?? 'usd',
+        status: 'created',
+        stripeEventId: event.id,
       });
       break;
     }
@@ -123,6 +137,18 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
     case 'customer.subscription.deleted': {
       const sub = event.data.object as Stripe.Subscription;
       await provisioning.updateBillingStatus(sub.id, 'cancelled');
+
+      const cancelledTenantId = await resolveTenantIdBySubscription(sub.id);
+      if (cancelledTenantId) {
+        await recordBillingHistory({
+          tenantId: cancelledTenantId,
+          eventType: 'subscription_cancelled',
+          amount: 0,
+          currency: 'usd',
+          status: 'cancelled',
+          stripeEventId: event.id,
+        });
+      }
       break;
     }
 
@@ -139,6 +165,19 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
 
       const newStatus = SaasBillingService.mapStripeToBillingStatus(subscription.status);
       await provisioning.updateBillingStatus(subscriptionId, newStatus);
+
+      const paidTenantId = await resolveTenantIdBySubscription(subscriptionId);
+      if (paidTenantId) {
+        await recordBillingHistory({
+          tenantId: paidTenantId,
+          eventType: 'invoice_paid',
+          amount: invoice.amount_paid,
+          currency: invoice.currency,
+          status: 'paid',
+          stripeEventId: event.id,
+          stripeInvoiceId: invoice.id,
+        });
+      }
       break;
     }
 
@@ -151,6 +190,19 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       if (!subscriptionId) break;
 
       await provisioning.updateBillingStatus(subscriptionId, 'past_due');
+
+      const failedTenantId = await resolveTenantIdBySubscription(subscriptionId);
+      if (failedTenantId) {
+        await recordBillingHistory({
+          tenantId: failedTenantId,
+          eventType: 'invoice_payment_failed',
+          amount: invoice.amount_due,
+          currency: invoice.currency,
+          status: 'failed',
+          stripeEventId: event.id,
+          stripeInvoiceId: invoice.id,
+        });
+      }
       break;
     }
 
@@ -162,6 +214,69 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
 // ------------------------------------------
 // Helpers
 // ------------------------------------------
+
+/**
+ * Look up which tenant a Stripe subscription belongs to.
+ * Used to attribute billing_history rows — invoice/subscription webhook
+ * payloads only carry the Stripe subscription ID, not our tenant UUID.
+ */
+async function resolveTenantIdBySubscription(subscriptionId: string): Promise<string | null> {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('stripe_subscription_id', subscriptionId)
+      .maybeSingle();
+
+    if (error) {
+      logger.error('[SAAS WEBHOOK] Failed to resolve tenant for billing_history', { subscriptionId, error: error.message });
+      return null;
+    }
+    return data?.id ?? null;
+  } catch (err) {
+    logger.error('[SAAS WEBHOOK] Unexpected error resolving tenant for billing_history', { subscriptionId, err });
+    return null;
+  }
+}
+
+/**
+ * Append a row to billing_history. Best-effort — a failed write here must
+ * never break the underlying billing-status update it accompanies, so all
+ * errors are logged and swallowed.
+ */
+async function recordBillingHistory(entry: {
+  tenantId: string;
+  eventType: string;
+  amount: number;
+  currency: string;
+  status: string;
+  stripeEventId?: string;
+  stripeInvoiceId?: string | null;
+}): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    const { error } = await supabase.from('billing_history').insert({
+      tenant_id: entry.tenantId,
+      event_type: entry.eventType,
+      amount: entry.amount,
+      currency: entry.currency,
+      status: entry.status,
+      stripe_event_id: entry.stripeEventId ?? null,
+      stripe_invoice_id: entry.stripeInvoiceId ?? null,
+    });
+
+    if (error) {
+      // Duplicate stripe_event_id on retry is expected and harmless —
+      // the unique index is there specifically to make retries idempotent.
+      if (error.code !== '23505') {
+        logger.error('[SAAS WEBHOOK] Failed to write billing_history row', { entry, error: error.message });
+      }
+    }
+  } catch (err) {
+    logger.error('[SAAS WEBHOOK] Unexpected error writing billing_history row', { entry, err });
+  }
+}
 
 async function resolveSubscription(subscriptionId: string): Promise<Stripe.Subscription | null> {
   try {

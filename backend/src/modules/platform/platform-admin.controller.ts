@@ -39,7 +39,7 @@ export async function listTenants(req: Request, res: Response): Promise<void> {
 
     let query = supabase
       .from('tenants')
-      .select('id, subdomain, subscription_tier, billing_status, trial_ends_at, created_at, stripe_customer_id', { count: 'exact' })
+      .select('id, subdomain, subscription_tier, billing_status, trial_ends_at, created_at, stripe_customer_id, property_group_id', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -54,9 +54,127 @@ export async function listTenants(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    const tenantIds = (data ?? []).map((t) => t.id);
+
+    // Owner email — the frontend tenant list has no email column source at
+    // all right now. There's no explicit "owner" flag on users, but
+    // provisioning.service.ts creates exactly one user per tenant at signup
+    // (the operator), so the earliest-created user for a tenant_id is that
+    // tenant's owner. Ordered ascending so the first row seen per tenant_id
+    // below is that earliest user.
+    const emailByTenantId = new Map<string, string>();
+    if (tenantIds.length > 0) {
+      const { data: ownerUsers, error: ownerErr } = await supabase
+        .from('users')
+        .select('email, tenant_id, created_at')
+        .in('tenant_id', tenantIds)
+        .order('created_at', { ascending: true });
+
+      if (ownerErr) {
+        logger.warn('[PLATFORM] listTenants owner-email lookup failed (non-fatal)', { error: ownerErr.message });
+      } else {
+        for (const u of ownerUsers ?? []) {
+          if (u.tenant_id && !emailByTenantId.has(u.tenant_id)) {
+            emailByTenantId.set(u.tenant_id, u.email);
+          }
+        }
+      }
+    }
+
+    // property_count / module_count — batched across the whole page instead
+    // of one query per tenant. Mirrors the per-tenant logic in getTenant()
+    // below, just grouped by property_group_id up front.
+    const groupIds = Array.from(
+      new Set((data ?? []).map((t) => t.property_group_id).filter((g): g is string => !!g)),
+    );
+
+    const propertyCountByGroup = new Map<string, number>();
+    const moduleCountByGroup = new Map<string, number>();
+
+    if (groupIds.length > 0) {
+      const { data: propertyRows } = await supabase
+        .from('properties')
+        .select('id, group_id')
+        .in('group_id', groupIds);
+
+      const propertyIdsByGroup = new Map<string, string[]>();
+      for (const p of propertyRows ?? []) {
+        propertyCountByGroup.set(p.group_id, (propertyCountByGroup.get(p.group_id) ?? 0) + 1);
+        if (!propertyIdsByGroup.has(p.group_id)) propertyIdsByGroup.set(p.group_id, []);
+        propertyIdsByGroup.get(p.group_id)!.push(p.id);
+      }
+
+      const allPropertyIds = (propertyRows ?? []).map((p) => p.id);
+      if (allPropertyIds.length > 0) {
+        const { data: moduleRows } = await supabase
+          .from('modules')
+          .select('property_id')
+          .in('property_id', allPropertyIds);
+
+        const moduleCountByProperty = new Map<string, number>();
+        for (const m of moduleRows ?? []) {
+          if (!m.property_id) continue;
+          moduleCountByProperty.set(m.property_id, (moduleCountByProperty.get(m.property_id) ?? 0) + 1);
+        }
+
+        for (const [groupId, propIds] of propertyIdsByGroup) {
+          const total = propIds.reduce((sum, pid) => sum + (moduleCountByProperty.get(pid) ?? 0), 0);
+          moduleCountByGroup.set(groupId, total);
+        }
+      }
+    }
+
+    // MRR — same tier→price resolution used by getRevenueOverview/getPlatformStats,
+    // so this list's numbers always agree with the aggregate dashboard ones.
+    const tierMrr = await resolveTierMrrMap();
+
+    // Last activity — best-effort from audit_logs.tenant_id. Capped at the
+    // 500 most recent audit rows across the matched tenants rather than a
+    // full GROUP BY (not supported by supabase-js), so a tenant with no
+    // activity in that recent window will show no last_activity even if it
+    // has older rows further back — acceptable for a "how recently active"
+    // signal, not treated as a complete history.
+    const lastActivityByTenant = new Map<string, string>();
+    if (tenantIds.length > 0) {
+      const { data: activityRows, error: activityErr } = await supabase
+        .from('audit_logs')
+        .select('tenant_id, created_at')
+        .in('tenant_id', tenantIds)
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (activityErr) {
+        logger.warn('[PLATFORM] listTenants last_activity lookup failed (non-fatal)', { error: activityErr.message });
+      } else {
+        for (const r of activityRows ?? []) {
+          if (r.tenant_id && !lastActivityByTenant.has(r.tenant_id)) {
+            lastActivityByTenant.set(r.tenant_id, r.created_at);
+          }
+        }
+      }
+    }
+
+    const enriched = (data ?? []).map((t) => {
+      const propertyCount = t.property_group_id ? propertyCountByGroup.get(t.property_group_id) ?? 0 : 0;
+      const moduleCount = t.property_group_id ? moduleCountByGroup.get(t.property_group_id) ?? 0 : 0;
+      const mrr =
+        t.billing_status === 'active' || t.billing_status === 'past_due'
+          ? tierMrr[t.subscription_tier as SubscriptionTier] ?? 0
+          : 0;
+
+      return {
+        ...t,
+        email: emailByTenantId.get(t.id) ?? null,
+        property_count: propertyCount,
+        module_count: moduleCount,
+        mrr,
+        last_activity: lastActivityByTenant.get(t.id) ?? null,
+      };
+    });
+
     res.json({
       success: true,
-      data: data ?? [],
+      data: enriched,
       pagination: { page, limit, total: count ?? 0 },
     });
   } catch (err) {
@@ -89,24 +207,64 @@ export async function getTenant(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Fetch property count
-    const { count: propertyCount } = await supabase
+    // Fetch the actual property rows — the frontend tenant detail page
+    // renders tenant.properties directly (name, slug, module_count,
+    // is_active), not just a count.
+    const { data: propertyRows } = await supabase
       .from('properties')
-      .select('id', { count: 'exact', head: true })
+      .select('id, name, public_slug, is_active')
       .eq('group_id', tenant.property_group_id);
 
-    // Fetch module count
-    const { count: moduleCount } = await supabase
-      .from('modules')
-      .select('id', { count: 'exact', head: true })
-      .in(
-        'property_id',
-        await getPropertyIds(supabase, tenant.property_group_id),
-      );
+    const propertyIds = (propertyRows ?? []).map((p) => p.id);
+
+    // Fetch module rows for those properties and count per property_id
+    // client-side (no GROUP BY over supabase-js).
+    const { data: moduleRows } = propertyIds.length
+      ? await supabase.from('modules').select('id, property_id').in('property_id', propertyIds)
+      : { data: [] as { id: string; property_id: string }[] };
+
+    const moduleCountByProperty = new Map<string, number>();
+    for (const m of moduleRows ?? []) {
+      if (!m.property_id) continue;
+      moduleCountByProperty.set(m.property_id, (moduleCountByProperty.get(m.property_id) ?? 0) + 1);
+    }
+
+    const properties = (propertyRows ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.public_slug,
+      module_count: moduleCountByProperty.get(p.id) ?? 0,
+      is_active: p.is_active,
+    }));
+
+    // MRR for this single tenant — same tier→price resolution used by the
+    // platform-wide revenue endpoints, so a single tenant's number always
+    // agrees with the aggregate ones.
+    const tierMrr = await resolveTierMrrMap();
+    const mrr =
+      tenant.billing_status === 'active' || tenant.billing_status === 'past_due'
+        ? tierMrr[tenant.subscription_tier as SubscriptionTier] ?? 0
+        : 0;
+
+    // Billing history — written by saas-webhook.controller.ts on
+    // invoice.paid / invoice.payment_failed / customer.subscription.deleted.
+    const { data: billingHistory } = await supabase
+      .from('billing_history')
+      .select('id, event_type, amount, currency, status, created_at')
+      .eq('tenant_id', id)
+      .order('created_at', { ascending: false })
+      .limit(20);
 
     res.json({
       success: true,
-      data: { ...tenant, propertyCount: propertyCount ?? 0, moduleCount: moduleCount ?? 0 },
+      data: {
+        ...tenant,
+        properties,
+        propertyCount: properties.length,
+        moduleCount: properties.reduce((sum, p) => sum + p.module_count, 0),
+        mrr,
+        billing_history: billingHistory ?? [],
+      },
     });
   } catch (err) {
     logger.error('[PLATFORM] getTenant error', err);
@@ -378,8 +536,26 @@ export async function createCheckoutSession(req: Request, res: Response): Promis
       return;
     }
 
-    // Check subdomain availability
     const supabase = getSupabase();
+
+    // Check if email already belongs to an existing tenant owner.
+    // NOTE: intentionally scoped to scope = 'tenant_owner' — the `users` table
+    // holds every role across every tenant (customers, staff, etc.), so an
+    // unscoped email match here would block anyone who's ever been a customer
+    // (e.g. on the platform demo tenant) from ever becoming a real tenant owner.
+    const { data: existingOwner } = await supabase
+      .from('users')
+      .select('id, tenant_id')
+      .eq('email', email)
+      .eq('scope', 'tenant_owner')
+      .maybeSingle();
+
+    if (existingOwner) {
+      res.status(409).json({ success: false, error: 'Email is already in use. Please use a different email address.' });
+      return;
+    }
+
+    // Check subdomain availability
     const { data: existing } = await supabase
       .from('tenants')
       .select('id')
@@ -566,13 +742,3 @@ export async function getTenantBySlug(req: Request, res: Response): Promise<void
   }
 }
 
-async function getPropertyIds(
-  supabase: ReturnType<typeof getSupabase>,
-  groupId: string,
-): Promise<string[]> {
-  const { data } = await supabase
-    .from('properties')
-    .select('id')
-    .eq('group_id', groupId);
-  return (data ?? []).map((p) => p.id);
-}

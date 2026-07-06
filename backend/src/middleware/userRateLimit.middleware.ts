@@ -42,10 +42,16 @@ interface RateLimitInfo {
 export function userRateLimit(config: RateLimitConfig) {
   const {
     windowMs,
-    maxRequests,
+    // DEV-ONLY: triple every rate limit ceiling in development so local
+    // testing (repeated bad registrations, login retries, etc.) doesn't
+    // trip 429s. Production/staging get the configured value unchanged.
+    maxRequests: configuredMaxRequests,
     keyPrefix = 'user-rate:',
     message = 'Too many requests. Please try again later.'
   } = config;
+  const maxRequests = process.env.NODE_ENV === 'development'
+    ? configuredMaxRequests * 3
+    : configuredMaxRequests;
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {

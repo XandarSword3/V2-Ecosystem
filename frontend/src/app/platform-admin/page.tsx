@@ -40,7 +40,12 @@ type SubscriptionTier = 'starter' | 'growth' | 'enterprise';
 interface Tenant {
   id: string;
   subdomain: string;
-  subscription_tier: SubscriptionTier;
+  email: string | null;
+  // NOTE: no longer a closed enum on the backend — migration
+  // 20260703140000_change_subscription_tier_to_text.sql made this a free-text
+  // column driven by the `plans` table, so any plan code a super-admin creates
+  // can show up here. Do not assume it's one of SubscriptionTier's 3 values.
+  subscription_tier: string;
   billing_status: BillingStatus;
   mrr: number;
   property_count: number;
@@ -79,6 +84,17 @@ const TIER_STYLE: Record<SubscriptionTier, { label: string; color: string }> = {
   growth:     { label: 'Growth',     color: '#9B5DE5' },
   enterprise: { label: 'Enterprise', color: '#F5A623' },
 };
+
+// subscription_tier is free-text (plan codes from the `plans` table), so any
+// value outside the 3 legacy tiers above is expected, not an error. Fall
+// back to a neutral style + title-cased label instead of crashing.
+const DEFAULT_TIER_STYLE = { color: '#8A95A5' };
+function getTierStyle(tier: string): { label: string; color: string } {
+  return TIER_STYLE[tier as SubscriptionTier] ?? {
+    label: tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : 'Unknown',
+    color: DEFAULT_TIER_STYLE.color,
+  };
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -276,7 +292,7 @@ export default function PlatformAdminPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#111820' }}>
-              {['Subdomain', 'Tier', 'Status', 'MRR', 'Properties', 'Created', 'Actions'].map(h => (
+              {['Subdomain', 'Email', 'Tier', 'Status', 'MRR', 'Properties', 'Created', 'Actions'].map(h => (
                 <th key={h} style={{
                   padding: '10px 16px', textAlign: 'left', fontSize: 10,
                   color: '#5B6B7F', fontWeight: 500, textTransform: 'uppercase',
@@ -287,9 +303,9 @@ export default function PlatformAdminPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#5B6B7F', fontSize: 13 }}>Loading…</td></tr>
+              <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#5B6B7F', fontSize: 13 }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#5B6B7F', fontSize: 13 }}>No tenants match your filters.</td></tr>
+              <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#5B6B7F', fontSize: 13 }}>No tenants match your filters.</td></tr>
             ) : filtered.map((tenant, i) => {
               const isBusy = actionLoading === tenant.id;
               return (
@@ -304,6 +320,11 @@ export default function PlatformAdminPage() {
                     )}
                   </td>
 
+                  {/* Email */}
+                  <td style={{ padding: '12px 16px', borderBottom: '1px solid #1A222C', fontSize: 12, color: '#8A95A5' }}>
+                    {tenant.email ?? '—'}
+                  </td>
+
                   {/* Tier — inline select for quick upgrade/downgrade */}
                   <td style={{ padding: '12px 16px', borderBottom: '1px solid #1A222C' }}>
                     <select
@@ -312,13 +333,20 @@ export default function PlatformAdminPage() {
                       disabled={isBusy}
                       style={{
                         background: 'transparent', border: 'none',
-                        color: TIER_STYLE[tenant.subscription_tier].color,
+                        color: getTierStyle(tenant.subscription_tier).color,
                         fontSize: 12, fontWeight: 600, cursor: 'pointer', outline: 'none',
                       }}
                     >
-                      {(Object.keys(TIER_STYLE) as SubscriptionTier[]).map(t => (
+                      {/* Union of the 3 known tiers + this tenant's actual tier,
+                          in case it's a custom plan code not in TIER_STYLE — an
+                          unlisted current value would otherwise not render as
+                          an option and the <select> would show blank. */}
+                      {Array.from(new Set([
+                        ...(Object.keys(TIER_STYLE) as SubscriptionTier[]),
+                        tenant.subscription_tier,
+                      ])).map(t => (
                         <option key={t} value={t} style={{ background: '#111820', color: '#E8ECF1' }}>
-                          {TIER_STYLE[t].label}
+                          {getTierStyle(t).label}
                         </option>
                       ))}
                     </select>

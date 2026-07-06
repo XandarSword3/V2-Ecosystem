@@ -21,7 +21,6 @@ export default defineConfig({
       'tests/ai-agent.integration.test.ts',
       'tests/comprehensive-verification.test.ts',
       'tests/security-patches.test.ts',
-      'tests/unit/modules/bookings/bookings.service.test.ts', // Blocked by config import error - requires investigation
       // Dead tests — import from src/lib/ which was deleted (lib/ purge, June 2026)
       'tests/unit/services/amenity.service.test.ts',
       'tests/unit/services/event.service.test.ts',

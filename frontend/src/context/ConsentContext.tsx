@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { API_BASE_URL } from '@/lib/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,8 +95,16 @@ async function recordConsentToBackend(
   version: string,
 ): Promise<void> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
-    await fetch(`${baseUrl}/api/gdpr/cookie-consent`, {
+    // Reuse the shared API_BASE_URL (already handles the double-/api guard
+    // and the /v1 prefix — see lib/api.ts) instead of building an ad-hoc URL
+    // here. The previous version built its own baseUrl from
+    // NEXT_PUBLIC_API_URL and hardcoded /api/gdpr/... with no /v1, so
+    // whenever NEXT_PUBLIC_API_URL already included /api (a valid value
+    // elsewhere) this produced /api/api/gdpr/cookie-consent, and even when
+    // it didn't, the request was still missing /v1 and would 404 against
+    // the real mount at /api/v1/gdpr/cookie-consent (app.ts:
+    // app.use('/api/v1', apiRouter)).
+    await fetch(`${API_BASE_URL}/gdpr/cookie-consent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

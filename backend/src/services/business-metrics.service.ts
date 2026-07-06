@@ -58,12 +58,13 @@ export interface PerformanceMetrics {
 
 class BusinessMetricsService {
   private cachePrefix = 'metrics:';
-  private cacheTTL = 300; // 5 minutes
+  private cacheTTL = 900; // 15 minutes (increased from 5 to reduce Redis reads)
 
   /**
    * Get all dashboard metrics
+   * @param bypassCache - Skip Redis cache and fetch fresh data from database
    */
-  async getDashboardMetrics(): Promise<{
+  async getDashboardMetrics(bypassCache = false): Promise<{
     bookings: BookingMetrics;
     revenue: RevenueMetrics;
     users: UserMetrics;
@@ -71,10 +72,10 @@ class BusinessMetricsService {
     timestamp: string;
   }> {
     const [bookings, revenue, users, operational] = await Promise.all([
-      this.getBookingMetrics(),
-      this.getRevenueMetrics(),
-      this.getUserMetrics(),
-      this.getOperationalMetrics(),
+      this.getBookingMetrics('month', bypassCache),
+      this.getRevenueMetrics('month', bypassCache),
+      this.getUserMetrics(bypassCache),
+      this.getOperationalMetrics(bypassCache),
     ]);
 
     return {
@@ -88,10 +89,13 @@ class BusinessMetricsService {
 
   /**
    * Get booking metrics
+   * @param bypassCache - Skip Redis cache and fetch fresh data from database
    */
-  async getBookingMetrics(period: 'day' | 'week' | 'month' = 'month'): Promise<BookingMetrics> {
-    const cached = await this.getCached<BookingMetrics>(`bookings:${period}`);
-    if (cached) return cached;
+  async getBookingMetrics(period: 'day' | 'week' | 'month' = 'month', bypassCache = false): Promise<BookingMetrics> {
+    if (!bypassCache) {
+      const cached = await this.getCached<BookingMetrics>(`bookings:${period}`);
+      if (cached) return cached;
+    }
 
     const periodStart = this.getPeriodStart(period);
 
@@ -147,10 +151,13 @@ class BusinessMetricsService {
 
   /**
    * Get revenue metrics
+   * @param bypassCache - Skip Redis cache and fetch fresh data from database
    */
-  async getRevenueMetrics(period: 'day' | 'week' | 'month' = 'month'): Promise<RevenueMetrics> {
-    const cached = await this.getCached<RevenueMetrics>(`revenue:${period}`);
-    if (cached) return cached;
+  async getRevenueMetrics(period: 'day' | 'week' | 'month' = 'month', bypassCache = false): Promise<RevenueMetrics> {
+    if (!bypassCache) {
+      const cached = await this.getCached<RevenueMetrics>(`revenue:${period}`);
+      if (cached) return cached;
+    }
 
     const periodStart = this.getPeriodStart(period);
 
@@ -205,10 +212,13 @@ class BusinessMetricsService {
 
   /**
    * Get user metrics
+   * @param bypassCache - Skip Redis cache and fetch fresh data from database
    */
-  async getUserMetrics(): Promise<UserMetrics> {
-    const cached = await this.getCached<UserMetrics>('users');
-    if (cached) return cached;
+  async getUserMetrics(bypassCache = false): Promise<UserMetrics> {
+    if (!bypassCache) {
+      const cached = await this.getCached<UserMetrics>('users');
+      if (cached) return cached;
+    }
 
     const now = new Date();
     const day1 = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
@@ -271,10 +281,13 @@ class BusinessMetricsService {
 
   /**
    * Get operational metrics
+   * @param bypassCache - Skip Redis cache and fetch fresh data from database
    */
-  async getOperationalMetrics(): Promise<OperationalMetrics> {
-    const cached = await this.getCached<OperationalMetrics>('operational');
-    if (cached) return cached;
+  async getOperationalMetrics(bypassCache = false): Promise<OperationalMetrics> {
+    if (!bypassCache) {
+      const cached = await this.getCached<OperationalMetrics>('operational');
+      if (cached) return cached;
+    }
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);

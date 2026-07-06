@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { Mail, Lock, User, Phone, Loader2, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Container } from '@/components/layout/Container';
+import { getApiErrorMessage } from '@/types';
 
 export default function RegisterPage() {
   const t = useTranslations('auth.register');
@@ -55,8 +56,11 @@ export default function RegisterPage() {
       // Redirect to login
       router.push('/login');
     } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || 'Registration failed');
+      // Axios throws on non-2xx before `data.success` is ever checked, so the
+      // real backend message (e.g. password policy failures) lives at
+      // err.response.data.error, NOT err.message (which is just "Request
+      // failed with status code 400"). getApiErrorMessage() unwraps that.
+      setError(getApiErrorMessage(err, 'Registration failed'));
     } finally {
       setIsLoading(false);
     }

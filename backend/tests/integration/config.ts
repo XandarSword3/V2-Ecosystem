@@ -8,17 +8,17 @@
 export const TEST_CONFIG = {
   // Database configuration
   database: {
-    host: process.env.TEST_DB_HOST || 'localhost',
-    port: parseInt(process.env.TEST_DB_PORT || '5433', 10),
-    user: process.env.TEST_DB_USER || 'v2ecosystem_test',
-    password: process.env.TEST_DB_PASSWORD || 'v2ecosystem_test_secret',
-    database: process.env.TEST_DB_NAME || 'v2ecosystem_test',
+    host: process.env.TEST_DB_HOST || '127.0.0.1',
+    port: parseInt(process.env.TEST_DB_PORT || '5432', 10),
+    user: process.env.TEST_DB_USER || 'v2ecosystem',
+    password: process.env.TEST_DB_PASSWORD || 'v2ecosystem_secret',
+    database: process.env.TEST_DB_NAME || 'v2ecosystem',
   },
 
   // Redis configuration
   redis: {
-    host: process.env.TEST_REDIS_HOST || process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.TEST_REDIS_PORT || '6380', 10),
+    host: process.env.TEST_REDIS_HOST || process.env.REDIS_HOST || '127.0.0.1',
+    port: parseInt(process.env.TEST_REDIS_PORT || '6379', 10),
     url: process.env.TEST_REDIS_URL,
   },
 

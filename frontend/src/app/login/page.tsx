@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
-import { Mail, Lock, Loader2, Eye, EyeOff, AlertCircle, Shield, KeyRound } from 'lucide-react';
+import { Mail, Lock, Loader2, Eye, EyeOff, AlertCircle, Shield, KeyRound, Smartphone, Check, AlertTriangle, Copy } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { authApi } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Container } from '@/components/layout/Container';
+import { getApiErrorMessage } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
 
@@ -17,7 +19,7 @@ export default function LoginPage() {
   const tAuth = useTranslations('auth');
   const tCommon = useTranslations('common');
   const router = useRouter();
-  const { user, isAuthenticated, login, verify2FA } = useAuth();
+  const { user, isAuthenticated, login, verify2FA, completeTwoFactorSetupLogin } = useAuth();
   const { settings } = useSiteSettings();
 
   const [email, setEmail] = useState('');
@@ -32,6 +34,17 @@ export default function LoginPage() {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [useBackupCode, setUseBackupCode] = useState(false);
 
+  // Mandatory 2FA enrollment state (account has no 2FA set up yet — login()
+  // returned requiresTwoFactorSetup instead of completing).
+  const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [enrollStep, setEnrollStep] = useState<'qr' | 'backup'>('qr');
+  const [enrollQrCode, setEnrollQrCode] = useState('');
+  const [enrollSecret, setEnrollSecret] = useState('');
+  const [enrollBackupCodes, setEnrollBackupCodes] = useState<string[]>([]);
+  const [enrollCode, setEnrollCode] = useState('');
+  const [copiedBackupCodes, setCopiedBackupCodes] = useState(false);
+  const [enrolledUser, setEnrolledUser] = useState<{ roles: string[]; is_platform_admin?: boolean } | null>(null);
+
   // Get redirect parameter from URL
   const getRedirectPath = () => {
     if (typeof window !== 'undefined') {
@@ -44,7 +57,28 @@ export default function LoginPage() {
     return null;
   };
 
+  // Shared post-login redirect logic — used by password login, 2FA
+  // verification, and mandatory-2FA-enrollment completion alike.
+  const redirectAfterLogin = (userData: { roles: string[]; is_platform_admin?: boolean }) => {
+    const redirectPath = getRedirectPath();
+    if (redirectPath) {
+      window.location.href = redirectPath;
+      return;
+    }
+    const roles = userData.roles || [];
+    if (userData.is_platform_admin) {
+      window.location.href = '/platform-admin';
+    } else if (roles.includes('super_admin') || roles.includes('admin')) {
+      window.location.href = `/${settings.propertySlug}/admin`;
+    } else if (roles.some((r: string) => r.includes('staff') || r.includes('manager'))) {
+      window.location.href = `/${settings.propertySlug}/staff`;
+    } else {
+      window.location.href = '/';
+    }
+  };
+
   // Redirect if already authenticated
+
   useEffect(() => {
     if (isAuthenticated && user && settings.propertySlug) {
       const redirectPath = getRedirectPath();
@@ -75,10 +109,28 @@ export default function LoginPage() {
       // Use auth context login which updates state immediately
       const result = await login(email, password);
 
-      // Check if 2FA is required
+      // Check if 2FA is required (already enrolled)
       if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
         setPending2FAUserId(result.userId);
         setShow2FA(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if mandatory 2FA enrollment is required (privileged account, no 2FA set up yet)
+      if ('requiresTwoFactorSetup' in result && result.requiresTwoFactorSetup) {
+        setSetupToken(result.twoFactorSetupToken);
+        try {
+          const setupResponse = await authApi.setup2FAWithToken(result.twoFactorSetupToken);
+          const setupData = setupResponse.data.data;
+          setEnrollQrCode(setupData.qrCode);
+          setEnrollSecret(setupData.secret);
+          setEnrollBackupCodes(setupData.backupCodes);
+          setEnrollStep('qr');
+        } catch (setupErr: unknown) {
+          setError(getApiErrorMessage(setupErr, 'Failed to start 2FA enrollment. Please try logging in again.'));
+          setSetupToken(null);
+        }
         setIsLoading(false);
         return;
       }
@@ -107,8 +159,7 @@ export default function LoginPage() {
         window.location.href = '/';
       }
     } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || 'Login failed. Please try again.');
+      setError(getApiErrorMessage(err, 'Login failed. Please try again.'));
       setIsLoading(false);
     }
   };
@@ -143,10 +194,44 @@ export default function LoginPage() {
         window.location.href = '/';
       }
     } catch (err: unknown) {
-      const error = err as Error;
-      setError(error.message || '2FA verification failed. Please try again.');
+      setError(getApiErrorMessage(err, '2FA verification failed. Please try again.'));
       setIsLoading(false);
     }
+  };
+
+  const handleEnrollVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!setupToken) return;
+
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await authApi.enable2FAWithToken(setupToken, enrollCode);
+      const data = response.data.data;
+
+      if (!data?.tokens?.accessToken || !data?.user) {
+        throw new Error('Invalid response completing 2FA enrollment');
+      }
+
+      completeTwoFactorSetupLogin(data.user, data.tokens.accessToken);
+      setEnrolledUser(data.user);
+      setEnrollStep('backup');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Invalid verification code. Please try again.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const copyEnrollBackupCodes = () => {
+    navigator.clipboard.writeText(enrollBackupCodes.join('\n'));
+    setCopiedBackupCodes(true);
+    setTimeout(() => setCopiedBackupCodes(false), 2000);
+  };
+
+  const finishEnrollment = () => {
+    if (enrolledUser) redirectAfterLogin(enrolledUser);
   };
 
   return (
@@ -185,7 +270,129 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          {show2FA ? (
+          {setupToken ? (
+            /* Mandatory 2FA Enrollment */
+            enrollStep === 'qr' ? (
+              <form onSubmit={handleEnrollVerify} className="space-y-5">
+                <div className="text-center mb-2">
+                  <Smartphone className="w-12 h-12 text-primary-600 mx-auto mb-2" />
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Two-Factor Authentication Required
+                  </h2>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Your account requires 2FA. Scan the QR code with your authenticator app to continue.
+                  </p>
+                </div>
+
+                {enrollQrCode && (
+                  <div className="flex justify-center p-4 bg-white rounded-lg">
+                    <img src={enrollQrCode} alt="2FA QR Code" className="w-48 h-48" />
+                  </div>
+                )}
+
+                {enrollSecret && (
+                  <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                      Can&apos;t scan? Enter this code manually:
+                    </p>
+                    <code className="text-sm font-mono break-all">{enrollSecret}</code>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Enter the 6-digit code from your app
+                  </label>
+                  <input
+                    type="text"
+                    value={enrollCode}
+                    onChange={(e) => setEnrollCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-center text-2xl tracking-widest font-mono"
+                    placeholder="000000"
+                    maxLength={6}
+                    required
+                    autoFocus
+                    autoComplete="one-time-code"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading || enrollCode.length !== 6}
+                  className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg shadow-primary-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify & Complete Setup'
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetupToken(null);
+                    setEnrollCode('');
+                    setEnrollStep('qr');
+                    setError('');
+                  }}
+                  className="w-full py-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 text-sm"
+                >
+                  ← Back to login
+                </button>
+              </form>
+            ) : (
+              /* Backup codes — shown once, immediately after enrollment completes */
+              <div className="space-y-4">
+                <div className="text-center">
+                  <Shield className="w-12 h-12 mx-auto text-green-500 mb-2" />
+                  <h2 className="text-lg font-semibold text-green-700 dark:text-green-400">
+                    2FA Enabled — You&apos;re Logged In
+                  </h2>
+                </div>
+
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-amber-800 dark:text-amber-400">Save your backup codes</p>
+                      <p className="text-sm text-amber-700 dark:text-amber-500 mt-1">
+                        Use these if you lose access to your authenticator app. Each code works once. They will not be shown again.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg font-mono text-sm">
+                  {enrollBackupCodes.map((code, index) => (
+                    <div key={index} className="p-2 bg-white dark:bg-slate-700 rounded text-center">
+                      {code}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={copyEnrollBackupCodes}
+                  className="w-full py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-center gap-2 text-sm font-medium"
+                >
+                  {copiedBackupCodes ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  {copiedBackupCodes ? 'Copied!' : 'Copy all codes'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={finishEnrollment}
+                  className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg shadow-primary-600/30 transition-all"
+                >
+                  I&apos;ve saved my codes — Continue
+                </button>
+              </div>
+            )
+          ) : show2FA ? (
             /* 2FA Verification Form */
             <form onSubmit={handle2FASubmit} className="space-y-5">
               <div className="text-center mb-4">
