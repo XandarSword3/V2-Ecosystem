@@ -38,7 +38,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@sentry/nextjs": "^10.53.1",
-    "@stripe/react-stripe-js": "^2.5.1",
+    "@stripe/react-stripe-js": "^6.7.0",
     "@stripe/stripe-js": "^3.0.6",
     "@stripe/terminal-js": "^0.26.0",
     "@supabase/supabase-js": "^2.91.1",
