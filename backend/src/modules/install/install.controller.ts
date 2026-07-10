@@ -26,6 +26,20 @@ import { generateTokens } from '../../modules/auth/auth.utils.js';
 import { logger } from '../../utils/logger.js';
 
 // ---------------------------------------------------------------------------
+// Kill switch
+// ---------------------------------------------------------------------------
+
+/**
+ * Defaults to DISABLED. Must be explicitly set to the string 'true' to allow
+ * the install wizard to run. This keeps the flow off by default on Vercel /
+ * Render deployments where tenants are provisioned through platform-admin
+ * instead.
+ */
+function isInstallEnabled(): boolean {
+  return process.env.INSTALL_ENABLED === 'true';
+}
+
+// ---------------------------------------------------------------------------
 // Machine ID
 // ---------------------------------------------------------------------------
 
@@ -125,6 +139,15 @@ async function getInstallState(): Promise<{ initialized: boolean; storedMachineI
  */
 export async function getInstallStatus(req: Request, res: Response, next: NextFunction) {
   try {
+    // Kill switch: report "initialized" unconditionally so the frontend
+    // wizard never renders and instead bounces straight to /login.
+    if (!isInstallEnabled()) {
+      return res.json({
+        success: true,
+        data: { initialized: true, reason: 'disabled' },
+      });
+    }
+
     const currentId = deriveMachineId();
     const { initialized, storedMachineId } = await getInstallState();
 
@@ -169,6 +192,14 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
   let createdUserId: string | null = null;
 
   try {
+    // 0. Kill switch
+    if (!isInstallEnabled()) {
+      return res.status(403).json({
+        success: false,
+        error: 'The install flow is disabled on this deployment.',
+      });
+    }
+
     // 1. Validate
     const parsed = installSchema.safeParse(req.body);
     if (!parsed.success) {
