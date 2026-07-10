@@ -72,8 +72,17 @@ export default function InstallPage() {
     confirmPw:     '',
   });
 
-  // On mount: verify this page should be shown
+  // On mount: verify this page should be shown.
+  // Kill switch: NEXT_PUBLIC_INSTALL_ENABLED defaults to disabled. If it's
+  // not explicitly 'true', bounce to /login immediately without even asking
+  // the backend — this deployment provisions tenants via platform-admin,
+  // not this first-boot wizard.
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_INSTALL_ENABLED !== 'true') {
+      router.replace('/login');
+      return;
+    }
+
     checkStatus().then((status) => {
       if (status.initialized) {
         // Already installed — bounce to login
@@ -83,9 +92,10 @@ export default function InstallPage() {
         setChecking(false);
       }
     }).catch(() => {
-      // Can't reach backend — still show the form; install will fail with a
-      // clear error message rather than silently blocking the user.
-      setChecking(false);
+      // Can't reach backend — bounce to login rather than silently showing
+      // the form. The wizard should only ever be reachable when explicitly
+      // enabled AND the backend confirms it's not yet initialized.
+      router.replace('/login');
     });
   }, [router]);
 
