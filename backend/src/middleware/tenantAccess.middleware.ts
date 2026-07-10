@@ -1,7 +1,7 @@
 /**
  * Tenant Access Middleware
  *
- * Resolves the calling tenant from request context using three strategies,
+ * Resolves the calling tenant from request context using four strategies,
  * tried in priority order:
  *
  *   1. X-Tenant-ID header     — UUID, used by internal API callers
@@ -10,7 +10,14 @@
  *                               This supports path-based multi-tenancy without
  *                               requiring wildcard subdomains or a custom domain.
  *   3. Host subdomain         — future: works once a wildcard domain is configured.
- *                               Currently a no-op on localhost and vercel.app hosts.
+ *                               Currently a no-op on localhost, vercel.app, and
+ *                               onrender.com hosts.
+ *   4. is_platform_root       — final fallback when none of the above produced a
+ *                               signal at all (bare platform domain, no headers).
+ *                               Resolves to the single tenant flagged
+ *                               is_platform_root = true so the platform operator's
+ *                               own tenant (login, settings, modules) works on its
+ *                               bare domain without needing a header or subdomain.
  *
  * Billing gate rules:
  *   active / trialing          → allow through, no header added
@@ -88,8 +95,9 @@ declare global {
 
 /**
  * Extract the subdomain from the Host header.
- * Returns null if the host is bare (no subdomain), localhost, or a Vercel
- * preview URL — none of these have meaningful per-tenant subdomains yet.
+ * Returns null if the host is bare (no subdomain), localhost, a Vercel
+ * preview URL, or a Render default hostname — none of these have
+ * meaningful per-tenant subdomains yet.
  *
  * Will become useful once a wildcard custom domain is configured.
  */
@@ -100,6 +108,14 @@ function extractSubdomain(host: string | undefined): string | null {
 
   // Skip Vercel preview URLs — they're not tenant-routed
   if (hostname.endsWith('.vercel.app')) return null;
+
+  // Skip Render's default hostnames — e.g. "v2-ecosystem-backend.onrender.com"
+  // has the same subdomain.domain.tld shape as a real tenant subdomain, but
+  // "v2-ecosystem-backend" is the Render service name, not a tenant slug.
+  // Without this exclusion, resolveTenant() treats it as an (unresolvable)
+  // tenant subdomain and 404s "Tenant not found" on every request that
+  // doesn't carry an explicit tenant header — including login.
+  if (hostname.endsWith('.onrender.com')) return null;
 
   // Localhost — support subdomain in dev: "acme.localhost"
   if (hostname === 'localhost' || hostname === '127.0.0.1') return null;
@@ -199,11 +215,62 @@ async function lookupTenant(key: string, field: 'id' | 'subdomain'): Promise<Ten
   }
 }
 
+const PLATFORM_ROOT_CACHE_KEY = 'platform_root';
+
+/**
+ * Look up the single tenant flagged is_platform_root = true.
+ * This is the final fallback for resolveTenant(): when no ID/slug/subdomain
+ * signal is present at all (e.g. requests hitting the bare Vercel/Render
+ * domain), we still want req.tenant set to the platform operator's own
+ * tenant rather than left undefined — that's what makes /api/settings and
+ * /api/modules resolve real platform content instead of falling back to
+ * frontend placeholder defaults.
+ */
+async function lookupPlatformRootTenant(): Promise<TenantRecord | null> {
+  const cached = await getCached(PLATFORM_ROOT_CACHE_KEY);
+  if (cached !== undefined) return cached;
+
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('*, plan:plans(feature_limits)')
+      .eq('is_platform_root', true)
+      .maybeSingle();
+
+    if (error) {
+      logger.warn('[TENANT] Platform-root lookup error', { error: error.message });
+      return null;
+    }
+
+    let tenant: TenantRecord | null = null;
+    if (data) {
+      const { plan, ...tenantFields } = data as TenantRecord & {
+        plan?: { feature_limits: Record<string, unknown> } | null;
+      };
+      tenant = {
+        ...tenantFields,
+        feature_limits: plan?.feature_limits ?? tenantFields.feature_limits,
+      };
+    }
+
+    await setCached(PLATFORM_ROOT_CACHE_KEY, tenant);
+    return tenant;
+  } catch (err) {
+    logger.error('[TENANT] Unexpected platform-root lookup failure', { err });
+    return null;
+  }
+}
+
 /** Invalidate cache for a tenant (call after billing_status updates). */
 export async function invalidateTenantCache(tenantId: string, subdomain?: string): Promise<void> {
   try {
     await cache.del(`${CACHE_KEY_PREFIX}id:${tenantId}`);
     if (subdomain) await cache.del(`${CACHE_KEY_PREFIX}subdomain:${subdomain}`);
+    // Also drop the platform-root cache entry — if this update was to the
+    // platform tenant itself, a stale cached copy would otherwise linger
+    // for up to CACHE_TTL seconds after a billing_status change.
+    await cache.del(`${CACHE_KEY_PREFIX}${PLATFORM_ROOT_CACHE_KEY}`);
   } catch {
     // Silent fail
   }
@@ -217,9 +284,10 @@ export async function invalidateTenantCache(tenantId: string, subdomain?: string
  * Resolve tenant from request context and attach to req.tenant.
  *
  * Resolution order:
- *   1. X-Tenant-ID header  (UUID — internal/API callers)
+ *   1. X-Tenant-ID header   (UUID — internal/API callers)
  *   2. X-Tenant-Slug header (slug — frontend path-based routing, e.g. /app/[slug])
  *   3. Host subdomain       (future — requires wildcard custom domain)
+ *   4. is_platform_root     (final fallback — bare platform domain, no signal at all)
  *
  * Does NOT gate access — use validateTenantBilling for that.
  */
@@ -265,6 +333,19 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
       return;
     }
     req.tenant = tenant;
+    return next();
+  }
+
+  // Priority 4: platform-root fallback — no ID header, no slug header, and
+  // no tenant-bearing subdomain at all (e.g. the bare vercel.app/onrender.com
+  // domain). Rather than leaving req.tenant unset (which used to silently
+  // fall through to "legacy single-tenant mode" and break login + settings
+  // resolution for the platform tenant itself), resolve to whichever tenant
+  // is flagged is_platform_root. If that lookup also comes back empty
+  // (platform tenant not yet seeded), fall through unset as before.
+  const platformTenant = await lookupPlatformRootTenant();
+  if (platformTenant) {
+    req.tenant = platformTenant;
   }
 
   next();
