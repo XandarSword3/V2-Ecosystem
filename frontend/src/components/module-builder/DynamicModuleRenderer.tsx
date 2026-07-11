@@ -340,7 +340,8 @@ function SectionWrapper({ block, children }: SectionWrapperProps) {
 
   return (
     <section
-      className="relative w-full overflow-hidden"
+      id={block.id}
+      className="relative w-full overflow-hidden scroll-mt-20"
       style={{
         ...backgroundStyles,
         ...heightStyles,
