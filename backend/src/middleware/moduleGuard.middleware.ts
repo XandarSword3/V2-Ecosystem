@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
+import { getCallerTenantId } from '../security/tenant-scope.js';
 
 /**
  * Module Guard Middleware
@@ -107,11 +108,12 @@ export function clearModuleCache(slug?: string): void {
 export function requireModule(moduleSlug: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // Same dual-source tenant resolution used elsewhere (tenantAccess
-      // middleware sets req.tenant; internal callers may send the header
-      // directly). A missing tenant is valid — legacy/global modules have
-      // tenant_id IS NULL — getModuleStatus handles that fallback.
-      const tenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string | undefined) || null;
+      // JWT-derived only — see remediation plan Phase 0, item 0.3. All routes
+      // through this guard run behind `authenticate` (see the router.use()
+      // chain), so req.user is always populated here; null only for
+      // super_admin, which getModuleStatus treats as the legacy/global-module
+      // fallback (tenant_id IS NULL).
+      const tenantId = getCallerTenantId(req);
       const isActive = await getModuleStatus(moduleSlug, tenantId);
 
       if (!isActive) {

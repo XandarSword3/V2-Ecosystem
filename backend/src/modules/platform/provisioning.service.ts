@@ -352,7 +352,7 @@ export class ProvisioningService {
     // ---- Step 8: Property access for owner ----
     await supabase
       .from('user_property_access')
-      .insert({ user_id: user.id, property_id: property.id });
+      .insert({ user_id: user.id, property_id: property.id, tenant_id: tenantId });
 
     // ---- Step 9: Invalidate tenant cache ----
     invalidateTenantCache(tenantId, subdomain);

@@ -208,7 +208,7 @@ class CustomizationController {
         return;
       }
 
-      const link = await customizationService.linkToEntity(data);
+      const link = await customizationService.linkToEntity(data, tenantScopeFor(req));
       
       logger.info('Customization linked to entity', { 
         linkId: link.id, 
@@ -226,7 +226,7 @@ class CustomizationController {
       const { id } = req.params;
       const data: UpdateEntityCustomizationRequest = req.body;
 
-      const link = await customizationService.updateEntityLink(id, data);
+      const link = await customizationService.updateEntityLink(id, data, tenantScopeFor(req));
       
       logger.info('Entity customization link updated', { linkId: id });
       res.json(link);
@@ -238,7 +238,7 @@ class CustomizationController {
   unlinkFromEntity = asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
 
-      await customizationService.unlinkFromEntity(id);
+      await customizationService.unlinkFromEntity(id, tenantScopeFor(req));
       
       logger.info('Customization unlinked from entity', { linkId: id });
       res.status(204).send();
@@ -256,7 +256,7 @@ class CustomizationController {
         return;
       }
 
-      const links = await customizationService.getEntityLinks(entityType, entityId);
+      const links = await customizationService.getEntityLinks(entityType, entityId, tenantScopeFor(req));
 
       res.json(links);
   });
@@ -357,7 +357,7 @@ class CustomizationController {
         selections: selections || [],
         baseQuantity,
         executeInventory
-      });
+      }, tenantScopeFor(req));
 
       if (!result.success) {
         res.status(400).json({
@@ -395,7 +395,8 @@ class CustomizationController {
       const result = await customizationService.reverseOrderItemInventory(
         snapshotId,
         reason || 'Refund',
-        reversedBy
+        reversedBy,
+        tenantScopeFor(req)
       );
 
       if (!result.success) {
@@ -422,7 +423,8 @@ class CustomizationController {
 
       const customizations = await customizationService.getReversibleOrderCustomizations(
         orderType,
-        orderId
+        orderId,
+        tenantScopeFor(req)
       );
 
       res.json(customizations);

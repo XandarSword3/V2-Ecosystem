@@ -330,6 +330,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       .insert({
         user_id: userId,
         property_id: propertyId,
+        tenant_id: req.tenant?.id ?? null,
         access_level: 'admin',
       });
 
