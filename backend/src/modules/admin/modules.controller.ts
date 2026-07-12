@@ -46,7 +46,7 @@ export async function getModules(req: Request, res: Response, next: NextFunction
     }
 
     // Scope to tenant — only show this tenant's modules plus any unscoped (null) global modules
-    const tenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string);
+    const tenantId = getCallerTenantId(req);
     if (tenantId) {
       query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
     }
