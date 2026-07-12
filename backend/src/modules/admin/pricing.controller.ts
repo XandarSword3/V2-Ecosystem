@@ -6,6 +6,7 @@ import { asyncHandler } from '../../middleware/async-handler';
 import { AppError } from '../../utils/AppError';
 import { seasonalPricingService } from '../../services/seasonal-pricing.service';
 import { logger } from '../../utils/logger';
+import { getCallerTenantId } from '../../security/tenant-scope.js';
 
 const router = Router();
 
@@ -19,7 +20,7 @@ router.get(
     // tenant's rules plus unscoped/global ones — this endpoint was previously returning
     // every tenant's pricing rules to any admin/staff caller.
     const isSuperAdmin = (req.user as any)?.roles?.includes('super_admin') ?? false;
-    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    const callerTenantId = getCallerTenantId(req);
 
     const rules = await seasonalPricingService.getSeasonalRules(callerTenantId, isSuperAdmin);
 
@@ -56,7 +57,7 @@ router.post(
 
     // 0.6 fix: stamp the rule with the caller's tenant/property so it isn't created as an
     // unscoped/global rule by default — matches the tenant resolution used in modules.controller.ts.
-    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    const callerTenantId = getCallerTenantId(req);
     const callerPropertyId = (req as any).property?.id ?? ((req as any).propertyId as string | undefined) ?? null;
 
     const rule = await seasonalPricingService.createSeasonalRule(
@@ -109,7 +110,7 @@ router.put(
 
     // 0.6 fix: resolve caller tenant context so the service can reject cross-tenant writes.
     const isSuperAdmin = (req.user as any)?.roles?.includes('super_admin') ?? false;
-    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    const callerTenantId = getCallerTenantId(req);
 
     await seasonalPricingService.updateSeasonalRule(ruleId, updates, callerTenantId, isSuperAdmin);
 
@@ -132,7 +133,7 @@ router.delete(
 
     // 0.6 fix: resolve caller tenant context so the service can reject cross-tenant deletes.
     const isSuperAdmin = (req.user as any)?.roles?.includes('super_admin') ?? false;
-    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    const callerTenantId = getCallerTenantId(req);
 
     await seasonalPricingService.deleteSeasonalRule(ruleId, callerTenantId, isSuperAdmin);
 

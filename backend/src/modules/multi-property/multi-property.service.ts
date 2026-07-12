@@ -242,11 +242,20 @@ export async function grantPropertyAccess(
       .eq('user_id', userId);
   }
 
+  // Item 0.6 — stamp tenant_id, derived server-side from the property being
+  // granted (not caller-supplied), so this row is never left tenant-null.
+  const { data: property } = await client
+    .from('properties')
+    .select('tenant_id')
+    .eq('id', propertyId)
+    .maybeSingle();
+
   const { data, error } = await client
     .from('user_property_access')
     .upsert({
       user_id: userId,
       property_id: propertyId,
+      tenant_id: property?.tenant_id ?? null,
       access_level: accessLevel,
       granted_by: grantedBy,
       is_primary: options?.isPrimary || false,
@@ -753,12 +762,20 @@ export async function switchUserProperty(
     .update({ is_primary: false })
     .eq('user_id', userId);
 
+  // Item 0.6 — stamp tenant_id, derived server-side from the property.
+  const { data: property } = await client
+    .from('properties')
+    .select('tenant_id')
+    .eq('id', propertyId)
+    .maybeSingle();
+
   // Set selected property as primary
   await client
     .from('user_property_access')
     .upsert({
       user_id: userId,
       property_id: propertyId,
+      tenant_id: property?.tenant_id ?? null,
       access_level: 'read',
       is_primary: true
     }, {
