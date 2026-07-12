@@ -75,8 +75,18 @@ export async function loadDynamicModules(): Promise<void> {
       // so req.tenant is already resolved here when a tenant is known.
       // Internal callers that skip tenant resolution can still pass the
       // header directly (same fallback pattern used across the codebase).
-      const requestTenantId =
-        dynReq.tenant?.id || (req.headers?.['x-tenant-id'] as string | undefined) || null;
+      //
+      // NOT fixed alongside the rest of Phase 0/1 — unlike the ownership
+      // checks in modules/pricing/customization controllers, this resolves
+      // WHICH mounted-module config to route a request to (config lookup,
+      // not a data-mutation ownership check), and there's an explicit
+      // "internal callers" carve-out in the comment above suggesting the
+      // header path may be load-bearing for something. Needs someone who
+      // knows what calls this internally before swapping it to
+      // getCallerTenantId() blind — flagging via the lint exception below
+      // rather than guessing.
+      // eslint-disable-next-line no-restricted-syntax
+      const requestTenantId = dynReq.tenant?.id || (req.headers?.['x-tenant-id'] as string | undefined) || null;
 
       // Resolution order:
       //   1. Exact tenant match — this request's tenant owns one of these rows.
