@@ -107,10 +107,17 @@ async function seedTestEnvironment() {
   // 4. Seed suspended tenant (for billing gate tests)
   await ensureTestTenant(supabase, 'suspended', firstPlanCode, 'suspended');
 
-  // 5. Seed testcorp super_admin user with a known test password
+  // 4b. Seed othercorp tenant — a second, independent tenant with its own
+  // admin. Needed for cross-tenant isolation tests (remediation plan Phase 0):
+  // authenticate as one tenant's admin, attempt to act on the other tenant's
+  // resources, assert 403/404. A single tenant can't prove isolation.
+  const othercorpId = await ensureTestTenant(supabase, 'othercorp', firstPlanCode, 'trialing');
+
+  // 5. Seed testcorp + othercorp super_admin users with a known test password
   //    Password is hardcoded here — this is a test-only account on a test-only DB.
   //    Never use this pattern for real credentials.
   await ensureTestAdminUser(supabase, testcorpId, 'testcorp');
+  await ensureTestAdminUser(supabase, othercorpId, 'othercorp');
 
   console.log('  ✓ Test tenants ready');
 }

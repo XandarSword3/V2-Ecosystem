@@ -12,6 +12,7 @@ import { buildModulePermissionRows } from "../../security/template-permission-pr
 import { permissionCache } from "../../security/permission-cache.service.js";
 import { assertModuleLimit } from "../../services/feature-limits.service.js";
 import { ENGINE_TO_LEGACY_TEMPLATE_TYPE } from "../../engines/types.js";
+import { getCallerTenantId } from "../../security/tenant-scope.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
@@ -126,7 +127,9 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
     }
 
     // Q171 — Scope slug uniqueness check to tenant so two tenants can share the same slug
-    const tenantIdForSlugCheck = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    // JWT-derived only (req.user.tenantId via getCallerTenantId) — never the x-tenant-id
+    // header, which is attacker-controlled. See remediation plan Phase 0, item 0.1.
+    const tenantIdForSlugCheck = getCallerTenantId(req);
 
     // Pre-check: if a module with this slug already exists within this tenant (active or inactive),
     // surface a clear 409 rather than a cryptic 500 from the DB unique constraint.
@@ -186,7 +189,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         is_active: true,
         show_in_main: true,
         property_id: propertyId,
-        tenant_id: (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null,
+        tenant_id: getCallerTenantId(req),
       })
       .select()
       .single();
@@ -378,8 +381,10 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
     const user = req.user;
     if (!user) throw new Error('Authentication required');
     const isSuperAdmin = user.roles.includes('super_admin');
-    // Same tenant resolution createModule() uses when stamping the row on insert.
-    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    // JWT-derived only — see remediation plan Phase 0, item 0.1. Previously fell
+    // back to the x-tenant-id header, which an authenticated admin/manager of
+    // Tenant A could set to Tenant B's id to pass the ownership check below.
+    const callerTenantId = getCallerTenantId(req);
 
     // 1. Fetch current module to check permissions, tenant ownership, and version
     const { data: currentModule, error: fetchError } = await supabase
@@ -486,7 +491,8 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
     const user = req.user;
     if (!user) throw new Error('Authentication required');
     const isSuperAdmin = user.roles.includes('super_admin');
-    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    // JWT-derived only — see remediation plan Phase 0, item 0.1.
+    const callerTenantId = getCallerTenantId(req);
     if (!isSuperAdmin && moduleData.tenant_id !== callerTenantId) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
