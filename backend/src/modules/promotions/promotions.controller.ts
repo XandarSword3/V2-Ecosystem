@@ -71,7 +71,7 @@ export class PromotionsController {
     try {
       const validation = applyCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -123,7 +123,7 @@ export class PromotionsController {
     try {
       const validation = createCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -263,7 +263,7 @@ export class PromotionsController {
     try {
       const validation = issueGiftCardSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -362,7 +362,7 @@ export class PromotionsController {
     try {
       const validation = redeemGiftCardSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -516,7 +516,7 @@ export class PromotionsController {
     try {
       const validation = awardPointsSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -589,7 +589,7 @@ export class PromotionsController {
     try {
       const validation = redeemPointsSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;

@@ -23,7 +23,7 @@ const assignTaskSchema = z.object({
 
 const completeTaskSchema = z.object({
   notes: z.string().optional(),
-  checklistCompleted: z.record(z.boolean()).optional(),
+  checklistCompleted: z.record(z.string(), z.boolean()).optional(),
   photosUrls: z.array(z.string().url()).optional(),
 });
 
@@ -327,7 +327,7 @@ export class HousekeepingController {
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 
@@ -393,7 +393,7 @@ export class HousekeepingController {
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 
@@ -469,7 +469,7 @@ export class HousekeepingController {
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 
@@ -589,7 +589,7 @@ export class HousekeepingController {
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 
@@ -775,7 +775,7 @@ export class HousekeepingController {
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 
@@ -823,7 +823,7 @@ export class HousekeepingController {
       // FIX: Iteration 11 - Validate input (was missing, unlike createSchedule)
       const validation = createScheduleSchema.partial().safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
       const data = validation.data;
       const supabase = getSupabase();

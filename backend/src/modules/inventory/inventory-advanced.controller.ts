@@ -48,7 +48,7 @@ export class InventoryAdvancedController {
     try {
       const validation = recordWastageSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -160,7 +160,7 @@ export class InventoryAdvancedController {
     try {
       const validation = physicalCountSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -317,7 +317,7 @@ export class InventoryAdvancedController {
     try {
       const validation = createPurchaseOrderSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -374,7 +374,7 @@ export class InventoryAdvancedController {
       const { id } = req.params;
       const validation = receivePurchaseOrderSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
