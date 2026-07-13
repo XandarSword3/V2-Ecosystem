@@ -5,7 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import xss from 'xss';
@@ -264,7 +264,7 @@ export function createRateLimiter(options: {
       retryAfter: Math.ceil((options.windowMs || SECURITY_CONFIG.rateLimit.window) / 1000),
     },
     skipSuccessfulRequests: options.skipSuccessfulRequests || false,
-    keyGenerator: options.keyGenerator || ((req) => req.ip || 'unknown'),
+    keyGenerator: options.keyGenerator || ((req) => ipKeyGenerator(req.ip || 'unknown')),
     handler: async (req, res) => {
       await securityAuditLogger.logSecurityEvent({
         eventType: securityAuditLogger.SecurityEventType.SUSPICIOUS_ACTIVITY,

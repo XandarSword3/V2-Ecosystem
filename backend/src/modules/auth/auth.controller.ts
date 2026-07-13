@@ -75,7 +75,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
-        error: error.errors[0].message,
+        error: error.issues[0].message,
         code: 'VALIDATION_ERROR',
       });
     }
@@ -180,7 +180,7 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         success: false,
-        error: error.errors[0].message,
+        error: error.issues[0].message,
         code: 'VALIDATION_ERROR',
       });
     }

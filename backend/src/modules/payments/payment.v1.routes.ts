@@ -96,7 +96,7 @@ router.post(
           success: false,
           error: 'Validation failed',
           code: 'VALIDATION_ERROR',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 
@@ -309,7 +309,7 @@ router.post(
           success: false,
           error: 'Validation failed',
           code: 'VALIDATION_ERROR',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 
