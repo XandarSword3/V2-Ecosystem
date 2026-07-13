@@ -40,6 +40,23 @@
         "no-useless-escape": "warn",
         "no-case-declarations": "warn",
         "no-useless-catch": "warn",
-        "no-prototype-builtins": "warn"
-    }
+        "no-prototype-builtins": "warn",
+        "no-restricted-syntax": [
+            "error",
+            {
+                "selector": "MemberExpression[computed=true] > Literal[value='x-tenant-id']",
+                "message": "Do not read the x-tenant-id header directly for an authorization/ownership decision — it is attacker-controlled (any authenticated caller can set it to any value). Use getCallerTenantId()/requireTenantScope() from src/security/tenant-scope.ts instead. See remediation plan Phase 0/1. (tenantAccess.middleware.ts is the one legitimate exception, exempted below.)"
+            }
+        ]
+    },
+    "overrides": [
+        {
+            "files": [
+                "src/middleware/tenantAccess.middleware.ts"
+            ],
+            "rules": {
+                "no-restricted-syntax": "off"
+            }
+        }
+    ]
 }

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../../middleware/async-handler.js';
 import { customizationService } from '../services/customization.service.js';
 import { logger } from '../../../utils/logger.js';
-import { AppError } from '../../../utils/AppError.js';
+import { getCallerTenantId } from '../../../security/tenant-scope.js';
 import type {
   CustomizableEntityType,
   CreateCustomizationGroupRequest,
@@ -16,17 +16,10 @@ import type {
 
 /**
  * Resolve the tenant scope a request should be limited to.
- * super_admin is the platform-wide operator role and intentionally sees
- * everything; every other scope is confined to its own tenant.
- * Mirrors the same convention used in auth.middleware's authorize() guard.
+ * Moved to backend/src/security/tenant-scope.ts so every controller shares
+ * one implementation instead of reinventing it (see remediation plan 1.1/1.2).
  */
-function tenantScopeFor(req: Request): string | null {
-  if (req.user?.scope === 'super_admin') return null;
-  if (!req.user?.tenantId) {
-    throw new AppError('No tenant associated with this account', 403);
-  }
-  return req.user.tenantId;
-}
+const tenantScopeFor = getCallerTenantId;
 
 /**
  * Unified Customization Controller
@@ -215,7 +208,7 @@ class CustomizationController {
         return;
       }
 
-      const link = await customizationService.linkToEntity(data);
+      const link = await customizationService.linkToEntity(data, tenantScopeFor(req));
       
       logger.info('Customization linked to entity', { 
         linkId: link.id, 
@@ -233,7 +226,7 @@ class CustomizationController {
       const { id } = req.params;
       const data: UpdateEntityCustomizationRequest = req.body;
 
-      const link = await customizationService.updateEntityLink(id, data);
+      const link = await customizationService.updateEntityLink(id, data, tenantScopeFor(req));
       
       logger.info('Entity customization link updated', { linkId: id });
       res.json(link);
@@ -245,7 +238,7 @@ class CustomizationController {
   unlinkFromEntity = asyncHandler(async (req: Request, res: Response) => {
       const { id } = req.params;
 
-      await customizationService.unlinkFromEntity(id);
+      await customizationService.unlinkFromEntity(id, tenantScopeFor(req));
       
       logger.info('Customization unlinked from entity', { linkId: id });
       res.status(204).send();
@@ -263,7 +256,7 @@ class CustomizationController {
         return;
       }
 
-      const links = await customizationService.getEntityLinks(entityType, entityId);
+      const links = await customizationService.getEntityLinks(entityType, entityId, tenantScopeFor(req));
 
       res.json(links);
   });
@@ -364,7 +357,7 @@ class CustomizationController {
         selections: selections || [],
         baseQuantity,
         executeInventory
-      });
+      }, tenantScopeFor(req));
 
       if (!result.success) {
         res.status(400).json({
@@ -402,7 +395,8 @@ class CustomizationController {
       const result = await customizationService.reverseOrderItemInventory(
         snapshotId,
         reason || 'Refund',
-        reversedBy
+        reversedBy,
+        tenantScopeFor(req)
       );
 
       if (!result.success) {
@@ -429,7 +423,8 @@ class CustomizationController {
 
       const customizations = await customizationService.getReversibleOrderCustomizations(
         orderType,
-        orderId
+        orderId,
+        tenantScopeFor(req)
       );
 
       res.json(customizations);

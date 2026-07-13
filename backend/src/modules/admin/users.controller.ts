@@ -22,6 +22,7 @@ import {
   deriveSlugFromPermission 
 } from './types.js';
 import { assertStaffUserLimit } from '../../services/feature-limits.service.js';
+import { getCallerTenantId } from '../../security/tenant-scope.js';
 
 // Interface for user with roles from Supabase query
 interface UserWithRolesQuery extends UserRow {
@@ -462,6 +463,7 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
         .insert({
           user_id: user.id,
           property_id: propertyId,
+          tenant_id: tenantId ?? null,
           access_level: 'write'
         });
       if (accessError) throw accessError;
@@ -654,7 +656,7 @@ export const revokeUserSessions = asyncHandler(async (req: Request, res: Respons
         return res.status(404).json({ success: false, error: 'User not found' });
       }
 
-      const requestingTenantId = (req as any).tenant?.id;
+      const requestingTenantId = getCallerTenantId(req);
       if (!requestingTenantId || targetUser.tenant_id !== requestingTenantId) {
         return res.status(403).json({ success: false, error: 'Access denied: User does not belong to your tenant' });
       }

@@ -4,6 +4,7 @@ import { getSupabase } from "../../database/connection";
 import { translateText, getTranslationStatus } from "../../services/translation.service";
 import { logActivity } from "../../utils/activityLogger";
 import { logger } from "../../utils/logger.js";
+import { getCallerTenantId } from "../../security/tenant-scope.js";
 
 // Tables that have entity-level translatable fields (_ar / _fr column pairs).
 // NOTE: DE/IT entity-column translations are not tracked here — those columns
@@ -142,7 +143,7 @@ interface MissingTranslation {
 export const getMissingTranslations = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const propertyId = req.headers?.['x-property-id'] as string | undefined;
-    const tenantId = req.headers?.['x-tenant-id'] as string | undefined;
+    const tenantId = getCallerTenantId(req) ?? undefined;
     const missing: MissingTranslation[] = [];
 
     const { configs: tableConfigs, moduleIds } = await getActiveTranslatableTables(supabase, propertyId, tenantId);
@@ -235,7 +236,7 @@ export const getMissingTranslations = asyncHandler(async (req: Request, res: Res
 export const getTranslationStats = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const propertyId = req.headers?.['x-property-id'] as string | undefined;
-    const tenantId = req.headers?.['x-tenant-id'] as string | undefined;
+    const tenantId = getCallerTenantId(req) ?? undefined;
     const stats: Record<string, { total: number; translated: number; missing: number }> = {};
 
     const { configs: tableConfigs, moduleIds } = await getActiveTranslatableTables(supabase, propertyId, tenantId);
