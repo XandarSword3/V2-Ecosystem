@@ -1,0 +1,87 @@
+# Tenant-scope coverage (Phase 2, item 2.3)
+
+Registered tables: customization_groups, customization_options, entity_customizations, modules, order_customizations
+
+Total call sites on registered tables: 77
+  Through getScopedClient(): 2
+  NOT scoped (getSupabase() / bare client): 75
+
+## Remaining — not yet migrated
+
+| File | Line | Table |
+|---|---|---|
+| src/database/system-modules.seeder.ts | 50 | modules |
+| src/database/system-modules.seeder.ts | 63 | modules |
+| src/middleware/moduleGuard.middleware.ts | 50 | modules |
+| src/middleware/moduleGuard.middleware.ts | 59 | modules |
+| src/middleware/propertyAccess.middleware.ts | 210 | modules |
+| src/modules/admin/controllers/delete-preview.controller.ts | 488 | modules |
+| src/modules/admin/controllers/delete-preview.controller.ts | 553 | modules |
+| src/modules/admin/controllers/onboarding.controller.ts | 438 | modules |
+| src/modules/admin/controllers/reports.controller.ts | 248 | modules |
+| src/modules/admin/controllers/reports.controller.ts | 528 | modules |
+| src/modules/admin/modules.controller.ts | 31 | modules |
+| src/modules/admin/modules.controller.ts | 71 | modules |
+| src/modules/admin/modules.controller.ts | 82 | modules |
+| src/modules/admin/modules.controller.ts | 138 | modules |
+| src/modules/admin/modules.controller.ts | 393 | modules |
+| src/modules/admin/modules.controller.ts | 488 | modules |
+| src/modules/admin/modules.controller.ts | 617 | modules |
+| src/modules/admin/modules.controller.ts | 618 | modules |
+| src/modules/admin/modules.controller.ts | 657 | modules |
+| src/modules/admin/modules.controller.ts | 658 | modules |
+| src/modules/admin/translations.controller.ts | 99 | modules |
+| src/modules/analytics/analytics.controller.ts | 294 | modules |
+| src/modules/analytics/metrics-layer.service.ts | 1003 | modules |
+| src/modules/analytics/metrics-layer.service.ts | 1207 | modules |
+| src/modules/analytics/metrics-layer.service.ts | 1295 | modules |
+| src/modules/analytics/metrics-layer.service.ts | 1367 | modules |
+| src/modules/customization/services/customization.service.ts | 259 | customization_groups |
+| src/modules/customization/services/customization.service.ts | 328 | customization_groups |
+| src/modules/customization/services/customization.service.ts | 354 | customization_groups |
+| src/modules/customization/services/customization.service.ts | 378 | customization_groups |
+| src/modules/customization/services/customization.service.ts | 414 | customization_groups |
+| src/modules/customization/services/customization.service.ts | 472 | customization_groups |
+| src/modules/customization/services/customization.service.ts | 490 | customization_options |
+| src/modules/customization/services/customization.service.ts | 564 | customization_options |
+| src/modules/customization/services/customization.service.ts | 590 | customization_options |
+| src/modules/customization/services/customization.service.ts | 613 | customization_options |
+| src/modules/customization/services/customization.service.ts | 640 | entity_customizations |
+| src/modules/customization/services/customization.service.ts | 679 | entity_customizations |
+| src/modules/customization/services/customization.service.ts | 704 | entity_customizations |
+| src/modules/customization/services/customization.service.ts | 727 | entity_customizations |
+| src/modules/customization/services/customization.service.ts | 948 | customization_options |
+| src/modules/customization/services/customization.service.ts | 1025 | order_customizations |
+| src/modules/customization/services/customization.service.ts | 1094 | order_customizations |
+| src/modules/inventory/inventory.controller.ts | 80 | modules |
+| src/modules/inventory/inventory.controller.ts | 97 | modules |
+| src/modules/multi-property/multi-property.service.ts | 513 | modules |
+| src/modules/multi-property/multi-property.service.ts | 561 | modules |
+| src/modules/multi-property/multi-property.service.ts | 719 | modules |
+| src/modules/platform/platform-admin.controller.ts | 110 | modules |
+| src/modules/platform/platform-admin.controller.ts | 223 | modules |
+| src/modules/staff/module-staff.controller.ts | 38 | modules |
+| src/modules/staff/module-staff.controller.ts | 116 | modules |
+| src/modules/staff/module-staff.controller.ts | 201 | modules |
+| src/modules/staff/module-staff.controller.ts | 280 | modules |
+| src/modules/staff/module-staff.controller.ts | 323 | modules |
+| src/modules/staff/module-staff.controller.ts | 421 | modules |
+| src/modules/staff/module-staff.controller.ts | 512 | modules |
+| src/modules/staff/module-staff.controller.ts | 549 | modules |
+| src/modules/staff/module-staff.controller.ts | 632 | modules |
+| src/modules/staff/module-staff.controller.ts | 781 | modules |
+| src/modules/staff/module-staff.controller.ts | 825 | modules |
+| src/modules/staff/module-staff.controller.ts | 907 | modules |
+| src/modules/staff/module-staff.controller.ts | 971 | modules |
+| src/modules/staff/module-staff.controller.ts | 1034 | modules |
+| src/modules/staff/module-staff.controller.ts | 1090 | modules |
+| src/modules/staff/module-staff.controller.ts | 1161 | modules |
+| src/modules/staff/module-staff.controller.ts | 1197 | modules |
+| src/modules/templates/templates.service.ts | 120 | modules |
+| src/modules/templates/templates.service.ts | 136 | modules |
+| src/routes/dynamic-module.router.ts | 2346 | modules |
+| src/routes/dynamic-module.router.ts | 2410 | modules |
+| src/routes/dynamic-module.router.ts | 2478 | modules |
+| src/routes/dynamic-modules.loader.ts | 26 | modules |
+| src/security/scoped-client.ts | 12 | modules |
+| src/services/feature-limits.service.ts | 54 | modules |
