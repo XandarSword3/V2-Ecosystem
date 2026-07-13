@@ -350,9 +350,18 @@ export class ProvisioningService {
     }
 
     // ---- Step 8: Property access for owner ----
-    await supabase
+    const { error: accessErr } = await supabase
       .from('user_property_access')
-      .insert({ user_id: user.id, property_id: property.id });
+      .insert({
+        user_id: user.id,
+        property_id: property.id,
+        tenant_id: tenantId,
+        access_level: 'admin',
+      });
+
+    if (accessErr) {
+      logger.error('[PROVISIONING] Failed to create user_property_access for owner', { error: accessErr.message });
+    }
 
     // ---- Step 9: Invalidate tenant cache ----
     invalidateTenantCache(tenantId, subdomain);

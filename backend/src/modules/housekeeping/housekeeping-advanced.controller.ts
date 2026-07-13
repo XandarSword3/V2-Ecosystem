@@ -94,7 +94,7 @@ export class HousekeepingAdvancedController {
     try {
       const validation = createTaskSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -199,7 +199,7 @@ export class HousekeepingAdvancedController {
       const { id } = req.params;
       const validation = completeTaskSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -274,7 +274,7 @@ export class HousekeepingAdvancedController {
     try {
       const validation = inspectionSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;
@@ -404,7 +404,7 @@ export class HousekeepingAdvancedController {
       const { unitId } = req.params;
       const validation = blockUnitSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: validation.error.errors });
+        return res.status(400).json({ success: false, error: validation.error.issues });
       }
 
       const data = validation.data;

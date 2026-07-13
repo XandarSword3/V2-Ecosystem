@@ -136,7 +136,7 @@ export const getStaffShifts = asyncHandler(async (req: Request, res: Response) =
 export const createShift = asyncHandler(async (req: Request, res: Response) => {
     const validation = createShiftSchema.safeParse(req.body);
     if (!validation.success) {
-      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
+      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
       return;
     }
 
@@ -181,7 +181,7 @@ export const updateShift = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const validation = updateShiftSchema.safeParse(req.body);
     if (!validation.success) {
-      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
+      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
       return;
     }
 
@@ -424,7 +424,7 @@ export const updateStaffAssignments = asyncHandler(async (req: Request, res: Res
     const { staffId } = req.params;
     const validation = assignmentSchema.safeParse(req.body);
     if (!validation.success) {
-      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
+      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
       return;
     }
 
@@ -513,7 +513,7 @@ export const bulkAssignStaff = asyncHandler(async (req: Request, res: Response) 
 export const requestShiftSwap = asyncHandler(async (req: Request, res: Response) => {
     const validation = swapRequestSchema.safeParse(req.body);
     if (!validation.success) {
-      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
+      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
       return;
     }
 

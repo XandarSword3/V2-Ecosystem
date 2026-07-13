@@ -96,8 +96,8 @@ export function validate(schema: ZodSchema, source: 'body' | 'query' | 'params' 
       
       // Replace with validated data
       if (source === 'body') req.body = validated;
-      else if (source === 'query') req.query = validated;
-      else req.params = validated;
+      else if (source === 'query') req.query = validated as any;
+      else req.params = validated as any;
       
       next();
     } catch (error) {
@@ -105,7 +105,7 @@ export function validate(schema: ZodSchema, source: 'body' | 'query' | 'params' 
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
-          details: error.errors.map(e => ({
+          details: error.issues.map(e => ({
             path: e.path.join('.'),
             message: e.message,
           })),

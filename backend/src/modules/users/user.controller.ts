@@ -114,7 +114,7 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
       res.status(400).json({ 
         success: false, 
         error: 'Validation failed',
-        details: validation.error.errors 
+        details: validation.error.issues 
       });
       return;
     }
@@ -334,7 +334,7 @@ export const updateUserRoles = asyncHandler(async (req: Request, res: Response) 
       res.status(400).json({ 
         success: false, 
         error: 'Validation failed',
-        details: validation.error.errors 
+        details: validation.error.issues 
       });
       return;
     }

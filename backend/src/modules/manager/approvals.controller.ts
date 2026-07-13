@@ -169,7 +169,7 @@ export class ApprovalsController {
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 
@@ -262,7 +262,7 @@ export class ApprovalsController {
         return res.status(400).json({
           success: false,
           error: 'Validation failed',
-          details: validation.error.errors,
+          details: validation.error.issues,
         });
       }
 

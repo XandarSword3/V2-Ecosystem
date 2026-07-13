@@ -72,7 +72,7 @@ export class CouponController {
     try {
       const validation = validateCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
+        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
       }
 
       const { code, orderType, orderAmount, itemCount, userId } = validation.data;
@@ -170,7 +170,7 @@ export class CouponController {
     try {
       const validation = applyCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
+        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
       }
 
       const { code, orderType, orderAmount, userId, orderId } = validation.data;
@@ -380,7 +380,7 @@ export class CouponController {
     try {
       const validation = createCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
+        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
       }
 
       const data = validation.data;
@@ -446,7 +446,7 @@ export class CouponController {
       const { id } = req.params;
       const validation = updateCouponSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.errors });
+        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
       }
 
       const data = validation.data;

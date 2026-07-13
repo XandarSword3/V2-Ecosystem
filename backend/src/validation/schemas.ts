@@ -253,7 +253,7 @@ export const createModuleSchema = z.object({
   name: z.string().min(2).max(100),
   slug: z.string().min(2).max(50).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, numbers, and hyphens only').optional(),
   description: sanitizedString(500).optional(),
-  settings: z.record(z.any()).optional(),
+  settings: z.record(z.string(), z.any()).optional(),
 });
 
 export const updateModuleSchema = z.object({
@@ -261,7 +261,7 @@ export const updateModuleSchema = z.object({
   description: sanitizedString(500).optional(),
   is_active: z.boolean().optional(),
   show_in_main: z.boolean().optional(),
-  settings: z.record(z.any()).optional(),
+  settings: z.record(z.string(), z.any()).optional(),
   sort_order: z.number().int().min(0).optional(),
   // For optimistic locking
   settings_version: z.number().int().positive().optional(), 
@@ -276,10 +276,10 @@ export const updateModuleSchema = z.object({
 export function validateBody<T>(schema: z.ZodSchema<T>, body: unknown): T {
   const result = schema.safeParse(body);
   if (!result.success) {
-    const errors = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+    const errors = result.error.issues.map(e => `${e.path.join('.')}: ${e.message}`);
     const error = new Error(`Validation failed: ${errors.join(', ')}`);
     (error as any).statusCode = 400;
-    (error as any).errors = result.error.errors;
+    (error as any).errors = result.error.issues;
     throw error;
   }
   return result.data;
