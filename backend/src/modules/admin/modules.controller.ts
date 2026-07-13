@@ -13,6 +13,7 @@ import { permissionCache } from "../../security/permission-cache.service.js";
 import { assertModuleLimit } from "../../services/feature-limits.service.js";
 import { ENGINE_TO_LEGACY_TEMPLATE_TYPE } from "../../engines/types.js";
 import { getCallerTenantId } from "../../security/tenant-scope.js";
+import { getScopedClient, tenantContextFor } from "../../security/scoped-client.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
@@ -176,7 +177,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
       });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getScopedClient(tenantContextFor(req))
       .from('modules')
       .insert({
         engine_type,
@@ -189,7 +190,8 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         is_active: true,
         show_in_main: true,
         property_id: propertyId,
-        tenant_id: getCallerTenantId(req),
+        // tenant_id intentionally omitted — getScopedClient stamps it.
+        // (Phase 2, item 2.2 pilot. See backend/src/security/scoped-client.ts.)
       })
       .select()
       .single();
@@ -444,10 +446,16 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
         updateData.settings_version = (currentModule.settings_version || 0) + 1;
     }
 
-    const { data, error } = await (currentModule.tenant_id
-      ? supabase.from('modules').update(updateData).eq('id', id).eq('tenant_id', currentModule.tenant_id)
-      : supabase.from('modules').update(updateData).eq('id', id).is('tenant_id', null)
-    ).select().single();
+    // Ownership already confirmed above (currentModule.tenant_id vs callerTenantId,
+    // or isSuperAdmin) — getScopedClient re-applies the same tenant filter here
+    // so the actual UPDATE can't touch a row outside that scope either.
+    // (Phase 2, item 2.2 pilot.)
+    const { data, error } = await getScopedClient(tenantContextFor(req))
+      .from('modules')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
 
     if (error) throw error;
 
