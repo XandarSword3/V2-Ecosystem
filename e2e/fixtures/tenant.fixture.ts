@@ -61,6 +61,7 @@ export function tenantHeaders(subdomain: string, token?: string): Record<string,
 /** Reserved test subdomains — match exactly what global-setup seeds. */
 export const TEST_TENANTS = {
   PRIMARY:   'testcorp',
+  SECONDARY: 'othercorp', // independent tenant, used for cross-tenant isolation tests
   SUSPENDED: 'suspended',
   PLATFORM:  'platform',
 } as const;

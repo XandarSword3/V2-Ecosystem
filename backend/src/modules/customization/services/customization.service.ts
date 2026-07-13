@@ -633,9 +633,9 @@ class CustomizationService {
   /**
    * Link a customization group to an entity
    */
-  async linkToEntity(data: LinkCustomizationRequest): Promise<EntityCustomization> {
+  async linkToEntity(data: LinkCustomizationRequest, tenantId?: string | null): Promise<EntityCustomization> {
     const supabase = getSupabase();
-    
+
     const { data: link, error } = await supabase
       .from('entity_customizations')
       .insert({
@@ -646,7 +646,8 @@ class CustomizationService {
         min_selections_override: data.minSelectionsOverride,
         max_selections_override: data.maxSelectionsOverride,
         price_multiplier: data.priceMultiplier ?? 1.0,
-        sort_order: data.sortOrder ?? 0
+        sort_order: data.sortOrder ?? 0,
+        tenant_id: tenantId ?? null
       })
       .select()
       .single();
@@ -662,7 +663,7 @@ class CustomizationService {
   /**
    * Update an entity customization link
    */
-  async updateEntityLink(id: string, data: UpdateEntityCustomizationRequest): Promise<EntityCustomization> {
+  async updateEntityLink(id: string, data: UpdateEntityCustomizationRequest, tenantId?: string | null): Promise<EntityCustomization> {
     const supabase = getSupabase();
     
     const updateData: Record<string, unknown> = {};
@@ -674,16 +675,20 @@ class CustomizationService {
     if (data.isEnabled !== undefined) updateData.is_enabled = data.isEnabled;
     if (data.sortOrder !== undefined) updateData.sort_order = data.sortOrder;
 
-    const { data: link, error } = await supabase
+    let updateQuery = supabase
       .from('entity_customizations')
       .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+    if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+
+    const { data: link, error } = await updateQuery.select().maybeSingle();
 
     if (error) {
       logger.error('Failed to update entity link', { error, id, data });
       throw new Error(`Failed to update entity link: ${error.message}`);
+    }
+    if (!link) {
+      throw new AppError('Entity customization link not found', 404);
     }
 
     return this.mapEntityCustomizationFromDb(link);
@@ -692,33 +697,42 @@ class CustomizationService {
   /**
    * Remove an entity customization link
    */
-  async unlinkFromEntity(id: string): Promise<void> {
+  async unlinkFromEntity(id: string, tenantId?: string | null): Promise<void> {
     const supabase = getSupabase();
-    
-    const { error } = await supabase
+
+    let deleteQuery = supabase
       .from('entity_customizations')
       .delete()
       .eq('id', id);
+    if (tenantId) deleteQuery = deleteQuery.eq('tenant_id', tenantId);
+
+    const { data, error } = await deleteQuery.select('id').maybeSingle();
 
     if (error) {
       logger.error('Failed to unlink customization', { error, id });
       throw new Error(`Failed to unlink customization: ${error.message}`);
+    }
+    if (!data) {
+      throw new AppError('Entity customization link not found', 404);
     }
   }
 
   /**
    * Get all customization links for an entity
    */
-  async getEntityLinks(entityType: CustomizableEntityType, entityId: string): Promise<EntityCustomization[]> {
+  async getEntityLinks(entityType: CustomizableEntityType, entityId: string, tenantId?: string | null): Promise<EntityCustomization[]> {
     const supabase = getSupabase();
-    
-    const { data: links, error } = await supabase
+
+    let query = supabase
       .from('entity_customizations')
       .select('*, customization_groups(*)')
       .eq('entity_type', entityType)
       .eq('entity_id', entityId)
       .eq('is_enabled', true)
       .order('sort_order', { ascending: true });
+    if (tenantId) query = query.eq('tenant_id', tenantId);
+
+    const { data: links, error } = await query;
 
     if (error) {
       throw new Error(`Failed to get entity links: ${error.message}`);
@@ -913,7 +927,7 @@ class CustomizationService {
     selections: Array<{ optionId: string; quantity: number }>;
     baseQuantity?: number;
     executeInventory?: boolean;
-  }): Promise<{
+  }, tenantId?: string | null): Promise<{
     success: boolean;
     snapshotId?: string;
     totalPriceAdjustment: number;
@@ -923,7 +937,26 @@ class CustomizationService {
   }> {
     const supabase = getSupabase();
     const startTime = Date.now();
-    
+
+    // Item 0.5 — the RPC below has no tenant scoping of its own, so verify
+    // every selected option actually belongs to the caller's tenant before
+    // invoking it. Otherwise a caller could reference another tenant's
+    // customization_options and have inventory/pricing applied against them.
+    if (tenantId && params.selections.length > 0) {
+      const optionIds = params.selections.map(s => s.optionId);
+      const { data: foreignOptions, error: scopeError } = await supabase
+        .from('customization_options')
+        .select('id')
+        .in('id', optionIds)
+        .neq('tenant_id', tenantId);
+      if (scopeError) {
+        throw new Error(`Failed to verify option ownership: ${scopeError.message}`);
+      }
+      if (foreignOptions && foreignOptions.length > 0) {
+        throw new AppError('One or more customizations were not found', 404);
+      }
+    }
+
     const { data, error } = await supabase.rpc('create_order_customization_snapshot', {
       p_order_type: params.orderType,
       p_order_id: params.orderId,
@@ -974,7 +1007,8 @@ class CustomizationService {
   async reverseOrderItemInventory(
     snapshotId: string,
     reason: string = 'Refund',
-    reversedBy?: string
+    reversedBy?: string,
+    tenantId?: string | null
   ): Promise<{
     success: boolean;
     itemsReversed: number;
@@ -982,7 +1016,25 @@ class CustomizationService {
     errorMessage?: string;
   }> {
     const supabase = getSupabase();
-    
+
+    // Item 0.5 — the RPC has no tenant scoping of its own; verify the
+    // snapshot belongs to the caller's tenant first, or a caller could
+    // reverse (restore inventory / mark reversed) another tenant's order.
+    if (tenantId) {
+      const { data: snapshot, error: scopeError } = await supabase
+        .from('order_customizations')
+        .select('id')
+        .eq('id', snapshotId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (scopeError) {
+        throw new Error(`Failed to verify snapshot ownership: ${scopeError.message}`);
+      }
+      if (!snapshot) {
+        throw new AppError('Order snapshot not found', 404);
+      }
+    }
+
     logger.info('Reversing order item inventory', { snapshotId, reason, reversedBy });
     
     const { data, error } = await supabase.rpc('reverse_order_item_inventory', {
@@ -1020,7 +1072,8 @@ class CustomizationService {
    */
   async getReversibleOrderCustomizations(
     orderType: string,
-    orderId: string
+    orderId: string,
+    tenantId?: string | null
   ): Promise<Array<{
     snapshotId: string;
     orderItemId?: string;
@@ -1032,7 +1085,26 @@ class CustomizationService {
     canReverse: boolean;
   }>> {
     const supabase = getSupabase();
-    
+
+    // Item 0.5 — verify at least one snapshot for this order belongs to the
+    // caller's tenant before asking the RPC (which has no tenant scoping of
+    // its own) for the full reversible list.
+    if (tenantId) {
+      const { data: owned, error: scopeError } = await supabase
+        .from('order_customizations')
+        .select('id')
+        .eq('order_type', orderType)
+        .eq('order_id', orderId)
+        .eq('tenant_id', tenantId)
+        .limit(1);
+      if (scopeError) {
+        throw new Error(`Failed to verify order ownership: ${scopeError.message}`);
+      }
+      if (!owned || owned.length === 0) {
+        return [];
+      }
+    }
+
     const { data, error } = await supabase.rpc('get_reversible_order_customizations', {
       p_order_type: orderType,
       p_order_id: orderId

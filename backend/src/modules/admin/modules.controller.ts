@@ -12,6 +12,8 @@ import { buildModulePermissionRows } from "../../security/template-permission-pr
 import { permissionCache } from "../../security/permission-cache.service.js";
 import { assertModuleLimit } from "../../services/feature-limits.service.js";
 import { ENGINE_TO_LEGACY_TEMPLATE_TYPE } from "../../engines/types.js";
+import { getCallerTenantId } from "../../security/tenant-scope.js";
+import { getScopedClient, tenantContextFor } from "../../security/scoped-client.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
   try {
@@ -45,7 +47,7 @@ export async function getModules(req: Request, res: Response, next: NextFunction
     }
 
     // Scope to tenant — only show this tenant's modules plus any unscoped (null) global modules
-    const tenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string);
+    const tenantId = getCallerTenantId(req);
     if (tenantId) {
       query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
     }
@@ -126,7 +128,9 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
     }
 
     // Q171 — Scope slug uniqueness check to tenant so two tenants can share the same slug
-    const tenantIdForSlugCheck = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    // JWT-derived only (req.user.tenantId via getCallerTenantId) — never the x-tenant-id
+    // header, which is attacker-controlled. See remediation plan Phase 0, item 0.1.
+    const tenantIdForSlugCheck = getCallerTenantId(req);
 
     // Pre-check: if a module with this slug already exists within this tenant (active or inactive),
     // surface a clear 409 rather than a cryptic 500 from the DB unique constraint.
@@ -173,7 +177,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
       });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getScopedClient(tenantContextFor(req))
       .from('modules')
       .insert({
         engine_type,
@@ -186,7 +190,8 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         is_active: true,
         show_in_main: true,
         property_id: propertyId,
-        tenant_id: (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null,
+        // tenant_id intentionally omitted — getScopedClient stamps it.
+        // (Phase 2, item 2.2 pilot. See backend/src/security/scoped-client.ts.)
       })
       .select()
       .single();
@@ -378,8 +383,10 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
     const user = req.user;
     if (!user) throw new Error('Authentication required');
     const isSuperAdmin = user.roles.includes('super_admin');
-    // Same tenant resolution createModule() uses when stamping the row on insert.
-    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    // JWT-derived only — see remediation plan Phase 0, item 0.1. Previously fell
+    // back to the x-tenant-id header, which an authenticated admin/manager of
+    // Tenant A could set to Tenant B's id to pass the ownership check below.
+    const callerTenantId = getCallerTenantId(req);
 
     // 1. Fetch current module to check permissions, tenant ownership, and version
     const { data: currentModule, error: fetchError } = await supabase
@@ -439,10 +446,16 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
         updateData.settings_version = (currentModule.settings_version || 0) + 1;
     }
 
-    const { data, error } = await (currentModule.tenant_id
-      ? supabase.from('modules').update(updateData).eq('id', id).eq('tenant_id', currentModule.tenant_id)
-      : supabase.from('modules').update(updateData).eq('id', id).is('tenant_id', null)
-    ).select().single();
+    // Ownership already confirmed above (currentModule.tenant_id vs callerTenantId,
+    // or isSuperAdmin) — getScopedClient re-applies the same tenant filter here
+    // so the actual UPDATE can't touch a row outside that scope either.
+    // (Phase 2, item 2.2 pilot.)
+    const { data, error } = await getScopedClient(tenantContextFor(req))
+      .from('modules')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
 
     if (error) throw error;
 
@@ -486,7 +499,8 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
     const user = req.user;
     if (!user) throw new Error('Authentication required');
     const isSuperAdmin = user.roles.includes('super_admin');
-    const callerTenantId = (req as any).tenant?.id || (req.headers?.['x-tenant-id'] as string) || null;
+    // JWT-derived only — see remediation plan Phase 0, item 0.1.
+    const callerTenantId = getCallerTenantId(req);
     if (!isSuperAdmin && moduleData.tenant_id !== callerTenantId) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
