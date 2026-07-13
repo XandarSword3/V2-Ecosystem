@@ -41,7 +41,7 @@
     "@supabase/supabase-js": "^2.89.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
-    "archiver": "^7.0.1",
+    "archiver": "^8.0.0",
     "axios": "^1.18.1",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
@@ -83,7 +83,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/archiver": "^7.0.0",
+    "@types/archiver": "^8.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/compression": "^1.7.5",
     "@types/cookie-parser": "^1.4.10",
