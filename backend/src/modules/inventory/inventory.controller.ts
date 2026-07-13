@@ -3,21 +3,7 @@ import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { AppError } from '../../utils/AppError.js';
 import { z } from 'zod';
-
-/**
- * Resolve the tenant scope a request should be limited to.
- * super_admin is the platform-wide operator role and intentionally sees
- * everything; every other scope is confined to its own tenant.
- * Mirrors the convention in customization.controller.ts / auth.middleware's
- * authorize() guard.
- */
-function tenantScopeFor(req: Request): string | null {
-  if (req.user?.scope === 'super_admin') return null;
-  if (!req.user?.tenantId) {
-    throw new AppError('No tenant associated with this account', 403);
-  }
-  return req.user.tenantId;
-}
+import { getCallerTenantId as tenantScopeFor } from '../../security/tenant-scope.js';
 
 // Validation schemas
 const createItemSchema = z.object({
