@@ -8,7 +8,7 @@ import { asyncHandler } from '../../middleware/async-handler.js';
 import { alertService } from './alert.service.js';
 import { queryBuilderService } from './query-builder.service.js';
 import { guestSegmentationService } from './guest-segmentation.service.js';
-import { metricsLayer, resolveEngineType } from './metrics-layer.service.js';
+import { metricsLayer } from './metrics-layer.service.js';
 
 /**
  * Read property ID from the middleware-validated req.propertyId first (set by
@@ -298,7 +298,7 @@ export class AnalyticsController {
     for (const m of (modules || [])) {
       moduleMap[m.id] = {
         name: m.name,
-        engine: m.engine_type || resolveEngineType(m.template_type),
+        engine: m.engine_type,
       };
     }
 

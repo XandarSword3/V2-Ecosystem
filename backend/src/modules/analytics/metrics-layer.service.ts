@@ -299,30 +299,12 @@ export const CANONICAL_METRICS: Omit<MetricDefinition, 'id' | 'version' | 'creat
 ];
 
 // =============================================
-// LEGACY ALIAS RESOLVER
-// =============================================
-
-/**
- * Resolve a legacy template_type alias to its canonical engine type.
- * Keeps backward-compatibility for DB rows that were created before the
- * template_type → engine_type migration completed.
- */
-export function resolveEngineType(templateType: string | null | undefined): string {
-  const LEGACY_MAP: Record<string, string> = {
-    menu_service:       'instant_transaction',
-    multi_day_booking:  'time_exclusive_reservation',
-    session_access:     'shared_capacity_access',
-    subscription:       'ongoing_entitlement',
-    membership_access:  'ongoing_entitlement',
-    appointment_booking:'time_exclusive_reservation',
-    class_scheduling:   'shared_capacity_access',
-  };
-  return LEGACY_MAP[templateType ?? ''] ?? templateType ?? 'instant_transaction';
-}
-
-// =============================================
 // METRICS LAYER SERVICE
 // =============================================
+// NOTE: modules.engine_type is NOT NULL as of the Stage 1 contract-freeze
+// migration (see docs/architecture/MODULE_ENGINE_CONTRACT.md). The
+// resolveEngineType(template_type) fallback that used to live here is
+// gone — read m.engine_type directly.
 
 export class MetricsLayerService {
   private supabase = getSupabase();
@@ -1007,7 +989,7 @@ export class MetricsLayerService {
 
     const engineModuleCounts: Record<string, number> = {};
     for (const m of (modules || [])) {
-      const engine = m.engine_type || resolveEngineType(m.template_type);
+      const engine = m.engine_type;
       engineModuleCounts[engine] = (engineModuleCounts[engine] || 0) + 1;
     }
 
@@ -1211,7 +1193,7 @@ export class MetricsLayerService {
     for (const m of (modules || [])) {
       moduleMap[m.id] = {
         name: m.name,
-        engine: m.engine_type || resolveEngineType(m.template_type),
+        engine: m.engine_type,
       };
     }
 
@@ -1407,7 +1389,7 @@ export class MetricsLayerService {
     }>> = {};
 
     for (const m of (modules || [])) {
-      const engineType = m.engine_type || resolveEngineType(m.template_type);
+      const engineType = m.engine_type;
       if (!moduleGroups[engineType]) moduleGroups[engineType] = [];
       moduleGroups[engineType].push({
         moduleId: m.id,
