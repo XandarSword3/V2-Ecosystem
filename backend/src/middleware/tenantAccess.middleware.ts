@@ -359,15 +359,30 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
  * For past_due tenants: GET/HEAD/OPTIONS pass through with an
  * X-Billing-Warning header; all write methods (POST/PUT/PATCH/DELETE/etc.)
  * are blocked with 402 — this is the doc's "PASS reads / BLOCK writes" rule.
- * Passes through if no tenant is resolved (single-tenant legacy mode).
+ *
+ * Fails closed if no tenant is resolved. There is no more "single-tenant
+ * legacy mode" — the product is fully multi-tenant, and the old passthrough
+ * here was a leftover from before that was true, not a deliberate exception.
+ * It contradicted the fail-closed pattern resolveTenant already uses for
+ * every other "couldn't identify a tenant" case (see the hard 404s above).
+ * Given resolveTenant now actively falls back to the platform-root tenant,
+ * req.tenant should only be unset here in the brief post-install window
+ * before that tenant is seeded — which is exactly when nothing should be
+ * proceeding past this gate anyway.
  */
 export async function validateTenantBilling(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (req.skipTenantGate) return next();
 
   const tenant = req.tenant;
 
-  // No tenant resolved — legacy single-tenant deployment, allow through
-  if (!tenant) return next();
+  if (!tenant) {
+    logger.warn('[TENANT] Blocked request — no tenant resolved', {
+      path: req.path,
+      method: req.method,
+    });
+    res.status(404).json({ success: false, error: 'Tenant not found' });
+    return;
+  }
 
   const { billing_status, id, subdomain } = tenant;
 
