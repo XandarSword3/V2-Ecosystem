@@ -103,6 +103,7 @@ push_error.log
 **/archive/**/*.txt
 **/_archive/**/*.txt
 tools/*.json
+!tools/legacy-audit-baseline.json
 reports/*.json
 screenshots/*.png
 screenshots/**/*.png
