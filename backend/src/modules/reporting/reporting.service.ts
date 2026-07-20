@@ -2347,7 +2347,7 @@ class ReportingService {
         return this.exportToPDF(result, filename);
 
       case 'excel':
-
+        // falls through
       case 'xlsx':
 
         return this.exportToExcel(result, filename);

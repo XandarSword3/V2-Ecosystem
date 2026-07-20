@@ -615,7 +615,7 @@ export class FinancialLedgerService {
       switch (entry.transaction_type) {
 
         case 'charge':
-
+          // falls through
         case 'deposit':
 
           totalCharges += amount;
@@ -623,9 +623,9 @@ export class FinancialLedgerService {
           break;
 
         case 'refund':
-
+          // falls through
         case 'void':
-
+          // falls through
         case 'deposit_release':
 
           totalRefunds += amount;

@@ -19,7 +19,19 @@ const path = require('path');
 
 // ── CONFIGURATION ─────────────────────────────────────────────────────────────
 
-const ROOT = __dirname;
+// BUG FIX (found while wiring this into CI for Stage 4 of the
+// tenant-isolation contract freeze): this was `__dirname`, which for a
+// script living at tools/legacy-audit.js resolves to the tools/ directory
+// itself, not the repo root. Every SKIP_SEGMENTS entry below that names a
+// top-level repo folder ('tools', 'scripts', 'mobile', 'docs', 'messages')
+// only makes sense if ROOT is the repo root -- they were never reachable
+// as skip targets before, because the walk never started high enough to
+// encounter them. In practice this meant the "full-codebase" audit the
+// header comment describes had only ever scanned tools/ itself (mostly
+// tools/stress-test/, which happens to live under here) -- backend/,
+// frontend/, and supabase/ were never scanned at all despite being the
+// entire point of the tool.
+const ROOT = path.join(__dirname, '..');
 
 const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.sql', '.json']);
 
@@ -568,5 +580,66 @@ console.log('    node legacy-audit.js --module=chalet        one module only');
 console.log('    node legacy-audit.js --module=snack_bar     one module only');
 console.log('    node legacy-audit.js --dir=routes           one directory');
 console.log('    node legacy-audit.js --detail --module=chalet --dir=backend');
+console.log('    node legacy-audit.js --ci                   exit 1 on NEW violations only (baseline-ratcheted)');
+console.log('    node legacy-audit.js --ci --update-baseline shrink the baseline to the current violation set');
 console.log('─────────────────────────────────────────────────────────────────────');
 console.log('');
+
+// ── CI RATCHET ──────────────────────────────────────────────────────────────
+// Added as part of the Stage 4 CI-enforcement work
+// (docs/architecture/DATA_OWNERSHIP_CONTRACT.md's sibling stage). This tool
+// found 356 pre-existing active violations the day this was added -- failing
+// the build on all of them would just get the check disabled. Ratchet
+// against a checked-in baseline instead, same pattern as
+// backend/scripts/check-tenant-scoped-writes.js: anything already known is
+// tolerated, anything NEW fails CI. Only runs with --ci; default/no-flag
+// behavior above is unchanged for local interactive use.
+if (args.includes('--ci')) {
+  const BASELINE_PATH = path.join(__dirname, 'legacy-audit-baseline.json');
+  const updateBaseline = args.includes('--update-baseline');
+
+  const violationKey = (file, h) => `${file}:${h.lineNum}:${h.module}:${h.term}:${h.isBareWord ? 'bare' : 'exact'}`;
+
+  const current = new Set();
+  for (const [file, hits] of Object.entries(fileResults)) {
+    for (const h of hits) {
+      // Migration hits are included too (not just "active"): now that ROOT
+      // is fixed, these are real and previously invisible to this tool.
+      // Existing ones are grandfathered by the baseline like everything
+      // else; new ones in new migration files still get caught.
+      current.add(violationKey(file, h));
+    }
+  }
+
+  if (updateBaseline) {
+    fs.writeFileSync(BASELINE_PATH, JSON.stringify([...current].sort(), null, 2) + '\n');
+    console.log(`[--ci] Baseline updated: ${current.size} known violation(s) recorded to ${path.relative(ROOT, BASELINE_PATH)}`);
+    process.exit(0);
+  }
+
+  let baseline = new Set();
+  if (fs.existsSync(BASELINE_PATH)) {
+    baseline = new Set(JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')));
+  }
+
+  const newViolations = [...current].filter(k => !baseline.has(k));
+
+  if (newViolations.length > 0) {
+    console.error(`\n[--ci] ✗ ${newViolations.length} NEW legacy-terminology violation(s) not in the baseline:\n`);
+    for (const k of newViolations.sort()) console.error(`  ${k}`);
+    console.error(
+      `\nNew hardcoded restaurant/pool/chalet/snack_bar references are not allowed.\n` +
+      `If this is a false positive, fix the detection logic rather than the baseline --\n` +
+      `the baseline is for pre-existing debt, not new escapes.\n` +
+      `To knowingly absorb a reviewed exception: node tools/legacy-audit.js --ci --update-baseline\n`
+    );
+    process.exit(1);
+  }
+
+  const resolvedCount = [...baseline].filter(k => !current.has(k)).length;
+  console.log(
+    `[--ci] ✓ No new legacy-terminology violations. ${current.size} pre-existing (baselined) violation(s) remain` +
+    (resolvedCount > 0 ? `, ${resolvedCount} resolved since the baseline was last updated (run --ci --update-baseline to shrink it).` : '.')
+  );
+  process.exit(0);
+}
