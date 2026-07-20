@@ -62,6 +62,9 @@ jobs:
         working-directory: backend
         run: npm run check:tenant-writes
 
+      - name: Check legacy module terminology
+        run: node tools/legacy-audit.js --ci
+
       - name: Lint frontend
         working-directory: frontend
         run: npm run lint
