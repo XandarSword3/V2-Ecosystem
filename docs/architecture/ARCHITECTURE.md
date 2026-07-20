@@ -1,8 +1,8 @@
-<!-- Last updated: 2026-05-10 -->
+<!-- Last updated: 2026-07-20 (Stage 6 cleanup pass: engine/module/migration counts, added Engine E) -->
 
 # Architecture Overview
 
-> **Platform**: V2 Resort Management System | **Commits**: 257 | **Modules**: 37 | **Engines**: 4
+> **Platform**: V2 Resort Management System | **Modules**: 39 | **Engines**: 5 | **Migrations**: 190
 
 This document describes the unified engine architecture that powers all transactions in the V2 platform.
 
@@ -16,11 +16,11 @@ This document describes the unified engine architecture that powers all transact
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
 │  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐    │
-│  │                 │     │   37 Modules    │     │                 │    │
-│  │   Frontend      │────▶│   4 Engines     │────▶│   Supabase      │    │
+│  │                 │     │   39 Modules    │     │                 │    │
+│  │   Frontend      │────▶│   5 Engines     │────▶│   Supabase      │    │
 │  │   Next.js 14    │     │   Express.js    │     │   PostgreSQL 15 │    │
 │  │   (Port 3005)   │     │   PostgreSQL 15 │     │                 │    │
-│  │                 │     │                 │     │  158 Migrations │    │
+│  │                 │     │                 │     │  190 Migrations │    │
 │  └────────┬────────┘     └────────┬────────┘     └─────────────────┘    │
 │           │                       │                                      │
 │           │  WebSocket (Socket.io)                                     │
@@ -28,11 +28,11 @@ This document describes the unified engine architecture that powers all transact
 │                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │                    Unified Transaction Layer                      │    │
-│  ├───────────┬───────────────┬─────────────────┬─────────────────┤    │
-│  │ instant_  │ time_exclusive│ shared_capacity │ ongoing_        │    │
-│  │ transaction│ _reservation  │ _access         │ entitlement     │    │
-│  │ (POS)     │ (Bookings)    │ (Pool/Gym)      │ (Memberships)   │    │
-│  └───────────┴───────────────┴─────────────────┴─────────────────┘    │
+│  ├───────────┬───────────────┬─────────────────┬─────────────────┬──────┤
+│  │ instant_  │ time_exclusive│ shared_capacity │ ongoing_        │platform_│
+│  │ transaction│ _reservation  │ _access         │ entitlement     │entitlement│
+│  │ (POS)     │ (Bookings)    │ (Pool/Gym)      │ (Memberships)   │(SaaS billing)│
+│  └───────────┴───────────────┴─────────────────┴─────────────────┴──────┘
 │                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │                    Third-Party Services                           │    │
@@ -46,9 +46,9 @@ This document describes the unified engine architecture that powers all transact
 
 ---
 
-## The 4-Engine Abstraction
+## The 5-Engine Abstraction
 
-All transactions in V2 flow through one of four unified engines. This replaces the legacy architecture where restaurant, pool, chalets, and snack were separate modules.
+All transactions in V2 flow through one of five unified engines. This replaces the legacy architecture where restaurant, pool, chalets, and snack were separate modules. The fifth engine, `platform_entitlement`, is internal-only — it runs the platform's own SaaS billing and tenant provisioning rather than anything a guest-facing module does. See `docs/architecture/MODULE_ENGINE_CONTRACT.md` for the frozen, authoritative list.
 
 | Engine Type | TypeScript Name | Template | Pattern | State Machine |
 |-------------|-----------------|----------|---------|---------------|
@@ -56,6 +56,7 @@ All transactions in V2 flow through one of four unified engines. This replaces t
 | **Time-Exclusive Reservation** | `time_exclusive_reservation` | `multi_day_booking` | Date-range bookings with exclusive unit lock | `pending → confirmed → checked_in → checked_out` |
 | **Shared Capacity Access** | `shared_capacity_access` | `session_access` | Capacity-limited shared sessions | `valid → active → used` |
 | **Ongoing Entitlement** | `ongoing_entitlement` | `subscription` | Recurring memberships and subscriptions | `pending → active → paused → expired` |
+| **Platform Entitlement** | `platform_entitlement` | `saas_subscription` | Engine E — internal-only, SaaS billing / tenant provisioning | `pending → active → paused → expired` |
 
 ### Engine Definition Files
 
@@ -65,7 +66,8 @@ backend/src/engines/
 │   ├── instant-transaction.ts         # POS orders, food service
 │   ├── time-exclusive-reservation.ts  # Chalets, rooms
 │   ├── shared-capacity-access.ts      # Pool sessions, gym access
-│   └── ongoing-entitlement.ts         # Memberships, subscriptions
+│   ├── ongoing-entitlement.ts         # Memberships, subscriptions
+│   └── platform-entitlement.ts        # SaaS billing, tenant provisioning (internal-only)
 ├── registry.ts                        # Engine factory & mapping
 ├── state-machine.ts                   # State transition logic
 └── types.ts                           # TypeScript definitions
@@ -109,8 +111,8 @@ Every transaction follows the same pipeline:
 v2-resort/
 ├── backend/                 # Express.js API (Node 20, TypeScript 5.3)
 │   ├── src/
-│   │   ├── modules/         # 37 feature modules
-│   │   ├── engines/         # 4 unified transaction engines
+│   │   ├── modules/         # 39 feature modules
+│   │   ├── engines/         # 5 unified transaction engines
 │   │   ├── services/        # Shared business services
 │   │   ├── database/        # Connection, migrations, seeding
 │   │   ├── middleware/      # Express middleware
@@ -272,7 +274,7 @@ cd frontend && npm run dev    # Port 3000
 
 ## Configuration Tables — The Rule
 
-The 4 engines govern **financial and access events**. Modules also need **configuration data** — what products exist, what time slots are available, what can be booked. These configuration tables are legitimate. But they must be **engine-generic, not module-specific.**
+The 5 engines govern **financial and access events**. Modules also need **configuration data** — what products exist, what time slots are available, what can be booked. These configuration tables are legitimate. But they must be **engine-generic, not module-specific.**
 
 ### The distinction
 

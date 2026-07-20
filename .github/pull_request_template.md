@@ -30,6 +30,7 @@ Closes #<!-- issue number, if applicable -->
 
 ## Checklist
 
+- [ ] If this PR touches tenant/route/table-scoping code (auth middleware, controllers reading `x-tenant-id`/`x-property-id`, anything writing to a tenant-scoped table, module/engine resolution), I read the three frozen contract docs first: [`MODULE_ENGINE_CONTRACT.md`](../docs/architecture/MODULE_ENGINE_CONTRACT.md), [`ROUTE_SCOPING_CONTRACT.md`](../docs/architecture/ROUTE_SCOPING_CONTRACT.md), [`DATA_OWNERSHIP_CONTRACT.md`](../docs/architecture/DATA_OWNERSHIP_CONTRACT.md) — not applicable otherwise.
 - [ ] Tests pass locally (`npm test` in affected workspace)
 - [ ] Linting passes (`npm run lint` in affected workspace)
 - [ ] No `console.log` left in production code paths

@@ -57,7 +57,11 @@ jobs:
       - name: Lint backend
         working-directory: backend
         run: npm run lint
-      
+
+      - name: Check tenant-scoped writes
+        working-directory: backend
+        run: npm run check:tenant-writes
+
       - name: Lint frontend
         working-directory: frontend
         run: npm run lint

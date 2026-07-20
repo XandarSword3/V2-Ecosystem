@@ -20,6 +20,7 @@
     "test:integration:teardown": "docker-compose -f docker-compose.test.yml down -v",
     "test:all": "npm run test:unit && npm run test:integration",
     "lint": "eslint src --ext .ts",
+    "check:tenant-writes": "node scripts/check-tenant-scoped-writes.js",
     "lint:fix": "eslint src --ext .ts --fix",
     "test:smoke": "node scripts/api-smoke-test.js"
   },
