@@ -12,7 +12,7 @@ import { buildModulePermissionRows } from "../../security/template-permission-pr
 import { permissionCache } from "../../security/permission-cache.service.js";
 import { assertModuleLimit } from "../../services/feature-limits.service.js";
 import { ENGINE_TO_LEGACY_TEMPLATE_TYPE } from "../../engines/types.js";
-import { getCallerTenantId } from "../../security/tenant-scope.js";
+import { getCallerTenantId, requireTenantScope } from "../../security/tenant-scope.js";
 import { getScopedClient, tenantContextFor } from "../../security/scoped-client.js";
 
 export async function getModules(req: Request, res: Response, next: NextFunction) {
@@ -46,8 +46,15 @@ export async function getModules(req: Request, res: Response, next: NextFunction
       query = query.or(`property_id.eq.${propertyId},property_id.is.null`);
     }
 
-    // Scope to tenant — only show this tenant's modules plus any unscoped (null) global modules
-    const tenantId = getCallerTenantId(req);
+    // Scope to tenant — only show this tenant's modules plus any unscoped (null) global modules.
+    // This handler is mounted on two routes: the authenticated /admin/modules
+    // (req.user present) and the unauthenticated public /api/modules (app.ts,
+    // mounted with only resolveTenant/resolveProperty, no auth middleware).
+    // getCallerTenantId() assumes an authenticated caller and throws a 403 when
+    // req.user is absent — which is every single call on the public route, and
+    // was surfacing here as a masked 500. Fall back to req.tenant?.id (resolved
+    // by resolveTenant from the subdomain/header) for unauthenticated callers.
+    const tenantId = req.user ? getCallerTenantId(req) : (req.tenant?.id ?? null);
     if (tenantId) {
       query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
     }
@@ -58,6 +65,7 @@ export async function getModules(req: Request, res: Response, next: NextFunction
 
     res.json({ success: true, data });
   } catch (error: unknown) {
+    logger.error('[Modules] getModules failed:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch modules' });
   }
 }
@@ -66,23 +74,38 @@ export const getModule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
+    // SECURITY FIX: tenant/property scoping — same dual-source resolution as
+    // getModules() above. This handler is mounted on both the authenticated
+    // /admin/modules/:id (req.user present) and the unauthenticated public
+    // /api/modules/:slug (app.ts, resolveTenant + resolveProperty only, no
+    // auth). Previously applied NEITHER filter, despite the middleware chain
+    // populating req.tenant/req.property identically to the getModules route
+    // right above it — any tenant's module row was fetchable by anyone who
+    // knew or guessed its id/slug. Matching getModules' scoping here closes
+    // that cross-tenant read.
+    const propertyId = req.property?.id ?? ((req as any).propertyId as string | undefined);
+    const tenantId = req.user ? getCallerTenantId(req) : (req.tenant?.id ?? null);
+
+    const applyScope = (q: any) => {
+      let scoped = q;
+      if (propertyId) scoped = scoped.or(`property_id.eq.${propertyId},property_id.is.null`);
+      if (tenantId) scoped = scoped.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+      return scoped;
+    };
+
     // Try to fetch by id first
-    const { data: initialData, error: initialError } = await supabase
-      .from('modules')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
+    const { data: initialData, error: initialError } = await applyScope(
+      supabase.from('modules').select('*').eq('id', id)
+    ).maybeSingle();
 
     let data = initialData;
     const error = initialError;
 
     // If not found by id, try slug
     if ((error || !data) && id) {
-      const { data: bySlug, error: slugErr } = await supabase
-        .from('modules')
-        .select('*')
-        .eq('slug', id)
-        .maybeSingle();
+      const { data: bySlug, error: slugErr } = await applyScope(
+        supabase.from('modules').select('*').eq('slug', id)
+      ).maybeSingle();
 
       if (slugErr) throw slugErr;
       if (!bySlug) return res.status(404).json({ success: false, error: 'Module not found' });
@@ -177,7 +200,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
       });
     }
 
-    const { data, error } = await getScopedClient(tenantContextFor(req))
+    const { data, error } = await getScopedClient({ tenantId: requireTenantScope(req), actorId: req.user?.userId })
       .from('modules')
       .insert({
         engine_type,
@@ -191,6 +214,8 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         show_in_main: true,
         property_id: propertyId,
         // tenant_id intentionally omitted — getScopedClient stamps it.
+        // requireTenantScope (not tenantContextFor) ensures super_admin callers
+        // get a 403 rather than a null tenant_id → 23502 constraint violation.
         // (Phase 2, item 2.2 pilot. See backend/src/security/scoped-client.ts.)
       })
       .select()

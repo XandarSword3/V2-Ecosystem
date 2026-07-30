@@ -7,6 +7,11 @@ import { AppError } from '../../utils/AppError';
 import { seasonalPricingService } from '../../services/seasonal-pricing.service';
 import { logger } from '../../utils/logger';
 import { getCallerTenantId } from '../../security/tenant-scope.js';
+import { PricingPipeline } from '../../engines/pricing-pipeline.js';
+import { taxService } from '../../services/tax.service.js';
+import { orderConfigService } from '../../services/order-config.service.js';
+import { resolveTaxCategory } from '../../services/tax.service.js';
+import type { PricingLineItem, PricingConfig, PricingContext } from '../../engines/types.js';
 
 const router = Router();
 
@@ -310,6 +315,99 @@ router.get(
         ruleUsage,
         recentHistory: analytics?.slice(0, 50),
       },
+    });
+  })
+);
+
+// Preview pricing for cart items - returns full breakdown with tax and fees
+// No auth required - guests need to see pricing before checkout
+router.post(
+  '/preview',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { 
+      items, 
+      moduleId, 
+      orderType, 
+      conditions,
+      couponCode,
+      giftCardCodes,
+      loyaltyPointsToRedeem,
+      customerId
+    } = req.body;
+
+    // Validate required fields
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw new AppError('items array is required', 400);
+    }
+
+    if (!moduleId) {
+      throw new AppError('moduleId is required to resolve tax categories', 400);
+    }
+
+    // Fetch module's tax category for server-side resolution
+    const { data: module } = await supabase
+      .from('modules')
+      .select('tax_category')
+      .eq('id', moduleId)
+      .maybeSingle();
+
+    const moduleTaxCategory = module?.tax_category ?? 'all';
+
+    // Convert items to PricingLineItem format and resolve taxCategory server-side
+    const lineItems: PricingLineItem[] = items.map((item: any) => {
+      const lineItem = {
+        itemId: item.itemId,
+        name: item.name || 'Item',
+        unitPrice: item.unitPrice || 0,
+        quantity: item.quantity || 1,
+        unitAdjustment: item.unitAdjustment,
+        metadata: item.metadata || {}
+      };
+      return {
+        ...lineItem,
+        taxCategory: resolveTaxCategory(lineItem, moduleTaxCategory)
+      };
+    });
+
+    // Build pricing config (default to applying tax and fees unless specified)
+    const pricingConfig: PricingConfig = {
+      applyTax: req.body.applyTax !== false,
+      applyServiceCharge: req.body.applyServiceCharge !== false,
+      serviceChargeCondition: req.body.serviceChargeCondition,
+      applyDeliveryFee: req.body.applyDeliveryFee !== false,
+      deliveryFeeCondition: req.body.deliveryFeeCondition,
+      supportsCoupons: !!couponCode,
+      supportsGiftCards: !!giftCardCodes && giftCardCodes.length > 0,
+      supportsLoyaltyRedemption: !!loyaltyPointsToRedeem,
+      earnsLoyaltyPoints: false,
+      deductsInventory: false,
+      rounding: 'round',
+      decimalPlaces: 2
+    };
+
+    // Build pricing context
+    const pricingContext: PricingContext = {
+      moduleId,
+      conditions: conditions || { orderType: orderType },
+      customerId,
+      couponCode,
+      giftCardCodes,
+      loyaltyPointsToRedeem,
+      propertyId: (req as any).property?.id,
+      staffId: (req.user as any)?.userId
+    };
+
+    // Use pricing pipeline to compute full breakdown
+    const pipeline = new PricingPipeline({
+      taxService,
+      orderConfigService
+    });
+
+    const result = await pipeline.calculate(lineItems, pricingConfig, pricingContext);
+
+    res.json({
+      success: true,
+      data: result
     });
   })
 );

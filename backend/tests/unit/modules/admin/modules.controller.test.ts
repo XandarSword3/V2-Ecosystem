@@ -163,6 +163,11 @@ const MOD_RESTAURANT = {
   settings: {},
   settings_version: 1,
   sort_order: 0,
+  // tenant_id: fixtures need a concrete owning tenant so non-super_admin
+  // mock users (scope + tenantId below) can pass the controller's tenant-
+  // ownership check (getCallerTenantId-derived) instead of being treated
+  // as a global/unscoped module that only super_admin may touch.
+  tenant_id: 'tenant-1',
 };
 
 const MOD_POOL = {
@@ -175,6 +180,7 @@ const MOD_POOL = {
   settings: {},
   settings_version: 1,
   sort_order: 1,
+  tenant_id: 'tenant-1',
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -184,7 +190,20 @@ function mockReq(overrides: Record<string, unknown> = {}): Record<string, unknow
     params: {},
     query: {},
     body: {},
-    user: { userId: 'admin-1', id: 'admin-1', roles: ['super_admin'] },
+    // property: createModule requires a resolvable property context (400s
+    // otherwise — modules.property_id is NOT NULL) and getModule/getModules
+    // read req.property?.id for optional scoping. Real routes resolve this
+    // via resolveProperty/validatePropertyAccess middleware; simulate that here.
+    property: { id: 'property-1' },
+    // scope is the real authorization primitive read by getCallerTenantId()
+    // (see backend/src/security/tenant-scope.ts); roles[] is kept alongside
+    // since the controller's own permission checks read roles directly.
+    // Prior to this fix this mock never set scope, so any codepath calling
+    // getCallerTenantId() threw "No tenant associated with this account"
+    // even for a simulated super_admin — a pre-existing fixture/type-drift
+    // bug (scope was added to AuthenticatedUser after this file was written),
+    // unrelated to and predating today's getModule/getModules tenant-scoping fix.
+    user: { userId: 'admin-1', id: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
     ip: '127.0.0.1',
     get: vi.fn().mockReturnValue('vitest-agent'),
     ...overrides,
@@ -405,7 +424,11 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { name: 'Hack' },
-        user: { userId: 'staff-1', roles: ['customer'] },
+        // scope+tenantId matching MOD_RESTAURANT's tenant_id so this caller
+        // clears the tenant-ownership check and reaches the permission
+        // check this test is actually exercising (expects 403 from insufficient
+        // permission, not from a tenant mismatch/missing-tenant throw).
+        user: { userId: 'staff-1', roles: ['customer'], scope: 'customer', tenantId: 'tenant-1' },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -418,7 +441,7 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { name: 'Admin Updated' },
-        user: { userId: 'admin-1', roles: ['super_admin'] },
+        user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -445,7 +468,7 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { name: 'Refresh' },
-        user: { userId: 'admin-1', roles: ['super_admin'] },
+        user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -458,7 +481,7 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { name: 'Logged' },
-        user: { userId: 'admin-1', roles: ['super_admin'] },
+        user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -509,7 +532,9 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         query: {},
-        user: { userId: 'staff-1', roles: ['customer'] },
+        // scope+tenantId matching MOD_RESTAURANT's tenant_id — see the
+        // matching updateModule test above for why this is needed.
+        user: { userId: 'staff-1', roles: ['customer'], scope: 'customer', tenantId: 'tenant-1' },
       });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
@@ -549,7 +574,12 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         query: {},
-        user: { userId: 'mod-admin', roles: ['menu_service_admin'] },
+        // scope is any non-super_admin value here (only its equality to
+        // 'super_admin' matters to getCallerTenantId) — tenantId must match
+        // MOD_RESTAURANT's tenant_id to clear the ownership check. Actual
+        // authorization for this test comes from roles including
+        // `${slug}_admin`, checked directly by deleteModule.
+        user: { userId: 'mod-admin', roles: ['menu_service_admin'], scope: 'tenant_admin', tenantId: 'tenant-1' },
       });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
@@ -737,7 +767,14 @@ describe('ModulesController', () => {
       setupSupabase();
       const req = mockReq({
         body: { template_type: 'menu_service', name: 'Cafe' },
-        user: undefined,
+        // createModule unconditionally calls getCallerTenantId(req) (unlike
+        // getModule/getModules, this route is always authenticated in
+        // practice), so req.user must be present with a scope — a fully
+        // absent user would throw before ever reaching the 'system'
+        // fallback this test exercises. scope-only (no userId) preserves
+        // the original intent: verify the (req.user as any)?.userId ||
+        // 'system' fallback in logActivity.
+        user: { scope: 'super_admin' },
       });
       const res = mockRes();
       // createModule reads (req.user as any)?.userId || 'system'
@@ -788,7 +825,7 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { settings: { theme: 'dark' }, settings_version: 1 },
-        user: { userId: 'admin-1', roles: ['super_admin'] },
+        user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -820,7 +857,8 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { name: 'Updated by manager' },
-        user: { userId: 'mgr-1', roles: ['menu_service_admin'] },
+        // See deleteModule's "slug-specific admin" test for why scope+tenantId are needed here.
+        user: { userId: 'mgr-1', roles: ['menu_service_admin'], scope: 'tenant_admin', tenantId: 'tenant-1' },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -833,7 +871,7 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { name: 'Socket Test' },
-        user: { userId: 'admin-1', roles: ['super_admin'] },
+        user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -846,7 +884,7 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         body: { name: 'No Version Check' },
-        user: { userId: 'admin-1', roles: ['super_admin'] },
+        user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
@@ -931,7 +969,7 @@ describe('ModulesController', () => {
       const req = mockReq({
         params: { id: 'mod-1' },
         query: {},
-        user: { roles: ['super_admin'] },
+        user: { roles: ['super_admin'], scope: 'super_admin' },
       });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());

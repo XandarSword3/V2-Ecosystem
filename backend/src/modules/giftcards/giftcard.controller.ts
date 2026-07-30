@@ -17,6 +17,18 @@ function getPropertyId(req: Request): string | undefined {
   return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || undefined;
 }
 
+async function getTenantIdFromReq(req: Request, propertyId?: string): Promise<string | null> {
+  const reqTenantId = (req as any).tenant?.id || req.user?.tenantId || (req.headers?.['x-tenant-id'] as string) || null;
+  if (reqTenantId) return reqTenantId;
+  const supabase = getSupabase();
+  if (propertyId) {
+    const { data } = await supabase.from('properties').select('tenant_id').eq('id', propertyId).maybeSingle();
+    if (data?.tenant_id) return data.tenant_id;
+  }
+  const { data } = await supabase.from('properties').select('tenant_id').limit(1).maybeSingle();
+  return data?.tenant_id || null;
+}
+
 // Validation schemas
 const createGiftCardSchema = z.object({
   amount: z.number().positive().min(10).max(1000).optional(),
@@ -121,6 +133,7 @@ export class GiftCardController {
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
+      const tenant_id = await getTenantIdFromReq(req, propertyId);
       const { data: giftCard, error: insertError } = await supabase
         .from('gift_cards')
         .insert({
@@ -135,6 +148,7 @@ export class GiftCardController {
           sender_name: senderName || null,
           expires_at: expiresAt.toISOString(),
           property_id: propertyId || null,
+          tenant_id,
         })
         .select()
         .single();
@@ -544,6 +558,7 @@ export class GiftCardController {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
+      const tenant_id = await getTenantIdFromReq(req, propertyId);
       const { data: giftCard, error: insertError } = await supabase
         .from('gift_cards')
         .insert({
@@ -557,6 +572,7 @@ export class GiftCardController {
           personal_message: finalMessage,
           expires_at: expiresAt.toISOString(),
           property_id: propertyId || null,
+          tenant_id,
         })
         .select()
         .single();

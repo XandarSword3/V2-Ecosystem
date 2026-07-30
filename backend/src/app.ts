@@ -293,6 +293,9 @@ apiRouter.use('/translations', translationRoutes);
 import financeRoutes from './modules/finance/finance.routes.js';
 import customizationRoutes from './modules/customization/routes/customization.routes.js';
 import paymentPlatformRoutes from './modules/payments/payment.v1.routes.js';
+import pricingRoutes from './modules/admin/pricing.controller.js';
+
+apiRouter.use('/pricing', pricingRoutes);
 
 // Integrations
 import { quickbooksRoutes } from './modules/integrations/index.js';

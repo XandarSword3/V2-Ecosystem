@@ -344,7 +344,14 @@ export async function refreshAccessToken(refreshToken: string) {
     .single();
 
   if (sessionError || !session || !session.is_active) {
-    throw new Error('Invalid refresh token');
+    // Ambiguous, NOT necessarily a dead session: refresh tokens rotate on every
+    // successful call, so a concurrent second caller presenting the just-rotated-out
+    // token will land here even though the session itself is alive and well under
+    // its new token. auth.controller.ts must NOT treat this the same as a genuinely
+    // invalid/expired JWT (which clears the refresh cookie) — doing so previously
+    // wiped a live session's only cookie whenever two refresh calls raced, stranding
+    // the user with a working access token but no way to refresh once it expired.
+    throw new AppError('Refresh session not found or already rotated', 401, 'REFRESH_SESSION_NOT_FOUND');
   }
 
   // Get user with roles

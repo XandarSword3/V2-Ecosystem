@@ -467,6 +467,7 @@ export default function DynamicUnitDetailPage() {
                           orderTotal={pricing.totalAmount}
                           orderType="multi_day_booking"
                           moduleId={moduleId}
+                          moduleSlug={currentModule?.slug}
                           onTotalChange={(newTotal, discounts) => {
                             setAppliedDiscounts(discounts);
                             setFinalTotal(newTotal);

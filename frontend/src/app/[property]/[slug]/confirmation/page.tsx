@@ -60,6 +60,9 @@ interface OrderConfirmation {
   status: string;
   order_type: string;
   total_amount: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  qr_code?: string;
   table_id?: string;
   created_at: string;
   items?: Array<{
@@ -293,13 +296,20 @@ function ConfirmationContent() {
               </CardTitle>
             </CardHeader>
             <CardContent className="divide-y divide-slate-200 dark:divide-slate-700">
+              {order.qr_code && (
+                <div className="py-6 flex justify-center">
+                  <div className="bg-white p-4 rounded-lg shadow-inner">
+                    <img src={order.qr_code} alt="Order QR Code" className="w-40 h-40" />
+                  </div>
+                </div>
+              )}
               <div className="py-4 flex items-center gap-4">
                 <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
                   <Receipt className="w-6 h-6 text-orange-600" />
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Order Type</p>
-                  <p className="font-semibold capitalize">{order.order_type?.replace('_', ' ') || 'Dine In'}</p>
+                  <p className="font-semibold capitalize">{order.order_type ? order.order_type.replace('_', ' ') : 'Order'}</p>
                 </div>
               </div>
               {order.table_id && (
@@ -330,16 +340,23 @@ function ConfirmationContent() {
                   </div>
                 </div>
               )}
-              <div className="py-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Estimated Time</p>
-                  <p className="font-semibold">15-25 minutes</p>
-                </div>
-              </div>
               <div className="py-4">
+                {(!!order.discount_amount || !!order.tax_amount) && (
+                  <div className="mb-3 space-y-1 text-sm text-slate-600 dark:text-slate-400">
+                    {!!order.discount_amount && (
+                      <div className="flex justify-between">
+                        <span>Discount applied</span>
+                        <span className="text-green-600">-{formatCurrency(order.discount_amount, currency)}</span>
+                      </div>
+                    )}
+                    {!!order.tax_amount && (
+                      <div className="flex justify-between">
+                        <span>Tax</span>
+                        <span>{formatCurrency(order.tax_amount, currency)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">{tCommon('total')}</span>
                   <span className="text-2xl font-bold text-orange-600">{formatCurrency(order.total_amount, currency)}</span>

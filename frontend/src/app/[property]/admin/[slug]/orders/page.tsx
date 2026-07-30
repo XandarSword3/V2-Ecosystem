@@ -97,7 +97,7 @@ export default function DynamicOrdersPage() {
   const fetchOrders = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get(`/${slug}/staff/orders`, {
+      const response = await api.get(`/${slug}/orders`, {
         params: { moduleId: currentModule.id }
       });
       setOrders(response.data.data || []);

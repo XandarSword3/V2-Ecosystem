@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { PropertyProvider } from '@/context/PropertyContext';
 
 interface StaffLayoutProps {
   children: ReactNode;
@@ -213,7 +214,8 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <PropertyProvider>
+      <div className="min-h-screen bg-slate-900">
       {/* Top Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-slate-800 border-b border-slate-700 h-16 flex items-center justify-between px-4">
         <div className="flex items-center gap-4">
@@ -447,5 +449,6 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
         </motion.div>
       </main>
     </div>
+    </PropertyProvider>
   );
 }

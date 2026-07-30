@@ -38,7 +38,12 @@ export default function ModulePage() {
   useEffect(() => {
     const fetchAllModules = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/modules`);
+        // NOTE: NEXT_PUBLIC_API_URL may already include a trailing /api
+        // (it does in .env.local) — strip it before appending /api/modules,
+        // same pattern as settings-context.tsx, or this becomes /api/api/modules.
+        const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+        const apiUrl = rawBaseUrl.replace(/\/api\/?$/, '');
+        const response = await fetch(`${apiUrl}/api/modules`);
         if (response.ok) {
           const data = await response.json();
           setAllModules(data.data || []);
@@ -73,7 +78,8 @@ export default function ModulePage() {
       // Otherwise fetch from API
       setFetchingLayout(true);
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+        const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+        const baseUrl = rawBaseUrl.replace(/\/api\/?$/, '');
         const res = await fetch(`${baseUrl}/api/modules/${slug}`);
         if (res.ok) {
           const data = await res.json();

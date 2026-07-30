@@ -26,6 +26,29 @@ export class SupabaseCouponResolver implements CouponResolver {
     const supabase = getSupabase();
 
     try {
+      // apply_coupon_atomic's p_module_type is matched against the coupon's
+      // `applies_to` column, which stores the module SLUG (e.g. 'delete'),
+      // not the module's UUID — see coupon.controller.ts's validateCoupon,
+      // which correctly forwards the slug as `orderType`. This resolver only
+      // receives `moduleId` (the UUID) from the pricing pipeline, so it must
+      // be resolved to the slug here before calling the RPC. Previously this
+      // was hardcoded to 'all', which made every applies_to-scoped coupon
+      // fail at checkout regardless of which module the order was actually
+      // for, even though the same coupon validated fine on the cart page.
+      let moduleType = 'all';
+      if (moduleId) {
+        const { data: moduleRow, error: moduleError } = await supabase
+          .from('modules')
+          .select('slug')
+          .eq('id', moduleId)
+          .maybeSingle();
+        if (moduleError) {
+          logger.warn('[COUPON RESOLVER] Failed to resolve module slug for coupon scoping', { moduleId, error: moduleError.message });
+        } else if (moduleRow?.slug) {
+          moduleType = moduleRow.slug;
+        }
+      }
+
       const { data: couponResult, error: couponError } = await supabase.rpc(
         'apply_coupon_atomic',
         {
@@ -33,12 +56,12 @@ export class SupabaseCouponResolver implements CouponResolver {
           p_user_id: customerId || null,
           p_order_total: subtotal,
           p_order_id: null, // Order ID not known yet at pricing time
-          p_module_type: 'all',
+          p_module_type: moduleType,
         },
       );
 
       if (couponError) {
-        logger.warn('[COUPON RESOLVER] Coupon application failed:', couponError);
+        logger.warn('[COUPON RESOLVER] Coupon application failed', { code: couponCode, error: couponError.message });
         return null;
       }
 
@@ -51,13 +74,21 @@ export class SupabaseCouponResolver implements CouponResolver {
         };
       }
 
+      // NOTE: previously this passed error_message as a bare string second
+      // argument to logger.warn(). The logger (utils/logger.ts) only merges
+      // plain-OBJECT extra args into the printed line; a bare string extra
+      // arg is silently dropped with no format.splat() configured. That's
+      // why every real rejection reason ("Coupon not valid for this order
+      // type", "Coupon usage limit reached", etc.) printed as a blank
+      // "Coupon invalid:" with nothing after it. Wrapping it in an object
+      // makes it actually show up in the logs.
       if (couponResult && couponResult[0]?.error_message) {
-        logger.warn('[COUPON RESOLVER] Coupon invalid:', couponResult[0].error_message);
+        logger.warn('[COUPON RESOLVER] Coupon invalid', { code: couponCode, reason: couponResult[0].error_message });
       }
 
       return null;
     } catch (err) {
-      logger.warn('[COUPON RESOLVER] Coupon error (non-fatal):', err);
+      logger.warn('[COUPON RESOLVER] Coupon error (non-fatal)', { code: couponCode, error: err instanceof Error ? err.message : String(err) });
       return null;
     }
   }
@@ -75,29 +106,70 @@ export class SupabaseGiftCardResolver implements GiftCardResolver {
     const supabase = getSupabase();
 
     try {
-      const { data: gcResult, error: gcError } = await supabase.rpc(
-        'redeem_giftcard_atomic',
-        {
-          p_code: giftCardCode.toUpperCase(),
-          p_amount: maxAmount,
-          p_order_id: null, // Can be linked later
-        },
-      );
+      const upperCode = giftCardCode.toUpperCase();
 
-      if (gcError) {
-        logger.warn('[GIFT CARD RESOLVER] Gift card redemption failed:', gcError);
+      // 1. Fetch gift card
+      const { data: card, error: fetchErr } = await supabase
+        .from('gift_cards')
+        .select('id, current_balance, status, expires_at, tenant_id')
+        .eq('code', upperCode)
+        .maybeSingle();
+
+      if (fetchErr || !card) {
+        logger.warn('[GIFT CARD RESOLVER] Card not found', { code: upperCode });
         return null;
       }
 
-      if (gcResult && gcResult[0]?.success) {
-        const amountDeducted = parseFloat(gcResult[0].amount_redeemed) || 0;
-        return {
-          amountDeducted,
-          giftCardId: gcResult[0].gift_card_id,
-        };
+      if (card.status !== 'active') {
+        logger.warn('[GIFT CARD RESOLVER] Card not active', { status: card.status });
+        return null;
       }
 
-      return null;
+      if (card.expires_at && new Date(card.expires_at) < new Date()) {
+        logger.warn('[GIFT CARD RESOLVER] Card expired');
+        return null;
+      }
+
+      const balance = parseFloat(card.current_balance) || 0;
+      if (balance <= 0) return null;
+
+      const amountToDeduct = Math.min(maxAmount, balance);
+      const newBalance = balance - amountToDeduct;
+
+      // 2. Deduct balance
+      const { error: updateErr } = await supabase
+        .from('gift_cards')
+        .update({
+          current_balance: newBalance,
+          status: newBalance <= 0 ? 'used' : 'active',
+        })
+        .eq('id', card.id);
+
+      if (updateErr) {
+        logger.warn('[GIFT CARD RESOLVER] Failed to update balance:', updateErr);
+        return null;
+      }
+
+      // 3. Record transaction WITH tenant_id
+      const { error: txErr } = await supabase
+        .from('gift_card_transactions')
+        .insert({
+          gift_card_id: card.id,
+          type: 'redemption',
+          amount: -amountToDeduct,
+          balance_after: newBalance,
+          tenant_id: card.tenant_id,
+        });
+
+      if (txErr) {
+        logger.warn('[GIFT CARD RESOLVER] Transaction log failed (non-blocking):', txErr);
+        // Don't fail the redemption — balance was already deducted
+      }
+
+      return {
+        amountDeducted: amountToDeduct,
+        giftCardId: card.id,
+      };
     } catch (err) {
       logger.warn('[GIFT CARD RESOLVER] Gift card error (non-fatal):', err);
       return null;

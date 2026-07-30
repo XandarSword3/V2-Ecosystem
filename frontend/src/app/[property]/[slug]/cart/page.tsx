@@ -70,6 +70,8 @@ export default function ModuleCartPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [tableNumber, setTableNumber] = useState('');
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [serviceLocations, setServiceLocations] = useState<Array<{ id: string; name: string; is_active: boolean }>>([]);
   const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [notes, setNotes] = useState('');
@@ -89,14 +91,86 @@ export default function ModuleCartPage() {
   const [showStripePayment, setShowStripePayment] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
+  // Pricing breakdown state from backend
+  const [pricingBreakdown, setPricingBreakdown] = useState<any>(null);
+  const [loadingPricing, setLoadingPricing] = useState(false);
+
   const subtotal = moduleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  // FIX: Iteration 4 - Use dynamic tax rate from settings instead of hardcoded 0.11
-  const taxRate = settings.taxRate || 0.11;
-  const tax = subtotal * taxRate;
-  // Phase 2: Add service charge + delivery fee to match instant_transaction cart parity
-  const serviceChargeRate = settings.serviceChargeRate ?? 0.10;
-  const serviceCharge = orderType === 'dine_in' ? subtotal * serviceChargeRate : 0;
-  const deliveryFee = orderType === 'delivery' ? (settings.deliveryFee ?? 5) : 0;
+
+  // Fetch service locations for this module & auto-fill from URL query param
+  useEffect(() => {
+    if (!slug) return;
+    api.get(`/${slug}/service-locations`).then((res) => {
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const activeLocs = res.data.data.filter((l: any) => l.is_active !== false);
+        setServiceLocations(activeLocs);
+
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const urlLoc = urlParams.get('location') || urlParams.get('table') || urlParams.get('service_location_id');
+          if (urlLoc) {
+            const matched = activeLocs.find((l: any) => l.id === urlLoc || l.name.toLowerCase() === urlLoc.toLowerCase());
+            if (matched) {
+              setSelectedLocationId(matched.id);
+              setTableNumber(matched.name);
+            } else {
+              setTableNumber(urlLoc);
+            }
+          }
+        }
+      }
+    }).catch(() => {});
+  }, [slug]);
+
+  // Stable key for pricing deps — avoids infinite re-render from .filter() creating new array refs
+  const pricingKey = JSON.stringify(
+    moduleItems.map(i => ({ id: i.id, qty: i.quantity, p: i.price, mt: i.modifierTotal || 0 }))
+  );
+
+  // Fetch pricing breakdown from backend (debounced to avoid request storms)
+  useEffect(() => {
+    if (moduleItems.length === 0 || !moduleId) {
+      setPricingBreakdown(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setLoadingPricing(true);
+      try {
+        const response = await api.post('/pricing/preview', {
+          items: moduleItems.map(item => ({
+            itemId: item.id,
+            name: item.name,
+            unitPrice: item.price + (item.modifierTotal || 0),
+            quantity: item.quantity,
+          })),
+          moduleId,
+          orderType,
+          conditions: { orderType },
+          applyTax: true,
+          applyServiceCharge: orderType === 'dine_in',
+          applyDeliveryFee: orderType === 'delivery'
+        });
+        setPricingBreakdown(response.data?.data);
+      } catch (error: any) {
+        console.warn('[Cart] Pricing preview fallback:', error?.response?.data?.error || error?.message);
+        setPricingBreakdown(null);
+      } finally {
+        setLoadingPricing(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pricingKey, moduleId, orderType]);
+
+  // Use backend pricing breakdown if available, otherwise fallback to local calculation
+  const tax = pricingBreakdown?.taxAmount ?? (settings.taxRate || 0.11) * subtotal;
+  const taxBreakdown = pricingBreakdown?.taxBreakdown ?? [];
+  const serviceCharge = pricingBreakdown?.serviceCharge ?? (orderType === 'dine_in' ? (settings.serviceChargeRate ?? 0.10) * subtotal : 0);
+  const serviceChargeRate = pricingBreakdown?.serviceChargeRate ?? (settings.serviceChargeRate ?? 0.10);
+  const deliveryFee = pricingBreakdown?.deliveryFee ?? (orderType === 'delivery' ? (settings.deliveryFee ?? 5) : 0);
+  const feeBreakdown = pricingBreakdown?.feeBreakdown ?? [];
   const preDiscountTotal = subtotal + tax + serviceCharge + deliveryFee;
   const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
   const total = Math.max(0, preDiscountTotal - totalDiscount);
@@ -128,7 +202,7 @@ export default function ModuleCartPage() {
   }
 
   const orderMutation = useMutation({
-    mutationFn: (data: OrderData) => api.post('/orders', data),
+    mutationFn: (data: OrderData) => api.post(`/${slug}/orders`, data),
     onSuccess: (response) => {
       const order = response?.data?.data;
       const orderId = order?.id || order?.order_id || '';
@@ -141,12 +215,13 @@ export default function ModuleCartPage() {
       } else {
         // For cash payments or zero total, redirect directly
         moduleItems.forEach(item => removeItem(item.id));
-        toast.success(t('orderPlaced') || 'Order placed successfully!');
+        toast.success('Order placed successfully!');
         router.push(`/${propertySlug}/${slug}/confirmation?type=order&id=${orderId}`);
       }
     },
     onError: (err: MutationError) => {
-      toast.error(err.response?.data?.error || t('orderFailed') || 'Failed to place order');
+      const errMsg = err.response?.data?.error || (err.response?.data as any)?.message || err.message || 'Failed to place order';
+      toast.error(errMsg);
     },
   });
 
@@ -200,10 +275,12 @@ export default function ModuleCartPage() {
       paymentMethod,
       notes: notes.trim(),
       items: moduleItems.map((item) => ({
+        catalog_item_id: item.id,
         menuItemId: item.id,
         quantity: item.quantity,
         specialInstructions: item.specialInstructions,
       })),
+      service_location_id: selectedLocationId || undefined,
       moduleId,
       // Pass discount information to backend
       couponCode: couponDiscount?.code,
@@ -579,15 +656,32 @@ export default function ModuleCartPage() {
                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-2">
                         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-orange-500" />
-                          Table Number
+                          Service Location / Table
                         </label>
-                        <input
-                          type="text"
-                          value={tableNumber}
-                          onChange={(e) => setTableNumber(e.target.value)}
-                          placeholder="Enter your table number"
-                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all outline-none text-slate-900 dark:text-white placeholder:text-slate-400"
-                        />
+                        {serviceLocations.length > 0 ? (
+                          <select
+                            value={selectedLocationId}
+                            onChange={(e) => {
+                              setSelectedLocationId(e.target.value);
+                              const loc = serviceLocations.find(l => l.id === e.target.value);
+                              if (loc) setTableNumber(loc.name);
+                            }}
+                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all outline-none text-slate-900 dark:text-white"
+                          >
+                            <option value="">Select location / table</option>
+                            {serviceLocations.map((loc) => (
+                              <option key={loc.id} value={loc.id}>{loc.name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={tableNumber}
+                            onChange={(e) => setTableNumber(e.target.value)}
+                            placeholder="Enter your table or location number"
+                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all outline-none text-slate-900 dark:text-white placeholder:text-slate-400"
+                          />
+                        )}
                       </motion.div>
                     )}
 
@@ -711,6 +805,7 @@ export default function ModuleCartPage() {
                         orderTotal={preDiscountTotal}
                         orderType={orderType}
                         moduleId={moduleId}
+                        moduleSlug={currentModule?.slug}
                         onTotalChange={(newTotal, discounts) => {
                           setAppliedDiscounts(discounts);
                           setFinalTotal(newTotal);
@@ -792,11 +887,20 @@ export default function ModuleCartPage() {
                       <span className="text-slate-500">Subtotal</span>
                       <span className="text-slate-700 dark:text-slate-300">{formatCurrency(subtotal, currency)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      {/* FIX: Iteration 4 - Dynamic tax rate label */}
-                      <span className="text-slate-500">Tax ({Math.round(taxRate * 100)}%)</span>
-                      <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, currency)}</span>
-                    </div>
+                    {/* Show individual tax lines from backend breakdown */}
+                    {taxBreakdown.length > 0 ? (
+                      taxBreakdown.map((taxItem: any, index: number) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span className="text-slate-500">{taxItem.name} ({taxItem.rate}%)</span>
+                          <span className="text-slate-700 dark:text-slate-300">{formatCurrency(taxItem.amount, currency)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Tax</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, currency)}</span>
+                      </div>
+                    )}
                     {serviceCharge > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500">Service Charge ({Math.round(serviceChargeRate * 100)}%)</span>

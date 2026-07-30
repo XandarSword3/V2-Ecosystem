@@ -1,0 +1,14 @@
+const en = require('./messages/en.json');
+const ar = require('./messages/ar.json');
+console.log('--- EN home.hero ---');
+console.log(JSON.stringify(en.home.hero, null, 2));
+console.log('--- AR home.hero ---');
+console.log(JSON.stringify(ar.home.hero, null, 2));
+console.log('--- EN home.stats ---');
+console.log(JSON.stringify(en.home.stats, null, 2));
+console.log('--- AR home.stats ---');
+console.log(JSON.stringify(ar.home.stats, null, 2));
+console.log('--- EN home.cta ---');
+console.log(JSON.stringify(en.home.cta, null, 2));
+console.log('--- AR home.cta ---');
+console.log(JSON.stringify(ar.home.cta, null, 2));

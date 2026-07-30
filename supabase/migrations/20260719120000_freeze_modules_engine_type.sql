@@ -14,22 +14,11 @@
 -- backend/src/routes/dynamic-module.router.ts) and are folded in here
 -- so no known template_type value is left unmapped.
 --
--- FIX (found while replaying all migrations for the Stage 3 data-ownership
--- audit): module_template_type is a real Postgres ENUM, and only
--- menu_service / multi_day_booking / session_access / subscription were
--- ever added to it (20260124170000_consolidate_missing_tables.sql,
--- 20260620000000_fix_module_creation_schema.sql). The other four aliases
--- referenced below were never added as enum values, so the CASE below
--- fails outright with "invalid input value for enum module_template_type"
--- the moment it hits a literal the enum doesn't recognize -- this migration
--- could not have applied as originally written. Adding the missing values
--- first (each ADD VALUE auto-commits on its own, so they're visible to the
--- UPDATE that follows).
-
-ALTER TYPE module_template_type ADD VALUE IF NOT EXISTS 'membership_access';
-ALTER TYPE module_template_type ADD VALUE IF NOT EXISTS 'class_scheduling';
-ALTER TYPE module_template_type ADD VALUE IF NOT EXISTS 'appointment_booking';
-ALTER TYPE module_template_type ADD VALUE IF NOT EXISTS 'saas_subscription';
+-- NOTE: The enum values 'membership_access', 'class_scheduling', 'appointment_booking',
+-- and 'saas_subscription' must be added to module_template_type BEFORE this migration runs.
+-- They are added in a separate migration (20260719110000_add_missing_module_template_types.sql)
+-- to avoid PostgreSQL's "unsafe use of new value" error when adding enum values and
+-- using them in the same transaction.
 
 UPDATE modules SET engine_type = CASE template_type
   WHEN 'menu_service'        THEN 'instant_transaction'

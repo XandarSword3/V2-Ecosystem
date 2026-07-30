@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, API_BASE_URL, memoryTokenStore } from './api';
+import { api, API_BASE_URL, memoryTokenStore, refreshAccessToken } from './api';
 import { useCartStore } from '@/stores/cartStore';
 import { authLogger } from './logger';
 
@@ -103,32 +103,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // If we have a stored user but no access token, try to refresh using the httpOnly refresh token cookie
+      // If we have a stored user but no access token, try to refresh using the httpOnly refresh token cookie.
+      // Routed through the shared single-flight refreshAccessToken() (api.ts) instead of
+      // calling api.post('/auth/refresh') directly — under React StrictMode's double-mount in
+      // dev, this effect runs twice almost simultaneously, and a second independent refresh call
+      // would present the now-rotated-out refresh cookie and get 401'd, logging the user out.
       if (!accessToken && storedUser) {
         try {
-          const refreshResponse = await api.post('/auth/refresh');
-          if (refreshResponse.data.success && refreshResponse.data.data?.tokens?.accessToken) {
-            accessToken = refreshResponse.data.data.tokens.accessToken;
-            memoryTokenStore.set(accessToken);
-            // Also update user from refresh response if available
-            if (refreshResponse.data.data.user) {
-              const refreshedUser: User = {
-                id: refreshResponse.data.data.user.id,
-                email: refreshResponse.data.data.user.email,
-                fullName: refreshResponse.data.data.user.full_name || refreshResponse.data.data.user.fullName,
-                phone: refreshResponse.data.data.user.phone,
-                profileImageUrl: refreshResponse.data.data.user.profile_image_url || refreshResponse.data.data.user.profileImageUrl,
-                preferredLanguage: refreshResponse.data.data.user.preferred_language || refreshResponse.data.data.user.preferredLanguage || 'en',
-                scope: refreshResponse.data.data.user.scope,
-                roles: refreshResponse.data.data.user.roles || [],
-                is_platform_admin: refreshResponse.data.data.user.is_platform_admin || false
-              };
-              setUser(refreshedUser);
-              localStorage.setItem('user', JSON.stringify(refreshedUser));
-              setIsLoading(false);
-              return;
-            }
-          }
+          accessToken = await refreshAccessToken();
+          // We only have the token from the shared helper, not the user payload
+          // (the helper doesn't expose it). Fall through to /auth/me below to
+          // fetch and validate the user, same as the normal path.
         } catch (refreshError: any) {
           const status = refreshError?.response?.status;
           // Only a definitive rejection from the auth server (401/403) means

@@ -105,9 +105,39 @@ export default function FooterSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const { data } = await api.get('/admin/settings', { headers: propertyHeader });
+      const [settingsRes, modulesRes] = await Promise.all([
+        api.get('/admin/settings', { headers: propertyHeader }).catch(() => ({ data: null })),
+        api.get('/modules?activeOnly=true', { headers: propertyHeader }).catch(() => ({ data: null }))
+      ]);
+
+      const data = settingsRes.data;
+      const modulesData = modulesRes.data;
+
+      const activeModules = modulesData?.data || [];
+      const dynamicModuleLinks = activeModules
+        .filter((m: any) => m.is_active && m.show_in_main)
+        .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+        .map((m: any) => ({
+          label: m.name,
+          href: `/${m.slug}`,
+        }));
+      if (dynamicModuleLinks.length > 0) {
+        dynamicModuleLinks.push({ label: 'Gift Cards', href: '/giftcards' });
+      }
+
+      const initialColumns = dynamicModuleLinks.length > 0 ? [
+        { title: 'Quick Links', links: dynamicModuleLinks },
+        {
+          title: 'Legal',
+          links: [
+            { label: 'Privacy Policy', href: '/privacy' },
+            { label: 'Terms of Service', href: '/terms' },
+            { label: 'Cancellation Policy', href: '/cancellation' }
+          ]
+        }
+      ] : DEFAULT_CONFIG.columns;
+
       if (data?.data?.footer) {
-        // deeply merge with default config to ensure all properties exist
         setConfig(prev => ({
           ...DEFAULT_CONFIG,
           ...data.data.footer,
@@ -119,9 +149,13 @@ export default function FooterSettingsPage() {
             ...DEFAULT_CONFIG.contact,
             ...(data.data.footer.contact || {})
           },
-          // Ensure arrays are arrays
-          columns: data.data.footer.columns || DEFAULT_CONFIG.columns,
+          columns: data.data.footer.columns || initialColumns,
           socials: data.data.footer.socials || DEFAULT_CONFIG.socials,
+        }));
+      } else {
+        setConfig(prev => ({
+          ...DEFAULT_CONFIG,
+          columns: initialColumns
         }));
       }
     } catch (error) {

@@ -65,7 +65,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const GLOBAL_ROUTE_SEGMENTS = new Set([
   'login', 'register', 'forgot-password', 'reset-password',
   'install', 'platform-admin', 'cookie-policy', 'terms', 'privacy',
-  'offline', 'error', 'global-error', 'api', 'favicon.ico',
+  'offline', 'error', 'global-error', 'api', 'favicon.ico', 'nexus',
 ]);
 
 /**
