@@ -104,7 +104,7 @@ export default function DynamicModifiersPage() {
     try {
       setLoading(true);
       // Use unified customization API with module filter
-      const groupsRes = await api.get('/customization/groups', { 
+      const groupsRes = await api.get('/customizations/groups', { 
         params: { moduleId: currentModule.id } 
       });
       // Transform customization groups to modifier format
@@ -203,10 +203,10 @@ export default function DynamicModifiersPage() {
         name_localized: payload.nameAr ? { ar: payload.nameAr } : undefined,
       };
       if (editingGroup) {
-        await api.put(`/customization/groups/${editingGroup.id}`, customizationPayload);
+        await api.put(`/customizations/groups/${editingGroup.id}`, customizationPayload);
         toast.success('Modifier group updated');
       } else {
-        await api.post('/customization/groups', customizationPayload);
+        await api.post('/customizations/groups', customizationPayload);
         toast.success('Modifier group created');
       }
       setShowGroupModal(false);
@@ -221,7 +221,7 @@ export default function DynamicModifiersPage() {
   const deleteGroup = async (groupId: string) => {
     if (!confirm('Delete this modifier group and all its options?')) return;
     try {
-      await api.delete(`/customization/groups/${groupId}`);
+      await api.delete(`/customizations/groups/${groupId}`);
       toast.success('Modifier group deleted');
       fetchData();
     } catch (error) {
@@ -281,10 +281,10 @@ export default function DynamicModifiersPage() {
         group_id: selectedGroupId,
       };
       if (editingOption) {
-        await api.put(`/customization/options/${editingOption.id}`, optionPayload);
+        await api.put(`/customizations/options/${editingOption.id}`, optionPayload);
         toast.success('Modifier option updated');
       } else {
-        await api.post('/customization/options', optionPayload);
+        await api.post('/customizations/options', optionPayload);
         toast.success('Modifier option created');
       }
       setShowOptionModal(false);
@@ -299,7 +299,7 @@ export default function DynamicModifiersPage() {
   const deleteOption = async (optionId: string) => {
     if (!confirm('Delete this modifier option?')) return;
     try {
-      await api.delete(`/customization/options/${optionId}`);
+      await api.delete(`/customizations/options/${optionId}`);
       toast.success('Modifier option deleted');
       fetchData();
     } catch (error) {

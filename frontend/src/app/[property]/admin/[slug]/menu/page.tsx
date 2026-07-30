@@ -119,6 +119,7 @@ export default function DynamicMenuPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [formData, setFormData] = useState<Partial<MenuItem>>({});
+  const [formErrors, setFormErrors] = useState<{ name?: boolean; price?: boolean; category_id?: boolean }>({});
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [recipeItems, setRecipeItems] = useState<RecipeItem[]>([]);
@@ -142,7 +143,7 @@ export default function DynamicMenuPage() {
           console.warn('[Menu Page] Inventory items fetch failed:', e.message);
           return { data: { data: [] } };
         }),
-        api.get(`/${slug}/modifiers`, { params: { moduleId: currentModule.id } }).catch((e) => {
+        api.get('/customizations/groups', { params: { moduleId: currentModule.id } }).catch((e) => {
           console.warn('[Menu Page] Modifiers fetch failed:', e.message);
           return { data: { data: [] } };
         }),
@@ -195,6 +196,7 @@ export default function DynamicMenuPage() {
     });
     setRecipeItems([]);
     setSelectedGroups([]);
+    setFormErrors({});
     setActiveTab('details');
     setShowModal(true);
   };
@@ -202,6 +204,7 @@ export default function DynamicMenuPage() {
   const openEditModal = (item: MenuItem) => {
     setEditingItem(item);
     setFormData({ ...item });
+    setFormErrors({});
     setRecipeItems(item.recipe || []);
     setSelectedGroups(item.customization_group_ids || []);
     setActiveTab('details');
@@ -242,8 +245,20 @@ export default function DynamicMenuPage() {
   };
 
   const handleSave = async () => {
-    if (!formData.name || formData.price == null || !formData.category_id) {
+    const errors = {
+      name: !formData.name,
+      price: formData.price == null || Number.isNaN(formData.price),
+      category_id: !formData.category_id,
+    };
+    setFormErrors(errors);
+    if (errors.name || errors.price || errors.category_id) {
       toast.error('Please fill in all required fields');
+      if (errors.category_id && categories.length > 0) {
+        // Category state didn't carry a real selection (e.g. categories loaded
+        // after the modal opened). Snap it to a real option now.
+        setFormData(prev => ({ ...prev, category_id: categories[0].id }));
+      }
+      setActiveTab('details');
       return;
     }
 
@@ -601,8 +616,13 @@ export default function DynamicMenuPage() {
                       </label>
                       <Input
                         value={formData.name || ''}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, name: e.target.value });
+                          if (formErrors.name) setFormErrors({ ...formErrors, name: false });
+                        }}
                         placeholder="e.g., Grilled Chicken"
+                        error={formErrors.name}
+                        helperText={formErrors.name ? 'Name is required' : undefined}
                       />
                     </div>
                     <div>
@@ -656,11 +676,19 @@ export default function DynamicMenuPage() {
                         <Input
                           type="number"
                           step="0.01"
-                          value={formData.price || ''}
-                          onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                          value={formData.price ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                            setFormData({ ...formData, price: v });
+                            if (formErrors.price) setFormErrors({ ...formErrors, price: false });
+                          }}
                           className="pl-10"
+                          error={formErrors.price}
                         />
                       </div>
+                      {formErrors.price && (
+                        <p className="mt-1 text-sm text-red-500">A valid price is required</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
@@ -668,13 +696,26 @@ export default function DynamicMenuPage() {
                       </label>
                       <select
                         value={formData.category_id || ''}
-                        onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
+                        onChange={(e) => {
+                          setFormData({ ...formData, category_id: e.target.value });
+                          if (formErrors.category_id) setFormErrors({ ...formErrors, category_id: false });
+                        }}
+                        className={`w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500 ${
+                          formErrors.category_id
+                            ? 'border-red-400 dark:border-red-500'
+                            : 'border-slate-200 dark:border-slate-700'
+                        }`}
                       >
+                        <option value="" disabled>
+                          {categories.length === 0 ? 'No categories yet — create one first' : 'Select a category'}
+                        </option>
                         {categories.map(cat => (
                           <option key={cat.id} value={cat.id}>{cat.name}</option>
                         ))}
                       </select>
+                      {formErrors.category_id && (
+                        <p className="mt-1 text-sm text-red-500">Please select a category</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">

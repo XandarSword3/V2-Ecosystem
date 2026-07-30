@@ -24,6 +24,8 @@ import type {
   PricingContext,
   PricingResult,
   DiscountBreakdown,
+  TaxBreakdownItem,
+  FeeBreakdownItem,
 } from './types.js';
 import type { TaxService } from '../services/tax.service.js';
 import type { OrderConfigService } from '../services/order-config.service.js';
@@ -154,24 +156,40 @@ export class PricingPipeline {
       }
     }
 
-    // ---- Step 3: Calculate tax (on subtotal minus pre-tax discounts) ----
+    // ---- Step 3: Calculate tax using multi-rate tax service ----
     let taxRate = 0;
     let taxAmount = 0;
+    let taxBreakdown: TaxBreakdownItem[] = [];
+    
     if (config.applyTax) {
-      taxRate = await this.deps.taxService.getTaxRate(context.moduleId ?? 'default');
       const taxableAmount = Math.max(0, subtotal - preBasketDiscount);
-      taxAmount = taxableAmount * taxRate;
+      taxBreakdown = await this.deps.taxService.computeTaxBreakdown(
+        lineItems,
+        taxableAmount,
+        context.moduleId
+      );
+      taxAmount = taxBreakdown.reduce((sum, item) => sum + item.amount, 0);
+      // Legacy taxRate for backward compatibility (use first tax rate or default)
+      taxRate = taxBreakdown.length > 0 ? taxBreakdown[0].rate / 100 : await this.deps.taxService.getTaxRate(context.moduleId ?? 'default');
     }
 
     // ---- Step 4: Calculate service charge ----
     let serviceChargeRate = 0;
     let serviceCharge = 0;
+    let feeBreakdown: FeeBreakdownItem[] = [];
+    
     if (config.applyServiceCharge) {
       const shouldApply = this.evaluateCondition(config.serviceChargeCondition, context.conditions ?? {});
       if (shouldApply) {
         const orderConfig = await this.deps.orderConfigService.getOrderConfig();
         serviceChargeRate = orderConfig.serviceChargeRate;
         serviceCharge = subtotal * serviceChargeRate;
+        feeBreakdown.push({
+          type: 'service_charge',
+          name: 'Service Charge',
+          amount: serviceCharge,
+          rate: serviceChargeRate
+        });
       }
     }
 
@@ -182,6 +200,11 @@ export class PricingPipeline {
       if (shouldApply) {
         const orderConfig = await this.deps.orderConfigService.getOrderConfig();
         deliveryFee = orderConfig.deliveryFee;
+        feeBreakdown.push({
+          type: 'delivery_fee',
+          name: 'Delivery Fee',
+          amount: deliveryFee
+        });
       }
     }
 
@@ -261,9 +284,11 @@ export class PricingPipeline {
       subtotal: round(subtotal),
       taxAmount: round(taxAmount),
       taxRate,
+      taxBreakdown,
       serviceCharge: round(serviceCharge),
       serviceChargeRate,
       deliveryFee: round(deliveryFee),
+      feeBreakdown,
       preDiscountTotal: round(preDiscountTotal),
       discounts: discounts.map(d => ({
         ...d,

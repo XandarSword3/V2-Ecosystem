@@ -18,7 +18,10 @@ const QR_CONFIG = {
 };
 
 interface QRPayload {
-  type: 'pool_ticket' | 'chalet_access' | 'restaurant_order' | 'module_content';
+  // Engine-agnostic terminology (matches the five-engine architecture):
+  // 'shared_capacity_access' covers what used to be pool_ticket/chalet_access,
+  // 'instant_transaction' covers what used to be restaurant_order.
+  type: 'shared_capacity_access' | 'instant_transaction' | 'module_content';
   id: string;
   timestamp: number;
   expiresAt: number;

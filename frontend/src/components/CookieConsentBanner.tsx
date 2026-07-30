@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { Cookie, Shield, BarChart, Target } from 'lucide-react';
 import {
   Dialog,
@@ -100,6 +101,7 @@ export const COOKIE_CATEGORIES: CookieCategoryMeta[] = [
 // ---------------------------------------------------------------------------
 
 export function CookieConsentBanner() {
+  const pathname = usePathname();
   const {
     showBanner,
     showCustomise,
@@ -146,6 +148,10 @@ export function CookieConsentBanner() {
   const handleSavePreferences = () => {
     savePreferences(localCategories);
   };
+
+  if (pathname === '/nexus' || pathname?.startsWith('/nexus')) {
+    return null;
+  }
 
   if (!showBanner && !showCustomise) return null;
 

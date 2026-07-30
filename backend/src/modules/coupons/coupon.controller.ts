@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
+import { requireTenantScope } from '../../security/tenant-scope.js';
 
 /**
  * Coupon Controller
@@ -391,6 +392,13 @@ export class CouponController {
         return res.status(400).json({ success: false, error: 'Property ID context is required' });
       }
 
+      let tenantId: string;
+      try {
+        tenantId = requireTenantScope(req);
+      } catch (scopeError: any) {
+        return res.status(scopeError.statusCode || 403).json({ success: false, error: scopeError.message || 'Tenant scope required' });
+      }
+
       const supabase = getSupabase();
 
       const { data: existing } = await supabase.from('coupons').select('id').eq('code', data.code).single();
@@ -425,6 +433,7 @@ export class CouponController {
           first_order_only: data.firstOrderOnly,
           created_by: userId,
           property_id: propertyId,
+          tenant_id: tenantId,
         })
         .select()
         .single();

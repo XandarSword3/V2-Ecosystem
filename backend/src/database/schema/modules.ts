@@ -19,6 +19,7 @@ export const modules = pgTable('modules', {
   icon: varchar('icon', { length: 50 }),
   version: varchar('version', { length: 20 }),
   settings: jsonb('settings').default('{}'),
+  taxCategory: varchar('tax_category', { length: 50 }).default('all'), // Default tax category for items in this module
   isEnabled: boolean('is_enabled').default(true),
   isCore: boolean('is_core').default(false),
   sortOrder: varchar('sort_order', { length: 10 }).default('0'),

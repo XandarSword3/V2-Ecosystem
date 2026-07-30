@@ -238,7 +238,7 @@ export class FinancialLedgerService {
 
       tenant_id: entry.tenantId,
 
-      metadata_id: entry.moduleId,
+      module_id: entry.moduleId,
 
       engine_type: entry.engineType,
 
@@ -398,6 +398,8 @@ export class FinancialLedgerService {
 
       notes?: string;
 
+      metadata?: Record<string, unknown>;
+
     },
 
   ): Promise<string> {
@@ -471,6 +473,8 @@ export class FinancialLedgerService {
       entityStateAtWrite: context.entityState,
 
       notes: context.notes,
+
+      metadata: context.metadata,
 
     });
 

@@ -262,6 +262,7 @@ export class EngineService {
       paymentReference?: string;
       idempotencyKey?: string;
       notes?: string;
+      metadata?: Record<string, unknown>;
     },
   ): Promise<string> {
     const engineType = this.resolveEngineType(context.templateType);

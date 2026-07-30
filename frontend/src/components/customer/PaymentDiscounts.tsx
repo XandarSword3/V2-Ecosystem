@@ -36,6 +36,8 @@ interface PaymentDiscountsProps {
   orderTotal: number;
   orderType?: string;
   moduleId?: string;
+  /** Module slug (e.g. 'delete', 'menu_service') — matches coupons.applies_to. */
+  moduleSlug?: string;
   onTotalChange?: (finalTotal: number, discounts: AppliedDiscount[]) => void;
   className?: string;
 }
@@ -44,6 +46,7 @@ export function PaymentDiscounts({
   orderTotal,
   orderType = 'general',
   moduleId,
+  moduleSlug,
   onTotalChange,
   className = '',
 }: PaymentDiscountsProps) {
@@ -142,8 +145,17 @@ export function PaymentDiscounts({
     setGiftCardLoading(true);
     try {
       const res = await api.get(`/giftcards/check/${giftCardCode.trim()}`);
-      if (res.data.success) {
-        setGiftCardBalance(res.data.data.balance);
+      const data = res.data.data;
+      // /giftcards/check returns success:true even for a disabled/used/expired
+      // card (it responds with the real status + a human-readable message
+      // instead of a 4xx) — status must be checked explicitly, not inferred
+      // from `success`, or a non-active card renders as if it were valid here
+      // only to be rejected for real at order creation.
+      if (res.data.success && data.status === 'active') {
+        setGiftCardBalance(data.balance);
+      } else {
+        toast.error(data?.message || 'This gift card is not active');
+        setGiftCardBalance(null);
       }
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Gift card not found');
@@ -271,6 +283,7 @@ export function PaymentDiscounts({
                   orderTotal={orderTotal}
                   orderType={orderType}
                   moduleId={moduleId}
+                  moduleSlug={moduleSlug}
                   onCouponApply={handleCouponApply}
                   onDiscountChange={setCouponDiscount}
                 />

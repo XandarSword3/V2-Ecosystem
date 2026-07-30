@@ -9,6 +9,7 @@ import { emailService } from "../../services/email.service";
 import { config } from "../../config";
 import { logActivity } from "../../utils/activityLogger";
 import { getErrorMessage } from "../../types/index.js";
+import { isAppError } from "../../utils/errors.js";
 
 const isProduction = config.env === 'production';
 
@@ -223,6 +224,24 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
       },
     });
   } catch (error: unknown) {
+    // REFRESH_SESSION_NOT_FOUND (auth.service.ts) means this specific token no
+    // longer matches any session row — which happens both when the token is
+    // truly dead AND, benignly, when a concurrent refresh call (e.g. a second
+    // browser tab, or React StrictMode's double-mount in dev) already won the
+    // race and rotated it first. We can't tell those two apart here, so we must
+    // NOT clear cookies in this case: doing so previously wiped out a sibling
+    // call's freshly-set, perfectly valid cookie, permanently stranding the
+    // user once their in-memory access token expired (~15 min later) with no
+    // way left to refresh. Just 401 and let the client's own in-memory token
+    // (from whichever call actually won) keep the session going.
+    if (isAppError(error) && error.code === 'REFRESH_SESSION_NOT_FOUND') {
+      return res.status(401).json({
+        success: false,
+        error: error.message,
+        code: 'REFRESH_SESSION_NOT_FOUND',
+      });
+    }
+
     const message = getErrorMessage(error);
     const lowerMessage = message.toLowerCase();
 
@@ -232,7 +251,8 @@ export const refreshToken = asyncHandler(async (req: Request, res: Response) => 
       lowerMessage.includes('malformed') ||
       lowerMessage.includes('expired')
     ) {
-      // Stale/invalid refresh token — clear both cookies so the client
+      // Genuinely stale/invalid refresh token (bad signature, expired JWT, or an
+      // explicit token_version invalidation) — clear both cookies so the client
       // falls back to a clean login instead of retrying with a dead cookie.
       clearAuthCookies(res);
       return res.status(401).json({
