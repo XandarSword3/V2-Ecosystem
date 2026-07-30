@@ -28,6 +28,7 @@ interface TaxRate {
   applies_to: string[];
   is_default: boolean;
   is_compound: boolean;
+  order: number; // Determines compounding sequence for compound taxes
   jurisdiction?: string;
   description?: string;
   created_at: string;
@@ -85,18 +86,8 @@ const defaultConfig: TaxConfiguration = {
       applies_to: ['all'],
       is_default: true,
       is_compound: false,
+      order: 1,
       description: 'Standard VAT rate',
-      created_at: new Date().toISOString()
-    },
-    {
-      id: '2',
-      name: 'Service Charge',
-      rate: 12,
-      type: 'service',
-      applies_to: ['food_beverage'],
-      is_default: false,
-      is_compound: false,
-      description: 'Food & Beverage service charge',
       created_at: new Date().toISOString()
     }
   ]
@@ -114,6 +105,7 @@ export default function TaxConfigurationPage() {
     applies_to: ['all'],
     is_default: false,
     is_compound: false,
+    order: 1,
     description: ''
   });
 
@@ -172,6 +164,7 @@ export default function TaxConfigurationPage() {
       applies_to: newRate.applies_to || ['all'],
       is_default: newRate.is_default || false,
       is_compound: newRate.is_compound || false,
+      order: newRate.order || (config.rates.length + 1),
       description: newRate.description,
       created_at: new Date().toISOString()
     };
@@ -182,7 +175,8 @@ export default function TaxConfigurationPage() {
       updatedRates = config.rates.map(r => ({ ...r, is_default: false }));
     }
     
-    setConfig({ ...config, rates: [...updatedRates, rate] });
+    const updated = { ...config, rates: [...updatedRates, rate] };
+    setConfig(updated);
     setShowAddModal(false);
     setNewRate({
       name: '',
@@ -191,9 +185,10 @@ export default function TaxConfigurationPage() {
       applies_to: ['all'],
       is_default: false,
       is_compound: false,
+      order: 1,
       description: ''
     });
-    toast.success('Tax rate added');
+    saveMutation.mutate(updated);
   };
 
   const handleUpdateRate = () => {
@@ -210,9 +205,10 @@ export default function TaxConfigurationPage() {
       );
     }
     
-    setConfig({ ...config, rates: updatedRates });
+    const updated = { ...config, rates: updatedRates };
+    setConfig(updated);
     setEditingRate(null);
-    toast.success('Tax rate updated');
+    saveMutation.mutate(updated);
   };
 
   const handleDeleteRate = (id: string) => {
@@ -222,8 +218,9 @@ export default function TaxConfigurationPage() {
       return;
     }
     if (confirm('Delete this tax rate?')) {
-      setConfig({ ...config, rates: config.rates.filter(r => r.id !== id) });
-      toast.success('Tax rate deleted');
+      const updated = { ...config, rates: config.rates.filter(r => r.id !== id) };
+      setConfig(updated);
+      saveMutation.mutate(updated);
     }
   };
 
@@ -232,8 +229,9 @@ export default function TaxConfigurationPage() {
       ...r,
       is_default: r.id === id
     }));
-    setConfig({ ...config, rates: updatedRates });
-    toast.success('Default tax rate updated');
+    const updated = { ...config, rates: updatedRates };
+    setConfig(updated);
+    saveMutation.mutate(updated);
   };
 
   const getTypeLabel = (type: string) => {

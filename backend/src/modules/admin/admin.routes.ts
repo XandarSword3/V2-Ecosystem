@@ -124,6 +124,10 @@ router.put('/settings/homepage', authorize('admin'), settingsController.updateHo
 router.get('/settings/tax', authorize('admin'), settingsController.getTaxSettings);
 router.put('/settings/tax', authorize('admin'), settingsController.updateTaxSettings);
 
+// Order settings (service charge, delivery fee)
+router.get('/settings/order', authorize('admin'), settingsController.getOrderSettings);
+router.put('/settings/order', authorize('admin'), settingsController.updateOrderSettings);
+
 // File Uploads - MANAGER
 router.get('/uploads', authorizeManager, uploadController.listFiles);
 router.post('/uploads', authorizeManager, rateLimits.expensive, uploadController.uploadFile);

@@ -147,8 +147,63 @@
       "cta": "استكشف الآن",
       "badge": "Premier Resort Experience"
     },
-    "services": "الخدمات",
-    "features": "المميزات",
+    "services": {
+      "title": "خدماتنا",
+      "subtitle": "اكتشف كل ما يقدمه Iron Paradise Gym لتجربة لا تُنسى",
+      "whatWeOffer": "ما نقدمه",
+      "restaurant": {
+        "title": "المطعم",
+        "description": "أطباق فاخرة من المطبخ اللبناني والعالمي"
+      },
+      "snackBar": {
+        "title": "سناك بار",
+        "description": "وجبات خفيفة ومرطبات بجانب المسبح"
+      },
+      "chalets": {
+        "title": "الشاليهات",
+        "description": "شاليهات مريحة تطل على مناظر جبلية خلابة"
+      },
+      "pool": {
+        "title": "المسبح",
+        "description": "جلسات مسبح منعشة لجميع أفراد العائلة"
+      }
+    },
+    "features": {
+      "title": "لماذا تختار Iron Paradise Gym؟",
+      "subtitle": "لماذا نحن؟",
+      "primeLocation": {
+        "title": "موقع مميز",
+        "description": "يقع في موقع جميل يتمتع بإطلالات خلابة"
+      },
+      "authenticCuisine": {
+        "title": "مأكولات استثنائية",
+        "description": "أطباق عالمية يُعدّها طهاة محترفون"
+      },
+      "modernAmenities": {
+        "title": "مرافق عصرية",
+        "description": "جميع الشاليهات مجهزة بواي فاي وتكييف ومطبخ وأكثر"
+      },
+      "familyFriendly": {
+        "title": "مناسب للعائلات",
+        "description": "مثالي للتجمعات العائلية والاحتفالات"
+      },
+      "restaurant": {
+        "title": "أطباق فاخرة",
+        "description": "استمتع بأشهى الأطباق اللبنانية والعالمية"
+      },
+      "chalets": {
+        "title": "شاليهات فاخرة",
+        "description": "ملاذات جبلية مريحة بإطلالات خلابة"
+      },
+      "pool": {
+        "title": "المسبح والترفيه",
+        "description": "مسابح منعشة وأنشطة مثيرة لجميع أفراد العائلة"
+      },
+      "snackBar": {
+        "title": "سناك بار",
+        "description": "وجبات خفيفة ومرطبات بجانب المسبح"
+      }
+    },
     "stats": {
       "businessUnits": "Business Units",
       "restaurant": "Restaurant",

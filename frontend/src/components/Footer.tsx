@@ -26,6 +26,7 @@ export default function Footer() {
     useLocale();
     const tFooter = useTranslations('footer');
     const { settings, modules } = useSiteSettings();
+    const activePropertySlug = propertySlug || settings.propertySlug || 'default';
 
     // Get active modules for Quick Links - memoized
     const activeModules = useMemo(() => {
@@ -43,22 +44,22 @@ export default function Footer() {
         if (activeModules.length === 0) {
             // No modules configured - show just gift cards
             return [
-                { label: tFooter('giftCards') || 'Gift Cards', href: propertySlug ? `/${propertySlug}/giftcards` : '/giftcards' }
+                { label: tFooter('giftCards') || 'Gift Cards', href: `/${activePropertySlug}/giftcards` }
             ];
         }
 
         // Build links from active modules
         const moduleLinks = activeModules.map(m => ({
             label: m.name,
-            href: propertySlug ? `/${propertySlug}/${m.slug}` : `/${m.slug}`,
+            href: `/${activePropertySlug}/${m.slug}`,
             moduleSlug: m.slug
         }));
 
         // Add gift cards link
-        moduleLinks.push({ label: tFooter('giftCards') || 'Gift Cards', href: propertySlug ? `/${propertySlug}/giftcards` : '/giftcards', moduleSlug: '' });
+        moduleLinks.push({ label: tFooter('giftCards') || 'Gift Cards', href: `/${activePropertySlug}/giftcards`, moduleSlug: '' });
 
         return moduleLinks;
-    }, [activeModules, tFooter, propertySlug]);
+    }, [activeModules, tFooter, activePropertySlug]);
 
     // Don't show footer on admin or staff pages
     if (pathname && /\/(?:admin|staff)(\/?$|\/)/.test(pathname)) {
@@ -135,12 +136,22 @@ export default function Footer() {
             ...col,
             // Translate column title if it matches known keys
             title: col.titleKey ? tFooter(col.titleKey) : col.title,
-            links: col.links?.map((link: FooterLink) => ({
-                ...link,
-                // Translate link labels for module links
-                label: link.moduleSlug ? (link.label || link.moduleSlug) :
-                    link.labelKey ? tFooter(link.labelKey) : link.label
-            }))
+            links: col.links?.map((link: FooterLink) => {
+                let href = link.href;
+                if (href && href.startsWith('/') && !href.startsWith('/#') && activePropertySlug) {
+                    const firstSeg = href.split('/')[1];
+                    const globalRoutes = ['login', 'register', 'privacy', 'terms', 'cookie-policy', 'cancellation', 'api', 'install', 'platform-admin'];
+                    if (firstSeg && firstSeg !== activePropertySlug && !globalRoutes.includes(firstSeg)) {
+                        href = `/${activePropertySlug}${href}`;
+                    }
+                }
+                return {
+                    ...link,
+                    href,
+                    label: link.moduleSlug ? (link.label || link.moduleSlug) :
+                        link.labelKey ? tFooter(link.labelKey) : link.label
+                };
+            })
         })) || defaultFooterConfig.columns,
         copyright: settings.footer.copyright || defaultFooterConfig.copyright
     } : defaultFooterConfig;
@@ -153,6 +164,10 @@ export default function Footer() {
             default: return <Globe className="w-5 h-5" />;
         }
     };
+
+    if (pathname === '/nexus' || pathname?.startsWith('/nexus')) {
+        return null;
+    }
 
     return (
         <footer className="relative bg-gradient-to-b from-white via-slate-50 to-slate-100 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-white py-20 overflow-hidden">

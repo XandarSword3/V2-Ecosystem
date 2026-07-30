@@ -676,6 +676,69 @@ export default function AdminSettingsPage() {
         </div>
       </motion.div>
 
+      {/* Settings Sub-Navigation & Quick Shortcuts */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <a
+          href="./settings/tax"
+          className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-500 transition-all shadow-sm group"
+        >
+          <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 group-hover:scale-105 transition-transform">
+            <CreditCard className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
+              Tax Config <ExternalLink className="w-3 h-3 opacity-60" />
+            </div>
+            <div className="text-xs text-slate-500">VAT & Sales tax</div>
+          </div>
+        </a>
+
+        <a
+          href="./settings/payments"
+          className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-500 transition-all shadow-sm group"
+        >
+          <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 group-hover:scale-105 transition-transform">
+            <CreditCard className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
+              Payments <ExternalLink className="w-3 h-3 opacity-60" />
+            </div>
+            <div className="text-xs text-slate-500">Gateways & Stripe</div>
+          </div>
+        </a>
+
+        <a
+          href="./settings/brand"
+          className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-500 transition-all shadow-sm group"
+        >
+          <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 group-hover:scale-105 transition-transform">
+            <Globe className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
+              Brand & Logo <ExternalLink className="w-3 h-3 opacity-60" />
+            </div>
+            <div className="text-xs text-slate-500">Identity & Icons</div>
+          </div>
+        </a>
+
+        <a
+          href="./settings/appearance"
+          className="flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-500 transition-all shadow-sm group"
+        >
+          <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 group-hover:scale-105 transition-transform">
+            <Settings className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
+              Appearance <ExternalLink className="w-3 h-3 opacity-60" />
+            </div>
+            <div className="text-xs text-slate-500">Themes & Colors</div>
+          </div>
+        </a>
+      </div>
+
       <div className="flex flex-wrap gap-2 mb-6">
         {tabs.map((tab) => (
           <button

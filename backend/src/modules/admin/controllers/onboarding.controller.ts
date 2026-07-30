@@ -403,9 +403,34 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       configured: !!(smtpPass || smtpApiKey || smtpData.host),
     };
 
-    const taxSettings = {
-      taxRate:       parseFloat(taxData.taxRate ?? '0') || 0,
-      serviceCharge: parseFloat(taxData.serviceCharge ?? '0') || 0,
+    // Unify settings to use canonical site_settings keys instead of property_settings
+    const taxConfiguration = {
+      default_rate: parseFloat(taxData.taxRate ?? '11') || 11,
+      tax_included_in_price: false,
+      show_tax_breakdown: true,
+      rounding_method: 'round',
+      decimal_places: 2,
+      tax_number: '',
+      tax_name_display: 'Tax',
+      rates: [
+        {
+          id: 'default',
+          name: 'Standard VAT',
+          rate: parseFloat(taxData.taxRate ?? '11') || 11,
+          type: 'vat',
+          applies_to: ['all'],
+          is_default: true,
+          is_compound: false,
+          order: 1,
+          description: 'Default VAT rate',
+          created_at: new Date().toISOString()
+        }
+      ]
+    };
+
+    const orderConfiguration = {
+      serviceChargeRate: parseFloat(taxData.serviceCharge ?? '0.10') || 0.10,
+      deliveryFee: 5
     };
 
     const settingsToInsert = [
@@ -413,7 +438,6 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       { property_id: propertyId, setting_key: 'operational_hours', setting_value: hoursData,           category: 'general' },
       { property_id: propertyId, setting_key: 'payment_gateway',   setting_value: finalGatewaySettings, category: 'finance' },
       { property_id: propertyId, setting_key: 'smtp_config',       setting_value: finalSmtpSettings,   category: 'system' },
-      { property_id: propertyId, setting_key: 'tax_config',        setting_value: taxSettings,         category: 'finance' },
     ];
 
     const { error: settingsErr } = await supabase
@@ -421,6 +445,18 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       .insert(settingsToInsert);
 
     if (settingsErr) throw settingsErr;
+
+    // Write canonical tax and order settings to site_settings
+    const siteSettingsToInsert = [
+      { key: 'tax_configuration', value: taxConfiguration },
+      { key: 'order_configuration', value: orderConfiguration },
+    ];
+
+    const { error: siteSettingsErr } = await supabase
+      .from('site_settings')
+      .upsert(siteSettingsToInsert, { onConflict: 'key' });
+
+    if (siteSettingsErr) throw siteSettingsErr;
 
     // 6. Provision Modules
     const selectedModules: string[] = modulesData.modules || [];

@@ -37,7 +37,7 @@ export interface HostSegments {
 const GLOBAL_ROUTE_SEGMENTS = new Set([
   'login', 'register', 'forgot-password', 'reset-password',
   'install', 'platform-admin', 'cookie-policy', 'terms', 'privacy',
-  'offline', 'error', 'global-error', 'api',
+  'offline', 'error', 'global-error', 'api', 'nexus',
 ]);
 
 /**
@@ -217,23 +217,35 @@ async function ensureCsrfToken(): Promise<string | null> {
   return csrfTokenPromise;
 }
 
-// Track if we're currently refreshing to avoid multiple refreshes
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (value?: unknown) => void;
-  reject: (reason?: any) => void;
-}> = [];
+// Single-flight refresh: any concurrent caller (the proactive request-
+// interceptor check, the reactive 401 handler, or an explicit call from
+// auth-context's validateSession()) shares the same in-flight promise
+// instead of firing separate POST /auth/refresh calls. This matters
+// because the refresh-token cookie rotates on every successful refresh —
+// a second concurrent call presenting the now-stale cookie gets 401'd,
+// which previously surfaced as (and caused) a spurious logout, especially
+// under React StrictMode's double-effect-invocation in dev.
+let refreshPromise: Promise<string> | null = null;
 
-const processQueue = (error: Error | null, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
+export async function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+      // Response shape is { success, data: { user, tokens: { accessToken } } } —
+      // see backend/src/modules/auth/auth.controller.ts refreshToken().
+      const accessToken = response.data?.data?.tokens?.accessToken;
+      if (!accessToken) throw new Error('Refresh response missing accessToken');
+      memoryTokenStore.set(accessToken);
+      return accessToken;
+    } finally {
+      refreshPromise = null;
     }
-  });
-  failedQueue = [];
-};
+  })();
+
+  return refreshPromise;
+}
 
 // Helper to check if token is close to expiring
 const isTokenExpiringSoon = (token: string): boolean => {
@@ -262,19 +274,11 @@ api.interceptors.request.use(
       let token = memoryTokenStore.get();
 
       // Check if token is close to expiring and proactively refresh
-      if (token && isTokenExpiringSoon(token) && !isRefreshing) {
-        // Refresh is now cookie-based — send an empty body; the httpOnly
-        // refresh-token cookie is forwarded automatically by the browser.
+      if (token && isTokenExpiringSoon(token)) {
         try {
-          isRefreshing = true;
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
-          const { accessToken } = response.data.data;
-          memoryTokenStore.set(accessToken);
-          token = accessToken;
+          token = await refreshAccessToken();
         } catch {
           // Refresh failed, continue with old token
-        } finally {
-          isRefreshing = false;
         }
       }
 
@@ -372,30 +376,16 @@ api.interceptors.response.use(
 
     // Handle 401 errors with token refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        // If already refreshing, add to queue
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return api(originalRequest);
-        });
-      }
-
       originalRequest._retry = true;
-      isRefreshing = true;
 
       try {
-        // Refresh token is in httpOnly cookie — browser forwards it automatically.
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
-        const { accessToken } = response.data.data;
-        memoryTokenStore.set(accessToken);
-
-        processQueue(null, accessToken);
+        // Shared single-flight refresh — if another caller (proactive check,
+        // another queued 401, or auth-context) already kicked one off, this
+        // just awaits that same in-flight promise instead of racing it.
+        const accessToken = await refreshAccessToken();
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError: any) {
-        processQueue(refreshError, null);
         memoryTokenStore.clear();
         // Genuine refresh rejection (401/403 from /auth/refresh) means the
         // refresh token is actually invalid — clear the stale 'user' marker
@@ -407,8 +397,6 @@ api.interceptors.response.use(
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
         }
-      } finally {
-        isRefreshing = false;
       }
     }
 

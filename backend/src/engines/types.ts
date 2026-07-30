@@ -72,6 +72,8 @@ export interface PricingLineItem {
   quantity: number;
   unitAdjustment?: number;
   metadata?: Record<string, unknown>;
+  taxCategory?: string; // Tax category for scoping (e.g., 'accommodation', 'food_beverage', 'all'). Defaults to 'all' if unset.
+
 }
 
 export interface PricingConfig {
@@ -117,13 +119,30 @@ export interface DiscountBreakdown {
   metadata?: Record<string, unknown>;
 }
 
+export interface TaxBreakdownItem {
+  id: string;
+  name: string;
+  rate: number;
+  amount: number;
+  type: string;
+}
+
+export interface FeeBreakdownItem {
+  type: 'service_charge' | 'delivery_fee';
+  name: string;
+  amount: number;
+  rate?: number; // For percentage-based fees like service charge
+}
+
 export interface PricingResult extends EconomicsReporting {
   subtotal: number;
   taxAmount: number;
   taxRate: number;
+  taxBreakdown: TaxBreakdownItem[]; // Detailed breakdown of all taxes applied
   serviceCharge: number;
   serviceChargeRate: number;
   deliveryFee: number;
+  feeBreakdown: FeeBreakdownItem[]; // Detailed breakdown of all fees (service charge, delivery, etc.)
   preDiscountTotal: number;
   discounts: DiscountBreakdown[];
   totalDiscount: number;

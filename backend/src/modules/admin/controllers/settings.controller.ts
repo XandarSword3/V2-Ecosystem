@@ -521,3 +521,85 @@ export const updateTaxSettings = asyncHandler(async (req: Request, res: Response
 
   res.json({ success: true, message: 'Tax settings saved successfully' });
 });
+
+// Order configuration endpoints (service charge, delivery fee)
+export const getOrderSettings = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  // Only use propertyId set by middleware (validated UUID). Same reason as getHomepageSettings.
+  const propertyId = (req as any).propertyId as string | undefined;
+
+  if (propertyId) {
+    try {
+      const { resolveSetting } = await import('../../multi-property/settings-resolution.service.js');
+      const resolved = await resolveSetting(propertyId, 'order_configuration', null);
+      return res.json({ success: true, data: resolved.value });
+    } catch (err) {
+      logger.error('Failed to resolve order settings for property:', err);
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('site_settings')
+    .select('value')
+    .eq('key', 'order_configuration')
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    logger.error('Failed to fetch order settings:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch order settings' });
+  }
+
+  res.json({ success: true, data: data?.value || null });
+});
+
+export const updateOrderSettings = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const orderData = req.body;
+  // Only use propertyId set by middleware (validated UUID). Same reason as getHomepageSettings.
+  const propertyId = (req as any).propertyId as string | undefined;
+
+  if (propertyId) {
+    try {
+      const { setPropertySetting } = await import('../../multi-property/settings-resolution.service.js');
+      await setPropertySetting(propertyId, 'order_configuration', orderData, 'finance', (req.user as any)?.userId);
+
+      emitToAll('settings.updated', { order: orderData });
+
+      await logActivity({
+        user_id: (req.user as any)?.userId || 'system',
+        action: 'UPDATE_SETTINGS',
+        resource: 'settings:order',
+        new_value: orderData,
+      });
+
+      return res.json({ success: true, message: 'Order settings saved successfully' });
+    } catch (err: any) {
+      logger.error('Failed to update order settings for property:', err);
+      return res.status(500).json({ success: false, error: err.message || 'Failed to save order settings' });
+    }
+  }
+
+  const { error } = await supabase
+    .from('site_settings')
+    .upsert({
+      key: 'order_configuration',
+      value: orderData,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'key' });
+
+  if (error) {
+    logger.error('Failed to update order settings:', error);
+    return res.status(500).json({ success: false, error: 'Failed to save order settings' });
+  }
+
+  emitToAll('settings.updated', { order: orderData });
+
+  await logActivity({
+    user_id: (req.user as any)?.userId || 'system',
+    action: 'UPDATE_SETTINGS',
+    resource: 'settings:order',
+    new_value: orderData,
+  });
+
+  res.json({ success: true, message: 'Order settings saved successfully' });
+});

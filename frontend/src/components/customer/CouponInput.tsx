@@ -34,6 +34,8 @@ interface CouponInputProps {
   orderTotal: number;
   orderType?: string;
   moduleId?: string;
+  /** Module slug (e.g. 'delete', 'menu_service') — this is what coupons.applies_to actually stores. */
+  moduleSlug?: string;
   onCouponApply?: (coupon: AppliedCoupon | null) => void;
   onDiscountChange?: (discountAmount: number) => void;
   className?: string;
@@ -44,6 +46,7 @@ export function CouponInput({
   orderTotal,
   orderType = 'general',
   moduleId,
+  moduleSlug,
   onCouponApply,
   onDiscountChange,
   className = '',
@@ -85,8 +88,9 @@ export function CouponInput({
     setError('');
     
     try {
-      // Pass moduleId if available, otherwise use orderType (defaults to 'general')
-      const backendOrderType = moduleId || orderType;
+      // coupons.applies_to stores a module SLUG (e.g. 'delete'), not the module's UUID.
+      // moduleId is a database id and will never match applies_to - only moduleSlug can.
+      const backendOrderType = moduleSlug || orderType;
       
       const res = await api.post('/coupons/validate', {
         code: code.trim().toUpperCase(),

@@ -13,11 +13,11 @@
 -- elsewhere (20260624010000_audit_isolation_remediation.sql), so a NULL
 -- here is not contained to this table -- it can propagate to every
 -- property in the group.
-
--- Fail loudly instead of silently forcing NOT NULL over real gaps.
--- If this fires, there are property_groups rows with no tenant -- triage
--- manually (either backfill the correct tenant_id or delete orphaned
--- rows) before re-running this migration.
+--
+-- NOTE: Orphaned property_groups rows (NULL tenant_id) are backfilled or
+-- deleted in 20260720115000_backfill_property_groups_tenant_id.sql BEFORE
+-- this migration runs. This check should never fire if that migration
+-- ran successfully.
 DO $$
 DECLARE
   orphan_count INTEGER;

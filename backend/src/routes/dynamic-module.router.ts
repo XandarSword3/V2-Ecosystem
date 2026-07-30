@@ -10,6 +10,8 @@ import { logger } from '../utils/logger.js';
 import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.js';
 import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purchase.js';
 import { computeStayBaseAmount } from '../utils/stay-pricing.js';
+import { resolveTaxCategory } from '../services/tax.service.js';
+import { generateQRCodeImage } from '../utils/qr-security.js';
 
 // Import parsers
 import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
@@ -762,25 +764,75 @@ function buildInstantTransactionRouter(router: Router): void {
       }
 
       const itemIds = items
-        .map((item: unknown) => (item as { catalog_item_id?: string }).catalog_item_id)
+        .map((item: unknown) => {
+          const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string };
+          return i.catalog_item_id || i.menuItemId || i.itemId;
+        })
         .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
 
       const { data: catalogRows, error: catalogError } = await supabase
         .from('catalog_items')
-        .select('id, price')
+        .select('id, name, price')
         .eq('module_id', mounted.id)
         .in('id', itemIds);
 
       if (catalogError) throw catalogError;
 
+      // Human-readable name lookup — the pricing pipeline's own lineItems
+      // only carry an opaque `catalog_item:<uuid>` placeholder (it doesn't
+      // need real names to price correctly), so a separate map is built
+      // here purely for the receipt/ledger snapshot and the confirmation
+      // page's itemized breakdown.
+      const nameMap = new Map((catalogRows ?? []).map((row: any) => [row.id, row.name as string]));
+
+      // Fetch module's tax category for tax scoping
+      const { data: module } = await supabase
+        .from('modules')
+        .select('tax_category')
+        .eq('id', mounted.id)
+        .maybeSingle();
+
       const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
       const lineItems = items.map((item: unknown) => {
-        const currentItem = item as { catalog_item_id: string; quantity?: number };
-        return {
-          itemId: currentItem.catalog_item_id,
-          name: `catalog_item:${currentItem.catalog_item_id}`,
+        const currentItem = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number; metadata?: Record<string, unknown> };
+        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+        const lineItem = {
+          itemId: resolvedId,
+          name: `catalog_item:${resolvedId}`,
           quantity: asNumber(currentItem.quantity, 1),
-          unitPrice: priceMap.get(currentItem.catalog_item_id) ?? 0,
+          unitPrice: priceMap.get(resolvedId) ?? 0,
+          metadata: currentItem.metadata || {},
+        };
+        return {
+          ...lineItem,
+          taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
+        };
+      });
+
+      // Receipt-friendly snapshot of what was actually ordered, with real
+      // catalog names + any modifiers the cart attached. This is what gets
+      // persisted into the ledger's metadata below so the confirmation page
+      // can show an itemized breakdown — previously this was computed for
+      // pricing and then discarded, since PricingResult.lineItems only
+      // carries the opaque `catalog_item:<uuid>` placeholder.
+      const receiptLineItems = items.map((item: unknown) => {
+        const currentItem = item as {
+          catalog_item_id?: string; menuItemId?: string; itemId?: string;
+          quantity?: number; metadata?: Record<string, unknown>;
+        };
+        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+        const quantity = asNumber(currentItem.quantity, 1);
+        const unitPrice = priceMap.get(resolvedId) ?? 0;
+        const selectedModifiers = Array.isArray(currentItem.metadata?.selectedModifiers)
+          ? currentItem.metadata!.selectedModifiers
+          : undefined;
+        return {
+          itemId: resolvedId,
+          name: nameMap.get(resolvedId) ?? 'Item',
+          quantity,
+          unitPrice,
+          lineTotal: unitPrice * quantity,
+          ...(selectedModifiers ? { selectedModifiers } : {}),
         };
       });
 
@@ -789,18 +841,25 @@ function buildInstantTransactionRouter(router: Router): void {
         .map((r: unknown) => (r as { code?: string }).code)
         .filter((code: unknown): code is string => typeof code === 'string' && code.length > 0);
 
+      const resolvedOrderType = req.body?.orderType ?? req.body?.metadata?.order_type ?? req.body?.order_type ?? 'dine_in';
+      const resolvedCustomerName = req.body?.customerName ?? req.body?.metadata?.customer_name ?? req.body?.customer_name ?? null;
+      const resolvedCustomerPhone = req.body?.customerPhone ?? req.body?.metadata?.customer_phone ?? req.body?.customer_phone ?? null;
+      const resolvedTableNumber = req.body?.tableNumber ?? req.body?.metadata?.table_number ?? req.body?.table_number ?? null;
+      const resolvedPaymentMethod = req.body?.paymentMethod ?? req.body?.metadata?.payment_method ?? req.body?.payment_method ?? 'cash';
+
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
         customerId: req.user?.userId ?? undefined,
         couponCode: typeof req.body?.couponCode === 'string' ? req.body.couponCode : undefined,
         giftCardCodes: giftCardCodes.length > 0 ? giftCardCodes : undefined,
         loyaltyPointsToRedeem: typeof req.body?.loyaltyPointsToRedeem === 'number' ? req.body.loyaltyPointsToRedeem : undefined,
+        conditions: { orderType: resolvedOrderType },
       });
 
       // Validate service_location_id belongs to this module before trusting it —
       // otherwise a caller could tag an order to another module's location.
       let serviceLocationId: string | null = null;
-      const requestedLocationId = req.body?.service_location_id;
+      const requestedLocationId = req.body?.service_location_id || req.body?.serviceLocationId;
       if (typeof requestedLocationId === 'string' && requestedLocationId.length > 0) {
         const { data: locationRow, error: locationError } = await supabase
           .from('service_locations')
@@ -815,29 +874,102 @@ function buildInstantTransactionRouter(router: Router): void {
         serviceLocationId = locationRow.id;
       }
 
+      // Resolve property_id: mounted module → request context — NO fallbacks
+      const propertyId = mounted.property_id
+        || (req as any).propertyId
+        || (req.headers?.['x-property-id'] as string)
+        || null;
+
+      if (!propertyId) {
+        logger.error('[Dynamic Router] POST /orders rejected — property_id could not be resolved', {
+          moduleId: mounted.id, slug: mounted.slug,
+        });
+        return res.status(500).json({ success: false, error: 'property_id is required but could not be resolved for this module' });
+      }
+
+      // Resolve tenant_id: mounted module → request context — NO fallbacks
+      const tenantId = mounted.tenant_id
+        || (req as any).tenant?.id
+        || req.user?.tenantId
+        || (req.headers?.['x-tenant-id'] as string)
+        || null;
+
+      if (!tenantId) {
+        logger.error('[Dynamic Router] POST /orders rejected — tenant_id could not be resolved', {
+          moduleId: mounted.id, slug: mounted.slug,
+        });
+        return res.status(500).json({ success: false, error: 'tenant_id is required but could not be resolved for this module' });
+      }
+
       const { data: created, error: createError } = await supabase
         .from('transactions')
         .insert({
           engine_type: 'instant_transaction',
           module_id: mounted.id,
+          property_id: propertyId,
+          tenant_id: tenantId,
           customer_id: req.user?.userId ?? null,
           status: 'pending',
           amount: pricing.totalAmount,
           discount_amount: pricing.totalDiscount ?? 0,
           tax_amount: pricing.taxAmount ?? 0,
+          // FIX: service_charge column already existed on transactions but
+          // was never populated at creation — every order with a service
+          // charge silently showed $0 for it downstream.
+          service_charge: pricing.serviceCharge ?? 0,
           service_location_id: serviceLocationId,
           metadata: {
             notes: req.body?.notes ?? req.body?.metadata?.notes ?? null,
-            payment_method: req.body?.metadata?.payment_method ?? req.body?.payment_method ?? null,
-            order_type: req.body?.metadata?.order_type ?? req.body?.order_type ?? null,
-            table_number: req.body?.metadata?.table_number ?? req.body?.table_number ?? null,
-            customer_name: req.body?.metadata?.customer_name ?? req.body?.customer_name ?? null,
+            payment_method: resolvedPaymentMethod,
+            order_type: resolvedOrderType,
+            table_number: resolvedTableNumber,
+            customer_name: resolvedCustomerName,
+            customer_phone: resolvedCustomerPhone,
           },
         })
         .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
         .single();
 
       if (createError) throw createError;
+
+      // Persist the full pricing breakdown (subtotal, discount detail,
+      // service charge, delivery fee, itemization) to the financial ledger.
+      // Previously this whole breakdown was computed by calculatePricing()
+      // above and then thrown away — only the three scalar columns on
+      // `transactions` were kept, so the confirmation page had nothing to
+      // reconstruct a receipt from. engine_financial_ledger already exists
+      // for exactly this (see FINANCIAL_INVARIANTS.md, INV-L1) but had no
+      // real call site anywhere in the app until now.
+      // Non-fatal by design: a ledger hiccup must never block the order
+      // itself from completing, since the transactions row is already the
+      // authoritative record of "an order exists" — this only enriches it.
+      try {
+        const actorIsStaff = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
+        await engineService.recordToLedger(pricing, {
+          tenantId,
+          moduleId: mounted.id,
+          templateType: 'instant_transaction',
+          entityId: created.id,
+          entityType: 'order',
+          transactionType: 'charge',
+          actorType: req.user ? (actorIsStaff ? 'staff' : 'customer') : 'system',
+          actorId: req.user?.userId,
+          entityState: 'pending',
+          paymentMethod: resolvedPaymentMethod,
+          notes: req.body?.notes ?? req.body?.metadata?.notes ?? undefined,
+          metadata: {
+            lineItems: receiptLineItems,
+            taxBreakdown: pricing.taxBreakdown,
+            feeBreakdown: pricing.feeBreakdown,
+          },
+        });
+      } catch (ledgerErr) {
+        logger.warn('[Dynamic Router] Failed to record order to financial ledger', {
+          orderId: created.id,
+          error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+        });
+      }
+
       // Flatten metadata fields to top level for client convenience
       const meta = (created?.metadata ?? {}) as Record<string, unknown>;
       res.status(201).json({
@@ -888,7 +1020,11 @@ function buildInstantTransactionRouter(router: Router): void {
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, customer_id, status, amount, created_at, metadata')
+        // tax_amount/discount_amount are written at order creation (see
+        // POST /orders below) but were previously never selected here, so
+        // the confirmation page had no way to show a subtotal/discount/tax
+        // breakdown even though the data existed on the row.
+        .select('id, customer_id, status, amount, tax_amount, discount_amount, created_at, metadata')
         .eq('engine_type', 'instant_transaction')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -897,12 +1033,32 @@ function buildInstantTransactionRouter(router: Router): void {
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Order not found' });
       const meta = (data?.metadata ?? {}) as Record<string, unknown>;
+
+      // QR code was never wired up for orders — qr-security.ts has a working,
+      // HMAC-signed generator that nothing was calling. Generated fresh on
+      // each fetch; validity is verified by signature/expiry, not storage.
+      let qrCode: string | null = null;
+      try {
+        const qr = await generateQRCodeImage('instant_transaction', data.id, { module_id: mounted.id });
+        qrCode = qr.dataUrl;
+      } catch (qrErr) {
+        logger.warn('[Dynamic Router] Failed to generate order QR code', { orderId: data.id, error: qrErr instanceof Error ? qrErr.message : String(qrErr) });
+      }
+
       res.json({
         success: true,
         data: {
           ...data,
+          order_number: data.id.slice(0, 8).toUpperCase(),
+          total_amount: data.amount,
+          tax_amount: data.tax_amount,
+          discount_amount: data.discount_amount,
+          order_type: meta.order_type ?? 'dine_in',
+          customer_name: meta.customer_name ?? null,
+          table_id: meta.table_number ?? null,
           payment_method: meta.payment_method ?? null,
           payment_status: data.status === 'completed' ? 'paid' : 'pending',
+          qr_code: qrCode,
         },
       });
     } catch (error) {
@@ -1012,6 +1168,119 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list service locations' });
     }
   });
+
+  // Waitlist endpoints
+  router.get('/waitlist', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('waitlist_entries')
+        .select('*')
+        .eq('module_id', mounted.id)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        logger.warn('[Dynamic Router] GET /waitlist query warning:', error.message);
+        return res.json({ success: true, data: [] });
+      }
+      res.json({ success: true, data: data ?? [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /waitlist failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list waitlist entries' });
+    }
+  });
+
+  router.post('/waitlist', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const { guest_name, name, party_size, partySize, phone, notes } = req.body ?? {};
+      const resolvedName = guest_name || name || 'Guest';
+      const resolvedPartySize = party_size || partySize || 1;
+      const tenant_id = await getTenantIdForMountedModule(mounted);
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('waitlist_entries')
+        .insert({
+          module_id: mounted.id,
+          tenant_id,
+          property_id: mounted.property_id ?? null,
+          guest_name: resolvedName,
+          party_size: resolvedPartySize,
+          phone: phone ?? null,
+          notes: notes ?? null,
+          status: 'waiting',
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /waitlist failed', error);
+      res.status(500).json({ success: false, error: 'Failed to add to waitlist' });
+    }
+  });
+
+  router.patch('/waitlist/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const { status } = req.body ?? {};
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('waitlist_entries')
+        .update({
+          ...(status && { status }),
+          ...(status === 'notified' && { notified_at: new Date().toISOString() }),
+        })
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (error) {
+      logger.error('[Dynamic Router] PATCH /waitlist/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to update waitlist entry' });
+    }
+  });
+
+  router.delete('/waitlist/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { error } = await supabase
+        .from('waitlist_entries')
+        .delete()
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id);
+
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('[Dynamic Router] DELETE /waitlist/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to delete waitlist entry' });
+    }
+  });
 }
 
 function buildTimeExclusiveReservationRouter(router: Router): void {
@@ -1082,6 +1351,13 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         .eq('unit_id', String(unit_id))
         .eq('is_active', true);
 
+      // Fetch module's tax category for tax scoping
+      const { data: module } = await supabase
+        .from('modules')
+        .select('tax_category')
+        .eq('id', mounted.id)
+        .maybeSingle();
+
       const baseAmount = computeStayBaseAmount(
         checkIn,
         checkOut,
@@ -1090,9 +1366,19 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         priceRules || [],
       );
 
+      const lineItem = {
+        itemId: String(unit_id),
+        name: 'booking',
+        quantity: 1,
+        unitPrice: baseAmount,
+        metadata: {},
+      };
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
-        [{ itemId: String(unit_id), name: 'booking', quantity: 1, unitPrice: baseAmount }],
+        [{
+          ...lineItem,
+          taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
+        }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
 
@@ -1336,11 +1622,24 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       }
 
       const guestCount = asNumber(quantity, 1);
-      const lineItems = [{
+
+      // Fetch module's tax category for tax scoping
+      const { data: module } = await supabase
+        .from('modules')
+        .select('tax_category')
+        .eq('id', mounted.id)
+        .maybeSingle();
+
+      const lineItem = {
         itemId: String(session_id),
         name: 'session_ticket',
         quantity: guestCount,
         unitPrice: asNumber(unit_price, 0),
+        metadata: bodyMetadata || {},
+      };
+      const lineItems = [{
+        ...lineItem,
+        taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
       }];
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
@@ -1432,7 +1731,20 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         .maybeSingle();
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Ticket not found' });
-      res.json({ success: true, data });
+
+      // qr_code was declared on the frontend SessionTicket type and rendered
+      // conditionally, but nothing ever generated or returned it — the QR
+      // block has been silently dead since it was built. Same generator now
+      // used for orders below.
+      let qrCode: string | null = null;
+      try {
+        const qr = await generateQRCodeImage('shared_capacity_access', data.id, { module_id: mounted.id });
+        qrCode = qr.dataUrl;
+      } catch (qrErr) {
+        logger.warn('[Dynamic Router] Failed to generate ticket QR code', { ticketId: data.id, error: qrErr instanceof Error ? qrErr.message : String(qrErr) });
+      }
+
+      res.json({ success: true, data: { ...data, qr_code: qrCode } });
     } catch (error) {
       logger.error('[Dynamic Router] GET /tickets/:id failed', error);
       res.status(500).json({ success: false, error: 'Failed to fetch ticket' });
@@ -1515,11 +1827,24 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         .single();
       if (sessionError) throw sessionError;
       const unitPrice = asNumber(session?.price, 0);
-      const lineItems = [{
+
+      // Fetch module's tax category for tax scoping
+      const { data: module } = await supabase
+        .from('modules')
+        .select('tax_category')
+        .eq('id', mounted.id)
+        .maybeSingle();
+
+      const lineItem = {
         itemId: String(session_id),
         name: 'session_ticket',
         quantity: guestCount,
         unitPrice,
+        metadata: session?.metadata || {},
+      };
+      const lineItems = [{
+        ...lineItem,
+        taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
       }];
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
@@ -1934,9 +2259,26 @@ function buildOngoingEntitlementRouter(router: Router): void {
       if (planError) throw planError;
       if (!plan) return res.status(404).json({ success: false, error: 'Plan not found' });
 
+      // Fetch module's tax category for tax scoping
+      const { data: module } = await supabase
+        .from('modules')
+        .select('tax_category')
+        .eq('id', mounted.id)
+        .maybeSingle();
+
+      const lineItem = {
+        itemId: plan.id,
+        name: 'subscription_plan',
+        quantity: 1,
+        unitPrice: asNumber(plan.price, 0),
+        metadata: {},
+      };
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
-        [{ itemId: plan.id, name: 'subscription_plan', quantity: 1, unitPrice: asNumber(plan.price, 0) }],
+        [{
+          ...lineItem,
+          taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
+        }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
 

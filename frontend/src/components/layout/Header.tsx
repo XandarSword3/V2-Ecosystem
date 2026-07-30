@@ -298,6 +298,10 @@ export default function Header() {
     sticky: true
   };
 
+  if (pathname === '/nexus' || pathname?.startsWith('/nexus')) {
+    return null;
+  }
+
   return (
     <motion.header
       initial={{ y: -100, opacity: 0 }}

@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/auth.middleware.js';
 import { getEngineService } from '../engines/engine-service.js';
 import { logger } from '../utils/logger.js';
 import { asyncHandler } from '../middleware/async-handler.js';
+import { resolveTaxCategory } from '../services/tax.service.js';
 
 const router = Router();
 const engineService = getEngineService();
@@ -236,12 +237,29 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
       return;
     }
 
+    // Fetch module's tax category for tax scoping
+    const { data: module } = await supabase
+      .from('modules')
+      .select('tax_category')
+      .eq('id', unit.module_id)
+      .maybeSingle();
+
     const nights = Math.max(1, dayjs(check_out_date).diff(dayjs(check_in_date), 'day'));
     const unitPrice = asNumber(unit.base_price, 0);
 
+    const lineItem = {
+      itemId: unit.id,
+      name: unit.name ?? 'unit',
+      quantity: nights,
+      unitPrice,
+      metadata: {},
+    };
     const pricing = await engineService.calculatePricing(
       'multi_day_booking',
-      [{ itemId: unit.id, name: unit.name ?? 'unit', quantity: nights, unitPrice }],
+      [{
+        ...lineItem,
+        taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
+      }],
       { moduleId: unit.module_id ?? undefined, customerId: req.user?.userId ?? undefined },
     );
 
