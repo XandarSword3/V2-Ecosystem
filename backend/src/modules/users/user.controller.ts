@@ -416,11 +416,15 @@ export const updateUserRoles = asyncHandler(async (req: Request, res: Response) 
 
 export const getMyStatement = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
-    const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
     if (!userId) {
       res.status(401).json({ success: false, error: 'Authentication required' });
       return;
     }
+
+    // Disable caching for statement endpoint to ensure fresh data
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     const { from, to } = req.query as { from?: string; to?: string };
     const supabase = getSupabase();
@@ -437,13 +441,9 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
 
     let txsQuery = supabase
       .from('transactions')
-      .select('id,engine_type,amount,net_amount,status,created_at,reference_id,reference_table,metadata')
+      .select('id,engine_type,amount,tax_amount,discount_amount,status,created_at,reference_id,reference_table,metadata,module_id')
       .eq('customer_id', userId)
       .in('engine_type', ['instant_transaction', 'shared_capacity_access', 'time_exclusive_reservation']);
-
-    if (propertyId) {
-      txsQuery = txsQuery.eq('property_id', propertyId);
-    }
 
     const [transactions, loyalty, giftcards] = await Promise.all([
       applyDateFilters(txsQuery),
@@ -459,11 +459,15 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
           id: row.id as string,
           engine_type: row.engine_type as string,
           amount: row.amount as number,
-          net_amount: row.net_amount as number | undefined,
+          total_amount: row.amount as number,
+          tax_amount: row.tax_amount as number | undefined,
+          discount_amount: row.discount_amount as number | undefined,
+          payment_method: (meta.payment_method as string | undefined) ?? null,
           status: row.status as string,
           created_at: row.created_at as string,
           reference_id: row.reference_id as string | undefined,
           reference_table: row.reference_table as string | undefined,
+          module_id: row.module_id as string | undefined,
           // Unpack display fields from metadata (canonical location post-clean-transactions)
           order_number:   (meta.order_number as string | undefined)   ?? null,
           ticket_number:  (meta.ticket_number as string | undefined)  ?? null,

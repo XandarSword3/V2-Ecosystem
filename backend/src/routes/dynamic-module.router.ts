@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import dayjs from 'dayjs';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
-import { requireModule } from '../middleware/moduleGuard.middleware.js';
+import { requireModule, getModuleStatus } from '../middleware/moduleGuard.middleware.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { getSupabase } from '../database/connection.js';
 import { getEngineService } from '../engines/engine-service.js';
@@ -74,7 +74,22 @@ function enforceMountedModuleActive(req: Request, res: Response, next: NextFunct
     return;
   }
 
-  requireModule(mounted.slug)(req, res, next).catch((error: unknown) => {
+  // For public routes (no auth), use tenant from tenantGate middleware
+  // For authenticated routes, use tenant from JWT
+  const tenantId = (req as any).tenant?.id || mounted.tenant_id || null;
+
+  // Direct module status check instead of using requireModule which requires auth
+  getModuleStatus(mounted.slug, tenantId).then((isActive) => {
+    if (!isActive) {
+      logger.info(`Blocked request to disabled module: ${mounted.slug}, path: ${req.path}`);
+      return res.status(503).json({
+        success: false,
+        error: 'This feature is currently unavailable',
+        code: 'MODULE_DISABLED',
+      });
+    }
+    next();
+  }).catch((error: unknown) => {
     logger.error('[Dynamic Router] Failed module guard check', {
       slug: mounted.slug,
       error: error instanceof Error ? error.message : String(error),
@@ -298,8 +313,8 @@ async function fetchServiceLocationsWithOccupancy(moduleId: string) {
 }
 
 function buildInstantTransactionRouter(router: Router): void {
-  // Categories endpoints
-  router.get('/categories', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+  // Categories endpoints - public access for customers to browse catalog
+  router.get('/categories', async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -321,7 +336,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.post('/admin/categories', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.post('/admin/categories', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -357,7 +372,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.put('/admin/categories/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.put('/admin/categories/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -386,7 +401,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.delete('/admin/categories/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.delete('/admin/categories/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -409,7 +424,7 @@ function buildInstantTransactionRouter(router: Router): void {
   });
 
   // Admin Items endpoints
-  router.get('/admin/items', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.get('/admin/items', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -431,7 +446,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.post('/admin/items', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.post('/admin/items', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -498,7 +513,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.put('/admin/items/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.put('/admin/items/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -568,7 +583,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.delete('/admin/items/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.delete('/admin/items/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -608,7 +623,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.post('/admin/service-locations', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+  router.post('/admin/service-locations', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -648,7 +663,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.put('/admin/service-locations/:id', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+  router.put('/admin/service-locations/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -685,7 +700,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.delete('/admin/service-locations/:id', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+  router.delete('/admin/service-locations/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -723,8 +738,8 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  // Items endpoint
-  router.get('/items', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+  // Items endpoint - public access for customers to browse catalog
+  router.get('/items', async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -750,7 +765,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.post('/orders', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.post('/orders', authenticate, enforceMountedModulePropertyAccess, authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -948,6 +963,7 @@ function buildInstantTransactionRouter(router: Router): void {
         await engineService.recordToLedger(pricing, {
           tenantId,
           moduleId: mounted.id,
+          propertyId,
           templateType: 'instant_transaction',
           entityId: created.id,
           entityType: 'order',
@@ -986,7 +1002,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.get('/orders', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.get('/orders', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -1010,7 +1026,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.get('/orders/:id', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.get('/orders/:id', authenticate, enforceMountedModulePropertyAccess, authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -1032,6 +1048,13 @@ function buildInstantTransactionRouter(router: Router): void {
 
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Order not found' });
+
+      // IDOR protection: Customers can only access their own orders
+      const roles = req.user?.roles ?? [];
+      const isStaff = ['staff', 'manager', 'admin', 'super_admin'].some(role => roles.includes(role));
+      if (!isStaff && data.customer_id !== req.user?.userId) {
+        return res.status(403).json({ success: false, error: 'Access denied' });
+      }
       const meta = (data?.metadata ?? {}) as Record<string, unknown>;
 
       // QR code was never wired up for orders — qr-security.ts has a working,
@@ -1045,6 +1068,32 @@ function buildInstantTransactionRouter(router: Router): void {
         logger.warn('[Dynamic Router] Failed to generate order QR code', { orderId: data.id, error: qrErr instanceof Error ? qrErr.message : String(qrErr) });
       }
 
+      // Pull the full pricing breakdown back out of the financial ledger
+      // (written at order creation — see POST /orders). Falls back to just
+      // the bare transactions fields for orders created before this ledger
+      // write existed, or if the ledger read itself fails for any reason —
+      // the confirmation page should degrade gracefully, never 500.
+      let ledgerBreakdown: Record<string, unknown> | null = null;
+      try {
+        const { data: ledgerRow, error: ledgerError } = await supabase
+          .from('engine_financial_ledger')
+          .select('subtotal, tax_amount, tax_rate, service_charge, delivery_fee, total_discount, deposit_amount, discount_breakdown, loyalty_points_earned, payment_method, notes, metadata')
+          .eq('entity_id', data.id)
+          .eq('entity_type', 'order')
+          .eq('transaction_type', 'charge')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (ledgerError) throw ledgerError;
+        ledgerBreakdown = ledgerRow ?? null;
+      } catch (ledgerReadErr) {
+        logger.warn('[Dynamic Router] Failed to read order financial ledger entry', {
+          orderId: data.id,
+          error: ledgerReadErr instanceof Error ? ledgerReadErr.message : String(ledgerReadErr),
+        });
+      }
+      const ledgerMeta = (ledgerBreakdown?.metadata ?? {}) as Record<string, unknown>;
+
       res.json({
         success: true,
         data: {
@@ -1055,10 +1104,23 @@ function buildInstantTransactionRouter(router: Router): void {
           discount_amount: data.discount_amount,
           order_type: meta.order_type ?? 'dine_in',
           customer_name: meta.customer_name ?? null,
+          customer_phone: meta.customer_phone ?? null,
+          notes: meta.notes ?? ledgerBreakdown?.notes ?? null,
           table_id: meta.table_number ?? null,
-          payment_method: meta.payment_method ?? null,
+          payment_method: meta.payment_method ?? ledgerBreakdown?.payment_method ?? null,
           payment_status: data.status === 'completed' ? 'paid' : 'pending',
           qr_code: qrCode,
+          // Rich breakdown — only present once the ledger entry exists.
+          subtotal: ledgerBreakdown?.subtotal ?? null,
+          tax_rate: ledgerBreakdown?.tax_rate ?? null,
+          service_charge: ledgerBreakdown?.service_charge ?? null,
+          delivery_fee: ledgerBreakdown?.delivery_fee ?? null,
+          deposit_amount: ledgerBreakdown?.deposit_amount ?? null,
+          loyalty_points_earned: ledgerBreakdown?.loyalty_points_earned ?? null,
+          discounts: ledgerBreakdown?.discount_breakdown ?? null,
+          line_items: ledgerMeta.lineItems ?? null,
+          tax_breakdown: ledgerMeta.taxBreakdown ?? null,
+          fee_breakdown: ledgerMeta.feeBreakdown ?? null,
         },
       });
     } catch (error) {
@@ -1067,7 +1129,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.patch('/orders/:id/status', authorize('staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
+  router.patch('/orders/:id/status', authenticate, enforceMountedModulePropertyAccess, authorize('staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -1122,7 +1184,7 @@ function buildInstantTransactionRouter(router: Router): void {
   });
 
   // Staff endpoints
-  router.get('/staff/orders', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.get('/staff/orders', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -2897,8 +2959,8 @@ export function buildModuleRouter(templateType: string): Router {
   };
   const normalizedType = (LEGACY[templateType] ?? templateType) as TemplateType;
 
-  // Every dynamic route is auth-protected and module-guarded.
-  router.use(authenticate, requireMountedModule, enforceMountedModuleActive, enforceMountedModulePropertyAccess);
+  // Every dynamic route is module-guarded. Authentication and property access are applied per-route below.
+  router.use(requireMountedModule, enforceMountedModuleActive);
 
   // Import routes (available for all engine types)
   buildImportRouter(router, normalizedType);

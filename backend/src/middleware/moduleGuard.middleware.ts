@@ -20,7 +20,7 @@ interface ModuleCache {
 const moduleCache: ModuleCache = {};
 const CACHE_TTL = 60000; // 1 minute cache
 
-async function getModuleStatus(slug: string, tenantId: string | null): Promise<boolean> {
+export async function getModuleStatus(slug: string, tenantId: string | null): Promise<boolean> {
   const cacheKey = tenantId ? `${tenantId}:${slug}` : `global:${slug}`;
   const now = Date.now();
   const cached = moduleCache[cacheKey];

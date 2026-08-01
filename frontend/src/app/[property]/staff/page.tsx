@@ -113,10 +113,9 @@ export default function StaffDashboard() {
     
     try {
       // Fetch live transactions from unified endpoint
-      const response = await api.get('/transactions/live', {
+      const response = await api.get('/staff/transactions/live', {
         params: {
-          propertyId: activeProperty.id,
-          statuses: 'pending,confirmed,preparing,active,ready',
+          statuses: 'pending,confirmed,preparing,ready,delivered,active',
         }
       });
 
@@ -124,7 +123,7 @@ export default function StaffDashboard() {
 
       // Count by transaction status
       const pending = allTransactions.filter((t: TransactionRecord) => 
-        ['pending', 'confirmed', 'preparing', 'active'].includes(t.status)
+        ['pending', 'confirmed', 'preparing', 'active', 'delivered'].includes(t.status)
       ).length;
 
       const completed = allTransactions.filter((t: TransactionRecord) => 

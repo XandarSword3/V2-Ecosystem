@@ -59,6 +59,32 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     // The tenantAccess middleware populates req.tenant from X-Tenant-ID / X-Tenant-Slug headers.
     // This is required: the DB constraint enforces tenant_id IS NOT NULL for 'customer' scope.
     (data as authService.RegisterData).tenantId = req.tenant?.id;
+    
+    // Inject property_id from request context if available
+    // First check if middleware already resolved it (req.propertyId)
+    let propertyId = (req as any).propertyId;
+    // If not, try to resolve from X-Property-Id header (might be a slug or UUID)
+    if (!propertyId) {
+      const propertyHeader = req.headers['x-property-id'] as string;
+      if (propertyHeader) {
+        // If it looks like a UUID, use it directly
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(propertyHeader)) {
+          propertyId = propertyHeader;
+        } else {
+          // Otherwise, resolve slug to UUID
+          const supabase = (await import('../../database/connection.js')).getSupabase();
+          const { data: property } = await supabase
+            .from('properties')
+            .select('id')
+            .eq('slug', propertyHeader)
+            .eq('tenant_id', req.tenant?.id)
+            .maybeSingle();
+          propertyId = property?.id;
+        }
+      }
+    }
+    (data as authService.RegisterData).propertyId = propertyId;
+    
     const result = await authService.register(data);
 
     await logActivity({

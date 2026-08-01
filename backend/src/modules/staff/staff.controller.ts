@@ -1011,3 +1011,48 @@ export const searchCustomers = asyncHandler(async (req: Request, res: Response) 
 
   res.json({ success: true, data: safeResults });
 });
+
+// ============================================
+// Live Transactions
+// ============================================
+
+/**
+ * GET /api/staff/transactions/live
+ * Get live transactions for the current property
+ * Used by staff dashboard to show real-time transaction activity
+ */
+export const getLiveTransactions = asyncHandler(async (req: Request, res: Response) => {
+  const propertyId = (req as any).property?.id;
+  if (!propertyId) {
+    res.status(400).json({ success: false, error: 'Property context required' });
+    return;
+  }
+
+  const { statuses, engine_type } = req.query;
+  const supabase = getSupabase();
+
+  // Default status list from all engine types
+  // Engine A (instant-transaction): pending, confirmed, preparing, ready, delivered, completed, cancelled
+  // Engine C (shared-capacity-access): valid, active, used, expired, cancelled
+  const defaultStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'active'];
+  const statusList = statuses 
+    ? String(statuses).split(',').map(s => s.trim())
+    : defaultStatuses;
+
+  let query = supabase
+    .from('transactions')
+    .select('*')
+    .eq('property_id', propertyId)
+    .in('status', statusList)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (engine_type) {
+    query = query.eq('engine_type', engine_type);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  res.json({ success: true, data: data || [] });
+});

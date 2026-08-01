@@ -24,6 +24,7 @@ export interface RegisterData {
   phone?: string;
   preferredLanguage?: 'en' | 'ar' | 'fr';
   tenantId?: string; // Required for non-platform scopes (customer, tenant_staff, etc.)
+  propertyId?: string; // Optional: property to grant access to during registration
 }
 
 export async function register(data: RegisterData) {
@@ -87,6 +88,34 @@ export async function register(data: RegisterData) {
   }
 
   // scope is set to 'customer' by DEFAULT in the database schema
+  
+  // Grant access to all properties in the tenant for customer accounts
+  // This allows customers to order from any property within the same tenant
+  if (data.tenantId) {
+    const { data: properties, error: propertiesError } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('tenant_id', data.tenantId);
+    
+    if (!propertiesError && properties && properties.length > 0) {
+      const accessEntries = properties.map(property => ({
+        user_id: user.id,
+        property_id: property.id,
+        tenant_id: data.tenantId,
+        granted_by: user.id, // Self-granted during registration
+      }));
+      
+      const { error: accessError } = await supabase
+        .from('user_property_access')
+        .insert(accessEntries);
+      
+      if (accessError) {
+        logger.warn('Failed to grant property access during registration:', accessError.message);
+        // Don't fail registration for this - user can be granted access later
+      }
+    }
+  }
+  
   // FIX: Send email verification link (fire-and-forget — don't block registration)
   sendVerificationEmail(user.id, user.email, user.full_name).catch(err => {
     logger.error('Failed to send verification email:', err);
