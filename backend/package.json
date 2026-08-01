@@ -114,7 +114,7 @@
     "supertest": "^7.0.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "exceljs": {
