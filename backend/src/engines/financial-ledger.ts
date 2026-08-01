@@ -58,6 +58,8 @@ export interface LedgerEntry {
 
   moduleId: string;
 
+  propertyId?: string;
+
   engineType: EngineType;
 
   entityId: string;
@@ -240,6 +242,8 @@ export class FinancialLedgerService {
 
       module_id: entry.moduleId,
 
+      property_id: entry.propertyId || null,
+
       engine_type: entry.engineType,
 
       entity_id: entry.entityId,
@@ -376,6 +380,8 @@ export class FinancialLedgerService {
 
       moduleId: string;
 
+      propertyId?: string;
+
       engineType: EngineType;
 
       entityId: string;
@@ -417,6 +423,8 @@ export class FinancialLedgerService {
       tenantId: context.tenantId,
 
       moduleId: context.moduleId,
+
+      propertyId: context.propertyId,
 
       engineType: context.engineType,
 

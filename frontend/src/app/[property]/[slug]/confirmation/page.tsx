@@ -28,6 +28,14 @@ import {
   User,
   MapPin,
   Receipt,
+  Tag,
+  CreditCard,
+  Sparkles,
+  Store,
+  ShoppingCart,
+  Truck,
+  Banknote,
+  MessageSquare,
 } from 'lucide-react';
 
 // ============================
@@ -53,15 +61,41 @@ interface SessionTicket {
   };
 }
 
+interface OrderDiscount {
+  type: string;
+  referenceId?: string;
+  label: string;
+  amount: number;
+  taxSavings?: number;
+}
+
+interface OrderTaxLine {
+  name: string;
+  rate?: number;
+  amount: number;
+}
+
+interface OrderLineItem {
+  itemId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  selectedModifiers?: Array<{ modifierType: string; optionName: string }>;
+}
+
 interface OrderConfirmation {
   id: string;
   order_number: string;
   customer_name?: string;
+  customer_phone?: string;
+  notes?: string;
   status: string;
   order_type: string;
   total_amount: number;
   tax_amount?: number;
   discount_amount?: number;
+  payment_method?: string;
   qr_code?: string;
   table_id?: string;
   created_at: string;
@@ -70,6 +104,19 @@ interface OrderConfirmation {
     quantity: number;
     catalog_items?: { name: string };
   }>;
+  // Rich breakdown — only populated for orders created after the ledger
+  // was wired up; null for older orders, so every field below must be
+  // treated as optional and the UI must degrade gracefully without it.
+  subtotal?: number | null;
+  tax_rate?: number | null;
+  service_charge?: number | null;
+  delivery_fee?: number | null;
+  deposit_amount?: number | null;
+  loyalty_points_earned?: number | null;
+  discounts?: OrderDiscount[] | null;
+  line_items?: OrderLineItem[] | null;
+  tax_breakdown?: OrderTaxLine[] | null;
+  fee_breakdown?: OrderTaxLine[] | null;
 }
 
 interface BookingConfirmation {
@@ -84,6 +131,60 @@ interface BookingConfirmation {
   guests?: number;
   special_requests?: string;
   unit?: { name: string };
+}
+
+// ============================
+// SMALL DISPLAY HELPERS
+// ============================
+
+function orderTypeIcon(orderType?: string) {
+  switch (orderType) {
+    case 'delivery':
+      return Truck;
+    case 'takeaway':
+    case 'pickup':
+      return ShoppingCart;
+    case 'dine_in':
+      return Store;
+    default:
+      return UtensilsCrossed;
+  }
+}
+
+function paymentMethodIcon(paymentMethod?: string) {
+  const value = (paymentMethod || '').toLowerCase();
+  if (value.includes('cash')) return Banknote;
+  return CreditCard;
+}
+
+function discountIcon(type?: string) {
+  switch (type) {
+    case 'gift_card':
+      return CreditCard;
+    case 'loyalty':
+      return Sparkles;
+    default:
+      return Tag;
+  }
+}
+
+// Status pills use the CMS's own success/warning/primary/destructive
+// tokens (see tailwind.config.js) rather than hardcoded green/amber/blue,
+// so an order's status reads correctly no matter which theme is active.
+function orderStatusStyle(status?: string) {
+  switch (status) {
+    case 'ready':
+    case 'delivered':
+    case 'completed':
+      return 'bg-success/10 text-success';
+    case 'confirmed':
+    case 'preparing':
+      return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400';
+    case 'cancelled':
+      return 'bg-destructive/10 text-destructive';
+    default:
+      return 'bg-warning/10 text-warning';
+  }
 }
 
 // ============================
@@ -142,7 +243,7 @@ function ConfirmationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary-50 to-white dark:from-slate-900 dark:to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
       </div>
     );
@@ -150,10 +251,10 @@ function ConfirmationContent() {
 
   if (error || (!ticket && !order && !booking)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary-50 to-white dark:from-slate-900 dark:to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <Card className="max-w-md mx-auto">
           <CardContent className="text-center py-8">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">{error || 'Confirmation not found'}</h2>
             <Link href={`/${propertySlug}/${slug}`}>
               <Button className="mt-4">Back to {moduleName}</Button>
@@ -182,12 +283,12 @@ function ConfirmationContent() {
           >
             <CheckCircle2 className="w-10 h-10 text-primary-600 dark:text-primary-400" />
           </motion.div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             {confirmationType === 'order' ? 'Order Confirmed!' :
              confirmationType === 'booking' ? 'Booking Confirmed!' :
              'Ticket Confirmed!'}
           </h1>
-          <p className="text-slate-600 dark:text-slate-400">
+          <p className="text-muted-foreground">
             {confirmationType === 'order' ? 'Your order has been placed successfully.' :
              confirmationType === 'booking' ? 'Your booking is confirmed. We look forward to hosting you!' :
              'Your ticket has been confirmed.'}
@@ -197,8 +298,8 @@ function ConfirmationContent() {
         {/* ========== SESSION TICKET CONFIRMATION ========== */}
         {ticket && (
           <Card className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-primary-600 to-primary-500 text-white border-b-0">
-              <CardTitle className="flex items-center justify-between">
+            <CardHeader className="rounded-lg bg-gradient-to-r from-primary-600 to-secondary-500 text-primary-foreground border-b-0">
+              <CardTitle className="flex items-center justify-between text-primary-foreground">
                 <span className="flex items-center gap-2">
                   <Ticket className="w-5 h-5" />
                   {moduleName} Ticket
@@ -208,7 +309,7 @@ function ConfirmationContent() {
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="divide-y divide-slate-200 dark:divide-slate-700">
+            <CardContent className="divide-y divide-border">
               {ticket.qr_code && (
                 <div className="py-6 flex justify-center">
                   <div className="bg-white p-4 rounded-lg shadow-inner">
@@ -221,7 +322,7 @@ function ConfirmationContent() {
                   <Ticket className="w-6 h-6 text-primary-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">{'Session'}</p>
+                  <p className="text-sm text-muted-foreground">{'Session'}</p>
                   <p className="font-semibold">{ticket.session?.name || 'Session'}</p>
                 </div>
               </div>
@@ -230,27 +331,27 @@ function ConfirmationContent() {
                   <Calendar className="w-6 h-6 text-primary-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-slate-500">{'Date'}</p>
+                  <p className="text-sm text-muted-foreground">{'Date'}</p>
                   <p className="font-semibold">{formatDate(ticket.ticket_date)}</p>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="w-4 h-4" />
                   <span>{ticket.session?.start_time} - {ticket.session?.end_time}</span>
                 </div>
               </div>
               <div className="py-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <Users className="w-6 h-6 text-purple-600" />
+                <div className="w-12 h-12 bg-secondary-100 dark:bg-secondary-900/30 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-secondary-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-slate-500">{tCommon('guests')}</p>
+                  <p className="text-sm text-muted-foreground">{tCommon('guests')}</p>
                   <p className="font-semibold">{ticket.number_of_guests} {ticket.number_of_guests > 1 ? 'guests' : 'guest'}</p>
                 </div>
               </div>
               <div className="py-4 space-y-2">
-                <p className="text-sm text-slate-500">{'Contact Information'}</p>
+                <p className="text-sm text-muted-foreground">{'Contact Information'}</p>
                 <p className="font-medium">{ticket.customer_name}</p>
-                <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="w-4 h-4" />
                   <span>{ticket.customer_phone}</span>
                 </div>
@@ -258,20 +359,20 @@ function ConfirmationContent() {
               <div className="py-4">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">{tCommon('total')}</span>
-                  <span className="text-2xl font-bold text-primary-600">{formatCurrency(ticket.total_amount, currency)}</span>
+                  <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">{formatCurrency(ticket.total_amount, currency)}</span>
                 </div>
                 <div className="mt-2 flex gap-2">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                     ticket.status === 'valid' 
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-muted text-muted-foreground'
                   }`}>
                     {ticket.status.toUpperCase()}
                   </span>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                     ticket.payment_status === 'paid'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-warning/10 text-warning'
                   }`}>
                     {ticket.payment_status === 'paid' ? 'PAID' : 'PAY ON ARRIVAL'}
                   </span>
@@ -282,106 +383,243 @@ function ConfirmationContent() {
         )}
 
         {/* ========== ORDER CONFIRMATION (menu_service) ========== */}
-        {order && (
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-orange-500 to-amber-500 text-white border-b-0">
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <UtensilsCrossed className="w-5 h-5" />
-                  {moduleName} Order
-                </span>
-                <span className="text-sm font-mono bg-white/20 px-3 py-1 rounded-full">
-                  #{order.order_number}
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="divide-y divide-slate-200 dark:divide-slate-700">
-              {order.qr_code && (
-                <div className="py-6 flex justify-center">
-                  <div className="bg-white p-4 rounded-lg shadow-inner">
-                    <img src={order.qr_code} alt="Order QR Code" className="w-40 h-40" />
-                  </div>
-                </div>
-              )}
-              <div className="py-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
-                  <Receipt className="w-6 h-6 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Order Type</p>
-                  <p className="font-semibold capitalize">{order.order_type ? order.order_type.replace('_', ' ') : 'Order'}</p>
-                </div>
-              </div>
-              {order.table_id && (
-                <div className="py-4 flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-500">Table</p>
-                    <p className="font-semibold">Table {order.table_id}</p>
-                  </div>
-                </div>
-              )}
-              {order.items && order.items.length > 0 && (
-                <div className="py-4">
-                  <p className="text-sm text-slate-500 mb-3">Items Ordered</p>
-                  <div className="space-y-2">
-                    {order.items.map((item) => (
-                      <div key={item.id} className="flex items-center gap-2">
-                        <span className="font-medium bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 rounded text-xs text-orange-700 dark:text-orange-300">
-                          {item.quantity}x
-                        </span>
-                        <span className="text-slate-700 dark:text-slate-300 text-sm">
-                          {item.catalog_items?.name || 'Item'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="py-4">
-                {(!!order.discount_amount || !!order.tax_amount) && (
-                  <div className="mb-3 space-y-1 text-sm text-slate-600 dark:text-slate-400">
-                    {!!order.discount_amount && (
-                      <div className="flex justify-between">
-                        <span>Discount applied</span>
-                        <span className="text-green-600">-{formatCurrency(order.discount_amount, currency)}</span>
-                      </div>
-                    )}
-                    {!!order.tax_amount && (
-                      <div className="flex justify-between">
-                        <span>Tax</span>
-                        <span>{formatCurrency(order.tax_amount, currency)}</span>
-                      </div>
-                    )}
+        {order && (() => {
+          const OrderTypeIcon = orderTypeIcon(order.order_type);
+          const PaymentIcon = paymentMethodIcon(order.payment_method);
+          const hasBreakdown = typeof order.subtotal === 'number';
+          const preDiscountTotal = hasBreakdown
+            ? (order.subtotal || 0) + (order.tax_amount || 0) + (order.service_charge || 0) + (order.delivery_fee || 0)
+            : null;
+          const showStrikethrough = preDiscountTotal !== null && preDiscountTotal - order.total_amount > 0.01;
+          const richItems = order.line_items && order.line_items.length > 0 ? order.line_items : null;
+          const legacyItems = !richItems && order.items && order.items.length > 0 ? order.items : null;
+
+          return (
+            <Card className="overflow-hidden">
+              <CardHeader className="relative overflow-hidden rounded-lg bg-gradient-to-r from-primary-600 to-secondary-500 text-primary-foreground border-b-0">
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-20"
+                  style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '20px 20px' }}
+                />
+                <CardTitle className="relative flex items-center justify-between text-primary-foreground">
+                  <span className="flex items-center gap-2">
+                    <OrderTypeIcon className="w-5 h-5" />
+                    {moduleName} Order
+                  </span>
+                  <span className="text-sm font-mono bg-white/20 px-3 py-1 rounded-full">
+                    #{order.order_number}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="divide-y divide-border">
+                {order.qr_code && (
+                  <div className="py-6 flex justify-center">
+                    <div className="bg-white p-4 rounded-lg shadow-inner">
+                      <img src={order.qr_code} alt="Order QR Code" className="w-40 h-40" />
+                    </div>
                   </div>
                 )}
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold">{tCommon('total')}</span>
-                  <span className="text-2xl font-bold text-orange-600">{formatCurrency(order.total_amount, currency)}</span>
+
+                <div className="py-4 flex items-center gap-4">
+                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                    <OrderTypeIcon className="w-6 h-6 text-primary-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Order Type</p>
+                    <p className="font-semibold capitalize">{order.order_type ? order.order_type.replace('_', ' ') : 'Order'}</p>
+                  </div>
                 </div>
-                <div className="mt-2">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    order.status === 'confirmed' || order.status === 'preparing'
-                      ? 'bg-blue-100 text-blue-700'
-                      : order.status === 'ready'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    {order.status?.toUpperCase() || 'PENDING'}
-                  </span>
+
+                {order.table_id && (
+                  <div className="py-4 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-secondary-100 dark:bg-secondary-900/30 rounded-lg flex items-center justify-center">
+                      <MapPin className="w-6 h-6 text-secondary-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Table</p>
+                      <p className="font-semibold">Table {order.table_id}</p>
+                    </div>
+                  </div>
+                )}
+
+                {(order.customer_name || order.customer_phone || order.payment_method) && (
+                  <div className="py-4 space-y-2">
+                    <p className="text-sm text-muted-foreground">Customer</p>
+                    {order.customer_name && <p className="font-medium">{order.customer_name}</p>}
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+                      {order.customer_phone && (
+                        <span className="flex items-center gap-2">
+                          <Phone className="w-4 h-4" />
+                          {order.customer_phone}
+                        </span>
+                      )}
+                      {order.payment_method && (
+                        <span className="flex items-center gap-2 capitalize">
+                          <PaymentIcon className="w-4 h-4" />
+                          {order.payment_method.replace('_', ' ')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {richItems && (
+                  <div className="py-4">
+                    <p className="text-sm text-muted-foreground mb-3">Items Ordered</p>
+                    <div className="space-y-2">
+                      {richItems.map((item, idx) => (
+                        <div key={`${item.itemId}-${idx}`} className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2">
+                            <span className="font-medium bg-primary-100 dark:bg-primary-900/30 px-2 py-0.5 rounded text-xs text-primary-700 dark:text-primary-400 shrink-0">
+                              {item.quantity}x
+                            </span>
+                            <div>
+                              <span className="text-foreground text-sm">{item.name}</span>
+                              {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {item.selectedModifiers.map((mod, mi) => (
+                                    <span key={mi} className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                      {mod.optionName}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">{formatCurrency(item.lineTotal, currency)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {legacyItems && (
+                  <div className="py-4">
+                    <p className="text-sm text-muted-foreground mb-3">Items Ordered</p>
+                    <div className="space-y-2">
+                      {legacyItems.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2">
+                          <span className="font-medium bg-primary-100 dark:bg-primary-900/30 px-2 py-0.5 rounded text-xs text-primary-700 dark:text-primary-400">
+                            {item.quantity}x
+                          </span>
+                          <span className="text-foreground text-sm">
+                            {item.catalog_items?.name || 'Item'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="py-4 space-y-2">
+                  {hasBreakdown ? (
+                    <div className="space-y-1.5 text-sm text-muted-foreground">
+                      <div className="flex justify-between">
+                        <span>Subtotal</span>
+                        <span>{formatCurrency(order.subtotal || 0, currency)}</span>
+                      </div>
+                      {order.tax_breakdown && order.tax_breakdown.length > 0 ? (
+                        order.tax_breakdown.map((line, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span>{line.name}{typeof line.rate === 'number' ? ` (${line.rate}%)` : ''}</span>
+                            <span>{formatCurrency(line.amount, currency)}</span>
+                          </div>
+                        ))
+                      ) : !!order.tax_amount && (
+                        <div className="flex justify-between">
+                          <span>Tax</span>
+                          <span>{formatCurrency(order.tax_amount, currency)}</span>
+                        </div>
+                      )}
+                      {!!order.service_charge && (
+                        <div className="flex justify-between">
+                          <span>Service charge</span>
+                          <span>{formatCurrency(order.service_charge, currency)}</span>
+                        </div>
+                      )}
+                      {!!order.delivery_fee && (
+                        <div className="flex justify-between">
+                          <span>Delivery fee</span>
+                          <span>{formatCurrency(order.delivery_fee, currency)}</span>
+                        </div>
+                      )}
+                      {order.discounts && order.discounts.length > 0 && order.discounts.map((d, i) => {
+                        const DiscountIcon = discountIcon(d.type);
+                        return (
+                          <div key={i} className="flex justify-between text-success">
+                            <span className="flex items-center gap-1.5">
+                              <DiscountIcon className="w-3.5 h-3.5" />
+                              {d.label}
+                            </span>
+                            <span>-{formatCurrency(d.amount, currency)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    (!!order.discount_amount || !!order.tax_amount) && (
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        {!!order.discount_amount && (
+                          <div className="flex justify-between">
+                            <span>Discount applied</span>
+                            <span className="text-success">-{formatCurrency(order.discount_amount, currency)}</span>
+                          </div>
+                        )}
+                        {!!order.tax_amount && (
+                          <div className="flex justify-between">
+                            <span>Tax</span>
+                            <span>{formatCurrency(order.tax_amount, currency)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  )}
+
+                  <div className="flex justify-between items-end pt-1">
+                    <span className="font-semibold text-foreground">{tCommon('total')}</span>
+                    <div className="text-right">
+                      {showStrikethrough && preDiscountTotal !== null && (
+                        <p className="text-sm text-muted-foreground line-through">{formatCurrency(preDiscountTotal, currency)}</p>
+                      )}
+                      <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                        {formatCurrency(order.total_amount, currency)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {!!order.loyalty_points_earned && (
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
+                      <Sparkles className="w-3.5 h-3.5 text-accent-600" />
+                      You earned {order.loyalty_points_earned} loyalty points on this order
+                    </p>
+                  )}
+
+                  <div className="pt-2">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${orderStatusStyle(order.status)}`}>
+                      {order.status?.toUpperCase() || 'PENDING'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+
+                {order.notes && (
+                  <div className="py-4">
+                    <p className="text-sm text-muted-foreground mb-1 flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Notes
+                    </p>
+                    <p className="text-foreground text-sm bg-muted p-3 rounded-lg">{order.notes}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* ========== BOOKING CONFIRMATION (multi_day_booking) ========== */}
         {booking && (
           <Card className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white border-b-0">
-              <CardTitle className="flex items-center justify-between">
+            <CardHeader className="rounded-lg bg-gradient-to-r from-primary-600 to-secondary-500 text-primary-foreground border-b-0">
+              <CardTitle className="flex items-center justify-between text-primary-foreground">
                 <span className="flex items-center gap-2">
                   <Home className="w-5 h-5" />
                   {moduleName} Booking
@@ -391,49 +629,49 @@ function ConfirmationContent() {
                 </span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="divide-y divide-slate-200 dark:divide-slate-700">
+            <CardContent className="divide-y divide-border">
               {booking.unit?.name && (
                 <div className="py-4 flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                    <Home className="w-6 h-6 text-emerald-600" />
+                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
+                    <Home className="w-6 h-6 text-primary-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-slate-500">Unit</p>
+                    <p className="text-sm text-muted-foreground">Unit</p>
                     <p className="font-semibold">{booking.unit.name}</p>
                   </div>
                 </div>
               )}
               <div className="py-4 flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-primary-600" />
+                <div className="w-12 h-12 bg-secondary-100 dark:bg-secondary-900/30 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-secondary-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-slate-500">Check-in / Check-out</p>
+                  <p className="text-sm text-muted-foreground">Check-in / Check-out</p>
                   <p className="font-semibold">
                     {formatDate(booking.check_in_date)} — {formatDate(booking.check_out_date)}
                   </p>
                 </div>
               </div>
               <div className="py-4 space-y-2">
-                <p className="text-sm text-slate-500">Guest Details</p>
+                <p className="text-sm text-muted-foreground">Guest Details</p>
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-slate-400" />
+                  <User className="w-4 h-4 text-muted-foreground" />
                   <p className="font-medium">{booking.customer_name}</p>
                 </div>
                 {booking.customer_email && (
-                  <p className="text-sm text-slate-600 dark:text-slate-400 ml-6">{booking.customer_email}</p>
+                  <p className="text-sm text-muted-foreground ml-6">{booking.customer_email}</p>
                 )}
                 {booking.guests && (
                   <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-slate-400" />
+                    <Users className="w-4 h-4 text-muted-foreground" />
                     <p className="text-sm">{booking.guests} guests</p>
                   </div>
                 )}
               </div>
               {booking.special_requests && (
                 <div className="py-4">
-                  <p className="text-sm text-slate-500 mb-1">Special Requests</p>
-                  <p className="text-slate-700 dark:text-slate-300 text-sm bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">Special Requests</p>
+                  <p className="text-foreground text-sm bg-muted p-3 rounded-lg">
                     {booking.special_requests}
                   </p>
                 </div>
@@ -441,13 +679,13 @@ function ConfirmationContent() {
               <div className="py-4">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">{tCommon('total')}</span>
-                  <span className="text-2xl font-bold text-emerald-600">{formatCurrency(booking.total_price, currency)}</span>
+                  <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">{formatCurrency(booking.total_price, currency)}</span>
                 </div>
                 <div className="mt-2">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                     booking.status === 'confirmed'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-amber-100 text-amber-700'
+                      ? 'bg-success/10 text-success'
+                      : 'bg-warning/10 text-warning'
                   }`}>
                     {booking.status?.toUpperCase() || 'PENDING'}
                   </span>
@@ -459,22 +697,22 @@ function ConfirmationContent() {
 
         {/* Info Note */}
         {ticket && (
-          <div className="mt-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-            <p className="text-sm text-amber-800 dark:text-amber-300">
+          <div className="mt-6 bg-warning/10 border border-warning/20 rounded-lg p-4">
+            <p className="text-sm text-warning">
               <strong>{'Important Note'}:</strong> {'Please show your QR code at the entrance to gain access.'}
             </p>
           </div>
         )}
         {order && (
-          <div className="mt-6 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-            <p className="text-sm text-orange-800 dark:text-orange-300">
+          <div className="mt-6 bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg p-4">
+            <p className="text-sm text-primary-800 dark:text-primary-300">
               <strong>Note:</strong> Your order is being prepared. You will be notified when it&apos;s ready.
             </p>
           </div>
         )}
         {booking && (
-          <div className="mt-6 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-4">
-            <p className="text-sm text-emerald-800 dark:text-emerald-300">
+          <div className="mt-6 bg-secondary-50 dark:bg-secondary-900/20 border border-secondary-200 dark:border-secondary-800 rounded-lg p-4">
+            <p className="text-sm text-secondary-800 dark:text-secondary-300">
               <strong>Note:</strong> A confirmation email has been sent. Please present your booking number at check-in.
             </p>
           </div>

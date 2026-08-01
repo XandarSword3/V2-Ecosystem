@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMutation } from '@tanstack/react-query';
@@ -11,8 +11,10 @@ import { formatCurrency } from '@/lib/utils';
 import { useCartStore } from '@/stores/cartStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
+import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
+import { AuthModal } from '@/components/auth/AuthModal';
 import {
   ShoppingCart,
   ArrowLeft,
@@ -44,11 +46,14 @@ export default function ModuleCartPage() {
   const t = useTranslations('common');
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const rawSlug = params?.slug;
   const slug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const propertySlug = (params?.property as string) || '';
 
   const { modules, loading: modulesLoading, settings } = useSiteSettings();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   
   const normalizedSlug = slug ? decodeURIComponent(slug).toLowerCase() : '';
   const currentModule = modules.find((m) => m.slug.toLowerCase() === normalizedSlug);
@@ -57,6 +62,7 @@ export default function ModuleCartPage() {
   const currency = useSettingsStore((s) => s.currency);
 
   const [isHydrated, setIsHydrated] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   useEffect(() => {
     setIsHydrated(true);
   }, []);
@@ -66,15 +72,21 @@ export default function ModuleCartPage() {
   
   const addItem = useCartStore((s) => s.addItem);
   const removeItem = useCartStore((s) => s.removeItem);
+  const customerName = useCartStore((s) => s.customerName);
+  const customerPhone = useCartStore((s) => s.customerPhone);
+  const tableNumber = useCartStore((s) => s.tableNumber);
+  const orderType = useCartStore((s) => s.orderType);
+  const paymentMethod = useCartStore((s) => s.paymentMethod);
+  const notes = useCartStore((s) => s.notes);
+  const setCustomerName = useCartStore((s) => s.setCustomerName);
+  const setCustomerPhone = useCartStore((s) => s.setCustomerPhone);
+  const setTableNumber = useCartStore((s) => s.setTableNumber);
+  const setOrderType = useCartStore((s) => s.setOrderType);
+  const setPaymentMethod = useCartStore((s) => s.setPaymentMethod);
+  const setNotes = useCartStore((s) => s.setNotes);
 
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [tableNumber, setTableNumber] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [serviceLocations, setServiceLocations] = useState<Array<{ id: string; name: string; is_active: boolean }>>([]);
-  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
-  const [notes, setNotes] = useState('');
   const [activeStep, setActiveStep] = useState(1);
 
   // Discount tracking state
@@ -220,6 +232,12 @@ export default function ModuleCartPage() {
       }
     },
     onError: (err: MutationError) => {
+      // Handle 401 errors by showing auth modal
+      if ((err as any).response?.status === 401) {
+        setShowAuthModal(true);
+        toast.error('Session expired. Please log in again.');
+        return;
+      }
       const errMsg = err.response?.data?.error || (err.response?.data as any)?.message || err.message || 'Failed to place order';
       toast.error(errMsg);
     },
@@ -242,6 +260,12 @@ export default function ModuleCartPage() {
   };
 
   const handlePlaceOrder = () => {
+    // Check authentication status - only show modal if auth is fully loaded
+    if (!authLoading && !isAuthenticated) {
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!customerName.trim()) {
       toast.error(t('enterName') || 'Please enter your name');
       setActiveStep(2);
@@ -996,13 +1020,18 @@ export default function ModuleCartPage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handlePlaceOrder}
-                    disabled={orderMutation.isPending}
+                    disabled={orderMutation.isPending || authLoading}
                     className="w-full py-4 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 hover:from-orange-600 hover:via-amber-600 hover:to-orange-600 text-white font-bold text-lg rounded-2xl shadow-xl shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
                   >
                     {orderMutation.isPending ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
                         Processing...
+                      </>
+                    ) : authLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Loading...
                       </>
                     ) : (
                       <>
@@ -1066,6 +1095,14 @@ export default function ModuleCartPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        currentPath={pathname}
+        searchParams={searchParams}
+      />
     </div>
   );
 }

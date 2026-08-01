@@ -527,7 +527,7 @@ export const getMyPayments = asyncHandler(async (req: Request, res: Response) =>
   // Pull all transactions for this customer (unified source of truth)
   const { data: transactions, error: txError } = await supabase
     .from('transactions')
-    .select('id, engine_type, status, amount, currency, created_at, metadata, payment_status')
+    .select('id, engine_type, status, amount, currency, created_at, metadata')
     .eq('customer_id', userId)
     .order('created_at', { ascending: false });
 

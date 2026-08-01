@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
@@ -15,6 +15,18 @@ export default function RegisterPage() {
   const tAuth = useTranslations('auth');
   const tCommon = useTranslations('common');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Extract property context from redirect URL if available
+  const redirectUrl = searchParams.get('redirect') || '';
+  let propertyId = '';
+  if (redirectUrl) {
+    // Extract property from URL like /acme/shop/cart?coupon=SAVE10
+    const match = redirectUrl.match(/^\/([^\/]+)/);
+    if (match) {
+      propertyId = match[1];
+    }
+  }
   
   const [formData, setFormData] = useState({
     email: '',
@@ -45,6 +57,10 @@ export default function RegisterPage() {
         password: formData.password,
         fullName: `${formData.firstName} ${formData.lastName}`.trim(),
         phone: formData.phone || undefined,
+      }, {
+        headers: propertyId ? {
+          'X-Property-Id': propertyId,
+        } : undefined,
       });
 
       const data = response.data;
@@ -53,8 +69,8 @@ export default function RegisterPage() {
         throw new Error(data.error || data.message || 'Registration failed');
       }
 
-      // Redirect to login
-      router.push('/login');
+      // Redirect to login with the original redirect URL
+      router.push(redirectUrl ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : '/login');
     } catch (err: unknown) {
       // Axios throws on non-2xx before `data.success` is ever checked, so the
       // real backend message (e.g. password policy failures) lives at
