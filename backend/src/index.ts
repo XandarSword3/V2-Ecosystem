@@ -4,7 +4,7 @@ import { logger } from './utils/logger.js';
 import { initializeDatabase, closeDatabase } from './database/connection.js';
 import { seedSystemModules } from './database/system-modules.seeder.js';
 import { initializeSocketServer, closeSocketServer } from './socket/index.js';
-import { initSentry } from './utils/sentry.js';
+import { initSentry } from './instrumentation.js';
 import { SchedulerService } from './services/scheduler.service.js';
 import { registerEngineCleanupJobs } from './jobs/engine-cleanup.job.js';
 import http from 'http';

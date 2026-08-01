@@ -531,17 +531,31 @@ function ConfirmationContent() {
                           <span>{formatCurrency(order.tax_amount, currency)}</span>
                         </div>
                       )}
-                      {!!order.service_charge && (
-                        <div className="flex justify-between">
-                          <span>Service charge</span>
-                          <span>{formatCurrency(order.service_charge, currency)}</span>
-                        </div>
-                      )}
-                      {!!order.delivery_fee && (
-                        <div className="flex justify-between">
-                          <span>Delivery fee</span>
-                          <span>{formatCurrency(order.delivery_fee, currency)}</span>
-                        </div>
+                      {/* All fees (service charge, delivery fee, resort fee, custom) come from
+                          the CMS tax configuration. Older orders predating the ledger wiring
+                          only have the two flat scalar fields, so fall back to those. */}
+                      {order.fee_breakdown && order.fee_breakdown.length > 0 ? (
+                        order.fee_breakdown.map((line, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span>{line.name}{typeof line.rate === 'number' ? ` (${line.rate}%)` : ''}</span>
+                            <span>{formatCurrency(line.amount, currency)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <>
+                          {!!order.service_charge && (
+                            <div className="flex justify-between">
+                              <span>Service charge</span>
+                              <span>{formatCurrency(order.service_charge, currency)}</span>
+                            </div>
+                          )}
+                          {!!order.delivery_fee && (
+                            <div className="flex justify-between">
+                              <span>Delivery fee</span>
+                              <span>{formatCurrency(order.delivery_fee, currency)}</span>
+                            </div>
+                          )}
+                        </>
                       )}
                       {order.discounts && order.discounts.length > 0 && order.discounts.map((d, i) => {
                         const DiscountIcon = discountIcon(d.type);

@@ -124,8 +124,7 @@ export const ongoingEntitlementStateMachine: StateMachineDefinition<OngoingEntit
 
 export const ongoingEntitlementPricing: PricingConfig = {
   applyTax: true,
-  applyServiceCharge: false,
-  applyDeliveryFee: false,
+  applyFees: false,
   supportsCoupons: false,
   supportsGiftCards: false,
   supportsLoyaltyRedemption: false,

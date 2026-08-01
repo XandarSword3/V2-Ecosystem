@@ -139,7 +139,9 @@ export default function TaxConfigurationPage() {
     queryFn: async () => {
       try {
         const res = await api.get('/admin/settings/tax');
-        return res.data?.data || defaultConfig;
+        // Only fall back to defaultConfig if data is truly undefined (network error/missing response)
+        // Empty object {} means no config is set, which is valid
+        return res.data?.data !== undefined ? res.data.data : defaultConfig;
       } catch {
         return defaultConfig;
       }
@@ -148,13 +150,17 @@ export default function TaxConfigurationPage() {
 
   useEffect(() => {
     if (fetchedConfig) {
-      const mergedRates = fetchedConfig.rates || defaultConfig.rates;
+      const mergedRates = fetchedConfig.rates && fetchedConfig.rates.length > 0 ? fetchedConfig.rates : defaultConfig.rates;
       const defaultRateObj = mergedRates.find((r: TaxRate) => r.is_default);
-      
+
       setConfig({
-        ...defaultConfig,
-        ...fetchedConfig,
         default_rate: defaultRateObj ? defaultRateObj.rate : (fetchedConfig.default_rate ?? defaultConfig.default_rate),
+        tax_included_in_price: fetchedConfig.tax_included_in_price ?? defaultConfig.tax_included_in_price,
+        show_tax_breakdown: fetchedConfig.show_tax_breakdown ?? defaultConfig.show_tax_breakdown,
+        rounding_method: fetchedConfig.rounding_method ?? defaultConfig.rounding_method,
+        decimal_places: fetchedConfig.decimal_places ?? defaultConfig.decimal_places,
+        tax_number: fetchedConfig.tax_number ?? defaultConfig.tax_number,
+        tax_name_display: fetchedConfig.tax_name_display ?? defaultConfig.tax_name_display,
         rates: mergedRates
       });
     }

@@ -20,7 +20,7 @@
  *   const engine = getEngineByTemplate(module.template_type);
  * 
  *   // Create pricing pipeline
- *   const pipeline = new PricingPipeline({ taxService, orderConfigService });
+ *   const pipeline = new PricingPipeline({ taxService });
  *   const result = await pipeline.calculate(lineItems, engine.pricing, context);
  * 
  *   // Enforce state transitions

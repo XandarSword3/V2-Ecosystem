@@ -439,11 +439,17 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
       return q;
     };
 
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string);
+
     let txsQuery = supabase
       .from('transactions')
       .select('id,engine_type,amount,tax_amount,discount_amount,status,created_at,reference_id,reference_table,metadata,module_id')
       .eq('customer_id', userId)
       .in('engine_type', ['instant_transaction', 'shared_capacity_access', 'time_exclusive_reservation']);
+
+    if (propertyId) {
+      txsQuery = txsQuery.eq('property_id', propertyId);
+    }
 
     const [transactions, loyalty, giftcards] = await Promise.all([
       applyDateFilters(txsQuery),

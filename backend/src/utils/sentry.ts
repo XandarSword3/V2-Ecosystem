@@ -4,11 +4,15 @@
  * This module provides Sentry integration for error tracking and performance monitoring.
  * Set SENTRY_DSN environment variable to enable.
  * 
+ * IMPORTANT: For proper Express auto-instrumentation, Sentry must be initialized
+ * BEFORE Express is imported. This is handled by instrumentation.ts as a preload module.
+ * 
  * Usage:
  * 1. Set SENTRY_DSN in environment variables
- * 2. Call initSentry() early in application startup
- * 3. Use sentryRequestHandler() before routes
- * 4. Use sentryErrorHandler() after routes
+ * 2. Use --import flag to preload instrumentation.ts before starting the app
+ * 3. Call initSentry() early in application startup (will no-op if already initialized)
+ * 4. Use sentryRequestHandler() before routes
+ * 5. Use sentryErrorHandler() after routes
  */
 
 import * as Sentry from '@sentry/node';
@@ -25,6 +29,7 @@ let isInitialized = false;
 /**
  * Initialize Sentry with configuration
  * Should be called early in the application lifecycle
+ * If Sentry was already initialized by instrumentation.ts, this will be a no-op
  */
 export function initSentry(app?: Express): void {
   if (isInitialized) {
@@ -50,6 +55,9 @@ export function initSentry(app?: Express): void {
       integrations: [
         // HTTP integration for tracing outgoing requests
         Sentry.httpIntegration(),
+        // Express integration - this will only work if Express is imported AFTER this init
+        // which is why we use instrumentation.ts as a preload module
+        Sentry.expressIntegration(),
         // Node-specific integrations
         Sentry.onUncaughtExceptionIntegration(),
         Sentry.onUnhandledRejectionIntegration(),

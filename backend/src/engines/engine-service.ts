@@ -36,7 +36,6 @@ import { createDiscountResolvers } from './discount-resolvers.js';
 import { getFinancialLedgerService, type LedgerTransactionType } from './financial-ledger.js';
 import { getTransactionManager, type TransactionStep, type EngineOperationContext } from './transaction-manager.js';
 import { TaxService } from '../services/tax.service.js';
-import { OrderConfigService } from '../services/order-config.service.js';
 import { logger } from '../utils/logger.js';
 
 // ============================================
@@ -50,12 +49,10 @@ export class EngineService {
   constructor(deps?: Partial<PricingPipelineDeps>) {
     // Create pricing pipeline with default or injected dependencies
     const taxService = new TaxService();
-    const orderConfigService = new OrderConfigService();
     const resolvers = createDiscountResolvers();
 
     this.pricingPipeline = new PricingPipeline({
       taxService: deps?.taxService || taxService,
-      orderConfigService: deps?.orderConfigService || orderConfigService,
       couponResolver: deps?.couponResolver || resolvers.couponResolver,
       giftCardResolver: deps?.giftCardResolver || resolvers.giftCardResolver,
       loyaltyResolver: deps?.loyaltyResolver || resolvers.loyaltyResolver,
