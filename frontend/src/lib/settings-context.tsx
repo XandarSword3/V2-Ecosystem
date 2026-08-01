@@ -20,9 +20,6 @@ export interface SiteSettings {
   description: string;
   currency: string;
   taxRate: number;
-  // FIX: Iteration 7 - Add service charge and delivery fee to settings
-  serviceChargeRate: number; // e.g. 0.10 for 10%
-  deliveryFee: number; // Flat fee in currency units
   timezone: string;
   propertySlug?: string;
 
@@ -228,9 +225,6 @@ const defaultSettings: SiteSettings = {
   currency: 'USD',
   // FIX: Iteration 4 - Align default taxRate to 0.11 (Lebanon VAT) to match backend DEFAULT_TAX_RATE
   taxRate: 0.11,
-  // FIX: Iteration 7 - Add service charge and delivery fee defaults
-  serviceChargeRate: 0.10,
-  deliveryFee: 5,
   timezone: 'UTC',
   propertySlug: undefined,
   phone: '',

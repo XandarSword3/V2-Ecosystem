@@ -131,8 +131,7 @@ export const platformEntitlementStateMachine: StateMachineDefinition<PlatformEnt
 export const platformEntitlementPricing: PricingConfig = {
   // Tax applied via Stripe Tax in billing jurisdiction — not computed by pricing pipeline
   applyTax: false,
-  applyServiceCharge: false,
-  applyDeliveryFee: false,
+  applyFees: false,
   supportsCoupons: false,
   supportsGiftCards: false,
   supportsLoyaltyRedemption: false,

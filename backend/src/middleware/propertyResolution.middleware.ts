@@ -181,6 +181,7 @@ async function lookupSingleProperty(groupId: string | null): Promise<PropertyRec
  * validatePropertyAccess. Falls through to slug/fallback for public traffic.
  */
 export async function resolveProperty(req: Request, _res: Response, next: NextFunction): Promise<void> {
+  const startTime = Date.now();
   // Priority 0: explicit x-property-id header (e.g. admin dashboard preview or local development override)
   const propertyIdHeader = req.headers['x-property-id'] as string | undefined;
   if (propertyIdHeader) {
@@ -193,6 +194,7 @@ export async function resolveProperty(req: Request, _res: Response, next: NextFu
         .maybeSingle();
       if (!error && data) {
         req.property = data as PropertyRecord;
+        console.log(`[PropertyResolution] Property found via x-property-id: ${Date.now() - startTime}ms`);
         return next();
       }
     } catch (err) {
@@ -237,5 +239,7 @@ export async function resolveProperty(req: Request, _res: Response, next: NextFu
     }
   }
 
+  const totalTime = Date.now() - startTime;
+  console.log(`[PropertyResolution] Total time: ${totalTime}ms`);
   next();
 }

@@ -109,10 +109,9 @@ export const instantTransactionStateMachine: StateMachineDefinition<InstantTrans
 
 export const instantTransactionPricing: PricingConfig = {
   applyTax: true,
-  applyServiceCharge: true,
-  serviceChargeCondition: 'orderType=dine_in',
-  applyDeliveryFee: true,
-  deliveryFeeCondition: 'orderType=delivery',
+  // Service charge, delivery fee, resort fee, and any custom surcharges are entirely
+  // CMS-driven via tax_configuration — configure them from Admin > Settings > Tax.
+  applyFees: true,
   supportsCoupons: true,
   supportsGiftCards: true,
   supportsLoyaltyRedemption: true,

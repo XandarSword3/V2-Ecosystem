@@ -1,10 +1,10 @@
-// FIX: Iteration 7 - Centralized service charge & delivery fee config (not hardcoded)
+// Centralized order config service (all fees configured via tax_configuration)
 import { getSupabase } from "../database/connection.js";
 import { logger } from "../utils/logger.js";
 
-// Defaults matching the previous hardcoded values
-const DEFAULT_SERVICE_CHARGE_RATE = 0.10; // 10% service for dine-in
-const DEFAULT_DELIVERY_FEE = 5;           // Flat delivery fee
+// Default fallbacks are 0 — all fees are dynamically configured via Tax & Fee Settings
+const DEFAULT_SERVICE_CHARGE_RATE = 0;
+const DEFAULT_DELIVERY_FEE = 0;
 
 export interface OrderConfig {
   serviceChargeRate: number;

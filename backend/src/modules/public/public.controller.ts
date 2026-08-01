@@ -155,11 +155,6 @@ export async function getSettings(req: Request, res: Response) {
                         result.taxRate = Number(taxConfig.default_rate) / 100;
                     }
                 }
-                if (setting.key === 'order_configuration' && setting.value && typeof setting.value === 'object') {
-                    const orderConfig = setting.value as Record<string, unknown>;
-                    if (orderConfig.serviceChargeRate !== undefined) result.serviceChargeRate = Number(orderConfig.serviceChargeRate);
-                    if (orderConfig.deliveryFee !== undefined) result.deliveryFee = Number(orderConfig.deliveryFee);
-                }
             }
         }
 
@@ -248,15 +243,17 @@ export async function getTaxSettings(req: Request, res: Response) {
             }
             res.json({ success: true, data: stored });
         } else {
+            // Return empty configuration instead of hardcoded 11% default
             res.json({
                 success: true,
-                data: { default_rate: 11, global_rate: 0.11, taxIncluded: false, taxName: 'VAT', taxCategories: [] }
+                data: { default_rate: 0, global_rate: 0, taxIncluded: false, taxName: 'Tax', taxCategories: [] }
             });
         }
     } catch {
+        // Return empty configuration instead of hardcoded 11% default
         res.json({
             success: true,
-            data: { default_rate: 11, global_rate: 0.11, taxIncluded: false, taxName: 'VAT', taxCategories: [] }
+            data: { default_rate: 0, global_rate: 0, taxIncluded: false, taxName: 'Tax', taxCategories: [] }
         });
     }
 }

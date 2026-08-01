@@ -73,15 +73,17 @@ export interface PricingLineItem {
   unitAdjustment?: number;
   metadata?: Record<string, unknown>;
   taxCategory?: string; // Tax category for scoping (e.g., 'accommodation', 'food_beverage', 'all'). Defaults to 'all' if unset.
-
+  category?: string;
+  moduleId?: UUID;
 }
 
 export interface PricingConfig {
   applyTax: boolean;
-  applyServiceCharge: boolean;
-  serviceChargeCondition?: string;
-  applyDeliveryFee: boolean;
-  deliveryFeeCondition?: string;
+  /** Whether CMS-configured fees (service_charge/resort_fee/delivery_fee/custom fee_types
+   *  on tax_configuration) apply to this engine. There is no hardcoded fee amount or
+   *  order-type condition — admins scope fees via applies_to/payment_methods on the
+   *  Tax & Fee admin page. */
+  applyFees: boolean;
   supportsCoupons: boolean;
   supportsGiftCards: boolean;
   supportsLoyaltyRedemption: boolean;
@@ -128,7 +130,8 @@ export interface TaxBreakdownItem {
 }
 
 export interface FeeBreakdownItem {
-  type: 'service_charge' | 'delivery_fee';
+  id: string; // tax_configuration rate id this fee came from
+  type: 'service_charge' | 'delivery_fee' | 'resort_fee' | 'custom';
   name: string;
   amount: number;
   rate?: number; // For percentage-based fees like service charge
@@ -139,10 +142,13 @@ export interface PricingResult extends EconomicsReporting {
   taxAmount: number;
   taxRate: number;
   taxBreakdown: TaxBreakdownItem[]; // Detailed breakdown of all taxes applied
+  // serviceCharge/deliveryFee are aggregates derived from feeBreakdown, kept for the
+  // financial ledger's existing service_charge/delivery_fee columns. feeBreakdown is the
+  // source of truth — read it directly for anything CMS-fee-type-specific (resort_fee, custom).
   serviceCharge: number;
   serviceChargeRate: number;
   deliveryFee: number;
-  feeBreakdown: FeeBreakdownItem[]; // Detailed breakdown of all fees (service charge, delivery, etc.)
+  feeBreakdown: FeeBreakdownItem[]; // Detailed breakdown of all CMS fees (service charge, delivery, resort, custom)
   preDiscountTotal: number;
   discounts: DiscountBreakdown[];
   totalDiscount: number;

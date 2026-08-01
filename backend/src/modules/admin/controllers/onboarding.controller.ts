@@ -404,8 +404,16 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
     };
 
     // Unify settings to use canonical site_settings keys instead of property_settings
+    // Service charge (admin-entered % on the wizard's Tax step) is provisioned as a
+    // service_charge fee_type rate on tax_configuration — the SAME CMS system used for
+    // everything else, not a separate hardcoded order_configuration. Admins can edit or
+    // delete it from Admin > Settings > Tax like any other rate. There is no equivalent
+    // delivery-fee input on the onboarding wizard, so none is fabricated here; admins add
+    // one from the Tax page if/when they need it.
+    const serviceChargePercent = parseFloat(taxData.serviceCharge ?? '10') || 0;
+    const taxRate = parseFloat(taxData.taxRate ?? '0') || 0;
     const taxConfiguration = {
-      default_rate: parseFloat(taxData.taxRate ?? '11') || 11,
+      default_rate: taxRate,
       tax_included_in_price: false,
       show_tax_breakdown: true,
       rounding_method: 'round',
@@ -415,22 +423,33 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       rates: [
         {
           id: 'default',
-          name: 'Standard VAT',
-          rate: parseFloat(taxData.taxRate ?? '11') || 11,
+          name: taxRate > 0 ? 'Standard VAT' : 'No Tax',
+          rate: taxRate,
           type: 'vat',
+          fee_type: 'tax',
           applies_to: ['all'],
+          payment_methods: ['all'],
           is_default: true,
           is_compound: false,
           order: 1,
-          description: 'Default VAT rate',
+          description: taxRate > 0 ? 'Default VAT rate' : 'No tax configured',
           created_at: new Date().toISOString()
-        }
+        },
+        ...(serviceChargePercent > 0 ? [{
+          id: 'onboarding-service-charge',
+          name: 'Service Charge',
+          rate: serviceChargePercent,
+          type: 'service' as const,
+          fee_type: 'service_charge' as const,
+          applies_to: ['all'],
+          payment_methods: ['all'],
+          is_default: false,
+          is_compound: false,
+          order: 2,
+          description: 'Default service charge set during property setup',
+          created_at: new Date().toISOString()
+        }] : [])
       ]
-    };
-
-    const orderConfiguration = {
-      serviceChargeRate: parseFloat(taxData.serviceCharge ?? '0.10') || 0.10,
-      deliveryFee: 5
     };
 
     const settingsToInsert = [
@@ -438,6 +457,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       { property_id: propertyId, setting_key: 'operational_hours', setting_value: hoursData,           category: 'general' },
       { property_id: propertyId, setting_key: 'payment_gateway',   setting_value: finalGatewaySettings, category: 'finance' },
       { property_id: propertyId, setting_key: 'smtp_config',       setting_value: finalSmtpSettings,   category: 'system' },
+      { property_id: propertyId, setting_key: 'tax_configuration', setting_value: taxConfiguration,   category: 'finance' },
     ];
 
     const { error: settingsErr } = await supabase
@@ -445,18 +465,6 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       .insert(settingsToInsert);
 
     if (settingsErr) throw settingsErr;
-
-    // Write canonical tax and order settings to site_settings
-    const siteSettingsToInsert = [
-      { key: 'tax_configuration', value: taxConfiguration },
-      { key: 'order_configuration', value: orderConfiguration },
-    ];
-
-    const { error: siteSettingsErr } = await supabase
-      .from('site_settings')
-      .upsert(siteSettingsToInsert, { onConflict: 'key' });
-
-    if (siteSettingsErr) throw siteSettingsErr;
 
     // 6. Provision Modules
     const selectedModules: string[] = modulesData.modules || [];

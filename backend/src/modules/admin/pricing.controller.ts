@@ -8,9 +8,7 @@ import { seasonalPricingService } from '../../services/seasonal-pricing.service'
 import { logger } from '../../utils/logger';
 import { getCallerTenantId } from '../../security/tenant-scope.js';
 import { PricingPipeline } from '../../engines/pricing-pipeline.js';
-import { taxService } from '../../services/tax.service.js';
-import { orderConfigService } from '../../services/order-config.service.js';
-import { resolveTaxCategory } from '../../services/tax.service.js';
+import { taxService, resolveTaxCategory, getModuleTaxCategory } from '../../services/tax.service.js';
 import type { PricingLineItem, PricingConfig, PricingContext } from '../../engines/types.js';
 
 const router = Router();
@@ -324,15 +322,21 @@ router.get(
 router.post(
   '/preview',
   asyncHandler(async (req: Request, res: Response) => {
-    const { 
-      items, 
-      moduleId, 
-      orderType, 
+    const controllerStart = Date.now();
+    const requestId = (req as any).requestId || Math.random().toString(36).substring(7);
+    const requestReceived = new Date().toISOString();
+    console.log(`[PricingController] RequestID: ${requestId} - Request received at: ${requestReceived}`);
+
+    const {
+      items,
+      moduleId,
+      orderType,
       conditions,
       couponCode,
       giftCardCodes,
       loyaltyPointsToRedeem,
-      customerId
+      customerId,
+      propertyId
     } = req.body;
 
     // Validate required fields
@@ -344,16 +348,15 @@ router.post(
       throw new AppError('moduleId is required to resolve tax categories', 400);
     }
 
-    // Fetch module's tax category for server-side resolution
-    const { data: module } = await supabase
-      .from('modules')
-      .select('tax_category')
-      .eq('id', moduleId)
-      .maybeSingle();
+    console.log(`[PricingController] RequestID: ${requestId} - Validation done: ${Date.now() - controllerStart}ms`);
 
-    const moduleTaxCategory = module?.tax_category ?? 'all';
+    // Fetch module's tax category for server-side resolution (cached)
+    const moduleFetchStart = Date.now();
+    const moduleTaxCategory = await getModuleTaxCategory(moduleId);
+    console.log(`[PricingController] RequestID: ${requestId} - Module fetch: ${Date.now() - moduleFetchStart}ms`);
 
     // Convert items to PricingLineItem format and resolve taxCategory server-side
+    const itemProcessingStart = Date.now();
     const lineItems: PricingLineItem[] = items.map((item: any) => {
       const lineItem = {
         itemId: item.itemId,
@@ -368,14 +371,15 @@ router.post(
         taxCategory: resolveTaxCategory(lineItem, moduleTaxCategory)
       };
     });
+    console.log(`[PricingController] RequestID: ${requestId} - Item processing: ${Date.now() - itemProcessingStart}ms`);
 
-    // Build pricing config (default to applying tax and fees unless specified)
+    // Build pricing config (default to applying tax and CMS fees unless specified).
+    // Fees (service charge, delivery fee, resort fee, custom) are entirely CMS-driven —
+    // configure them from Admin > Settings > Tax. There is no order-type gating here;
+    // scope a fee to specific order types via applies_to/payment_methods on that page.
     const pricingConfig: PricingConfig = {
       applyTax: req.body.applyTax !== false,
-      applyServiceCharge: req.body.applyServiceCharge !== false,
-      serviceChargeCondition: req.body.serviceChargeCondition,
-      applyDeliveryFee: req.body.applyDeliveryFee !== false,
-      deliveryFeeCondition: req.body.deliveryFeeCondition,
+      applyFees: req.body.applyFees !== false,
       supportsCoupons: !!couponCode,
       supportsGiftCards: !!giftCardCodes && giftCardCodes.length > 0,
       supportsLoyaltyRedemption: !!loyaltyPointsToRedeem,
@@ -393,22 +397,31 @@ router.post(
       couponCode,
       giftCardCodes,
       loyaltyPointsToRedeem,
-      propertyId: (req as any).property?.id,
+      // Use propertyId from request body if provided, otherwise fall back to middleware property
+      propertyId: propertyId || (req as any).property?.id || ((req as any).propertyId as string | undefined),
       staffId: (req.user as any)?.userId
     };
 
     // Use pricing pipeline to compute full breakdown
+    const pipelineStart = Date.now();
     const pipeline = new PricingPipeline({
-      taxService,
-      orderConfigService
+      taxService
     });
 
     const result = await pipeline.calculate(lineItems, pricingConfig, pricingContext);
+    console.log(`[PricingController] RequestID: ${requestId} - Pipeline calculation: ${Date.now() - pipelineStart}ms`);
 
+    const responseStart = Date.now();
+    const responseSent = new Date().toISOString();
     res.json({
       success: true,
       data: result
     });
+    const responseTime = Date.now() - responseStart;
+    const totalTime = Date.now() - controllerStart;
+    console.log(`[PricingController] RequestID: ${requestId} - Response preparation: ${responseTime}ms, Response sent at: ${responseSent}`);
+    console.log(`[PricingController] RequestID: ${requestId} - Total controller time: ${totalTime}ms`);
+    console.log(`[PricingController] RequestID: ${requestId} - End-to-end from request receipt: ${totalTime}ms`);
   })
 );
 

@@ -167,8 +167,8 @@ export const useCartStore = create<CartState>()(
       items: [],
       loyaltyPointsToRedeem: 0,
       appliedGiftCard: null,
-      taxRate: 0.11, // 11% VAT
-      serviceFeeRate: 0.05, // 5% service fee
+      taxRate: 0, // No default tax - should be fetched from backend
+      serviceFeeRate: 0, // No default service fee - should be fetched from backend
 
       // ========================================
       // Item Actions

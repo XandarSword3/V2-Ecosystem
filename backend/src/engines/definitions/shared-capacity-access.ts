@@ -86,8 +86,7 @@ export const sharedCapacityAccessStateMachine: StateMachineDefinition<SharedCapa
 
 export const sharedCapacityAccessPricing: PricingConfig = {
   applyTax: true,
-  applyServiceCharge: false,
-  applyDeliveryFee: false,
+  applyFees: false,
   supportsCoupons: true,
   supportsGiftCards: true,
   supportsLoyaltyRedemption: true,

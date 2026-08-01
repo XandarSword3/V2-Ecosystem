@@ -104,8 +104,7 @@ export const timeExclusiveReservationStateMachine: StateMachineDefinition<TimeEx
 
 export const timeExclusiveReservationPricing: PricingConfig = {
   applyTax: true,
-  applyServiceCharge: false,
-  applyDeliveryFee: false,
+  applyFees: false,
   supportsCoupons: true,
   supportsGiftCards: true,
   supportsLoyaltyRedemption: true,
