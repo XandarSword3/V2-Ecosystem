@@ -226,7 +226,7 @@ apiRouter.use(xssSanitizer);
 // Resolves the calling tenant (via X-Tenant-ID header, X-Tenant-Slug header,
 // or subdomain) and blocks suspended/cancelled tenants with 402.
 // Passes through cleanly when no tenant resolves (legacy single-tenant mode).
-apiRouter.use(tenantGate);
+// NOTE: tenantGate is applied at app level (line 213) to avoid double execution
 // ────────────────────────────────────────────────────────────────────────────
 
 // Add health check to API router

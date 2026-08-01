@@ -15,7 +15,6 @@ import * as auditController from "./controllers/audit.controller";
 import * as notificationsController from "./controllers/notifications.controller";
 import * as uploadController from "./controllers/upload.controller";
 import * as deletePreviewController from "./controllers/delete-preview.controller";
-import pricingRoutes from "./pricing.controller";
 import * as softDeleteController from "./controllers/soft-delete.controller";
 import * as reportsController from "./controllers/reports.controller";
 import { validatePropertyAccess } from "../../middleware/propertyAccess.middleware.js";
@@ -124,10 +123,6 @@ router.put('/settings/homepage', authorize('admin'), settingsController.updateHo
 router.get('/settings/tax', authorize('admin'), settingsController.getTaxSettings);
 router.put('/settings/tax', authorize('admin'), settingsController.updateTaxSettings);
 
-// Order settings (service charge, delivery fee)
-router.get('/settings/order', authorize('admin'), settingsController.getOrderSettings);
-router.put('/settings/order', authorize('admin'), settingsController.updateOrderSettings);
-
 // File Uploads - MANAGER
 router.get('/uploads', authorizeManager, uploadController.listFiles);
 router.post('/uploads', authorizeManager, rateLimits.expensive, uploadController.uploadFile);
@@ -209,9 +204,6 @@ router.post('/translations/ui/publish', authorize('super_admin'), translationsCo
 
 // Delete Preview - Impact Analysis - MANAGER
 router.get('/delete-preview/:entityType/:entityId', authorizeManager, deletePreviewController.getDeletePreview);
-
-// Pricing Management - SUPER ADMIN
-router.use('/pricing', pricingRoutes);
 
 // Soft Delete Management
 router.get('/deleted/:entityType', authorizeManager, softDeleteController.getDeletedRecords);

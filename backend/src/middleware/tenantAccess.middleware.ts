@@ -145,7 +145,7 @@ function extractSubdomain(host: string | undefined): string | null {
 // Tenant lookup (with Redis cache)
 // ============================================
 
-const CACHE_TTL = 30; // 30 seconds
+const CACHE_TTL = 300; // 5 minutes - increased from 30s to reduce cache misses and eliminate 1000ms spikes
 const CACHE_KEY_PREFIX = 'tenant:';
 
 async function getCached(key: string): Promise<TenantRecord | null | undefined> {
@@ -438,9 +438,18 @@ export async function validateTenantBilling(req: Request, res: Response, next: N
  * Equivalent to app.use(resolveTenant, validateTenantBilling).
  */
 export async function tenantGate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const startTime = Date.now();
+  const requestId = (req as any).requestId || Math.random().toString(36).substring(7);
+  (req as any).requestId = requestId;
+  const stack = new Error().stack;
+  console.log(`[TenantGate] START - RequestID: ${requestId} - called from: ${stack?.split('\n')[2]?.trim() || 'unknown'}`);
   await resolveTenant(req, res, () => {
+    const resolveTime = Date.now() - startTime;
+    console.log(`[TenantGate] RequestID: ${requestId} - resolveTenant: ${resolveTime}ms`);
     validateTenantBilling(req, res, next);
   });
+  const totalTime = Date.now() - startTime;
+  console.log(`[TenantGate] RequestID: ${requestId} - total: ${totalTime}ms`);
 }
 
 /**

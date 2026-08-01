@@ -12,6 +12,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useAuth } from '@/lib/auth-context';
+import { getStoredPropertyId } from '@/lib/property-id';
 import { Button } from '@/components/ui/Button';
 import { toast } from 'sonner';
 import { AuthModal } from '@/components/auth/AuthModal';
@@ -51,8 +52,9 @@ export default function ModuleCartPage() {
   const rawSlug = params?.slug;
   const slug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const propertySlug = (params?.property as string) || '';
+  const propertyId = getStoredPropertyId();
 
-  const { modules, loading: modulesLoading, settings } = useSiteSettings();
+  const { modules, loading: modulesLoading } = useSiteSettings();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   
   const normalizedSlug = slug ? decodeURIComponent(slug).toLowerCase() : '';
@@ -155,13 +157,15 @@ export default function ModuleCartPage() {
             name: item.name,
             unitPrice: item.price + (item.modifierTotal || 0),
             quantity: item.quantity,
+            taxCategory: (item as any).taxCategory || (item as any).category,
+            moduleId: (item as any).moduleId || moduleId,
           })),
           moduleId,
           orderType,
-          conditions: { orderType },
+          conditions: { orderType, paymentMethod },
           applyTax: true,
-          applyServiceCharge: orderType === 'dine_in',
-          applyDeliveryFee: orderType === 'delivery'
+          applyFees: true,
+          propertyId // Pass propertyId for tax configuration resolution
         });
         setPricingBreakdown(response.data?.data);
       } catch (error: any) {
@@ -174,16 +178,20 @@ export default function ModuleCartPage() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pricingKey, moduleId, orderType]);
+  }, [pricingKey, moduleId, orderType, paymentMethod]);
 
-  // Use backend pricing breakdown if available, otherwise fallback to local calculation
-  const tax = pricingBreakdown?.taxAmount ?? (settings.taxRate || 0.11) * subtotal;
+  // Tax comes entirely from the backend pricing preview (CMS tax_configuration rates).
+  // No local guess — if the backend call hasn't returned yet, tax is 0 rather than a
+  // stale/wrong hardcoded rate. Same treatment as feeBreakdown below.
+  const tax = pricingBreakdown?.taxAmount ?? 0;
   const taxBreakdown = pricingBreakdown?.taxBreakdown ?? [];
-  const serviceCharge = pricingBreakdown?.serviceCharge ?? (orderType === 'dine_in' ? (settings.serviceChargeRate ?? 0.10) * subtotal : 0);
-  const serviceChargeRate = pricingBreakdown?.serviceChargeRate ?? (settings.serviceChargeRate ?? 0.10);
-  const deliveryFee = pricingBreakdown?.deliveryFee ?? (orderType === 'delivery' ? (settings.deliveryFee ?? 5) : 0);
+  // Fees (service charge, delivery fee, resort fee, custom) come entirely from the CMS
+  // tax configuration via feeBreakdown — nothing here is hardcoded, and there is no
+  // dine-in/delivery gating. If the backend call hasn't returned yet, no fees are shown
+  // rather than guessing at a default.
   const feeBreakdown = pricingBreakdown?.feeBreakdown ?? [];
-  const preDiscountTotal = subtotal + tax + serviceCharge + deliveryFee;
+  const totalFees = feeBreakdown.reduce((sum: number, fee: any) => sum + fee.amount, 0);
+  const preDiscountTotal = subtotal + tax + totalFees;
   const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
   const total = Math.max(0, preDiscountTotal - totalDiscount);
 
@@ -926,18 +934,16 @@ export default function ModuleCartPage() {
                         <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, currency)}</span>
                       </div>
                     )}
-                    {serviceCharge > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Service Charge ({Math.round(serviceChargeRate * 100)}%)</span>
-                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(serviceCharge, currency)}</span>
+                    {/* All fees (service charge, delivery fee, resort fee, custom) come from
+                        the CMS tax configuration — configure them from Admin > Settings > Tax */}
+                    {feeBreakdown.map((fee: any, index: number) => (
+                      <div key={fee.id ?? index} className="flex justify-between text-sm">
+                        <span className="text-slate-500">
+                          {fee.name}{fee.rate !== undefined ? ` (${fee.rate}%)` : ''}
+                        </span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(fee.amount, currency)}</span>
                       </div>
-                    )}
-                    {deliveryFee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Delivery Fee</span>
-                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(deliveryFee, currency)}</span>
-                      </div>
-                    )}
+                    ))}
                     
                     {/* Show applied discounts */}
                     {appliedDiscounts.length > 0 && (

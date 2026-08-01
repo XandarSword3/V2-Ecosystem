@@ -7,14 +7,18 @@
  * 
  * FINANCIAL INVARIANTS:
  *   1. totalAmount = subtotal + taxAmount + serviceCharge + deliveryFee - totalDiscount
+ *      (serviceCharge + deliveryFee together always equal the sum of feeBreakdown — see Step 4)
  *   2. totalAmount >= 0 (never negative)
  *   3. Tax is (subtotal - preBasketDiscount) * taxRate
- *   4. Discounts are applied in order: coupon → gift card → loyalty
- *   5. Each discount is capped at remaining balance (no negative intermediate totals)
- *   6. All monetary values are rounded to decimalPlaces at final output (not intermediate)
+ *   4. Fees (service charge, delivery fee, resort fee, custom surcharges) are entirely
+ *      CMS-driven via tax_configuration fee_type rates — there are no hardcoded rates,
+ *      flat amounts, or order-type conditions. See TaxService.computeFeeBreakdown().
+ *   5. Discounts are applied in order: coupon → gift card → loyalty
+ *   6. Each discount is capped at remaining balance (no negative intermediate totals)
+ *   7. All monetary values are rounded to decimalPlaces at final output (not intermediate)
  * 
  * Usage:
- *   const pipeline = new PricingPipeline(taxService, orderConfigService);
+ *   const pipeline = new PricingPipeline({ taxService });
  *   const result = await pipeline.calculate(lineItems, pricingConfig, pricingContext);
  */
 
@@ -28,7 +32,6 @@ import type {
   FeeBreakdownItem,
 } from './types.js';
 import type { TaxService } from '../services/tax.service.js';
-import type { OrderConfigService } from '../services/order-config.service.js';
 import { logger } from '../utils/logger.js';
 
 // ============================================
@@ -94,7 +97,6 @@ export interface LoyaltyResolver {
 
 export interface PricingPipelineDeps {
   taxService: TaxService;
-  orderConfigService: OrderConfigService;
   couponResolver?: CouponResolver;
   giftCardResolver?: GiftCardResolver;
   loyaltyResolver?: LoyaltyResolver;
@@ -117,7 +119,11 @@ export class PricingPipeline {
     config: PricingConfig,
     context: PricingContext,
   ): Promise<PricingResult> {
+    const pipelineStart = Date.now();
+    console.log('[PricingPipeline] Starting calculation at:', new Date().toISOString());
+
     // ---- Step 1: Calculate subtotal ----
+    const subtotalStart = Date.now();
     const processedLineItems = lineItems.map((item, idx) => {
       const unitAdj = item.unitAdjustment ?? 0;
       const lineTotal = (item.unitPrice + unitAdj) * item.quantity;
@@ -132,8 +138,10 @@ export class PricingPipeline {
     });
 
     const subtotal = processedLineItems.reduce((sum, item) => sum + item.lineTotal, 0);
+    console.log(`[PricingPipeline] Step 1 (subtotal): ${Date.now() - subtotalStart}ms, subtotal: ${subtotal}`);
 
     // ---- Step 2: Apply pre-tax discounts (coupons are pre-tax) ----
+    const discountStart = Date.now();
     const discounts: DiscountBreakdown[] = [];
     let preBasketDiscount = 0;
 
@@ -155,63 +163,61 @@ export class PricingPipeline {
         });
       }
     }
+    console.log(`[PricingPipeline] Step 2 (coupons): ${Date.now() - discountStart}ms, discount: ${preBasketDiscount}`);
 
     // ---- Step 3: Calculate tax using multi-rate tax service ----
+    const taxStart = Date.now();
     let taxRate = 0;
     let taxAmount = 0;
     let taxBreakdown: TaxBreakdownItem[] = [];
-    
+    const paymentMethod = (context.conditions ?? {}).paymentMethod as string | undefined;
+
     if (config.applyTax) {
       const taxableAmount = Math.max(0, subtotal - preBasketDiscount);
       taxBreakdown = await this.deps.taxService.computeTaxBreakdown(
         lineItems,
         taxableAmount,
-        context.moduleId
+        context.moduleId,
+        paymentMethod,
+        context.propertyId
       );
       taxAmount = taxBreakdown.reduce((sum, item) => sum + item.amount, 0);
       // Legacy taxRate for backward compatibility (use first tax rate or default)
       taxRate = taxBreakdown.length > 0 ? taxBreakdown[0].rate / 100 : await this.deps.taxService.getTaxRate(context.moduleId ?? 'default');
     }
+    console.log(`[PricingPipeline] Step 3 (tax): ${Date.now() - taxStart}ms, taxAmount: ${taxAmount}`);
 
-    // ---- Step 4: Calculate service charge ----
-    let serviceChargeRate = 0;
-    let serviceCharge = 0;
+    // ---- Step 4: Calculate fees from CMS tax configuration ----
+    const feeStart = Date.now();
     let feeBreakdown: FeeBreakdownItem[] = [];
-    
-    if (config.applyServiceCharge) {
-      const shouldApply = this.evaluateCondition(config.serviceChargeCondition, context.conditions ?? {});
-      if (shouldApply) {
-        const orderConfig = await this.deps.orderConfigService.getOrderConfig();
-        serviceChargeRate = orderConfig.serviceChargeRate;
-        serviceCharge = subtotal * serviceChargeRate;
-        feeBreakdown.push({
-          type: 'service_charge',
-          name: 'Service Charge',
-          amount: serviceCharge,
-          rate: serviceChargeRate
-        });
-      }
+    if (config.applyFees) {
+      feeBreakdown = await this.deps.taxService.computeFeeBreakdown(
+        lineItems,
+        paymentMethod,
+        context.moduleId,
+        context.propertyId
+      );
     }
+    const totalFees = feeBreakdown.reduce((sum, f) => sum + f.amount, 0);
+    console.log(`[PricingPipeline] Step 4 (fees): ${Date.now() - feeStart}ms, totalFees: ${totalFees}`);
 
-    // ---- Step 5: Calculate delivery fee ----
-    let deliveryFee = 0;
-    if (config.applyDeliveryFee) {
-      const shouldApply = this.evaluateCondition(config.deliveryFeeCondition, context.conditions ?? {});
-      if (shouldApply) {
-        const orderConfig = await this.deps.orderConfigService.getOrderConfig();
-        deliveryFee = orderConfig.deliveryFee;
-        feeBreakdown.push({
-          type: 'delivery_fee',
-          name: 'Delivery Fee',
-          amount: deliveryFee
-        });
-      }
-    }
+    // Backward-compatible aggregate buckets for the financial ledger and reporting layer,
+    // which persist service_charge/delivery_fee as separate columns: delivery_fee rates
+    // roll into deliveryFee, every other fee_type (service_charge/resort_fee/custom) rolls
+    // into serviceCharge. Together they always equal totalFees — no fee amount is dropped.
+    const deliveryFee = feeBreakdown
+      .filter(f => f.type === 'delivery_fee')
+      .reduce((sum, f) => sum + f.amount, 0);
+    const serviceCharge = totalFees - deliveryFee;
+    // Effective blended rate, for display purposes only — meaningful when a single
+    // percentage-based fee applies, best-effort when several stack.
+    const serviceChargeRate = subtotal > 0 ? serviceCharge / subtotal : 0;
 
     // ---- Step 6: Pre-discount total ----
     const preDiscountTotal = subtotal + taxAmount + serviceCharge + deliveryFee;
 
     // ---- Step 7: Post-tax discounts (gift cards & loyalty, applied to total) ----
+    const postDiscountStart = Date.now();
     let remainingTotal = preDiscountTotal - preBasketDiscount;
     // Subtract any tax savings from coupon
     const couponTaxSavings = discounts
@@ -267,6 +273,7 @@ export class PricingPipeline {
     // ---- Step 8: Calculate totals ----
     const totalDiscount = discounts.reduce((sum, d) => sum + d.amount + d.taxSavings, 0);
     const totalAmount = Math.max(0, preDiscountTotal - totalDiscount);
+    console.log(`[PricingPipeline] Step 7 (post-tax discounts): ${Date.now() - postDiscountStart}ms, totalDiscount: ${totalDiscount}`);
 
     // ---- Step 9: Calculate loyalty points earned ----
     const loyaltyPointsEarned = 0;
@@ -279,6 +286,8 @@ export class PricingPipeline {
 
     // ---- Step 11: Round and return ----
     const round = (n: number) => this.roundAmount(n, config.decimalPlaces, config.rounding);
+    const pipelineTotal = Date.now() - pipelineStart;
+    console.log(`[PricingPipeline] Total pipeline time: ${pipelineTotal}ms`);
 
     const result: PricingResult = {
       subtotal: round(subtotal),
@@ -322,28 +331,6 @@ export class PricingPipeline {
   // ============================================
   // Private Helpers
   // ============================================
-
-  /**
-   * Evaluate a condition string against runtime conditions.
-   * Conditions are simple key=value checks: "orderType=dine_in", "orderType=delivery"
-   */
-  private evaluateCondition(
-    condition: string | undefined,
-    conditions: Record<string, unknown>,
-  ): boolean {
-    if (!condition) return true; // No condition = always apply
-
-    // Support simple conditions: "key=value"
-    const parts = condition.split('=');
-    if (parts.length !== 2) {
-      logger.warn(`Invalid pricing condition: '${condition}', defaulting to true`);
-      return true;
-    }
-
-    const [key, expectedValue] = parts;
-    const actualValue = conditions[key.trim()];
-    return String(actualValue) === expectedValue.trim();
-  }
 
   /**
    * Calculate deposit for reservation-type engines.
