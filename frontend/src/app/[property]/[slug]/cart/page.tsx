@@ -196,6 +196,7 @@ export default function ModuleCartPage() {
     customerName: string;
     customerPhone: string;
     tableNumber?: string;
+    service_location_id?: string;
     orderType: 'dine_in' | 'takeaway' | 'delivery';
     paymentMethod: 'cash' | 'card';
     notes?: string;

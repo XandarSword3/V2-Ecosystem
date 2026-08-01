@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/Input';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
+import PrivacyCenter from '@/components/PrivacyCenter';
 import {
   User,
   Mail,
@@ -38,9 +39,14 @@ import {
   FileDown,
   Trash2,
   AlertTriangle,
+  Award,
+  Gift,
+  Sparkles,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
-type TabType = 'profile' | 'orders' | 'bookings' | 'tickets' | 'statement' | 'payments' | 'privacy';
+type TabType = 'profile' | 'orders' | 'bookings' | 'tickets' | 'loyalty' | 'statement' | 'privacy';
 
 interface OrderRecord {
   id: string;
@@ -88,6 +94,8 @@ interface StatementRecord {
   reference_id?: string;
   reference_type?: string;
   module_id?: string;
+  module_name?: string;
+  items?: Array<{ name?: string; title?: string; quantity?: number; qty?: number; price?: number; unit_price?: number }>;
 }
 
 interface PaymentRecord {
@@ -125,6 +133,8 @@ export default function ProfilePage() {
   const [selectedBooking, setSelectedBooking] = useState<BookingRecord | null>(null);
   const [statementFrom, setStatementFrom] = useState('');
   const [statementTo, setStatementTo] = useState('');
+  const [statementFilter, setStatementFilter] = useState<'all' | 'orders' | 'bookings' | 'tickets' | 'payments' | 'loyalty'>('all');
+  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -135,25 +145,25 @@ export default function ProfilePage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Fetch user orders - use statement endpoint and filter for instant_transaction
+  // Fetch user orders - statement endpoint returns instant_transaction
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
     queryKey: ['my-orders'],
     queryFn: () => api.get('/users/me/statement'),
-    enabled: activeTab === 'orders' && !!user,
+    enabled: (activeTab === 'orders' || activeTab === 'statement') && !!user,
   });
 
-  // Fetch user bookings - use statement endpoint and filter for time_exclusive_reservation
+  // Fetch user bookings - statement endpoint returns time_exclusive_reservation
   const { data: bookingsData, isLoading: bookingsLoading } = useQuery({
     queryKey: ['my-bookings'],
     queryFn: () => api.get('/users/me/statement'),
-    enabled: activeTab === 'bookings' && !!user,
+    enabled: (activeTab === 'bookings' || activeTab === 'statement') && !!user,
   });
 
-  // Fetch user session passes (shared_capacity_access) - use statement endpoint and filter
+  // Fetch user session passes (shared_capacity_access)
   const { data: ticketsData, isLoading: ticketsLoading } = useQuery({
     queryKey: ['my-tickets'],
     queryFn: () => api.get('/users/me/statement'),
-    enabled: activeTab === 'tickets' && !!user,
+    enabled: (activeTab === 'tickets' || activeTab === 'statement') && !!user,
   });
 
   const { data: statementData, isLoading: statementLoading } = useQuery({
@@ -165,7 +175,34 @@ export default function ProfilePage() {
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
     queryKey: ['my-payments'],
     queryFn: () => api.get('/payments/me'),
-    enabled: activeTab === 'payments' && !!user,
+    enabled: activeTab === 'statement' && !!user,
+  });
+
+  // Loyalty Queries
+  const { data: loyaltyData, isLoading: loyaltyLoading } = useQuery({
+    queryKey: ['my-loyalty-account'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/loyalty/me');
+        return res.data?.data || null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: activeTab === 'loyalty' && !!user,
+  });
+
+  const { data: loyaltyTxData, isLoading: loyaltyTxLoading } = useQuery({
+    queryKey: ['my-loyalty-transactions'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/loyalty/me/transactions');
+        return res.data?.data || [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: activeTab === 'loyalty' && !!user,
   });
 
   const allStatement = ordersData?.data?.data || [];
@@ -263,19 +300,14 @@ export default function ProfilePage() {
     );
   }
 
-  // Derive which engine types have at least one active module on this property
-  const hasInstantTransaction = modules.some(m => m.is_active && m.engine_type === 'instant_transaction');
-  const hasTimeExclusiveReservation = modules.some(m => m.is_active && m.engine_type === 'time_exclusive_reservation');
-  const hasSharedCapacityAccess = modules.some(m => m.is_active && m.engine_type === 'shared_capacity_access');
-
   const tabs = [
-    { id: 'profile' as TabType, label: t('tabs.profile'), icon: User },
-    ...(hasInstantTransaction ? [{ id: 'orders' as TabType, label: t('tabs.orders'), icon: UtensilsCrossed }] : []),
-    ...(hasTimeExclusiveReservation ? [{ id: 'bookings' as TabType, label: t('tabs.bookings'), icon: Home }] : []),
-    ...(hasSharedCapacityAccess ? [{ id: 'tickets' as TabType, label: t('tabs.tickets'), icon: Ticket }] : []),
-    { id: 'statement' as TabType, label: t('tabs.statement'), icon: Calendar },
-    { id: 'payments' as TabType, label: t('tabs.payments'), icon: CreditCard },
-    { id: 'privacy' as TabType, label: t('tabs.privacy'), icon: Shield },
+    { id: 'profile' as TabType, label: 'Profile', icon: User },
+    { id: 'orders' as TabType, label: 'Orders', icon: UtensilsCrossed },
+    { id: 'bookings' as TabType, label: 'Bookings', icon: Home },
+    { id: 'tickets' as TabType, label: 'Passes & Tickets', icon: Ticket },
+    { id: 'loyalty' as TabType, label: 'Loyalty & Rewards', icon: Award },
+    { id: 'statement' as TabType, label: 'Unified Statement', icon: Calendar },
+    { id: 'privacy' as TabType, label: 'Privacy & Data', icon: Shield },
   ];
 
   return (
@@ -498,8 +530,8 @@ export default function ProfilePage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <UtensilsCrossed className="w-5 h-5" />
-                    {t('myOrders')}
+                    <UtensilsCrossed className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    My Orders
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -510,54 +542,90 @@ export default function ProfilePage() {
                   ) : orders.length === 0 ? (
                     <div className="text-center py-8">
                       <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-500">{t('noOrders')}</p>
+                      <p className="text-slate-500">No past orders found</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {orders.map((order: StatementRecord) => (
-                        <div
-                          key={order.id}
-                          className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-mono text-sm font-medium">#{order.order_number || order.id}</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[order.status || 'pending'] || statusColors.pending}`}>
-                              {(order.status || 'pending').toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400 mb-2">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatDate(order.created_at)}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              {order.module_id && (
-                                <span className="text-xs text-slate-500">
-                                  Module: {order.module_id.slice(0, 8)}...
-                                </span>
-                              )}
+                      {orders.map((order: StatementRecord) => {
+                        const isExpanded = !!expandedOrders[order.id];
+                        const orderNum = order.order_number || `ORD-${order.id.slice(-8).toUpperCase()}`;
+                        return (
+                          <div
+                            key={order.id}
+                            className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-all"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <span className="font-mono text-base font-bold text-slate-900 dark:text-white">#{orderNum}</span>
+                                {order.module_name && (
+                                  <span className="px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                                    {order.module_name}
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[order.status || 'pending'] || statusColors.pending}`}>
+                                {(order.status || 'pending').toUpperCase()}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400 mb-3">
+                              <span className="flex items-center gap-1.5 text-xs">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                {formatDate(order.created_at)}
+                              </span>
                               {order.payment_method && (
-                                <span className="text-xs text-slate-500">
+                                <span className="text-xs uppercase font-medium px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded border border-blue-100 dark:border-blue-800">
                                   {order.payment_method}
                                 </span>
                               )}
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm text-slate-600 dark:text-slate-400">
-                              {order.tax_amount && order.tax_amount > 0 && (
-                                <span className="mr-3">Tax: {formatCurrency(order.tax_amount, currency)}</span>
-                              )}
-                              {order.discount_amount && order.discount_amount > 0 && (
-                                <span className="text-green-600 dark:text-green-400 mr-3">Discount: -{formatCurrency(order.discount_amount, currency)}</span>
-                              )}
+
+                            {/* Itemized summary trigger if items exist */}
+                            {order.items && order.items.length > 0 && (
+                              <div className="mb-3 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                                <button
+                                  onClick={() => setExpandedOrders((prev) => ({ ...prev, [order.id]: !prev[order.id] }))}
+                                  className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                  {isExpanded ? 'Hide Item Details' : `View ${order.items.length} Ordered Item(s)`}
+                                </button>
+                                {isExpanded && (
+                                  <div className="mt-2 space-y-1 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700/50 text-xs">
+                                    {order.items.map((item, idx) => (
+                                      <div key={idx} className="flex justify-between text-slate-700 dark:text-slate-300">
+                                        <span>
+                                          {item.quantity || item.qty || 1}x {item.name || item.title || 'Item'}
+                                        </span>
+                                        <span className="font-mono">
+                                          {formatCurrency((item.price || item.unit_price || 0) * (item.quantity || item.qty || 1), currency)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700/80">
+                              <div className="text-xs text-slate-500 space-x-3">
+                                {order.tax_amount && order.tax_amount > 0 ? (
+                                  <span>Tax: {formatCurrency(order.tax_amount, currency)}</span>
+                                ) : null}
+                                {order.discount_amount && order.discount_amount > 0 ? (
+                                  <span className="text-green-600 dark:text-green-400 font-medium">Discount: -{formatCurrency(order.discount_amount, currency)}</span>
+                                ) : null}
+                              </div>
+                              <div className="text-right">
+                                <span className="text-xs text-slate-400 mr-2">Total Amount</span>
+                                <span className="text-lg font-bold text-slate-900 dark:text-white">
+                                  {formatCurrency(order.total_amount || order.amount || 0, currency)}
+                                </span>
+                              </div>
                             </div>
-                            <span className="font-semibold text-slate-900 dark:text-white">
-                              {formatCurrency(order.total_amount || order.amount || 0, currency)}
-                            </span>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -575,8 +643,8 @@ export default function ProfilePage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Home className="w-5 h-5" />
-                    {t('myBookings')}
+                    <Home className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    My Bookings & Stays
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -587,39 +655,47 @@ export default function ProfilePage() {
                   ) : bookings.length === 0 ? (
                     <div className="text-center py-8">
                       <Home className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-500">{t('noBookings')}</p>
+                      <p className="text-slate-500">No active or past bookings found</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {bookings.map((booking: BookingRecord) => (
-                        <div
-                          key={booking.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setSelectedBooking(booking)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBooking(booking); } }}
-                          className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{booking.unit?.name || 'Unit'}</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[booking.status] || statusColors.pending}`}>
-                              {booking.status?.toUpperCase()}
-                            </span>
+                      {bookings.map((booking: BookingRecord & StatementRecord) => {
+                        const bookingRef = booking.booking_number || `RES-${booking.id.slice(-8).toUpperCase()}`;
+                        return (
+                          <div
+                            key={booking.id}
+                            className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-all"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-semibold text-slate-900 dark:text-white text-base">
+                                  {booking.unit?.name || booking.module_name || 'Accommodation Unit'}
+                                </span>
+                                <div className="font-mono text-xs text-slate-500 mt-0.5">#{bookingRef}</div>
+                              </div>
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[booking.status] || statusColors.pending}`}>
+                                {booking.status?.toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 mt-3 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg border border-slate-100 dark:border-slate-700/50">
+                              <span className="flex items-center gap-1.5">
+                                <Calendar className="w-4 h-4 text-blue-500" />
+                                <span className="font-medium">{formatDate(booking.check_in_date || booking.created_at)}</span>
+                                <ChevronRight className="w-3 h-3 text-slate-400" />
+                                <span className="font-medium">{formatDate(booking.check_out_date || booking.created_at)}</span>
+                              </span>
+                            </div>
+                            <div className="mt-3 flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-700/80">
+                              <span className="text-xs text-slate-500">
+                                {booking.number_of_guests ? `${booking.number_of_guests} Guest(s)` : 'Standard Occupancy'}
+                              </span>
+                              <span className="text-lg font-bold text-slate-900 dark:text-white">
+                                {formatCurrency(booking.total_amount || booking.amount || 0, currency)}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {formatDate(booking.check_in_date)} - {formatDate(booking.check_out_date)}
-                            </span>
-                          </div>
-                          <div className="mt-2 flex justify-between">
-                            <span className="text-sm text-slate-500">{t('numberOfGuests', { count: booking.number_of_guests })}</span>
-                            <span className="font-semibold text-slate-900 dark:text-white">
-                              {formatCurrency(booking.total_amount, currency)}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -637,8 +713,8 @@ export default function ProfilePage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Ticket className="w-5 h-5" />
-                    {t('myTickets')}
+                    <Ticket className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    Passes & Tickets
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -649,34 +725,127 @@ export default function ProfilePage() {
                   ) : tickets.length === 0 ? (
                     <div className="text-center py-8">
                       <Ticket className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <p className="text-slate-500">{t('noTickets')}</p>
+                      <p className="text-slate-500">No session passes or tickets found</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {tickets.map((ticket: TicketRecord) => (
-                        <div
-                          key={ticket.id}
-                          className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-mono text-sm font-medium">#{ticket.ticket_number}</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[ticket.status] || statusColors.pending}`}>
-                              {ticket.status?.toUpperCase()}
-                            </span>
+                      {tickets.map((ticket: TicketRecord & StatementRecord) => {
+                        const ticketRef = ticket.ticket_number || `TKT-${ticket.id.slice(-8).toUpperCase()}`;
+                        return (
+                          <div
+                            key={ticket.id}
+                            className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-all"
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">#{ticketRef}</span>
+                                {ticket.module_name && (
+                                  <span className="ml-2 px-2 py-0.5 rounded text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 font-medium">
+                                    {ticket.module_name}
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[ticket.status] || statusColors.pending}`}>
+                                {ticket.status?.toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400 my-2">
+                              <span className="flex items-center gap-1.5">
+                                <Calendar className="w-4 h-4 text-purple-500" />
+                                {formatDate(ticket.ticket_date || ticket.created_at)}
+                              </span>
+                              {ticket.session?.name && <span className="font-medium text-slate-800 dark:text-slate-200">{ticket.session.name}</span>}
+                            </div>
+                            <div className="mt-3 flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-700/80">
+                              <span className="text-xs text-slate-500">
+                                {ticket.quantity || ticket.number_of_guests || 1} Pass(es)
+                              </span>
+                              <span className="text-lg font-bold text-slate-900 dark:text-white">
+                                {formatCurrency(ticket.total_amount || ticket.amount || 0, currency)}
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {formatDate(ticket.ticket_date)}
-                            </span>
-                            <span>{ticket.session?.name}</span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {activeTab === 'loyalty' && (
+            <motion.div
+              key="loyalty"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              {/* Loyalty Header & Status */}
+              <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+                <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-15 pointer-events-none">
+                  <Award className="w-64 h-64" />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <span className="text-amber-100 text-xs font-semibold tracking-wider uppercase">Resort Rewards</span>
+                      <h2 className="text-3xl font-extrabold mt-1 flex items-center gap-2">
+                        {loyaltyData?.tier || 'Member Tier'}
+                        <Sparkles className="w-6 h-6 text-yellow-300" />
+                      </h2>
+                    </div>
+                    <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl text-right border border-white/30">
+                      <div className="text-xs text-amber-100 font-medium">Balance</div>
+                      <div className="text-2xl font-black">{loyaltyData?.points || 0} pts</div>
+                    </div>
+                  </div>
+
+                  {/* Tier Progress */}
+                  <div className="mt-6 pt-4 border-t border-amber-400/40">
+                    <div className="flex justify-between text-xs text-amber-100 mb-1.5">
+                      <span>Current Progress</span>
+                      <span>Next Tier: {loyaltyData?.nextTier || 'Gold'}</span>
+                    </div>
+                    <div className="w-full bg-amber-900/40 h-2.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-yellow-300 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, ((loyaltyData?.points || 0) / 1000) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Loyalty History */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Gift className="w-5 h-5 text-amber-600" />
+                    Points Activity History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loyaltyTxLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
+                    </div>
+                  ) : loyaltyTxData.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500">No loyalty points history found</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {loyaltyTxData.map((tx: any) => (
+                        <div key={tx.id} className="p-3.5 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-sm text-slate-900 dark:text-white">
+                              {tx.description || (tx.points > 0 ? 'Points Earned' : 'Points Redeemed')}
+                            </div>
+                            <div className="text-xs text-slate-500">{formatDate(tx.created_at)}</div>
                           </div>
-                          <div className="mt-2 flex justify-between">
-                            <span className="text-sm text-slate-500">{t('numberOfGuests', { count: ticket.number_of_guests ?? 0 })}</span>
-                            <span className="font-semibold text-slate-900 dark:text-white">
-                              {formatCurrency(ticket.total_amount, currency)}
-                            </span>
-                          </div>
+                          <span className={`font-mono text-base font-bold ${tx.points >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {tx.points >= 0 ? `+${tx.points}` : tx.points} pts
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -695,88 +864,107 @@ export default function ProfilePage() {
             >
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5" />
-                    Unified Statement
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      Unified Statement & Ledger
+                    </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                    <Input type="date" value={statementFrom} onChange={(e) => setStatementFrom(e.target.value)} />
-                    <Input type="date" value={statementTo} onChange={(e) => setStatementTo(e.target.value)} />
+                  {/* Date Filters & Category Tabs */}
+                  <div className="space-y-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">From Date</label>
+                        <Input type="date" value={statementFrom} onChange={(e) => setStatementFrom(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">To Date</label>
+                        <Input type="date" value={statementTo} onChange={(e) => setStatementTo(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-700">
+                      {[
+                        { id: 'all', label: 'All Activity' },
+                        { id: 'orders', label: 'Orders' },
+                        { id: 'bookings', label: 'Bookings' },
+                        { id: 'tickets', label: 'Passes' },
+                        { id: 'payments', label: 'Payments' },
+                      ].map((f) => (
+                        <button
+                          key={f.id}
+                          onClick={() => setStatementFilter(f.id as any)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            statementFilter === f.id
+                              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
                   {statementLoading ? (
                     <div className="flex justify-center py-8">
                       <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                     </div>
                   ) : statement.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500">No statement activity found</div>
+                    <div className="text-center py-8 text-slate-500">No activity recorded for this period</div>
                   ) : (
                     <div className="space-y-3">
-                      {statement.map((row: StatementRecord) => (
-                        <div key={`${row.type}-${row.id}`} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium">{row.type.replace(/_/g, ' ')}</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[row.status || 'pending'] || statusColors.pending}`}>
-                              {(row.status || 'recorded').toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="text-xs text-slate-500 mb-1">{formatDate(row.created_at)}</div>
-                          <div className="text-sm text-slate-700 dark:text-slate-300">
-                            Ref: {row.order_number || row.booking_number || row.ticket_number || row.reference_id || row.id}
-                          </div>
-                          <div className="font-semibold mt-1">
-                            {row.total_amount !== undefined
-                              ? formatCurrency(Number(row.total_amount), currency)
-                              : row.amount !== undefined
-                                ? formatCurrency(Number(row.amount), currency)
-                                : `${row.points || 0} pts`}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          {activeTab === 'payments' && (
-            <motion.div
-              key="payments"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="w-5 h-5" />
-                    My Payments
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {paymentsLoading ? (
-                    <div className="flex justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                    </div>
-                  ) : payments.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500">No payments found</div>
-                  ) : (
-                    <div className="space-y-3">
-                      {payments.map((payment: PaymentRecord) => (
-                        <div key={payment.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium">{payment.reference_type || 'payment'}</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[payment.status] || statusColors.pending}`}>
-                              {payment.status.toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="text-xs text-slate-500">{formatDate(payment.created_at)}</div>
-                          <div className="text-sm text-slate-700 dark:text-slate-300">For: {payment.reference_id || '-'}</div>
-                          <div className="font-semibold mt-1">{formatCurrency(Number(payment.amount || 0), currency)}</div>
-                        </div>
-                      ))}
+                      {statement
+                        .filter((row: StatementRecord) => {
+                          if (statementFilter === 'all') return true;
+                          if (statementFilter === 'orders') return row.type === 'instant_transaction';
+                          if (statementFilter === 'bookings') return row.type === 'time_exclusive_reservation';
+                          if (statementFilter === 'tickets') return row.type === 'shared_capacity_access';
+                          if (statementFilter === 'payments') return row.type === 'payment' || row.payment_method;
+                          return true;
+                        })
+                        .map((row: StatementRecord) => {
+                          const refCode = row.order_number || row.booking_number || row.ticket_number || row.reference_id || `REF-${row.id.slice(-8).toUpperCase()}`;
+                          return (
+                            <div key={`${row.type}-${row.id}`} className="p-4 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow-sm flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-sm font-bold text-slate-900 dark:text-white capitalize">
+                                    {row.type.replace(/_/g, ' ')}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColors[row.status || 'pending'] || statusColors.pending}`}>
+                                    {(row.status || 'recorded').toUpperCase()}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-slate-500 space-x-2">
+                                  <span>{formatDate(row.created_at)}</span>
+                                  <span>•</span>
+                                  <span className="font-mono text-slate-600 dark:text-slate-400">Ref: #{refCode}</span>
+                                  {row.module_name && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-blue-600 dark:text-blue-400">{row.module_name}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-base font-bold text-slate-900 dark:text-white">
+                                  {row.total_amount !== undefined
+                                    ? formatCurrency(Number(row.total_amount), currency)
+                                    : row.amount !== undefined
+                                      ? formatCurrency(Number(row.amount), currency)
+                                      : `${row.points || 0} pts`}
+                                </div>
+                                {row.payment_method && (
+                                  <div className="text-[11px] text-slate-400 uppercase font-medium">{row.payment_method}</div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   )}
                 </CardContent>
@@ -790,43 +978,8 @@ export default function ProfilePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
             >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-blue-600" />
-                    Data Portability
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                    Download a copy of your personal data, including profile information, bookings, orders, and consent history in JSON format.
-                  </p>
-                  <Button onClick={handleExportData} disabled={isExporting} className="flex items-center gap-2">
-                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                    {isExporting ? 'Preparing Download...' : 'Export My Data'}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-red-200 dark:border-red-900/30">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-500">
-                    <Trash2 className="w-5 h-5" />
-                    Right to Erasure
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                    Permanently delete your account and personal data. This action cannot be undone. Some financial records may be anonymized rather than deleted to comply with local tax laws.
-                  </p>
-                  <Button variant="danger" onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-2">
-                    <Trash2 className="w-4 h-4" />
-                    Delete My Account
-                  </Button>
-                </CardContent>
-              </Card>
+              <PrivacyCenter />
             </motion.div>
           )}
         </AnimatePresence>

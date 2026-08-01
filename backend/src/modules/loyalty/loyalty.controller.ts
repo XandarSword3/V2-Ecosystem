@@ -10,8 +10,10 @@ import { z } from 'zod';
  * scoping there is handled at the DB level via loyalty_members.property_id.
  */
 
-function getPropertyId(req: Request): string | undefined {
-  return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || undefined;
+const DEFAULT_PROPERTY_ID = '00000000-0000-0000-0000-000000000001';
+
+function getPropertyId(req: Request): string {
+  return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || DEFAULT_PROPERTY_ID;
 }
 
 // Validation schemas
@@ -83,30 +85,33 @@ export class LoyaltyController {
       const supabase = getSupabase();
 
       // Get account with tier info — scoped to property
-      let memberQuery = supabase
+      const { data: account, error } = await supabase
         .from('loyalty_members')
         .select(`*, tier:loyalty_tiers(*)`)
-        .eq('user_id', userId);
-      if (propertyId) memberQuery = memberQuery.eq('property_id', propertyId);
+        .eq('user_id', userId)
+        .eq('property_id', propertyId)
+        .maybeSingle();
 
-      const { data: account, error } = await memberQuery.single();
-
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
 
       if (!account) {
         // Create account if doesn't exist — scoped to property
-        let settingsQuery = supabase.from('loyalty_settings').select('*');
-        if (propertyId) settingsQuery = settingsQuery.eq('property_id', propertyId);
-        const { data: settings } = await settingsQuery.limit(1).single();
+        const { data: settings } = await supabase
+          .from('loyalty_settings')
+          .select('*')
+          .eq('property_id', propertyId)
+          .limit(1)
+          .maybeSingle();
 
-        let tierQuery = supabase
+        const { data: defaultTier } = await supabase
           .from('loyalty_tiers')
           .select('id')
-          .order('min_points', { ascending: true });
-        if (propertyId) tierQuery = tierQuery.eq('property_id', propertyId);
-        const { data: defaultTier } = await tierQuery.limit(1).single();
+          .eq('property_id', propertyId)
+          .order('min_points', { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
         const signupBonus = settings?.signup_bonus || 0;
 
@@ -115,8 +120,8 @@ export class LoyaltyController {
           .insert({
             user_id: userId,
             tenant_id: req.user?.tenantId || null,
-            property_id: propertyId || null,
-            tier_id: defaultTier?.id,
+            property_id: propertyId,
+            tier_id: defaultTier?.id || null,
             available_points: signupBonus,
             lifetime_points: signupBonus,
             total_points: signupBonus,
