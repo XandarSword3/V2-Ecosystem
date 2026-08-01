@@ -32,6 +32,12 @@ interface CartItem {
 
 interface CartState {
   items: CartItem[];
+  customerName: string;
+  customerPhone: string;
+  tableNumber: string;
+  orderType: 'dine_in' | 'takeaway' | 'delivery';
+  paymentMethod: 'cash' | 'card';
+  notes: string;
 
   addItem: (item: CartItem) => void;
   removeItem: (itemId: string, uniqueKey?: string) => void;
@@ -40,6 +46,13 @@ interface CartState {
   clearCart: () => void;
   getTotal: () => number;
   getCount: () => number;
+  setCustomerName: (name: string) => void;
+  setCustomerPhone: (phone: string) => void;
+  setTableNumber: (tableNumber: string) => void;
+  setOrderType: (orderType: 'dine_in' | 'takeaway' | 'delivery') => void;
+  setPaymentMethod: (paymentMethod: 'cash' | 'card') => void;
+  setNotes: (notes: string) => void;
+  clearOrderDetails: () => void;
 }
 
 function generateUniqueKey(itemId: string, modifiers?: SelectedModifier[]): string {
@@ -55,6 +68,12 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      customerName: '',
+      customerPhone: '',
+      tableNumber: '',
+      orderType: 'dine_in',
+      paymentMethod: 'cash',
+      notes: '',
 
       addItem: (item) => set((state) => {
         const uniqueKey = item.uniqueKey || generateUniqueKey(item.id, item.selectedModifiers);
@@ -113,6 +132,21 @@ export const useCartStore = create<CartState>()(
       getCount: () => {
         return get().items.reduce((sum, item) => sum + item.quantity, 0);
       },
+
+      setCustomerName: (name) => set({ customerName: name }),
+      setCustomerPhone: (phone) => set({ customerPhone: phone }),
+      setTableNumber: (tableNumber) => set({ tableNumber }),
+      setOrderType: (orderType) => set({ orderType }),
+      setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
+      setNotes: (notes) => set({ notes }),
+      clearOrderDetails: () => set({
+        customerName: '',
+        customerPhone: '',
+        tableNumber: '',
+        orderType: 'dine_in',
+        paymentMethod: 'cash',
+        notes: '',
+      }),
     }),
     {
       name: 'v2-ecosystem-cart',

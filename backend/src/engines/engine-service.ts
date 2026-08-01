@@ -251,6 +251,7 @@ export class EngineService {
     context: {
       tenantId: string;
       moduleId: string;
+      propertyId?: string;
       templateType: string;
       entityId: string;
       entityType: string;

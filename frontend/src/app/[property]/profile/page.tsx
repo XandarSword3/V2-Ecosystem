@@ -78,12 +78,16 @@ interface StatementRecord {
   created_at: string;
   total_amount?: number;
   amount?: number;
+  tax_amount?: number;
+  discount_amount?: number;
+  payment_method?: string;
   points?: number;
   order_number?: string;
   booking_number?: string;
   ticket_number?: string;
   reference_id?: string;
   reference_type?: string;
+  module_id?: string;
 }
 
 interface PaymentRecord {
@@ -131,24 +135,24 @@ export default function ProfilePage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Fetch user orders
+  // Fetch user orders - use statement endpoint and filter for instant_transaction
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
     queryKey: ['my-orders'],
-    queryFn: () => api.get('/orders/me'),
+    queryFn: () => api.get('/users/me/statement'),
     enabled: activeTab === 'orders' && !!user,
   });
 
-  // Fetch user bookings
+  // Fetch user bookings - use statement endpoint and filter for time_exclusive_reservation
   const { data: bookingsData, isLoading: bookingsLoading } = useQuery({
     queryKey: ['my-bookings'],
-    queryFn: () => api.get('/reservations/me'),
+    queryFn: () => api.get('/users/me/statement'),
     enabled: activeTab === 'bookings' && !!user,
   });
 
-  // Fetch user session passes (shared_capacity_access)
+  // Fetch user session passes (shared_capacity_access) - use statement endpoint and filter
   const { data: ticketsData, isLoading: ticketsLoading } = useQuery({
     queryKey: ['my-tickets'],
-    queryFn: () => api.get('/capacity-access/me'),
+    queryFn: () => api.get('/users/me/statement'),
     enabled: activeTab === 'tickets' && !!user,
   });
 
@@ -164,9 +168,10 @@ export default function ProfilePage() {
     enabled: activeTab === 'payments' && !!user,
   });
 
-  const orders = ordersData?.data?.data || [];
-  const bookings = bookingsData?.data?.data || [];
-  const tickets = ticketsData?.data?.data || [];
+  const allStatement = ordersData?.data?.data || [];
+  const orders = allStatement.filter((row: StatementRecord) => row.type === 'instant_transaction');
+  const bookings = (bookingsData?.data?.data || []).filter((row: StatementRecord) => row.type === 'time_exclusive_reservation');
+  const tickets = (ticketsData?.data?.data || []).filter((row: StatementRecord) => row.type === 'shared_capacity_access');
   const statement = statementData?.data?.data || [];
   const payments = paymentsData?.data?.data || [];
 
@@ -509,24 +514,46 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {orders.map((order: OrderRecord) => (
+                      {orders.map((order: StatementRecord) => (
                         <div
                           key={order.id}
                           className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="font-mono text-sm font-medium">#{order.order_number}</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[order.status] || statusColors.pending}`}>
-                              {order.status?.toUpperCase()}
+                            <span className="font-mono text-sm font-medium">#{order.order_number || order.id}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${statusColors[order.status || 'pending'] || statusColors.pending}`}>
+                              {(order.status || 'pending').toUpperCase()}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
+                          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400 mb-2">
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
                               {formatDate(order.created_at)}
                             </span>
+                            <div className="flex items-center gap-2">
+                              {order.module_id && (
+                                <span className="text-xs text-slate-500">
+                                  Module: {order.module_id.slice(0, 8)}...
+                                </span>
+                              )}
+                              {order.payment_method && (
+                                <span className="text-xs text-slate-500">
+                                  {order.payment_method}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-slate-600 dark:text-slate-400">
+                              {order.tax_amount && order.tax_amount > 0 && (
+                                <span className="mr-3">Tax: {formatCurrency(order.tax_amount, currency)}</span>
+                              )}
+                              {order.discount_amount && order.discount_amount > 0 && (
+                                <span className="text-green-600 dark:text-green-400 mr-3">Discount: -{formatCurrency(order.discount_amount, currency)}</span>
+                              )}
+                            </div>
                             <span className="font-semibold text-slate-900 dark:text-white">
-                              {formatCurrency(order.total_amount, currency)}
+                              {formatCurrency(order.total_amount || order.amount || 0, currency)}
                             </span>
                           </div>
                         </div>

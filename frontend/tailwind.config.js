@@ -27,6 +27,19 @@ module.exports = {
           DEFAULT: 'var(--color-error)',
           foreground: 'var(--color-text-on-primary)',
         },
+        // success/warning: ThemeInjector already sets --color-success and
+        // --color-warning on :root (with sane defaults) but nothing in
+        // tailwind config exposed them as classes, so every "positive"/
+        // "pending" UI state in the app fell back to hardcoded green-*/
+        // amber-* instead of the CMS-configured status colors.
+        success: {
+          DEFAULT: 'var(--color-success)',
+          foreground: 'var(--color-text-on-primary)',
+        },
+        warning: {
+          DEFAULT: 'var(--color-warning)',
+          foreground: 'var(--color-text-on-primary)',
+        },
 
         // CMS Theme-aware colors using CSS variables
         theme: {

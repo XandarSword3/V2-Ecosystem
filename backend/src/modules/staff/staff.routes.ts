@@ -84,6 +84,9 @@ router.delete('/shifts/swap/:id', authorize(...staffRoles), staffController.canc
 router.post('/scan', authorize(...staffRoles), staffController.scanCode);
 router.get('/customers/search', authorize(...staffRoles), staffController.searchCustomers);
 
+// Live transactions endpoint for staff dashboard
+router.get('/transactions/live', authorize(...staffRoles), staffController.getLiveTransactions);
+
 // Get time tracking report
 router.get('/time-tracking', authorize(...managerRoles), staffController.getTimeTrackingReport);
 

@@ -149,10 +149,9 @@ export default function ManagerDashboard() {
     try {
       // FIX Iter-14: Pass AbortSignal to all API calls to cancel on unmount
       const [transactionsRes, modulesRes, staffRes, activityRes, weeklyOrdersRes, approvalsRes, todayShiftsRes, managerSummaryRes] = await Promise.all([
-        api.get('/transactions/live', { 
+        api.get('/staff/transactions/live', { 
           params: { 
-            propertyId: activeProperty.id,
-            statuses: 'pending,confirmed,preparing,active,ready'
+            statuses: 'pending,confirmed,preparing,ready,delivered,active'
           },
           signal 
         }).catch(() => ({ data: { data: [] } })),
