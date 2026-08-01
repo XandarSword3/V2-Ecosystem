@@ -127,7 +127,7 @@ function enforceMountedModulePropertyAccess(req: Request, res: Response, next: N
 
 /**
  * Defense-in-depth ownership check for write routes on the dynamic module
- * router. `enforceMountedModulePropertyAccess` above already runs for every
+ * router. `enforceMountedModulePropertyAccess` above runs for every protected
  * route via router.use(), but it is a no-op (calls next() unconditionally)
  * whenever the mounted module has no property_id — which is a real,
  * reachable state per dynamic-modules.loader.ts (property_id is read
@@ -136,13 +136,10 @@ function enforceMountedModulePropertyAccess(req: Request, res: Response, next: N
  * any tenant could otherwise create/update/delete rows on someone else's
  * module by slug.
  *
- * This does not retrofit the other ~15 pre-existing dynamic-router routes
- * (out of scope for Phase 3 — see REFIT_PLAN.md open question). It only
- * covers the new service_locations routes.
+ * This covers the service_locations routes when mounted on property-less modules.
  *
  * When property_id IS set, this duplicates enforceMountedModulePropertyAccess's
- * check — intentional belt-and-suspenders, not a substitute for fixing the
- * router-level gap itself.
+ * check — intentional belt-and-suspenders.
  *
  * Deliberately compares against req.user.tenantId (from the verified JWT),
  * never req.tenant.id (resolved from the client-supplied X-Tenant-ID /
@@ -312,7 +309,7 @@ async function fetchServiceLocationsWithOccupancy(moduleId: string) {
   }));
 }
 
-function buildInstantTransactionRouter(router: Router): void {
+function buildPublicInstantTransactionRoutes(router: Router): void {
   // Categories endpoints - public access for customers to browse catalog
   router.get('/categories', async (req: Request, res: Response) => {
     try {
@@ -336,6 +333,35 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
+  // Items endpoint - public access for customers to browse catalog
+  router.get('/items', async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('catalog_items')
+        .select('id, name, description, price, category, is_available')
+        .eq('module_id', mounted.id)
+        .eq('is_available', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        logger.error('[Dynamic Router] GET /items database error', { error: error.message, moduleId: mounted.id });
+        throw error;
+      }
+      res.json({ success: true, data: data ?? [] });
+    } catch (error: any) {
+      logger.error('[Dynamic Router] GET /items failed', { error: error?.message, stack: error?.stack });
+      res.status(500).json({ success: false, error: 'Failed to list items', details: error?.message });
+    }
+  });
+}
+
+function buildInstantTransactionRouter(router: Router): void {
   router.post('/admin/categories', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -735,33 +761,6 @@ function buildInstantTransactionRouter(router: Router): void {
     } catch (error) {
       logger.error('[Dynamic Router] GET /modifiers failed', error);
       res.status(500).json({ success: false, error: 'Failed to list modifiers' });
-    }
-  });
-
-  // Items endpoint - public access for customers to browse catalog
-  router.get('/items', async (req: Request, res: Response) => {
-    try {
-      const mounted = getMountedModule(req);
-      if (!mounted) {
-        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
-      }
-
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('catalog_items')
-        .select('id, name, description, price, category, is_available')
-        .eq('module_id', mounted.id)
-        .eq('is_available', true)
-        .order('name', { ascending: true });
-
-      if (error) {
-        logger.error('[Dynamic Router] GET /items database error', { error: error.message, moduleId: mounted.id });
-        throw error;
-      }
-      res.json({ success: true, data: data ?? [] });
-    } catch (error: any) {
-      logger.error('[Dynamic Router] GET /items failed', { error: error?.message, stack: error?.stack });
-      res.status(500).json({ success: false, error: 'Failed to list items', details: error?.message });
     }
   });
 
@@ -2959,8 +2958,16 @@ export function buildModuleRouter(templateType: string): Router {
   };
   const normalizedType = (LEGACY[templateType] ?? templateType) as TemplateType;
 
-  // Every dynamic route is module-guarded. Authentication and property access are applied per-route below.
+  // Every dynamic route is module-guarded for existence & active status
   router.use(requireMountedModule, enforceMountedModuleActive);
+
+  // Mount intentionally public catalog browsing routes before authentication middleware
+  if (normalizedType === 'instant_transaction') {
+    buildPublicInstantTransactionRoutes(router);
+  }
+
+  // Blanket authentication and property access control for all protected dynamic routes
+  router.use(authenticate, enforceMountedModulePropertyAccess);
 
   // Import routes (available for all engine types)
   buildImportRouter(router, normalizedType);

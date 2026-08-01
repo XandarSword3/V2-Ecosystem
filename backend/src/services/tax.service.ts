@@ -36,12 +36,14 @@ import { resolveSetting } from "../modules/multi-property/settings-resolution.se
 //
 // ============================================
 
-interface TaxRate {
+export interface TaxRate {
   id: string;
   name: string;
   rate: number; // Percentage (e.g., 11 for 11%)
   type: 'vat' | 'sales' | 'service' | 'tourism' | 'custom';
+  fee_type?: 'tax' | 'service_charge' | 'resort_fee' | 'delivery_fee' | 'custom';
   applies_to: string[]; // Categories this tax applies to
+  payment_methods?: string[]; // Payment methods this tax applies to: ['cash', 'credit_card', 'room_charge', 'all']
   is_default: boolean;
   is_compound: boolean;
   order: number; // Compounding sequence
@@ -157,13 +159,21 @@ export class TaxService {
   async computeTaxBreakdown(
     lineItems: PricingLineItem[],
     subtotal: number,
-    moduleId?: string
+    moduleId?: string,
+    paymentMethod?: string
   ): Promise<TaxBreakdownItem[]> {
     const config = await this.getTaxConfiguration();
     
     if (!config.rates || config.rates.length === 0) {
       return [];
     }
+
+    // Filter rates by payment method if specified
+    const applicableRates = config.rates.filter((r) => {
+      if (!paymentMethod) return true;
+      if (!r.payment_methods || r.payment_methods.length === 0 || r.payment_methods.includes('all')) return true;
+      return r.payment_methods.includes(paymentMethod.toLowerCase());
+    });
 
     // Group line items by tax category
     const categorySubtotals = new Map<string, number>();
@@ -177,11 +187,11 @@ export class TaxService {
     const breakdown: TaxBreakdownItem[] = [];
     
     // Separate compound and non-compound taxes
-    const nonCompoundTaxes = config.rates
+    const nonCompoundTaxes = applicableRates
       .filter(r => !r.is_compound)
       .sort((a, b) => a.order - b.order);
     
-    const compoundTaxes = config.rates
+    const compoundTaxes = applicableRates
       .filter(r => r.is_compound)
       .sort((a, b) => a.order - b.order);
 

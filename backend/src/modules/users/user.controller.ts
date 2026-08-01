@@ -451,12 +451,38 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
       applyDateFilters(supabase.from('gift_card_transactions').select('id,amount,created_at').eq('user_id', userId)),
     ]);
 
+    // Fetch module names for all unique module_ids in transactions
+    const moduleIds = Array.from(
+      new Set(
+        (transactions.data || [])
+          .map((row: Record<string, unknown>) => row.module_id as string)
+          .filter(Boolean)
+      )
+    );
+
+    const moduleMap = new Map<string, string>();
+    if (moduleIds.length > 0) {
+      const { data: moduleRows } = await supabase
+        .from('modules')
+        .select('id, name')
+        .in('id', moduleIds);
+      (moduleRows || []).forEach((m: { id: string; name: string }) => {
+        if (m.id && m.name) moduleMap.set(m.id, m.name);
+      });
+    }
+
     const rows = [
       ...(transactions.data || []).map((row: Record<string, unknown>) => {
         const meta = (row.metadata ?? {}) as Record<string, unknown>;
+        const rawId = row.id as string;
+        const moduleId = row.module_id as string | undefined;
+        const fallbackOrderNo = `ORD-${rawId.slice(-8).toUpperCase()}`;
+        const fallbackTicketNo = `TKT-${rawId.slice(-8).toUpperCase()}`;
+        const fallbackBookingNo = `RES-${rawId.slice(-8).toUpperCase()}`;
+
         return {
           type: row.engine_type as string,
-          id: row.id as string,
+          id: rawId,
           engine_type: row.engine_type as string,
           amount: row.amount as number,
           total_amount: row.amount as number,
@@ -467,11 +493,13 @@ export const getMyStatement = asyncHandler(async (req: Request, res: Response) =
           created_at: row.created_at as string,
           reference_id: row.reference_id as string | undefined,
           reference_table: row.reference_table as string | undefined,
-          module_id: row.module_id as string | undefined,
-          // Unpack display fields from metadata (canonical location post-clean-transactions)
-          order_number:   (meta.order_number as string | undefined)   ?? null,
-          ticket_number:  (meta.ticket_number as string | undefined)  ?? null,
-          booking_number: (meta.booking_number as string | undefined) || (row.id as string),
+          module_id: moduleId,
+          module_name: moduleId ? moduleMap.get(moduleId) || null : null,
+          items: meta.items || meta.line_items || null,
+          // Unpack display fields with clean fallback formatting
+          order_number:   (meta.order_number as string | undefined)   || fallbackOrderNo,
+          ticket_number:  (meta.ticket_number as string | undefined)  || fallbackTicketNo,
+          booking_number: (meta.booking_number as string | undefined) || fallbackBookingNo,
           customer_name:  (meta.customer_name as string | undefined)  ?? null,
           table_number:   (meta.table_number as string | undefined)   ?? null,
           session_id:     (meta.session_id as string | undefined)     ?? null,
