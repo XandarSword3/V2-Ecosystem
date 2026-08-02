@@ -10,6 +10,7 @@ import { getEngineService } from '../../engines/engine-service.js';
 import { normalizeReferenceType } from './reference-type-adapter.js';
 import { getTransactionManager } from '../../engines/transaction-manager.js';
 import { getIdempotencyGuard } from '../../engines/idempotency-guard.js';
+import { reverseDiscounts } from '../../engines/discount-reversal.js';
 
 const getStripeInstance = async () => {
   const supabase = getSupabase();
@@ -653,6 +654,53 @@ export async function processRefundById(
 
   const refStatus = isPartialRefund ? 'partial' as const : 'refunded' as const;
   await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, refStatus);
+
+  // Give back whatever coupon/gift card the order consumed at creation (see
+  // discount-reversal.ts). Previously a refund only touched Stripe + the
+  // payments table + the order's payment_status — coupon usage counts and
+  // gift card balances were never restored, refunded or not.
+  //
+  // Scoped to full refunds of order-type payments only: a partial refund
+  // doesn't have an unambiguous rule for how much of a coupon/gift-card
+  // discount to give back, and reversing the whole thing on a partial
+  // refund would usually be wrong (e.g. a $5 refund on a $50 order with a
+  // 20%-off coupon shouldn't restore the full discount). Left as a flagged
+  // gap for partial refunds rather than guessed at.
+  if (!isPartialRefund && payment.reference_type === 'order') {
+    try {
+      const { data: order } = await supabase
+        .from('transactions')
+        .select('id, customer_id, metadata')
+        .eq('id', payment.reference_id)
+        .maybeSingle();
+
+      const orderMetadata = (order?.metadata ?? {}) as Record<string, unknown>;
+      const alreadyReversed = Boolean(orderMetadata.discountsReversedAt);
+      const discounts = Array.isArray((orderMetadata as { discounts?: unknown }).discounts)
+        ? (orderMetadata as { discounts: any[] }).discounts
+        : [];
+
+      if (order && !alreadyReversed && discounts.length > 0) {
+        await reverseDiscounts(supabase, discounts, {
+          userId: order.customer_id ?? undefined,
+          orderId: order.id,
+        });
+        await supabase
+          .from('transactions')
+          .update({ metadata: { ...orderMetadata, discountsReversedAt: new Date().toISOString() } })
+          .eq('id', order.id);
+      }
+    } catch (reversalErr) {
+      // Non-fatal: the refund itself already succeeded and must not be
+      // rolled back over this. Logged at error level in reverseDiscounts()
+      // itself/here since a failure here is a real, if secondary, money leak.
+      logger.error('[Payments] Failed to reverse order discount usage after refund', {
+        paymentId,
+        referenceId: payment.reference_id,
+        error: reversalErr instanceof Error ? reversalErr.message : String(reversalErr),
+      });
+    }
+  }
 
   logger.info(`Refund processed for payment ${paymentId} by user ${processedByUserId}`);
   return { isPartial: isPartialRefund };
