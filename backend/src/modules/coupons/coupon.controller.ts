@@ -59,9 +59,8 @@ const validateCouponSchema = z.object({
   userId: z.string().uuid().optional(),
 });
 
-const applyCouponSchema = validateCouponSchema.extend({
-  orderId: z.string().uuid(),
-});
+// applyCouponSchema removed along with applyCoupon() below — see that removal
+// note for why.
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
@@ -164,85 +163,19 @@ export class CouponController {
     }
   }
 
-  /**
-   * Apply a coupon to an order (during checkout) — atomic RPC
-   */
-  async applyCoupon(req: Request, res: Response) {
-    try {
-      const validation = applyCouponSchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
-      }
-
-      const { code, orderType, orderAmount, userId, orderId } = validation.data;
-      const supabase = getSupabase();
-
-      const { data: result, error: rpcError } = await supabase.rpc('apply_coupon_atomic', {
-        p_code: code.toUpperCase().trim(),
-        p_user_id: userId || null,
-        p_order_total: orderAmount,
-        p_order_id: orderId,
-        p_module_type: orderType || 'all',
-      });
-
-      if (rpcError) throw rpcError;
-
-      const row = result?.[0];
-      if (!row?.success) {
-        return res.status(400).json({ success: false, error: row?.error_message || 'Invalid coupon code' });
-      }
-
-      const discountAmount = parseFloat(row.discount_amount) || 0;
-
-      const { data: currentOrder } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('id', orderId)
-        .single();
-
-      if (currentOrder) {
-        const newTotalAmount = parseFloat(currentOrder.amount || 0) - discountAmount;
-
-        const { error: orderUpdateError } = await supabase
-          .from('transactions')
-          .update({
-            coupon_id: row.coupon_id,
-            coupon_code: code.toUpperCase().trim(),
-            coupon_discount: discountAmount,
-            discount_amount: discountAmount,
-            total_amount: Math.max(0, newTotalAmount),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', orderId);
-
-        if (orderUpdateError) {
-          logger.error('Order update failed after coupon consumed, reversing coupon usage:', orderUpdateError);
-          try {
-            await supabase.rpc('reverse_coupon_usage', {
-              p_coupon_id: row.coupon_id,
-              p_user_id: userId || null,
-              p_order_id: orderId,
-            });
-          } catch (reverseErr) {
-            logger.error('CRITICAL: Failed to reverse coupon usage after order update failure', { couponId: row.coupon_id, orderId, userId, reverseErr });
-          }
-          return res.status(500).json({ success: false, error: 'Failed to apply discount to order. Coupon was not consumed.' });
-        }
-      }
-
-      res.json({
-        success: true,
-        data: {
-          couponId: row.coupon_id,
-          discountApplied: Math.round(discountAmount * 100) / 100,
-          finalAmount: Math.max(0, orderAmount - discountAmount),
-        },
-      });
-    } catch (error: any) {
-      console.error('Error applying coupon:', error);
-      res.status(500).json({ success: false, error: 'Failed to apply coupon', message: error.message });
-    }
-  }
+  // applyCoupon() removed. It was unreachable — the frontend's CouponInput
+  // only ever calls /coupons/validate, never /coupons/apply — and would have
+  // thrown at runtime anyway: it wrote coupon_id/coupon_code/coupon_discount
+  // onto `transactions`, but the live schema (20260522000000_clean_
+  // transactions_table.sql) has no such columns, only discount_amount.
+  //
+  // The real, live coupon-consumption path is server-side inside
+  // PricingPipeline.calculate() (discount-resolvers.ts), triggered
+  // automatically at order creation — not a separate customer-invoked
+  // "apply" call. Its reversal-on-failure/cancel/refund logic (the useful
+  // part of this method — see reverse_coupon_usage usage above) now lives in
+  // engines/discount-reversal.ts, called from dynamic-module.router.ts and
+  // payment.controller.ts, which is the path that's actually reachable.
 
   /**
    * Get active coupons (public — for display)

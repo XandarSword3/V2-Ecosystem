@@ -106,69 +106,40 @@ export class SupabaseGiftCardResolver implements GiftCardResolver {
     const supabase = getSupabase();
 
     try {
-      const upperCode = giftCardCode.toUpperCase();
+      // Previously this did a manual fetch -> update -> insert instead of
+      // using the existing atomic RPC. Two real bugs from that:
+      //   1. No row lock between the fetch and the update, so two concurrent
+      //      redemptions of the same card could both read the same balance
+      //      and both succeed — a double-spend race. redeem_giftcard_atomic
+      //      (supabase/migrations/20260117180005_giftcard_func.sql) already
+      //      does `FOR UPDATE` correctly and was sitting unused.
+      //   2. The gift_card_transactions insert used the wrong column name
+      //      (`type` instead of `transaction_type`), which made every such
+      //      insert fail — silently, since the error was caught and logged
+      //      as "non-blocking". The balance was still deducted correctly,
+      //      but zero audit-trail rows were ever created for a pipeline-
+      //      driven redemption, so gift card statements were missing every
+      //      real order redemption.
+      const { data: result, error: rpcError } = await supabase.rpc('redeem_giftcard_atomic', {
+        p_code: giftCardCode.toUpperCase(),
+        p_amount: maxAmount,
+        p_order_id: null, // Order ID not known yet at pricing time — see discount-reversal.ts
+      });
 
-      // 1. Fetch gift card
-      const { data: card, error: fetchErr } = await supabase
-        .from('gift_cards')
-        .select('id, current_balance, status, expires_at, tenant_id')
-        .eq('code', upperCode)
-        .maybeSingle();
-
-      if (fetchErr || !card) {
-        logger.warn('[GIFT CARD RESOLVER] Card not found', { code: upperCode });
+      if (rpcError) {
+        logger.warn('[GIFT CARD RESOLVER] Gift card RPC failed', { code: giftCardCode, error: rpcError.message });
         return null;
       }
 
-      if (card.status !== 'active') {
-        logger.warn('[GIFT CARD RESOLVER] Card not active', { status: card.status });
+      const row = result?.[0];
+      if (!row?.success) {
+        logger.warn('[GIFT CARD RESOLVER] Gift card invalid', { code: giftCardCode, reason: row?.error_message });
         return null;
-      }
-
-      if (card.expires_at && new Date(card.expires_at) < new Date()) {
-        logger.warn('[GIFT CARD RESOLVER] Card expired');
-        return null;
-      }
-
-      const balance = parseFloat(card.current_balance) || 0;
-      if (balance <= 0) return null;
-
-      const amountToDeduct = Math.min(maxAmount, balance);
-      const newBalance = balance - amountToDeduct;
-
-      // 2. Deduct balance
-      const { error: updateErr } = await supabase
-        .from('gift_cards')
-        .update({
-          current_balance: newBalance,
-          status: newBalance <= 0 ? 'used' : 'active',
-        })
-        .eq('id', card.id);
-
-      if (updateErr) {
-        logger.warn('[GIFT CARD RESOLVER] Failed to update balance:', updateErr);
-        return null;
-      }
-
-      // 3. Record transaction WITH tenant_id
-      const { error: txErr } = await supabase
-        .from('gift_card_transactions')
-        .insert({
-          gift_card_id: card.id,
-          type: 'redemption',
-          amount: -amountToDeduct,
-          balance_after: newBalance,
-          tenant_id: card.tenant_id,
-        });
-
-      if (txErr) {
-        logger.warn('[GIFT CARD RESOLVER] Transaction log failed (non-blocking):', txErr);
-        // Don't fail the redemption — balance was already deducted
       }
 
       return {
-        amountDeducted: amountToDeduct,
-        giftCardId: card.id,
+        amountDeducted: parseFloat(row.amount_redeemed) || 0,
+        giftCardId: row.gift_card_id,
       };
     } catch (err) {
       logger.warn('[GIFT CARD RESOLVER] Gift card error (non-fatal):', err);

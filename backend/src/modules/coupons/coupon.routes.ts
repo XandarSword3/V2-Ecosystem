@@ -9,8 +9,9 @@ const router = Router();
 router.get('/active', couponController.getActiveCoupons.bind(couponController));
 router.post('/validate', couponController.validateCoupon.bind(couponController));
 
-// Customer routes (authenticated)
-router.post('/apply', authenticate, couponController.applyCoupon.bind(couponController));
+// /apply route removed — see coupon.controller.ts's removal note on
+// applyCoupon(). Coupon consumption now happens server-side at order
+// creation, not via a separate customer-invoked endpoint.
 
 // Admin routes
 router.get('/', authenticate, authorize('admin', 'super_admin'), couponController.getAllCoupons.bind(couponController));
