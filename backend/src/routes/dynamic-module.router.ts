@@ -13,6 +13,7 @@ import { computeStayBaseAmount } from '../utils/stay-pricing.js';
 import { resolveTaxCategory } from '../services/tax.service.js';
 import { generateQRCodeImage } from '../utils/qr-security.js';
 import { customizationService } from '../modules/customization/services/customization.service.js';
+import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reversal.js';
 
 // Import parsers
 import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
@@ -979,12 +980,36 @@ function buildInstantTransactionRouter(router: Router): void {
             table_number: resolvedTableNumber,
             customer_name: resolvedCustomerName,
             customer_phone: resolvedCustomerPhone,
+            // Which coupon/gift card (if any) this order's discount_amount
+            // came from. calculatePricing() above already atomically
+            // consumed these via the coupon/gift-card RPCs — previously
+            // that breakdown was computed and then discarded, so nothing on
+            // the order recorded what was actually used. Needed so
+            // cancellation/refund (below, and payment.controller.ts) can
+            // reverse the right coupon/gift card instead of nothing at all.
+            discounts: pricing.discounts,
           },
         })
         .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
         .single();
 
-      if (createError) throw createError;
+      if (createError) {
+        // Pricing above already atomically consumed the coupon/gift card
+        // (usage_count incremented, balance deducted) via
+        // apply_coupon_atomic/redeem_giftcard_atomic — before this insert
+        // ever ran. If the insert then fails, that consumption was for
+        // nothing and must be given back, or the coupon/gift card is
+        // permanently burned with no order to show for it.
+        await reverseDiscounts(supabase, pricing.discounts, { userId: req.user?.userId ?? undefined });
+        throw createError;
+      }
+
+      // Backfill the order_id onto the coupon_usage/gift_card_transactions
+      // row(s) created during pricing above (they were inserted with
+      // order_id NULL since the order didn't exist yet) so this order can be
+      // traced back to what it consumed, and so a later cancellation/refund
+      // can reverse it precisely by order_id instead of by fuzzy recency.
+      await linkDiscountsToOrder(supabase, pricing.discounts, created.id, req.user?.userId ?? undefined);
 
       // Persist the full pricing breakdown (subtotal, discount detail,
       // service charge, delivery fee, itemization) to the financial ledger.
@@ -1016,6 +1041,7 @@ function buildInstantTransactionRouter(router: Router): void {
             lineItems: receiptLineItems,
             taxBreakdown: pricing.taxBreakdown,
             feeBreakdown: pricing.feeBreakdown,
+            discounts: pricing.discounts,
           },
         });
       } catch (ledgerErr) {
@@ -1183,7 +1209,7 @@ function buildInstantTransactionRouter(router: Router): void {
       const supabase = getSupabase();
       const { data: current, error: currentError } = await supabase
         .from('transactions')
-        .select('id, status')
+        .select('id, status, customer_id, metadata')
         .eq('engine_type', 'instant_transaction')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -1206,15 +1232,48 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(400).json({ success: false, error: transition.error ?? 'Invalid status transition' });
       }
 
+      const currentMetadata = (current.metadata ?? {}) as Record<string, unknown>;
+      const isCancelling = transition.targetState === 'cancelled';
+      // Guard against reversing twice — a refund via payment.controller.ts's
+      // processRefundById can also reach this order and reverses the same
+      // way; whichever happens first sets discountsReversedAt.
+      const alreadyReversed = Boolean(currentMetadata.discountsReversedAt);
+      const updatedMetadata =
+        isCancelling && !alreadyReversed
+          ? { ...currentMetadata, discountsReversedAt: new Date().toISOString() }
+          : currentMetadata;
+
       const { data, error } = await supabase
         .from('transactions')
-        .update({ status: transition.targetState, updated_at: new Date().toISOString() })
+        .update({
+          status: transition.targetState,
+          updated_at: new Date().toISOString(),
+          ...(isCancelling && !alreadyReversed ? { metadata: updatedMetadata } : {}),
+        })
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .select('id, status, updated_at')
         .single();
 
       if (error) throw error;
+
+      // Give back whatever coupon/gift card this order consumed at creation
+      // (see discount-reversal.ts). Previously cancelling an order never
+      // touched coupon usage counts or gift card balances at all — a
+      // customer could cancel and re-book indefinitely on the same coupon,
+      // or a cancelled order's gift card balance was just gone.
+      if (isCancelling && !alreadyReversed) {
+        const discounts = Array.isArray((currentMetadata as { discounts?: unknown }).discounts)
+          ? ((currentMetadata as { discounts: any[] }).discounts)
+          : [];
+        if (discounts.length > 0) {
+          await reverseDiscounts(supabase, discounts, {
+            userId: current.customer_id ?? undefined,
+            orderId: current.id,
+          });
+        }
+      }
+
       res.json({ success: true, data });
     } catch (error) {
       logger.error('[Dynamic Router] PATCH /orders/:id/status failed', error);
