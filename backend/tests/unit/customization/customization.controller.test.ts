@@ -29,7 +29,6 @@ vi.mock('../../../src/modules/customization/services/customization.service.js', 
     getEvents: vi.fn(),
     getMetricsSummary: vi.fn(),
     getDualWriteDiscrepancies: vi.fn(),
-    migrateMenuModifiers: vi.fn(),
   },
 }));
 
@@ -579,19 +578,6 @@ describe('CustomizationController', () => {
 
       expect(customizationService.getDualWriteDiscrepancies).toHaveBeenCalledWith(50);
       expect(res.json).toHaveBeenCalledWith(mockDiscrepancies);
-    });
-  });
-
-  describe('migrateMenuModifiers', () => {
-    it('should migrate menu modifiers', async () => {
-      const mockResult = { migrated: 10, skipped: 2 };
-      vi.mocked(customizationService.migrateMenuModifiers).mockResolvedValue(mockResult);
-
-      const { req, res, next } = createMockReqRes({});
-
-      await customizationController.migrateMenuModifiers(req as any, res as any, next);
-
-      expect(res.json).toHaveBeenCalledWith({ message: 'Migration completed', migrated: 10, skipped: 2 });
     });
   });
 });

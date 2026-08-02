@@ -294,10 +294,6 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
     '/{moduleSlug}/categories': {
       get: { tags: ['Dynamic Modules'], operationId: 'getModuleCategories', summary: 'List categories for module', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Categories') } },
     },
-    '/{moduleSlug}/modifiers': {
-      get: { tags: ['Dynamic Modules'], operationId: 'getModuleModifiers', summary: 'List modifier/customization groups', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Modifier groups') } },
-      post: { tags: ['Dynamic Modules'], operationId: 'createModuleModifier', summary: 'Create modifier group (admin)', security: secured, parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], responses: { '201': jsonResponse('Created') } },
-    },
     '/{moduleSlug}/orders': {
       post: { tags: ['Dynamic Modules'], operationId: 'createModuleOrder', summary: 'Create order (instant_transaction)', parameters: [{ name: 'moduleSlug', in: 'path', required: true, schema: { type: 'string' } }], requestBody: jsonBody({ $ref: '#/components/schemas/CreateOrder' }), responses: { '201': jsonResponse('Created', { $ref: '#/components/schemas/Order' }), '400': responses.BadRequest } },
     },

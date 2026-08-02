@@ -12,6 +12,7 @@ import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purcha
 import { computeStayBaseAmount } from '../utils/stay-pricing.js';
 import { resolveTaxCategory } from '../services/tax.service.js';
 import { generateQRCodeImage } from '../utils/qr-security.js';
+import { customizationService } from '../modules/customization/services/customization.service.js';
 
 // Import parsers
 import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
@@ -748,22 +749,6 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  // Modifiers endpoints
-  router.get('/modifiers', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
-    try {
-      const mounted = getMountedModule(req);
-      if (!mounted) {
-        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
-      }
-
-      // catalog_modifiers was never created — no canonical replacement yet
-      res.json({ success: true, data: [] });
-    } catch (error) {
-      logger.error('[Dynamic Router] GET /modifiers failed', error);
-      res.status(500).json({ success: false, error: 'Failed to list modifiers' });
-    }
-  });
-
   router.post('/orders', authenticate, enforceMountedModulePropertyAccess, authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -807,14 +792,64 @@ function buildInstantTransactionRouter(router: Router): void {
         .maybeSingle();
 
       const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
-      const lineItems = items.map((item: unknown) => {
+
+      // Re-validate any submitted item customizations server-side before
+      // pricing — the client's `priceAdjustment` on each selected modifier
+      // is never trusted. `validate_customizations` re-derives the price
+      // from the DB (customization_options.price_adjustment) per item, so a
+      // tampered or stale client value can't affect the charge.
+      // Keyed by position in `items` since the same catalog_item_id can
+      // appear more than once in a cart with different selections.
+      const modifierAdjustmentByIndex = new Map<number, number>();
+      const modifierValidationErrors: string[] = [];
+
+      await Promise.all(items.map(async (item: unknown, index: number) => {
+        const currentItem = item as {
+          catalog_item_id?: string; menuItemId?: string; itemId?: string;
+          metadata?: Record<string, unknown>;
+        };
+        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+        const rawSelections = Array.isArray(currentItem.metadata?.selectedModifiers)
+          ? currentItem.metadata!.selectedModifiers as Array<Record<string, unknown>>
+          : [];
+        const selections = rawSelections
+          .map((m) => ({
+            groupId: String(m.groupId ?? ''),
+            optionId: String(m.optionId ?? ''),
+            quantity: asNumber(m.quantity, 1),
+          }))
+          .filter((s) => s.optionId.length > 0);
+        if (selections.length === 0) return;
+
+        try {
+          const result = await customizationService.validateSelections('catalog_item', resolvedId, selections);
+          if (!result.isValid) {
+            modifierValidationErrors.push(...result.validationErrors.map((e) => `${resolvedId}: ${e}`));
+            return;
+          }
+          modifierAdjustmentByIndex.set(index, result.totalPriceAdjustment);
+        } catch (err) {
+          logger.error('[Dynamic Router] Failed to validate item customizations', {
+            itemId: resolvedId, error: err instanceof Error ? err.message : String(err),
+          });
+          modifierValidationErrors.push(`${resolvedId}: failed to validate customizations`);
+        }
+      }));
+
+      if (modifierValidationErrors.length > 0) {
+        return res.status(400).json({ success: false, error: 'Invalid item customizations', details: modifierValidationErrors });
+      }
+
+      const lineItems = items.map((item: unknown, index: number) => {
         const currentItem = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number; metadata?: Record<string, unknown> };
         const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+        const basePrice = priceMap.get(resolvedId) ?? 0;
+        const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
         const lineItem = {
           itemId: resolvedId,
           name: `catalog_item:${resolvedId}`,
           quantity: asNumber(currentItem.quantity, 1),
-          unitPrice: priceMap.get(resolvedId) ?? 0,
+          unitPrice: basePrice + modifierAdjustment,
           metadata: currentItem.metadata || {},
         };
         return {
@@ -824,19 +859,24 @@ function buildInstantTransactionRouter(router: Router): void {
       });
 
       // Receipt-friendly snapshot of what was actually ordered, with real
-      // catalog names + any modifiers the cart attached. This is what gets
-      // persisted into the ledger's metadata below so the confirmation page
-      // can show an itemized breakdown — previously this was computed for
-      // pricing and then discarded, since PricingResult.lineItems only
-      // carries the opaque `catalog_item:<uuid>` placeholder.
-      const receiptLineItems = items.map((item: unknown) => {
+      // catalog names + any modifiers the cart attached, priced using the
+      // same server-validated unitPrice as `lineItems` above (base price +
+      // validated modifier adjustment) so the receipt and the actual charge
+      // always agree. This is what gets persisted into the ledger's
+      // metadata below so the confirmation page can show an itemized
+      // breakdown — previously this was computed for pricing and then
+      // discarded, since PricingResult.lineItems only carries the opaque
+      // `catalog_item:<uuid>` placeholder.
+      const receiptLineItems = items.map((item: unknown, index: number) => {
         const currentItem = item as {
           catalog_item_id?: string; menuItemId?: string; itemId?: string;
           quantity?: number; metadata?: Record<string, unknown>;
         };
         const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
         const quantity = asNumber(currentItem.quantity, 1);
-        const unitPrice = priceMap.get(resolvedId) ?? 0;
+        const basePrice = priceMap.get(resolvedId) ?? 0;
+        const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
+        const unitPrice = basePrice + modifierAdjustment;
         const selectedModifiers = Array.isArray(currentItem.metadata?.selectedModifiers)
           ? currentItem.metadata!.selectedModifiers
           : undefined;
