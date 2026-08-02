@@ -50,10 +50,6 @@ router.delete('/entity-links/:id', authenticate, authorize('admin', 'manager'),
 router.get('/entity-links', authenticate,
   customizationController.getEntityLinks.bind(customizationController));
 
-// Admin utilities
-router.post('/migrate', authenticate, authorize('admin'),
-  customizationController.migrateMenuModifiers.bind(customizationController));
-
 // ==========================================
 // TRANSACTIONAL ORDER OPERATIONS (staff)
 // ==========================================

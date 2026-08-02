@@ -80,26 +80,6 @@ vi.mock('@/lib/translate', () => ({
   }),
 }));
 
-vi.mock('@/components/modules/ModifierSelectionModal', () => ({
-  ModifierSelectionModal: ({ isOpen, onAddToCart, menuItem, onClose }: any) =>
-    isOpen ? (
-      <div data-testid="modifier-modal">
-        <button
-          onClick={() =>
-            onAddToCart({
-              id: menuItem.id,
-              name: menuItem.name,
-              price: menuItem.price,
-            })
-          }
-        >
-          legacy-add
-        </button>
-        <button onClick={onClose}>legacy-close</button>
-      </div>
-    ) : null,
-}));
-
 vi.mock('@/components/customization/CustomizationSelector', () => ({
   CustomizationSelector: ({ isOpen, onConfirm, onClose }: any) =>
     isOpen ? (
@@ -237,7 +217,7 @@ describe('MenuService behavior', () => {
     expect(toastSuccessMock).toHaveBeenCalledWith('Fries added to cart');
   });
 
-  it('falls back to legacy modifier modal when no customizations are returned', async () => {
+  it('adds item directly to cart when no customizations are attached (no legacy modal)', async () => {
     const user = userEvent.setup();
 
     useQueryMock.mockReturnValue({ data: menuResponse, isLoading: false, error: null });
@@ -247,17 +227,34 @@ describe('MenuService behavior', () => {
 
     await user.click(screen.getAllByRole('button', { name: /add to cart/i })[0]);
 
-    expect(await screen.findByTestId('modifier-modal')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(addItemMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'item-1',
+          moduleSlug: 'menu_service',
+          moduleId: 'mod-1',
+        })
+      );
+    });
 
-    await user.click(screen.getByRole('button', { name: 'legacy-add' }));
+    expect(screen.queryByTestId('customization-modal')).not.toBeInTheDocument();
+  });
 
-    expect(addItemMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 'item-1',
-        moduleSlug: 'menu_service',
-        moduleId: 'mod-1',
-      })
-    );
+  it('adds item directly to cart when the customization lookup fails', async () => {
+    const user = userEvent.setup();
+
+    useQueryMock.mockReturnValue({ data: menuResponse, isLoading: false, error: null });
+    apiGetMock.mockRejectedValueOnce(new Error('network error'));
+
+    render(<MenuService module={restaurantModule as any} />);
+
+    await user.click(screen.getAllByRole('button', { name: /add to cart/i })[0]);
+
+    await waitFor(() => {
+      expect(addItemMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'item-1', moduleSlug: 'menu_service' })
+      );
+    });
   });
 
   it('supports category filtering and floating cart navigation', async () => {

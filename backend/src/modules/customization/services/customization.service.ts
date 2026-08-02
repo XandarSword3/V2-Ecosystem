@@ -8,7 +8,7 @@ import { AppError } from '../../../utils/AppError.js';
 
 export type CustomizationType = 'add' | 'remove' | 'swap' | 'upgrade' | 'replace';
 export type CustomizableEntityType =
-  | 'menu_item'
+  | 'catalog_item'
   | 'kiosk_item'
   | 'accommodation_unit'
   | 'capacity_window'
@@ -882,32 +882,6 @@ class CustomizationService {
     }
 
     return data || [];
-  }
-
-  // ==========================================
-  // MIGRATION HELPER
-  // ==========================================
-
-  /**
-   * Migrate existing menu modifiers to unified system
-   */
-  async migrateMenuModifiers(): Promise<{ groups: number; options: number; links: number }> {
-    const supabase = getSupabase();
-    
-    const { data, error } = await supabase
-      .rpc('migrate_menu_modifiers_to_unified');
-
-    if (error) {
-      logger.error('Failed to migrate menu modifiers', { error });
-      throw new Error(`Migration failed: ${error.message}`);
-    }
-
-    const result = data?.[0];
-    return {
-      groups: result?.groups_migrated || 0,
-      options: result?.options_migrated || 0,
-      links: result?.links_migrated || 0
-    };
   }
 
   // ==========================================

@@ -13,7 +13,6 @@ import { formatCurrency } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { ModifierSelectionModal, type SelectedModifier } from '@/components/modules/ModifierSelectionModal';
 import { CustomizationSelector } from '@/components/customization/CustomizationSelector';
 import { ModuleHero, GlassSearch, CategoryPills, GlassCard, FloatingActionButton } from './';
 import { isOnline, catalogItemsStore, catalogCategoriesStore } from '@/lib/offline/offline-storage';
@@ -69,12 +68,48 @@ export function MenuService({ module }: MenuServiceProps) {
   const removeItem = useCartStore((s) => s.removeItem);
   const allItems = useCartStore((s) => s.items);
 
-  // Modifier/Customization modal state
-  const [selectedItemForModifiers, setSelectedItemForModifiers] = useState<MenuItemData | null>(null);
+  // Customization modal state
   const [selectedItemForCustomization, setSelectedItemForCustomization] = useState<MenuItemData | null>(null);
   const [checkingCustomizations, setCheckingCustomizations] = useState(false);
 
-  // When user clicks an item for the first time, check for customizations/modifiers
+  const isOutOfStock = (item: MenuItemData): boolean => {
+    if (item.is_available === false) return true;
+    if (item.track_inventory && item.available_stock !== null && item.available_stock !== undefined && item.available_stock <= 0) return true;
+    return false;
+  };
+
+  const addToCart = useCallback((item: MenuItemData) => {
+    if (isOutOfStock(item)) {
+      toast.error(`${translateContent(item, 'name')} is currently unavailable`);
+      return;
+    }
+    const cartItem = {
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      quantity: 1,
+      moduleId: module.id,
+      moduleSlug: module.slug,
+      moduleName: module.name,
+      imageUrl: item.image_url || item.image,
+    };
+
+    addItem(cartItem);
+
+    // Pass item name for the translation string; fallback to a simple English string
+    const translatedName = translateContent(item, 'name');
+    const msg = tCommon('addedToCart', { name: translatedName });
+    if (typeof msg === 'string' && msg.includes('MISSING_MESSAGE')) {
+      toast.success(`${translatedName} added to cart`);
+    } else {
+      toast.success(msg);
+    }
+  }, [addItem, module, translateContent, tCommon]);
+
+  // When user clicks an item, check whether it has any customization groups
+  // attached. If it does, open the selector; otherwise (including on a
+  // failed lookup) add it straight to the cart — there is no legacy
+  // modifier system to fall back to anymore.
   const handleItemClick = useCallback(async (item: MenuItemData) => {
     setCheckingCustomizations(true);
     try {
@@ -83,15 +118,15 @@ export function MenuService({ module }: MenuServiceProps) {
       if (customizationGroups.length > 0) {
         setSelectedItemForCustomization(item);
       } else {
-        setSelectedItemForModifiers(item);
+        addToCart(item);
       }
     } catch (error) {
-      // No customizations found, try legacy modifier modal
-      setSelectedItemForModifiers(item);
+      console.warn('Customization lookup failed, adding item without customizations', error);
+      addToCart(item);
     } finally {
       setCheckingCustomizations(false);
     }
-  }, []);
+  }, [addToCart]);
 
   // Handle customization confirm (new system)
   const handleCustomizationConfirm = useCallback((data: {
@@ -143,33 +178,6 @@ export function MenuService({ module }: MenuServiceProps) {
     toast.success(`${translatedName} added to cart`);
     setSelectedItemForCustomization(null);
   }, [selectedItemForCustomization, translateContent, addItem, module]);
-
-  // Handle modifier modal add to cart (legacy system)
-  const handleModifierAddToCart = useCallback((item: {
-    id: string;
-    name: string;
-    price: number;
-    category?: string;
-    imageUrl?: string;
-    selectedModifiers?: SelectedModifier[];
-    modifierTotal?: number;
-    specialInstructions?: string;
-  }) => {
-    addItem({
-      id: item.id,
-      name: item.name,
-      price: item.price,
-      quantity: 1,
-      moduleId: module.id,
-      moduleSlug: module.slug,
-      moduleName: module.name,
-      imageUrl: item.imageUrl,
-      selectedModifiers: item.selectedModifiers,
-      modifierTotal: item.modifierTotal,
-      specialInstructions: item.specialInstructions,
-    });
-    toast.success(`${item.name} added to cart`);
-  }, [addItem, module]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['catalog', module.slug],
@@ -258,40 +266,6 @@ export function MenuService({ module }: MenuServiceProps) {
   const cartCount = allItems
     .filter((i) => i.moduleId === module.id)
     .reduce((sum, i) => sum + i.quantity, 0);
-
-  const isOutOfStock = (item: MenuItemData): boolean => {
-    if (item.is_available === false) return true;
-    if (item.track_inventory && item.available_stock !== null && item.available_stock !== undefined && item.available_stock <= 0) return true;
-    return false;
-  };
-
-  const addToCart = (item: MenuItemData) => {
-    if (isOutOfStock(item)) {
-      toast.error(`${translateContent(item, 'name')} is currently unavailable`);
-      return;
-    }
-    const cartItem = {
-      id: item.id,
-      name: item.name,
-      price: item.price,
-      quantity: 1,
-      moduleId: module.id,
-      moduleSlug: module.slug,
-      moduleName: module.name,
-      imageUrl: item.image_url || item.image,
-    };
-
-    addItem(cartItem);
-
-    // Pass item name for the translation string; fallback to a simple English string
-    const translatedName = translateContent(item, 'name');
-    const msg = tCommon('addedToCart', { name: translatedName });
-    if (typeof msg === 'string' && msg.includes('MISSING_MESSAGE')) {
-      toast.success(`${translatedName} added to cart`);
-    } else {
-      toast.success(msg);
-    }
-  };
 
   const removeFromCart = (itemId: string) => {
     removeItem(itemId);
@@ -503,14 +477,14 @@ export function MenuService({ module }: MenuServiceProps) {
                 ) : getItemQuantity(item.id) > 0 ? (
                   <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
                     <button 
-                      onClick={() => removeFromCart(item.id)}
+                      onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
                       className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"
                     >
                       <Minus className="w-4 h-4" />
                     </button>
                     <span className="font-medium w-4 text-center">{getItemQuantity(item.id)}</span>
                     <button 
-                      onClick={() => addToCart(item)}
+                      onClick={(e) => { e.stopPropagation(); addToCart(item); }}
                       className="p-2 hover:bg-white dark:hover:bg-slate-600 rounded-md transition-colors"
                     >
                       <Plus className="w-4 h-4" />
@@ -518,7 +492,7 @@ export function MenuService({ module }: MenuServiceProps) {
                   </div>
                 ) : (
                   <button
-                    onClick={() => handleItemClick(item)}
+                    onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}
                     disabled={checkingCustomizations}
                     className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                   >
@@ -545,24 +519,6 @@ export function MenuService({ module }: MenuServiceProps) {
         position="bottom-center"
         label={formatCurrency(cartTotal, currency)}
       />
-
-      {/* Modifier Selection Modal (Legacy) */}
-      {selectedItemForModifiers && (
-        <ModifierSelectionModal
-          isOpen={!!selectedItemForModifiers}
-          onClose={() => setSelectedItemForModifiers(null)}
-          menuItem={{
-            id: selectedItemForModifiers.id,
-            name: selectedItemForModifiers.name,
-            name_ar: selectedItemForModifiers.name_ar,
-            description: selectedItemForModifiers.description,
-            price: Number(selectedItemForModifiers.price),
-            image_url: selectedItemForModifiers.image_url || selectedItemForModifiers.image,
-            category: undefined,
-          }}
-          onAddToCart={handleModifierAddToCart}
-        />
-      )}
 
       {/* Unified Customization Selector (New System) */}
       {selectedItemForCustomization && (

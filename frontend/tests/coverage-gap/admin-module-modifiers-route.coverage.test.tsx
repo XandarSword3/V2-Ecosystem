@@ -88,7 +88,7 @@ const groupsSeed = [
     min_selections: 0,
     max_selections: 3,
     is_required: false,
-    allow_multiple_same: false,
+    selection_mode: 'single',
     options: [
       {
         id: 'opt-1',
@@ -116,7 +116,7 @@ describe('Admin module modifiers route coverage', () => {
     toastErrorMock.mockReset();
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/customization/groups') {
+      if (url === '/customizations/groups') {
         return Promise.resolve({ data: { data: groupsSeed } });
       }
       return Promise.resolve({ data: { data: [] } });
@@ -146,7 +146,7 @@ describe('Admin module modifiers route coverage', () => {
 
     await waitFor(() => {
       expect(apiPostMock).toHaveBeenCalledWith(
-        '/customization/options',
+        '/customizations/options',
         expect.objectContaining({
           name: expect.any(String),
           modifierType: 'add',
