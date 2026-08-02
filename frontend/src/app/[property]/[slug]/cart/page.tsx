@@ -208,7 +208,7 @@ export default function ModuleCartPage() {
     orderType: 'dine_in' | 'takeaway' | 'delivery';
     paymentMethod: 'cash' | 'card';
     notes?: string;
-    items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string }>;
+    items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string; metadata?: { selectedModifiers: unknown[] } }>;
     moduleId?: string;
     // Discount integration fields
     couponCode?: string;
@@ -312,6 +312,9 @@ export default function ModuleCartPage() {
         menuItemId: item.id,
         quantity: item.quantity,
         specialInstructions: item.specialInstructions,
+        metadata: item.selectedModifiers && item.selectedModifiers.length > 0
+          ? { selectedModifiers: item.selectedModifiers }
+          : undefined,
       })),
       service_location_id: selectedLocationId || undefined,
       moduleId,

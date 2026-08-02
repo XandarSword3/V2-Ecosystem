@@ -479,23 +479,6 @@ class CustomizationController {
       const discrepancies = await customizationService.getDualWriteDiscrepancies(limit);
       res.json(discrepancies);
   });
-  // ==========================================
-  // ADMIN UTILITIES
-  // ==========================================
-
-  /**
-   * POST /api/customizations/migrate
-   * Migrate existing menu modifiers to unified system (admin only)
-   */
-  migrateMenuModifiers = asyncHandler(async (req: Request, res: Response) => {
-      const result = await customizationService.migrateMenuModifiers();
-      
-      logger.info('Menu modifiers migrated to unified system', result);
-      res.json({
-        message: 'Migration completed',
-        ...result
-      });
-  });
 }
 
 // Export singleton instance

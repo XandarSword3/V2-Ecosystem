@@ -284,7 +284,7 @@ test.describe('Admin functional - Dynamic module admin', () => {
         minSelections: 0,
         maxSelections: 1,
         isRequired: false,
-        allowMultipleSame: false,
+        selectionMode: 'single',
         moduleId: restaurantModule!.id,
         options: [{ name: 'Extra Sauce', price: 1.5, isAvailable: true, modifierType: 'add' }],
       },
