@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { customizationController } from '../controllers/customization.controller.js';
 import { authenticate, authorize } from '../../../middleware/auth.middleware.js';
+import { validatePropertyAccess } from '../../../middleware/propertyAccess.middleware.js';
 
 const router = Router();
 
@@ -9,7 +10,15 @@ const router = Router();
 // ==========================================
 
 // Groups
-router.post('/groups', authenticate, authorize('admin', 'manager'),
+// validatePropertyAccess added here so req.propertyId is actually populated
+// before the controller — createGroup requires it (customization_groups.
+// property_id is NOT NULL). Not added to the other admin routes below since
+// their controllers/services don't currently read propertyId; add it
+// per-route if/when that changes rather than blanket-applying router.use()
+// (which would also hit the unauthenticated PUBLIC ROUTES at the bottom of
+// this file and could 401 legitimate customer traffic that sends
+// x-property-id — see validatePropertyAccess's own 401 branch).
+router.post('/groups', authenticate, authorize('admin', 'manager'), validatePropertyAccess,
   customizationController.createGroup.bind(customizationController));
 
 router.put('/groups/:id', authenticate, authorize('admin', 'manager'),
@@ -21,7 +30,7 @@ router.delete('/groups/:id', authenticate, authorize('admin', 'manager'),
 router.get('/groups/:id', authenticate,
   customizationController.getGroup.bind(customizationController));
 
-router.get('/groups', authenticate,
+router.get('/groups', authenticate, validatePropertyAccess,
   customizationController.listGroups.bind(customizationController));
 
 // Options

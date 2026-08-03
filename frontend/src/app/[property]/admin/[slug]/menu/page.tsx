@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
+import { useProperty } from '@/context/PropertyContext';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -103,11 +104,13 @@ export default function DynamicMenuPage() {
   const params = useParams();
   const router = useRouter();
   const { modules } = useSiteSettings();
+  const { activePropertyId } = useProperty();
   const t = useTranslations('admin');
   
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
   const propertySlug = (params?.property as string) || '';
   const currentModule = modules.find(m => m.slug === slug);
+  const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : undefined;
 
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -139,13 +142,13 @@ export default function DynamicMenuPage() {
       const [menuRes, catRes, ingredientsRes, groupsRes] = await Promise.all([
         api.get(`/${slug}/admin/items`, { params: { moduleId: currentModule.id } }),
         api.get(`/${slug}/categories`, { params: { moduleId: currentModule.id } }),
-        api.get('/inventory/items', { params: { moduleId: currentModule.id } }).catch((e) => {
+        api.get('/inventory/items', { headers: propertyHeader }).catch((e) => {
           console.warn('[Menu Page] Inventory items fetch failed:', e.message);
-          return { data: { data: [] } };
+          return { data: [] };
         }),
-        api.get('/customizations/groups', { params: { moduleId: currentModule.id } }).catch((e) => {
+        api.get('/customizations/groups', { params: { includeOptions: true }, headers: propertyHeader }).catch((e) => {
           console.warn('[Menu Page] Modifiers fetch failed:', e.message);
-          return { data: { data: [] } };
+          return { data: [] };
         }),
       ]);
       // Transform backend items to match frontend interface
@@ -169,8 +172,8 @@ export default function DynamicMenuPage() {
       }));
       setItems(transformedItems);
       setCategories(catRes.data.data || []);
-      setIngredients(ingredientsRes.data.data || []);
-      setCustomizationGroups(groupsRes.data.data || []);
+      setIngredients(ingredientsRes.data?.data || []);
+      setCustomizationGroups(groupsRes.data || []);
     } catch (error) {
       toast.error('Failed to fetch menu data');
       console.error(error);

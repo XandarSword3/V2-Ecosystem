@@ -3,6 +3,7 @@ import { asyncHandler } from '../../../middleware/async-handler.js';
 import { customizationService } from '../services/customization.service.js';
 import { logger } from '../../../utils/logger.js';
 import { getCallerTenantId } from '../../../security/tenant-scope.js';
+import { requireCallerPropertyId } from '../../../security/property-scope.js';
 import type {
   CustomizableEntityType,
   CreateCustomizationGroupRequest,
@@ -52,7 +53,12 @@ class CustomizationController {
         return;
       }
 
-      const group = await customizationService.createGroup(data, { tenantId: tenantScopeFor(req) });
+      // property_id is NOT NULL on customization_groups — resolve it up front
+      // and fail with an actionable 400 rather than letting a null reach
+      // Postgres as an opaque 23502 not-null-violation 500.
+      const propertyId = requireCallerPropertyId(req);
+
+      const group = await customizationService.createGroup(data, { tenantId: tenantScopeFor(req), propertyId });
       
       logger.info('Customization group created', { groupId: group.id, name: group.name });
       res.status(201).json(group);
@@ -108,11 +114,29 @@ class CustomizationController {
       const isGlobal = req.query.isGlobal === 'true' ? true : req.query.isGlobal === 'false' ? false : undefined;
       const includeOptions = req.query.includeOptions === 'true';
 
+      const propertyId = (req as any).propertyId as string | undefined;
+      const tenantId = tenantScopeFor(req);
+
+      logger.info('[CustomizationController] listGroups called', {
+        entityType,
+        isGlobal,
+        includeOptions,
+        tenantId,
+        propertyId,
+        headers: req.headers['x-property-id'],
+      });
+
       const groups = await customizationService.listGroups({
         entityType,
         isGlobal,
         includeOptions,
-        tenantId: tenantScopeFor(req),
+        tenantId,
+        propertyId,
+      });
+
+      logger.info('[CustomizationController] listGroups result', {
+        count: groups.length,
+        groupIds: groups.map(g => g.id),
       });
 
       res.json(groups);
@@ -266,11 +290,15 @@ class CustomizationController {
 
   /**
    * GET /api/customizations/for-entity/:entityType/:entityId
-   * Get available customizations for an entity (customer-facing)
+   * Get customizations for an entity (customer-facing)
    */
   getCustomizationsForEntity = asyncHandler(async (req: Request, res: Response) => {
-      const entityType = req.params.entityType as CustomizableEntityType;
-      const { entityId } = req.params;
+      const { entityType, entityId } = req.params;
+
+      logger.info('[CustomizationController] getCustomizationsForEntity called', {
+        entityType,
+        entityId,
+      });
 
       if (!entityType || !entityId) {
         res.status(400).json({ error: 'Entity type and entity ID are required' });
@@ -278,6 +306,11 @@ class CustomizationController {
       }
 
       const customizations = await customizationService.getCustomizationsForEntity(entityType, entityId);
+
+      logger.info('[CustomizationController] getCustomizationsForEntity result', {
+        count: customizations.length,
+        groupIds: customizations.map(g => g.groupId),
+      });
 
       res.json(customizations);
   });

@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { useParams, useRouter } from 'next/navigation';
+import { CustomizationSelector } from '@/components/customization/CustomizationSelector';
 
 // Type definitions for menu and session data
 interface MenuItem {
@@ -1044,6 +1045,10 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
   const removeItem = useCartStore((s) => s.removeItem);
   const allItems = useCartStore((s) => s.items);
 
+  // Customization modal state
+  const [selectedItemForCustomization, setSelectedItemForCustomization] = useState<MenuItem | null>(null);
+  const [checkingCustomizations, setCheckingCustomizations] = useState(false);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['menu', module.id],
     // /items is the correct instant_transaction route — /menu never existed.
@@ -1082,6 +1087,80 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
     };
     addItem(cartItem);
     toast.success(`${translateContent(item, 'name')} added to cart`);
+  };
+
+  // Check for customizations before adding to cart
+  const handleItemClick = async (item: MenuItem) => {
+    console.log('[MenuListComponent] handleItemClick called', { item: item.name, itemId: item.id });
+    setCheckingCustomizations(true);
+    try {
+      console.log('[MenuListComponent] Fetching customizations for item', item.id);
+      const response = await api.get(`/customizations/for-entity/catalog_item/${item.id}`);
+      const customizationGroups = response.data || [];
+      console.log('[MenuListComponent] Customizations response', { count: customizationGroups.length, groups: customizationGroups });
+      if (customizationGroups.length > 0) {
+        setSelectedItemForCustomization(item);
+      } else {
+        addToCart(item);
+      }
+    } catch (error) {
+      console.warn('Customization lookup failed, adding item without customizations', error);
+      addToCart(item);
+    } finally {
+      setCheckingCustomizations(false);
+    }
+  };
+
+  // Handle customization confirm
+  const handleCustomizationConfirm = (data: {
+    selections: any[];
+    totalPriceAdjustment: number;
+    lineTotal: number;
+    quantity: number;
+  }) => {
+    if (!selectedItemForCustomization) return;
+
+    const translatedName = translateContent(selectedItemForCustomization, 'name');
+    const basePrice = Number(selectedItemForCustomization.price);
+
+    const mapCustomizationType = (type: string): 'add' | 'remove' | 'swap' => {
+      switch (type) {
+        case 'remove': return 'remove';
+        case 'swap':
+        case 'replace':
+        case 'upgrade': return 'swap';
+        default: return 'add';
+      }
+    };
+
+    const customizationDetails = data.selections.map((s: any) => ({
+      optionId: s.optionId,
+      optionName: s.optionName,
+      groupId: s.groupId,
+      groupName: s.groupName,
+      modifierType: mapCustomizationType(s.customizationType),
+      priceAdjustment: s.priceAdjustment || s.totalPrice || 0,
+      quantity: s.quantity,
+    }));
+
+    for (let i = 0; i < data.quantity; i++) {
+      addItem({
+        id: selectedItemForCustomization.id,
+        name: translatedName,
+        price: basePrice,
+        quantity: 1,
+        moduleId: module.id,
+        moduleSlug: module.slug,
+        moduleName: module.name,
+        type: 'instant_transaction' as const,
+        imageUrl: selectedItemForCustomization.image_url || selectedItemForCustomization.image,
+        selectedModifiers: customizationDetails,
+        modifierTotal: data.totalPriceAdjustment,
+      });
+    }
+
+    toast.success(`${translatedName} added to cart`);
+    setSelectedItemForCustomization(null);
   };
 
   if (isLoading) {
@@ -1174,18 +1253,20 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
                       </button>
                       <span className="font-bold">{qty}</span>
                       <button
-                        onClick={() => addToCart(item)}
-                        className="p-2 rounded-full bg-primary-600 text-white hover:bg-primary-700"
+                        onClick={() => handleItemClick(item)}
+                        disabled={checkingCustomizations}
+                        className="p-2 rounded-full bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
                       >
-                        <Plus className="w-4 h-4" />
+                        {checkingCustomizations ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                       </button>
                     </div>
                   ) : (
                     <button
-                      onClick={() => addToCart(item)}
-                      className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                      onClick={() => handleItemClick(item)}
+                      disabled={checkingCustomizations}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                     >
-                      <ShoppingCart className="w-4 h-4" />
+                      {checkingCustomizations ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
                       Add to Cart
                     </button>
                   )}
@@ -1200,6 +1281,25 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
         <div className="text-center py-12 text-slate-500">
           No items available in this category
         </div>
+      )}
+
+      {/* Customization Selector Modal */}
+      {selectedItemForCustomization && (
+        <CustomizationSelector
+          entityType="catalog_item"
+          entityId={selectedItemForCustomization.id}
+          entity={{
+            name: selectedItemForCustomization.name,
+            nameAr: selectedItemForCustomization.name_ar,
+            description: selectedItemForCustomization.description,
+            basePrice: Number(selectedItemForCustomization.price),
+            imageUrl: selectedItemForCustomization.image_url || selectedItemForCustomization.image,
+          }}
+          isOpen={!!selectedItemForCustomization}
+          onClose={() => setSelectedItemForCustomization(null)}
+          onConfirm={handleCustomizationConfirm}
+          title={translateContent(selectedItemForCustomization, 'name')}
+        />
       )}
     </div>
   );
