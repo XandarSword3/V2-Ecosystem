@@ -30,10 +30,9 @@ import {
 export type CustomizationType = 'add' | 'remove' | 'swap' | 'upgrade' | 'replace';
 export type CustomizableEntityType = 
   | 'catalog_item'
-  | 'menu_item' 
   | 'kiosk_item' 
   | 'accommodation_unit' 
-  | 'pool_session' 
+  | 'capacity_window' 
   | 'spa_service' 
   | 'activity' 
   | 'rental_item' 

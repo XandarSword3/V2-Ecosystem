@@ -316,20 +316,3 @@ export function useUnlinkCustomization() {
     },
   });
 }
-
-/**
- * Hook to migrate old menu modifiers (admin)
- */
-export function useMigrateMenuModifiers() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      const response = await api.post('/customizations/migrate');
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: customizationKeys.all });
-    },
-  });
-}
