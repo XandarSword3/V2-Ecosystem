@@ -42,13 +42,13 @@ type PriceType = 'fixed' | 'percentage' | 'per_unit' | 'per_night' | 'per_person
 
 // Map module template types to entity type keys
 const MODULE_TO_ENTITY_TYPE: Record<string, string> = {
-  'menu_service': 'menu_item',
-  'multi_day_booking':          'reservation_unit',
-  'session_access':             'capacity_session',
+  'menu_service': 'catalog_item',
+  'multi_day_booking':          'accommodation_unit',
+  'session_access':             'capacity_window',
   // canonical engine types
   'instant_transaction':        'catalog_item',
-  'time_exclusive_reservation': 'reservation_unit',
-  'shared_capacity_access':     'capacity_session',
+  'time_exclusive_reservation': 'accommodation_unit',
+  'shared_capacity_access':     'capacity_window',
 };
 
 interface CustomizationGroup {
@@ -105,10 +105,10 @@ interface DualWriteStats {
 
 // Entity type labels - static list, but will be filtered by active modules
 const ALL_ENTITY_TYPE_LABELS: Record<string, string> = {
-  menu_item: 'Menu Items',
-  catalog_item: 'Catalog Items',
-  reservation_unit: 'Accommodation Units',
-  pool_session: 'Pool Sessions',
+  catalog_item: 'Menu / Catalog Items',
+  kiosk_item: 'Kiosk Items',
+  accommodation_unit: 'Accommodation Units',
+  capacity_window: 'Capacity Windows',
   spa_service: 'Spa Services',
   activity: 'Activities',
   rental_item: 'Rentals',
@@ -119,7 +119,7 @@ const ALL_ENTITY_TYPE_LABELS: Record<string, string> = {
 
 // Map module slugs to entity types
 const MODULE_SLUG_TO_ENTITY: Record<string, string[]> = {
-  'pool': ['pool_session'],
+  'pool': ['capacity_window'],
   'spa': ['spa_service'],
   'activities': ['activity'],
   'rentals': ['rental_item'],
@@ -321,17 +321,6 @@ export default function AdminCustomizationsPage() {
     },
   });
 
-  const migrateMutation = useMutation({
-    mutationFn: () => api.post('/customizations/migrate'),
-    onSuccess: (response) => {
-      toast.success(`Migration completed: ${response.data.groups} groups, ${response.data.options} options, ${response.data.links} links`);
-      queryClient.invalidateQueries({ queryKey: ['customization-groups'] });
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Migration failed');
-    },
-  });
-
   // Toggle group expansion
   const toggleGroupExpansion = (groupId: string) => {
     setExpandedGroups(prev => {
@@ -447,7 +436,7 @@ export default function AdminCustomizationsPage() {
           {[
             { id: 'groups', label: 'Groups & Options', icon: Layers },
             { id: 'metrics', label: 'Performance Metrics', icon: BarChart3 },
-            { id: 'migration', label: 'Migration & Dual-Write', icon: RefreshCw },
+            { id: 'migration', label: 'Dual-Write Monitoring', icon: Activity },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -754,44 +743,6 @@ export default function AdminCustomizationsPage() {
             exit={{ opacity: 0, y: -10 }}
             className="space-y-4"
           >
-            {/* Migration Tool */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <RefreshCw className="h-5 w-5" />
-                  Menu Modifiers Migration
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground">
-                  Migrate existing menu modifier groups and options to the unified customization system.
-                  This is a one-time operation that copies data without deleting the original.
-                </p>
-                <div className="flex items-center gap-4">
-                  <Button
-                    onClick={() => {
-                      if (confirm('This will migrate all menu modifiers to the unified system. Continue?')) {
-                        migrateMutation.mutate();
-                      }
-                    }}
-                    disabled={migrateMutation.isPending}
-                  >
-                    {migrateMutation.isPending ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Migrating...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Run Migration
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Dual-Write Stats */}
             <Card>
               <CardHeader>

@@ -37,7 +37,6 @@ import {
   useDeleteCustomizationOption,
   useEntityCustomizations,
   useLinkCustomization,
-  useMigrateMenuModifiers,
   useOrderCustomizations,
   useUnlinkCustomization,
   useUpdateCustomizationOption,
@@ -358,20 +357,6 @@ describe('useCustomizations hooks', () => {
     options.onSuccess();
     expect(invalidateQueriesMock).toHaveBeenCalledWith({
       queryKey: ['customizations', 'groups'],
-    });
-  });
-
-  it('invalidates global customization cache after migration', () => {
-    renderHook(() => useMigrateMenuModifiers());
-
-    const options = useMutationMock.mock.calls[0][0] as {
-      onSuccess: () => void;
-    };
-
-    options.onSuccess();
-
-    expect(invalidateQueriesMock).toHaveBeenCalledWith({
-      queryKey: ['customizations'],
     });
   });
 });

@@ -76,7 +76,7 @@ const groupsSeed = [
     minSelections: 1,
     maxSelections: 1,
     isRequired: true,
-    applicableEntityTypes: ['menu_item'],
+    applicableEntityTypes: ['catalog_item'],
     isGlobal: false,
     isAvailable: true,
     sortOrder: 1,
@@ -170,19 +170,14 @@ describe('Admin customizations route coverage', () => {
       return Promise.resolve({ data: [] });
     });
 
-    apiPostMock.mockImplementation((url: string) => {
-      if (url === '/customizations/migrate') {
-        return Promise.resolve({ data: { groups: 2, options: 5, links: 8 } });
-      }
-      return Promise.resolve({ data: { success: true } });
-    });
+    apiPostMock.mockResolvedValue({ data: { success: true } });
     apiPutMock.mockResolvedValue({ data: { success: true } });
     apiDeleteMock.mockResolvedValue({ data: { success: true } });
 
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
   });
 
-  it('loads groups, opens metrics and migration tabs, then runs migration', async () => {
+  it('loads groups, opens metrics tab, and shows dual-write monitoring stats', async () => {
     const user = userEvent.setup();
 
     renderPage();
@@ -193,38 +188,34 @@ describe('Admin customizations route coverage', () => {
     await user.click(screen.getByRole('button', { name: /Performance Metrics/i }));
     expect(await screen.findByText('Validation Latency')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /Migration & Dual-Write/i }));
-    expect(await screen.findByText('Dual-Write Monitoring')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Dual-Write Monitoring/i }));
 
-    await user.click(screen.getByRole('button', { name: /Run Migration/i }));
-
-    await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/customizations/migrate');
-    });
-
-    expect(toastSuccessMock).toHaveBeenCalledWith('Migration completed: 2 groups, 5 options, 8 links');
+    expect(await screen.findByText('Total Operations')).toBeInTheDocument();
+    expect(screen.getByText('42')).toBeInTheDocument();
+    expect(screen.getByText('95.2%')).toBeInTheDocument();
+    expect(screen.getByText('Discrepancies detected')).toBeInTheDocument();
   });
 
-  it('shows mutation error when migration fails', async () => {
-    apiPostMock.mockImplementation((url: string) => {
-      if (url === '/customizations/migrate') {
-        return Promise.reject({ response: { data: { error: 'Cannot migrate now' } } });
+  it('shows the empty state when no dual-write data is available', async () => {
+    apiGetMock.mockImplementation((url: string) => {
+      if (url === '/customizations/groups') {
+        return Promise.resolve({ data: groupsSeed });
       }
-      return Promise.resolve({ data: { success: true } });
+      if (url === '/customizations/metrics') {
+        return Promise.resolve({ data: metricsSeed });
+      }
+      if (url === '/customizations/dual-write/stats') {
+        return Promise.reject(new Error('load failed'));
+      }
+      return Promise.resolve({ data: [] });
     });
 
     renderPage();
 
     await screen.findByText('Customization Manager');
 
-    fireEvent.click(screen.getByRole('button', { name: /Migration & Dual-Write/i }));
-    await waitFor(() => {
-      expect(screen.getByText('Dual-Write Monitoring')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Run Migration/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Dual-Write Monitoring/i }));
 
-    await waitFor(() => {
-      expect(toastErrorMock).toHaveBeenCalledWith('Cannot migrate now');
-    });
+    expect(await screen.findByText('No dual-write data available')).toBeInTheDocument();
   });
 });
