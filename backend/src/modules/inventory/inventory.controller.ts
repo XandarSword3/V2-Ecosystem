@@ -4,8 +4,15 @@ import { logger } from '../../utils/logger.js';
 import { AppError } from '../../utils/AppError.js';
 import { z } from 'zod';
 import { getCallerTenantId as tenantScopeFor } from '../../security/tenant-scope.js';
+import { requireCallerPropertyId } from '../../security/property-scope.js';
 
 // Validation schemas
+const dateOrDatetimeSchema = z.string().transform((val) => {
+  if (!val) return undefined;
+  if (val.includes('T')) return val;
+  return `${val}T00:00:00.000Z`;
+}).optional();
+
 const createItemSchema = z.object({
   name: z.string().min(1).max(200),
   sku: z.string().max(50).optional(),
@@ -19,7 +26,7 @@ const createItemSchema = z.object({
   costPerUnit: z.number().min(0).optional(),
   supplier: z.string().max(200).optional(),
   location: z.string().max(100).optional(),
-  expiryDate: z.string().datetime().optional(),
+  expiryDate: dateOrDatetimeSchema,
   notes: z.string().optional(),
 });
 
@@ -623,7 +630,7 @@ export class InventoryController {
       const data = validation.data;
       const userId = req.user?.id;
       const tenantId = tenantScopeFor(req);
-      const propertyId = (req as any).propertyId as string | undefined;
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
       // categoryId is caller-supplied — confirm it actually belongs to this
@@ -667,7 +674,7 @@ export class InventoryController {
           notes: data.notes,
           created_by: userId,
           tenant_id: tenantId,
-          property_id: propertyId ?? null,
+          property_id: propertyId,
         })
         .select()
         .single();

@@ -534,6 +534,24 @@ function buildInstantTransactionRouter(router: Router): void {
         .single();
 
       if (error) throw error;
+
+      // Create entity_customizations links if customization_group_ids provided
+      if (Array.isArray(customization_group_ids) && customization_group_ids.length > 0) {
+        const links = customization_group_ids.map((groupId: string) => ({
+          entity_type: 'catalog_item',
+          entity_id: data.id,
+          customization_group_id: groupId,
+          tenant_id,
+          property_id: mounted.property_id,
+          is_enabled: true,
+          sort_order: 0,
+        }));
+        const { error: linkError } = await supabase.from('entity_customizations').insert(links);
+        if (linkError) {
+          logger.warn('[Dynamic Router] Failed to create customization links', { error: linkError });
+        }
+      }
+
       res.status(201).json({ success: true, data });
     } catch (error) {
       logger.error('[Dynamic Router] POST /admin/items failed', error);
@@ -604,6 +622,36 @@ function buildInstantTransactionRouter(router: Router): void {
         .single();
 
       if (error) throw error;
+
+      // Sync entity_customizations links if customization_group_ids changed
+      if (customization_group_ids !== undefined) {
+        const tenant_id = await getTenantIdForMountedModule(mounted);
+        
+        // Delete existing links for this item
+        await supabase
+          .from('entity_customizations')
+          .delete()
+          .eq('entity_type', 'catalog_item')
+          .eq('entity_id', req.params.id);
+
+        // Create new links if any provided
+        if (Array.isArray(customization_group_ids) && customization_group_ids.length > 0) {
+          const links = customization_group_ids.map((groupId: string) => ({
+            entity_type: 'catalog_item',
+            entity_id: req.params.id,
+            customization_group_id: groupId,
+            tenant_id,
+            property_id: mounted.property_id,
+            is_enabled: true,
+            sort_order: 0,
+          }));
+          const { error: linkError } = await supabase.from('entity_customizations').insert(links);
+          if (linkError) {
+            logger.warn('[Dynamic Router] Failed to create customization links', { error: linkError });
+          }
+        }
+      }
+
       res.json({ success: true, data });
     } catch (error) {
       logger.error('[Dynamic Router] PUT /admin/items/:id failed', error);

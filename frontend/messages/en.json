@@ -106,7 +106,13 @@
     "notFound": "Not found",
     "notSupported": "Not supported",
     "today": "Today",
-    "yesterday": "Yesterday"
+    "yesterday": "Yesterday",
+    "basePrice": "Base price",
+    "required": "Required",
+    "quantity": "Quantity",
+    "confirmSelection": "Confirm Selection",
+    "customizations": "Customizations",
+    "enterName": "Please enter your name"
   },
   "errors": {
     "pageNotFound": "Page Not Found",
