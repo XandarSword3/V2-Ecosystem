@@ -22,10 +22,10 @@ export type CustomizationType =
  * Add new types as modules are built
  */
 export type CustomizableEntityType =
-  | 'menu_item'      // Menu service items
+  | 'catalog_item'       // Menu/kiosk-service catalog items
   | 'kiosk_item'         // Kiosk items
   | 'accommodation_unit' // Accommodation units
-  | 'pool_session'   // Pool sessions/bookings
+  | 'capacity_window'    // Capacity windows (pool sessions, timed slots, etc.)
   | 'spa_service'    // Spa services (future)
   | 'activity'       // Activities/excursions (future)
   | 'rental_item'    // Equipment rentals (future)

@@ -41,7 +41,7 @@
  * 
  * // For shared_capacity_access sessions
  * <CustomizationSelector
- *   entityType="capacity_session"
+ *   entityType="capacity_window"
  *   entityId={session.id}
  *   entity={{
  *     name: session.name,
@@ -84,6 +84,5 @@ export {
   useDeleteCustomizationOption,
   useLinkCustomization,
   useUnlinkCustomization,
-  useMigrateMenuModifiers,
   customizationKeys,
 } from '@/hooks/useCustomizations';
