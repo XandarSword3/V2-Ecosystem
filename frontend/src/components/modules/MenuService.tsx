@@ -111,10 +111,13 @@ export function MenuService({ module }: MenuServiceProps) {
   // failed lookup) add it straight to the cart — there is no legacy
   // modifier system to fall back to anymore.
   const handleItemClick = useCallback(async (item: MenuItemData) => {
+    console.log('[MenuService] handleItemClick called', { item: item.name, itemId: item.id });
     setCheckingCustomizations(true);
     try {
+      console.log('[MenuService] Fetching customizations for item', item.id);
       const response = await api.get(`/customizations/for-entity/catalog_item/${item.id}`);
       const customizationGroups = response.data || [];
+      console.log('[MenuService] Customizations response', { count: customizationGroups.length, groups: customizationGroups });
       if (customizationGroups.length > 0) {
         setSelectedItemForCustomization(item);
       } else {

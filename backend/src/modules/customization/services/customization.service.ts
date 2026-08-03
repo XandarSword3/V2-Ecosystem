@@ -406,6 +406,7 @@ class CustomizationService {
     isGlobal?: boolean;
     includeOptions?: boolean;
     tenantId?: string | null;
+    propertyId?: string | null;
   }): Promise<CustomizationGroup[]> {
     const supabase = getSupabase();
     
@@ -429,6 +430,11 @@ class CustomizationService {
     // and intentionally sees everything (platform-admin surface).
     if (filters?.tenantId) {
       query = query.eq('tenant_id', filters.tenantId);
+    }
+
+    // Property isolation: if propertyId is provided, filter to that property
+    if (filters?.propertyId) {
+      query = query.eq('property_id', filters.propertyId);
     }
 
     const { data: groups, error } = await query;
@@ -760,7 +766,22 @@ class CustomizationService {
     entityId: string
   ): Promise<CustomizationGroupWithOptions[]> {
     const supabase = getSupabase();
-    
+
+    logger.info('[CustomizationService] getCustomizationsForEntity', { entityType, entityId });
+
+    // First, check if there are any entity_customizations links directly
+    const { data: links, error: linksError } = await supabase
+      .from('entity_customizations')
+      .select('*')
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId);
+
+    logger.info('[CustomizationService] Direct entity_customizations query', {
+      count: links?.length || 0,
+      links: links,
+      error: linksError
+    });
+
     const { data, error } = await supabase
       .rpc('get_entity_customizations', {
         p_entity_type: entityType,
@@ -771,6 +792,11 @@ class CustomizationService {
       logger.error('Failed to get entity customizations', { error, entityType, entityId });
       throw new Error(`Failed to get customizations: ${error.message}`);
     }
+
+    logger.info('[CustomizationService] RPC result', {
+      count: data?.length || 0,
+      data
+    });
 
     return (data || []).map((row: any) => ({
       groupId: row.group_id,

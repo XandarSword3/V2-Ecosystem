@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/Dialog';
 import { useDebounce } from '@/utils/performance';
 import { useSiteSettings, Module } from '@/lib/settings-context';
+import { useProperty } from '@/context/PropertyContext';
 import {
   Plus,
   Edit2,
@@ -144,6 +145,8 @@ const CUSTOMIZATION_TYPE_LABELS: Record<CustomizationType, string> = {
 export default function AdminCustomizationsPage() {
   const queryClient = useQueryClient();
   const { modules } = useSiteSettings();
+  const { activePropertyId } = useProperty();
+  const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : undefined;
   const [activeTab, setActiveTab] = useState<'groups' | 'metrics' | 'migration'>('groups');
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -156,10 +159,10 @@ export default function AdminCustomizationsPage() {
   const [inventorySearch, setInventorySearch] = useState('');
 
   useEffect(() => {
-    api.get('/inventory/items?limit=500&fields=id,name,unit,current_stock')
-      .then(res => setInventoryItems(res.data?.items || []))
+    api.get('/inventory/items?limit=500', { headers: propertyHeader })
+      .then(res => setInventoryItems(res.data?.data || []))
       .catch(() => {});
-  }, []);
+  }, [propertyHeader]);
 
   // Compute available entity types based on active modules
   const availableEntityTypes = useMemo(() => {
