@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSocket } from '@/lib/socket';
-import { formatCurrency, formatTime, getOrderStatusColor } from '@/lib/utils';
+import { formatCurrency, formatTime } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
@@ -11,10 +11,11 @@ import {
   Clock,
   ChefHat,
   RefreshCw,
-  User,
   XCircle,
+  Check,
+  ChevronRight,
 } from 'lucide-react';
-import { Order, statusFlow } from './types';
+import { Order, OrderItem, ItemStatus, statusFlow, itemStatusFlow } from './types';
 
 import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
 import { createOfflineOrderStatusUpdate, createOfflineOrder, createOfflineCashPayment } from '@/lib/offline/offline-sync';
@@ -26,10 +27,150 @@ export interface KitchenViewProps {
   moduleId: string;
 }
 
+// ============================================
+// Elapsed-time hero element
+// ============================================
+// Time-in-state is the thing that actually matters on a kitchen display —
+// everything else (name, table, modifiers) is secondary once an order has
+// been sitting for a while. Hardcoded (not the CMS `primary` token) because
+// urgency color has to stay legible regardless of a tenant's brand palette.
+const ELAPSED_WARN_MIN = 10;
+const ELAPSED_CRIT_MIN = 20;
+
+function useElapsedMinutes(since: string): number {
+  const [minutes, setMinutes] = useState(() => Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 60000)));
+
+  useEffect(() => {
+    const tick = () => setMinutes(Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 60000)));
+    tick();
+    const id = setInterval(tick, 15000);
+    return () => clearInterval(id);
+  }, [since]);
+
+  return minutes;
+}
+
+function ElapsedTimer({ since }: { since: string }) {
+  const minutes = useElapsedMinutes(since);
+  const hh = Math.floor(minutes / 60);
+  const mm = minutes % 60;
+  const label = hh > 0 ? `${hh}:${String(mm).padStart(2, '0')}:00` : `${mm}:00`;
+
+  const tone =
+    minutes >= ELAPSED_CRIT_MIN
+      ? 'text-red-600 dark:text-red-400 animate-pulse'
+      : minutes >= ELAPSED_WARN_MIN
+      ? 'text-amber-600 dark:text-amber-400'
+      : 'text-emerald-600 dark:text-emerald-400';
+
+  return (
+    <span className={`font-mono tabular-nums font-bold text-lg leading-none ${tone}`}>
+      {label}
+    </span>
+  );
+}
+
+// ============================================
+// Item-level status chip — tap to advance
+// ============================================
+const ITEM_STATUS_STYLE: Record<ItemStatus, { bg: string; border: string; text: string; dot: string; label: string }> = {
+  pending: {
+    bg: 'bg-gray-50 dark:bg-gray-800',
+    border: 'border-gray-200 dark:border-gray-700',
+    text: 'text-gray-600 dark:text-gray-300',
+    dot: 'bg-gray-400',
+    label: 'Pending',
+  },
+  preparing: {
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
+    border: 'border-amber-300 dark:border-amber-700',
+    text: 'text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+    label: 'Preparing',
+  },
+  ready: {
+    bg: 'bg-teal-50 dark:bg-teal-900/20',
+    border: 'border-teal-300 dark:border-teal-700',
+    text: 'text-teal-700 dark:text-teal-300',
+    dot: 'bg-teal-500',
+    label: 'Ready',
+  },
+  served: {
+    bg: 'bg-gray-50 dark:bg-gray-800/60',
+    border: 'border-gray-200 dark:border-gray-700',
+    text: 'text-gray-400 dark:text-gray-500',
+    dot: 'bg-gray-400',
+    label: 'Served',
+  },
+};
+
+const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
+  pending: 'Start',
+  preparing: 'Ready',
+  ready: 'Serve',
+  served: null,
+};
+
+function ItemStatusChip({
+  item,
+  onAdvance,
+  disabled,
+}: {
+  item: OrderItem;
+  onAdvance: (item: OrderItem) => void;
+  disabled: boolean;
+}) {
+  const status = item.status ?? 'pending';
+  const style = ITEM_STATUS_STYLE[status];
+  const nextLabel = ITEM_NEXT_ACTION_LABEL[status];
+  const isServed = status === 'served';
+
+  return (
+    <div className={`rounded-md border ${style.border} ${style.bg} px-2 py-1.5`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <span className="font-medium bg-white/70 dark:bg-black/20 px-1 rounded text-[10px] shrink-0">
+            {item.quantity}x
+          </span>
+          <span className={`text-xs truncate ${isServed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'}`}>
+            {item.name}
+          </span>
+        </div>
+
+        {isServed ? (
+          <Check className="h-3.5 w-3.5 text-teal-500 shrink-0" />
+        ) : nextLabel ? (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdvance(item);
+            }}
+            className={`shrink-0 flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded ${style.text} bg-white dark:bg-gray-900 border ${style.border} hover:brightness-95 active:scale-95 transition disabled:opacity-40 disabled:pointer-events-none`}
+          >
+            {nextLabel}
+            <ChevronRight className="h-3 w-3" />
+          </button>
+        ) : null}
+      </div>
+
+      {item.specialInstructions && (
+        <p className="text-[10px] text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded mt-1">
+          {item.specialInstructions}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  // Items currently mid-flight to the item-status endpoint — used to disable
+  // the tapped chip so a slow network doesn't invite a double-tap.
+  const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(new Set());
   const { socket } = useSocket();
 
   useEffect(() => {
@@ -65,8 +206,33 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         );
       };
 
+      // New: item-level status, emitted by PATCH .../items/:itemId/status.
+      // Keeps every open KDS screen (multiple stations, expo, etc.) in sync
+      // when one of them bumps an item.
+      interface ItemStatusUpdate {
+        orderId: string;
+        itemId: string;
+        status: ItemStatus;
+      }
+
+      const handleItemStatusUpdate = (update: ItemStatusUpdate) => {
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === update.orderId
+              ? {
+                  ...order,
+                  items: order.items.map((item) =>
+                    item.id === update.itemId ? { ...item, status: update.status } : item
+                  ),
+                }
+              : order
+          )
+        );
+      };
+
       socket.on('order:new', handleNewOrder);
       socket.on('order:status', handleStatusUpdate);
+      socket.on('order:item:status', handleItemStatusUpdate);
       socket.on('new-order', handleNewOrder);
       socket.on('order-status-updated', handleStatusUpdate);
 
@@ -76,6 +242,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         socket.emit('leave:unit', slug);
         socket.off('order:new', handleNewOrder);
         socket.off('order:status', handleStatusUpdate);
+        socket.off('order:item:status', handleItemStatusUpdate);
         socket.off('new-order', handleNewOrder);
         socket.off('order-status-updated', handleStatusUpdate);
       };
@@ -101,7 +268,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         });
         const freshOrders = response.data.data || [];
         setOrders(freshOrders);
-        
+
         // 3. Update offline store
         await ordersStore.clear();
         await ordersStore.putMany(freshOrders);
@@ -148,6 +315,71 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
     }
   };
 
+  // Item-level status is deliberately online-only. Order-level updates have
+  // an offline queue (createOfflineOrderStatusUpdate) with a sync-replay path
+  // on the backend; wiring the same for individual order_items would mean
+  // teaching that replay logic a second entity type for a workflow that's
+  // rare to hit offline in the first place (a KDS is usually on stable wifi
+  // in the kitchen, unlike a server's handheld). Known gap, same call as the
+  // backend made for per-item cancel — documented rather than silently
+  // half-built. If it's actually offline, staff fall back to the existing
+  // whole-order "Advance Status" action below, which does queue.
+  const advanceItem = async (orderId: string, item: OrderItem) => {
+    const currentStatus = item.status ?? 'pending';
+    const nextIndex = itemStatusFlow.indexOf(currentStatus) + 1;
+    const nextStatus = itemStatusFlow[nextIndex];
+    if (!nextStatus) return;
+
+    if (!isOnline()) {
+      toast.error('Item updates need a connection', {
+        description: 'Use "Advance Status" on the order instead — it queues offline.',
+      });
+      return;
+    }
+
+    setPendingItemIds((prev) => new Set(prev).add(item.id));
+
+    // Optimistic update
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId
+          ? {
+              ...order,
+              items: order.items.map((i) => (i.id === item.id ? { ...i, status: nextStatus } : i)),
+            }
+          : order
+      )
+    );
+
+    try {
+      await api.patch(`/staff/modules/${slug}/orders/${orderId}/items/${item.id}/status`, {
+        status: nextStatus,
+      });
+      // Order-level auto-derivation (ready/served once every item matches)
+      // arrives over the 'order:status' socket event handled above, so no
+      // need to guess at it here.
+    } catch (error) {
+      // Roll back the optimistic bump
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId
+            ? {
+                ...order,
+                items: order.items.map((i) => (i.id === item.id ? { ...i, status: currentStatus } : i)),
+              }
+            : order
+        )
+      );
+      toast.error(`Failed to update ${item.name}`);
+    } finally {
+      setPendingItemIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
+
   const createStaffOrder = async () => {
     try {
       const itemId = window.prompt('Menu item ID');
@@ -159,7 +391,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         return;
       }
       const tableNumber = window.prompt('Table number (optional)') || undefined;
-      
+
       const orderData = {
         tableId: tableNumber, // API expects tableId or table_number depending on endpoint
         items: [{ menuItemId: itemId, quantity }],
@@ -289,7 +521,12 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                               </span>
                             )}
                           </div>
-                          {/* Order Type Badge */}
+                          {/* Elapsed timer — the hero element. What matters on a
+                              KDS is time-in-state, not just what was ordered. */}
+                          <ElapsedTimer since={order.createdAt} />
+                        </div>
+
+                        <div className="flex items-center justify-between mb-2">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
                             order.orderType === 'dine_in' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                             : order.orderType === 'delivery' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
@@ -297,29 +534,20 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                           }`}>
                             {order.orderType?.replace('_', ' ') || 'dine in'}
                           </span>
-                        </div>
-
-                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 mb-2">
-                          <Clock className="h-3 w-3" />
-                          <span>{formatTime(order.createdAt)}</span>
+                          <span className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                            <Clock className="h-3 w-3" />
+                            {formatTime(order.createdAt)}
+                          </span>
                         </div>
 
                         <div className="space-y-1 mb-2">
                           {order.items.map((item) => (
-                            <div key={item.id} className="text-xs">
-                              <div className="flex gap-1.5">
-                                <span className="font-medium bg-gray-100 dark:bg-gray-700 px-1 rounded text-[10px]">
-                                  {item.quantity}x
-                                </span>
-                                <span className="text-gray-700 dark:text-gray-300">{item.name}</span>
-                              </div>
-                              {/* Modifier Display */}
-                              {item.specialInstructions && (
-                                <p className="text-[10px] text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded mt-0.5 ml-5">
-                                  {item.specialInstructions}
-                                </p>
-                              )}
-                            </div>
+                            <ItemStatusChip
+                              key={item.id}
+                              item={item}
+                              disabled={pendingItemIds.has(item.id)}
+                              onAdvance={(i) => advanceItem(order.id, i)}
+                            />
                           ))}
                         </div>
 
@@ -329,7 +557,10 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                         </div>
                       </div>
 
-                      {/* Quick Action */}
+                      {/* Quick Action — order-level. Still needed for the
+                          pending→confirmed→preparing steps, since order_items
+                          has no 'confirmed' equivalent; items only drive
+                          auto-derivation once everything hits ready/served. */}
                       {(nextStatus || ['confirmed', 'preparing', 'ready', 'served'].includes(order.status)) && (
                         <div className="px-2 pb-2 flex gap-2">
                           <Button
@@ -383,8 +614,9 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                     {selectedOrder.orderType}
                   </span>
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  {formatTime(selectedOrder.createdAt)} • {selectedOrder.customerName}
+                <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+                  <span>{formatTime(selectedOrder.createdAt)} • {selectedOrder.customerName}</span>
+                  <ElapsedTimer since={selectedOrder.createdAt} />
                 </p>
               </div>
               <Button
@@ -398,26 +630,14 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
             </div>
 
             <div className="p-6 max-h-[60vh] overflow-y-auto">
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {selectedOrder.items.map((item) => (
-                  <div
+                  <ItemStatusChip
                     key={item.id}
-                    className="flex justify-between items-start py-2 border-b border-gray-50 dark:border-gray-700/50 last:border-0"
-                  >
-                    <div className="flex gap-3">
-                      <div className="bg-primary/10 text-primary font-bold w-8 h-8 rounded flex items-center justify-center shrink-0">
-                        {item.quantity}
-                      </div>
-                      <div>
-                        <p className="font-medium">{item.name}</p>
-                        {item.specialInstructions && (
-                          <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1 bg-yellow-50 dark:bg-yellow-900/20 p-1.5 rounded">
-                            Note: {item.specialInstructions}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    item={item}
+                    disabled={pendingItemIds.has(item.id)}
+                    onAdvance={(i) => advanceItem(selectedOrder.id, i)}
+                  />
                 ))}
               </div>
 
@@ -440,21 +660,21 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col gap-3">
               <div className="flex gap-3">
                 {selectedOrder.status !== 'completed' && (
-                  <Button 
+                  <Button
                     className="bg-green-600 hover:bg-green-700 text-white flex-1"
                     onClick={async () => {
                       if (isOnline()) {
-                        await api.post('/payments/cash', { 
-                          referenceType: 'restaurant_order', 
-                          referenceId: selectedOrder.id, 
-                          amount: selectedOrder.totalAmount 
+                        await api.post('/payments/cash', {
+                          referenceType: 'restaurant_order',
+                          referenceId: selectedOrder.id,
+                          amount: selectedOrder.totalAmount
                         });
                         toast.success('Payment recorded');
                       } else {
-                        await createOfflineCashPayment({ 
-                          referenceType: 'restaurant_order', 
-                          referenceId: selectedOrder.id, 
-                          amount: selectedOrder.totalAmount 
+                        await createOfflineCashPayment({
+                          referenceType: 'restaurant_order',
+                          referenceId: selectedOrder.id,
+                          amount: selectedOrder.totalAmount
                         });
                         toast.info('Cash payment queued offline', { icon: '💵' });
                       }
@@ -491,7 +711,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         </div>
       )}
       {/* Order Details Modal ... */}
-      
+
       {/* Footer */}
       <footer className="mt-auto">
         <DataFreshnessFooter storeName="orders" />
