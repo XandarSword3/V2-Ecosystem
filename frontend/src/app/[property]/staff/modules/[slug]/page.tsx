@@ -14,7 +14,13 @@ interface ModuleData {
   id: string;
   name: string;
   slug: string;
-  template_type: string;
+  // NOTE: `template_type` is a legacy column kept only for backward
+  // compatibility (see ENGINE_TO_LEGACY_TEMPLATE_TYPE in
+  // backend/src/engines/types.ts) — it holds old strings like
+  // 'menu_service', never the canonical engine values below. Route on
+  // `engine_type`, which is the real, current field.
+  engine_type: string;
+  template_type?: string;
   description?: string;
   is_active: boolean;
 }
@@ -77,7 +83,9 @@ export default function ModulesSlugPage() {
     );
   }
 
-  switch (module.template_type) {
+  // Route on engine_type (canonical). template_type is legacy — see the
+  // note on ModuleData above.
+  switch (module.engine_type) {
     case 'instant_transaction':
       return <KitchenView slug={slug} moduleName={module.name} moduleId={module.id} />;
 
@@ -96,7 +104,7 @@ export default function ModulesSlugPage() {
           slug={slug}
           moduleName={module.name}
           moduleId={module.id}
-          templateType={module.template_type}
+          templateType={module.engine_type}
           description={module.description}
         />
       );
