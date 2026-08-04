@@ -41,7 +41,7 @@ export default function InteractiveResortMap() {
     modules.forEach((module) => {
       if (!module.is_active) return;
 
-      if (module.template_type === 'instant_transaction') {
+      if (module.engine_type === 'instant_transaction') {
         list.push({
           id: module.id,
           name: module.name,
@@ -51,7 +51,7 @@ export default function InteractiveResortMap() {
           description: module.description || 'On-site dining and services',
           slug: module.slug,
         });
-      } else if (module.template_type === 'shared_capacity_access') {
+      } else if (module.engine_type === 'shared_capacity_access') {
         list.push({
           id: module.id,
           name: module.name,
@@ -61,7 +61,7 @@ export default function InteractiveResortMap() {
           description: module.description || 'Facility access and sessions',
           slug: module.slug,
         });
-      } else if (module.template_type === 'time_exclusive_reservation') {
+      } else if (module.engine_type === 'time_exclusive_reservation') {
         list.push({
           id: module.id,
           name: module.name,
@@ -71,7 +71,7 @@ export default function InteractiveResortMap() {
           description: module.description || 'Luxury accommodation booking',
           slug: module.slug,
         });
-      } else if (module.template_type === 'ongoing_entitlement') {
+      } else if (module.engine_type === 'ongoing_entitlement') {
         list.push({
           id: module.id,
           name: module.name,

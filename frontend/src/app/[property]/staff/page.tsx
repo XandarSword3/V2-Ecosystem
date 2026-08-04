@@ -335,17 +335,17 @@ export default function StaffDashboard() {
       let bgColor = 'bg-blue-50 dark:bg-blue-950/30';
       let description = m.description || 'Manage module';
 
-      if (m.template_type === 'instant_transaction') {
+      if (m.engine_type === 'instant_transaction') {
         icon = ChefHat;
         color = 'from-orange-400 to-rose-500';
         bgColor = 'bg-orange-50 dark:bg-orange-950/30';
         description = 'Kitchen view';
-      } else if (m.template_type === 'shared_capacity_access') {
+      } else if (m.engine_type === 'shared_capacity_access') {
         icon = Waves;
         color = 'from-primary-400 to-secondary-500';
         bgColor = 'bg-primary-50 dark:bg-primary-950/30';
         description = 'Sessions & Capacity';
-      } else if (m.template_type === 'time_exclusive_reservation') {
+      } else if (m.engine_type === 'time_exclusive_reservation') {
         icon = Home;
         color = 'from-emerald-400 to-teal-500';
         bgColor = 'bg-emerald-50 dark:bg-emerald-950/30';

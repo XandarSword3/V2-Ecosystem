@@ -79,21 +79,21 @@ export default function AdminSettingsPage() {
     
     activeModules.forEach(module => {
       // Add settings tab for modules that have configurable settings
-      if (module.template_type === 'time_exclusive_reservation') {
+      if (module.engine_type === 'time_exclusive_reservation') {
         tabs.push({
           id: `module-${module.slug}` as const,
           label: module.name,
           icon: Building2,
           moduleSlug: module.slug,
-          templateType: module.template_type
+          templateType: module.engine_type
         });
-      } else if (module.template_type === 'shared_capacity_access') {
+      } else if (module.engine_type === 'shared_capacity_access') {
         tabs.push({
           id: `module-${module.slug}` as const,
           label: module.name,
           icon: Globe,
           moduleSlug: module.slug,
-          templateType: module.template_type
+          templateType: module.engine_type
         });
       }
     });
@@ -191,7 +191,7 @@ export default function AdminSettingsPage() {
                         </div>
                         <div>
                           <h4 className="font-medium text-slate-900 dark:text-white">{module.name}</h4>
-                          <p className="text-xs text-slate-500">Slug: {module.slug} • Type: {module.template_type}</p>
+                          <p className="text-xs text-slate-500">Slug: {module.slug} • Type: {module.engine_type}</p>
                         </div>
                       </div>
                       
@@ -496,7 +496,7 @@ export default function AdminSettingsPage() {
           
           const moduleSettings = (formSettings.moduleSettings as Record<string, Record<string, string | number>> || {})[moduleSlug] || {};
           
-          if (module.template_type === 'time_exclusive_reservation') {
+          if (module.engine_type === 'time_exclusive_reservation') {
             // Multi-day booking settings (like units/rooms)
             return (
               <div className="space-y-8">
@@ -573,7 +573,7 @@ export default function AdminSettingsPage() {
                 </div>
               </div>
             );
-          } else if (module.template_type === 'shared_capacity_access') {
+          } else if (module.engine_type === 'shared_capacity_access') {
             return (
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-800 mb-4">
