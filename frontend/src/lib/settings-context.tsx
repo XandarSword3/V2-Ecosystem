@@ -261,7 +261,14 @@ export interface ModuleSettings {
 export interface Module {
   id: string;
   engine_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement' | 'platform_entitlement';
-  template_type?: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement'; // Backward compatibility
+  // Legacy backward-compat column. Despite the name overlap, this does NOT
+  // hold the same values as engine_type — it holds old strings written by
+  // ENGINE_TO_LEGACY_TEMPLATE_TYPE (backend/src/engines/types.ts), e.g.
+  // 'menu_service', 'multi_day_booking', 'session_access', 'subscription'.
+  // The previous type annotation here (identical union to engine_type) was
+  // wrong and is exactly what caused several call sites to switch on this
+  // field expecting canonical values. Always prefer engine_type.
+  template_type?: string;
   name: string;
   slug: string;
   description?: string;

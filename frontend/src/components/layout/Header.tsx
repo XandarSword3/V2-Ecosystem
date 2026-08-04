@@ -157,7 +157,7 @@ export default function Header() {
 
   interface ModuleIcon {
     slug: string;
-    template_type?: string;
+    engine_type?: string;
     settings?: { icon?: string };
   }
   const getIconForModule = (module: ModuleIcon) => {
@@ -166,8 +166,9 @@ export default function Header() {
       const customIcon = getIconByName(module.settings.icon);
       if (customIcon) return customIcon;
     }
-    // Fallback: icon based on canonical engine/template type
-    switch (module.template_type) {
+    // Fallback: icon based on canonical engine type. NOTE: engine_type, not
+    // the legacy template_type column — see backend/src/engines/types.ts.
+    switch (module.engine_type) {
       case 'instant_transaction': return UtensilsCrossed;
       case 'time_exclusive_reservation': return Home;
       case 'shared_capacity_access': return Waves;

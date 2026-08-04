@@ -65,7 +65,7 @@ export default function StaffBookingsPage() {
 
   const { modules } = useSiteSettings();
   // resolve the active reservation module slug dynamically; fall back to empty string
-  const bookingModule = modules.find((m) => m.template_type === 'time_exclusive_reservation');
+  const bookingModule = modules.find((m) => m.engine_type === 'time_exclusive_reservation');
   const moduleSlug = bookingModule?.slug ?? '';
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {

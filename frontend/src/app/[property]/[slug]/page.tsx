@@ -172,8 +172,11 @@ export default function ModulePage() {
   }
 
   // Fallback to legacy hardcoded templates for modules that have no custom layout.
-  // Maps real engine types → nearest legacy component.
-  switch (currentModule.template_type) {
+  // Maps real engine types → nearest legacy component. Switches on engine_type,
+  // not the legacy template_type column (see backend/src/engines/types.ts) —
+  // this was previously broken and meant any module without a custom Visual
+  // Builder layout showed "Unknown module type" to customers.
+  switch (currentModule.engine_type) {
     case 'instant_transaction':
       return <MenuService module={currentModule} />;
     case 'time_exclusive_reservation':
@@ -184,13 +187,13 @@ export default function ModulePage() {
       // No dedicated legacy component yet — fall through to generic message.
       return (
         <div className="min-h-screen flex items-center justify-center">
-          <p>Module type &quot;{currentModule.template_type}&quot; has no default renderer. Build a layout in the Visual Builder.</p>
+          <p>Module type &quot;{currentModule.engine_type}&quot; has no default renderer. Build a layout in the Visual Builder.</p>
         </div>
       );
     default:
       return (
         <div className="min-h-screen flex items-center justify-center">
-          <p>Unknown module type: {currentModule.template_type}</p>
+          <p>Unknown module type: {currentModule.engine_type}</p>
         </div>
       );
   }
