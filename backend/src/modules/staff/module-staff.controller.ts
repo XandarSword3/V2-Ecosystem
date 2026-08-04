@@ -74,6 +74,50 @@ export async function getModuleOrders(req: Request, res: Response) {
 
     if (error) throw error;
 
+    const orderIds = (orders || []).map((o) => o.id);
+
+    // Fetch order_items for this page of orders. Previously this endpoint
+    // always returned items: [] — see the commit that added order_items
+    // insertion at creation time for the full story. Kept as two plain
+    // queries (rather than a PostgREST embedded catalog_items(...) join)
+    // since that requires a specific FK relationship name and this way
+    // can't silently break if that ever changes.
+    const itemsByOrder: Record<string, Array<{
+      id: string; catalogItemId: string | null; name: string; quantity: number;
+      unitPrice: number; subtotal: number; specialInstructions: string | null; status: string;
+    }>> = {};
+
+    if (orderIds.length > 0) {
+      const { data: itemRows, error: itemsError } = await supabase
+        .from('order_items')
+        .select('id, transaction_id, catalog_item_id, quantity, unit_price, subtotal, special_instructions, status')
+        .in('transaction_id', orderIds);
+
+      if (itemsError) {
+        logger.warn('Failed to fetch order_items for module orders list — items will show empty', itemsError.message);
+      } else if (itemRows && itemRows.length > 0) {
+        const catalogIds = [...new Set(itemRows.map((r) => r.catalog_item_id).filter(Boolean))];
+        const { data: catalogRows } = catalogIds.length > 0
+          ? await supabase.from('catalog_items').select('id, name').in('id', catalogIds)
+          : { data: [] as Array<{ id: string; name: string }> };
+        const nameById = new Map((catalogRows || []).map((c) => [c.id, c.name]));
+
+        for (const row of itemRows) {
+          const list = itemsByOrder[row.transaction_id] ?? (itemsByOrder[row.transaction_id] = []);
+          list.push({
+            id: row.id,
+            catalogItemId: row.catalog_item_id,
+            name: nameById.get(row.catalog_item_id) ?? 'Item',
+            quantity: row.quantity,
+            unitPrice: row.unit_price,
+            subtotal: row.subtotal,
+            specialInstructions: row.special_instructions,
+            status: row.status ?? 'pending',
+          });
+        }
+      }
+    }
+
     // Transform data for frontend
     const transformedOrders = (orders || []).map(order => {
       const meta = (order.metadata ?? {}) as Record<string, unknown>;
@@ -84,7 +128,7 @@ export async function getModuleOrders(req: Request, res: Response) {
         customerId: order.customer_id,
         orderType: order.engine_type,
         status: order.status,
-        items: [], // Items fetched separately from order_items
+        items: itemsByOrder[order.id] ?? [],
         totalAmount: order.amount,
         tableNumber: meta.table_number ?? meta.table_id ?? null,
         createdAt: order.created_at,
@@ -380,6 +424,24 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       .single();
 
     if (updateError) throw updateError;
+
+    // Real-time notify the KDS — same gap as order creation, nothing
+    // previously emitted this despite KitchenView listening for it.
+    try {
+      const orderMeta = (order.metadata ?? {}) as Record<string, unknown>;
+      emitToUnit(req.user?.tenantId || 'default', slug, 'order:status', {
+        id: order.id,
+        status: order.status,
+        tableNumber: orderMeta.table_number ?? orderMeta.table_id ?? null,
+      });
+      emitToUnit(req.user?.tenantId || 'default', order.module_id, 'order:status', {
+        id: order.id,
+        status: order.status,
+        tableNumber: orderMeta.table_number ?? orderMeta.table_id ?? null,
+      });
+    } catch (socketErr: any) {
+      logger.warn('Failed to emit order:status', socketErr.message);
+    }
 
     // Log activity (non-critical, don't fail if table doesn't exist)
     try {
