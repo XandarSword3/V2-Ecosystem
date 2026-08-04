@@ -464,6 +464,157 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
   }
 }
 
+const ITEM_STATUS_FLOW = ['pending', 'preparing', 'ready', 'served'];
+
+/**
+ * Update the status of a single order_items row — the item-level KDS.
+ * Forward-only, one step at a time (mirrors the spirit of the order-level
+ * state machine, but order_items isn't a registered engine entity so this
+ * is enforced directly here rather than via transitionState).
+ *
+ * Once every item on an order reaches 'ready' or 'served', the parent
+ * order is auto-advanced to match via the real engine transition (actor
+ * 'system'), so staff don't have to separately bump the order after
+ * bumping its last item. If the order-level transition isn't currently
+ * allowed for any reason, the item status update still succeeds — the
+ * order just won't auto-advance that time.
+ *
+ * Known gap: no per-item cancel yet. An 86'd item mid-prep still has to
+ * go through order-level cancel for now.
+ */
+export async function updateModuleOrderItemStatus(req: Request, res: Response) {
+  try {
+    const { slug, orderId, itemId } = req.params;
+    const { status } = req.body;
+    const supabase = getSupabase();
+
+    if (!ITEM_STATUS_FLOW.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid item status. Must be one of: ${ITEM_STATUS_FLOW.join(', ')}`,
+      });
+    }
+
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (!module || module.engine_type !== 'instant_transaction') {
+      return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
+    }
+
+    // Scope the item to both this order and this module in one query, so a
+    // staff member can't bump an item belonging to a different module's (or
+    // a different tenant's) order just by guessing an itemId in the URL.
+    const { data: currentItem, error: itemFetchError } = await supabase
+      .from('order_items')
+      .select('id, status, transaction_id')
+      .eq('id', itemId)
+      .eq('transaction_id', orderId)
+      .single();
+
+    if (itemFetchError || !currentItem) {
+      return res.status(404).json({ success: false, error: 'Order item not found' });
+    }
+
+    const { data: parentOrder, error: orderFetchError } = await supabase
+      .from('transactions')
+      .select('id, status, module_id, metadata')
+      .eq('id', orderId)
+      .eq('module_id', module.id)
+      .single();
+
+    if (orderFetchError || !parentOrder) {
+      return res.status(404).json({ success: false, error: 'Order not found for this module' });
+    }
+
+    const currentIndex = ITEM_STATUS_FLOW.indexOf(currentItem.status ?? 'pending');
+    const targetIndex = ITEM_STATUS_FLOW.indexOf(status);
+    if (targetIndex !== currentIndex + 1) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot move item from '${currentItem.status}' to '${status}' — items advance one step at a time (${ITEM_STATUS_FLOW.join(' → ')}).`,
+      });
+    }
+
+    const { data: updatedItem, error: updateError } = await supabase
+      .from('order_items')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', itemId)
+      .select('*')
+      .single();
+
+    if (updateError) throw updateError;
+
+    try {
+      const itemPayload = { orderId, itemId, status };
+      emitToUnit(req.user?.tenantId || 'default', slug, 'order:item:status', itemPayload);
+      emitToUnit(req.user?.tenantId || 'default', module.id, 'order:item:status', itemPayload);
+    } catch (socketErr: any) {
+      logger.warn('Failed to emit order:item:status', socketErr.message);
+    }
+
+    // Auto-derive the parent order's status once every item hits the same
+    // milestone. Only for 'ready'/'served' — 'preparing' has no order-level
+    // action worth forcing, and a cancelled/completed order is never
+    // touched by this regardless of item states.
+    if (status === 'ready' || status === 'served') {
+      const { data: siblingItems, error: siblingError } = await supabase
+        .from('order_items')
+        .select('status')
+        .eq('transaction_id', orderId);
+
+      const allAtStatus = !siblingError && (siblingItems ?? []).length > 0
+        && (siblingItems ?? []).every((i) => i.status === status);
+
+      if (allAtStatus && parentOrder.status !== status
+          && parentOrder.status !== 'cancelled' && parentOrder.status !== 'completed') {
+        const engineService = getEngineService();
+        const engineAction = status === 'ready' ? 'mark_ready' : 'mark_served';
+        const transitionResult = await engineService.transitionState(
+          'instant_transaction',
+          parentOrder.status,
+          engineAction,
+          'system',
+          { orderId, derivedFromItems: true },
+        );
+
+        if (transitionResult.allowed) {
+          const orderMeta = (parentOrder.metadata ?? {}) as Record<string, unknown>;
+          const timestampField = status === 'ready'
+            ? { actual_ready_time: new Date().toISOString() }
+            : { served_at: new Date().toISOString() };
+
+          const { data: derivedOrder } = await supabase
+            .from('transactions')
+            .update({
+              status: transitionResult.targetState,
+              updated_at: new Date().toISOString(),
+              metadata: { ...orderMeta, ...timestampField },
+            })
+            .eq('id', orderId)
+            .select('id, status')
+            .single();
+
+          if (derivedOrder) {
+            emitToUnit(req.user?.tenantId || 'default', slug, 'order:status', derivedOrder);
+            emitToUnit(req.user?.tenantId || 'default', module.id, 'order:status', derivedOrder);
+          }
+        }
+        // Not allowed just means the order won't auto-advance this time —
+        // the item update above already succeeded and is not rolled back.
+      }
+    }
+
+    res.json({ success: true, data: updatedItem });
+  } catch (error: any) {
+    logger.error('Error updating order item status:', error);
+    res.status(500).json({ success: false, error: 'Failed to update order item', message: error.message });
+  }
+}
+
 // ============================================
 // BOOKINGS (for multi_day_booking modules)
 // ============================================
