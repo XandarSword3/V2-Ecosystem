@@ -14,6 +14,7 @@ import { resolveTaxCategory } from '../services/tax.service.js';
 import { generateQRCodeImage } from '../utils/qr-security.js';
 import { customizationService } from '../modules/customization/services/customization.service.js';
 import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reversal.js';
+import { emitToUnit } from '../socket/index.js';
 
 // Import parsers
 import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
@@ -1059,6 +1060,67 @@ function buildInstantTransactionRouter(router: Router): void {
       // can reverse it precisely by order_id instead of by fuzzy recency.
       await linkDiscountsToOrder(supabase, pricing.discounts, created.id, req.user?.userId ?? undefined);
 
+      // CRITICAL: persist order_items. Previously nothing in this codebase
+      // ever wrote a row to order_items — the only per-item record of an
+      // order was `receiptLineItems`, buried inside engine_financial_ledger
+      // metadata for receipt display only. Two real capabilities were
+      // silently broken as a result:
+      //   1. deduct_inventory_for_order_v2 (called on status → confirmed,
+      //      see engines/inventory-side-effects.ts) reads FROM order_items
+      //      WHERE transaction_id = p_transaction_id — with no rows, it
+      //      iterates zero times and deducts nothing. Every "confirmed"
+      //      order has been a no-op for inventory.
+      //   2. The staff/KDS orders endpoint has always returned items: []
+      //      for every order (see module-staff.controller.ts) — kitchen
+      //      staff never saw what was actually ordered.
+      // Item status defaults to 'pending' — this is what the item-level
+      // KDS (staff/KitchenView.tsx) advances through preparing/ready/served.
+      // Non-fatal by design, matching the ledger-recording block below: the
+      // transactions row is already the authoritative "an order exists"
+      // record, so a hiccup here must not block order creation — but unlike
+      // the ledger snapshot, a failure here means inventory won't deduct
+      // and the kitchen won't see items, so it's logged at error, not warn.
+      try {
+        const orderItemRows = items.map((item: unknown, index: number) => {
+          const currentItem = item as {
+            catalog_item_id?: string; menuItemId?: string; itemId?: string;
+            quantity?: number; metadata?: Record<string, unknown>;
+          };
+          const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+          const quantity = asNumber(currentItem.quantity, 1);
+          const basePrice = priceMap.get(resolvedId) ?? 0;
+          const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
+          const unitPrice = basePrice + modifierAdjustment;
+          const specialInstructions = (currentItem.metadata?.specialInstructions
+            ?? currentItem.metadata?.notes
+            ?? null) as string | null;
+          return {
+            transaction_id: created.id,
+            catalog_item_id: resolvedId || null,
+            quantity,
+            unit_price: unitPrice,
+            subtotal: unitPrice * quantity,
+            special_instructions: specialInstructions,
+            status: 'pending',
+            tenant_id: tenantId,
+            property_id: propertyId,
+          };
+        });
+
+        const { error: orderItemsError } = await supabase.from('order_items').insert(orderItemRows);
+        if (orderItemsError) {
+          logger.error('[Dynamic Router] Failed to persist order_items — inventory deduction and KDS item display will be broken for this order', {
+            orderId: created.id,
+            error: orderItemsError.message,
+          });
+        }
+      } catch (orderItemsErr) {
+        logger.error('[Dynamic Router] Unexpected error persisting order_items', {
+          orderId: created.id,
+          error: orderItemsErr instanceof Error ? orderItemsErr.message : String(orderItemsErr),
+        });
+      }
+
       // Persist the full pricing breakdown (subtotal, discount detail,
       // service charge, delivery fee, itemization) to the financial ledger.
       // Previously this whole breakdown was computed by calculatePricing()
@@ -1101,6 +1163,37 @@ function buildInstantTransactionRouter(router: Router): void {
 
       // Flatten metadata fields to top level for client convenience
       const meta = (created?.metadata ?? {}) as Record<string, unknown>;
+
+      // Real-time notify the KDS. KitchenView.tsx joins both the module id
+      // and slug as socket rooms and listens for 'order:new' — nothing
+      // anywhere in the backend previously emitted it, so "live" order
+      // updates never actually happened; staff needed a manual refresh.
+      try {
+        const kdsPayload = {
+          id: created.id,
+          orderNumber: meta.order_number ?? created.id.slice(0, 8),
+          customerName: meta.customer_name ?? 'Guest',
+          orderType: meta.order_type ?? 'dine_in',
+          status: created.status,
+          totalAmount: created.amount,
+          tableNumber: meta.table_number ?? null,
+          createdAt: created.created_at,
+          items: receiptLineItems.map((li) => ({
+            id: li.itemId,
+            name: li.name,
+            quantity: li.quantity,
+            specialInstructions: undefined,
+          })),
+        };
+        emitToUnit(tenantId, mounted.slug, 'order:new', kdsPayload);
+        emitToUnit(tenantId, mounted.id, 'order:new', kdsPayload);
+      } catch (socketErr) {
+        logger.warn('[Dynamic Router] Failed to emit order:new', {
+          orderId: created.id,
+          error: socketErr instanceof Error ? socketErr.message : String(socketErr),
+        });
+      }
+
       res.status(201).json({
         success: true,
         data: {
