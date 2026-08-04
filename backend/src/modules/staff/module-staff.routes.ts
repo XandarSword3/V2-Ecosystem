@@ -40,6 +40,9 @@ router.post('/modules/:slug/tables/:tableId/merge', authorize(...staffRoles), ve
 router.put('/modules/:slug/orders/:orderId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleOrderStatus);
 router.patch('/modules/:slug/orders/:orderId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleOrderStatus);
 
+// Update a single item's status (item-level KDS)
+router.patch('/modules/:slug/orders/:orderId/items/:itemId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleOrderItemStatus);
+
 // ============================================
 // Multi-Day Booking Operations (accommodation, villas, etc.)
 // ============================================
