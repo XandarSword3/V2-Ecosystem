@@ -262,7 +262,10 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
       try {
         const response = await api.get(`/staff/modules/${slug}/orders`, {
           params: {
-            status: 'pending,confirmed,preparing,ready,served',
+            // 'delivered' is the engine's real name for this step (see
+            // instant-transaction.ts) — the board used to ask for 'served'
+            // here, which no order could ever actually reach.
+            status: 'pending,confirmed,preparing,ready,delivered',
             moduleId: moduleId,
           },
         });
@@ -478,7 +481,9 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
             confirmed: { bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-300 dark:border-blue-700', text: 'text-blue-700 dark:text-blue-300', action: 'Start Prep', actionBg: 'bg-blue-600 hover:bg-blue-700', label: 'Confirmed' },
             preparing: { bg: 'bg-orange-50 dark:bg-orange-900/10', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-orange-300', action: 'Mark Ready', actionBg: 'bg-orange-500 hover:bg-orange-600', label: 'Preparing' },
             ready: { bg: 'bg-green-50 dark:bg-green-900/10', border: 'border-green-300 dark:border-green-700', text: 'text-green-700 dark:text-green-300', action: 'Served', actionBg: 'bg-emerald-600 hover:bg-emerald-700', label: 'Ready' },
-            served: { bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-300 dark:border-purple-700', text: 'text-purple-700 dark:text-purple-300', action: 'Complete', actionBg: 'bg-gray-600 hover:bg-gray-700', label: 'Served' },
+            // Key is 'delivered' to match the engine's real status name — label
+            // stays 'Served' since that's the term staff actually use.
+            delivered: { bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-300 dark:border-purple-700', text: 'text-purple-700 dark:text-purple-300', action: 'Complete', actionBg: 'bg-gray-600 hover:bg-gray-700', label: 'Served' },
           };
           const col = columnColors[status] || columnColors.pending;
           const nextStatus = statusFlow[statusFlow.indexOf(status) + 1];
@@ -561,7 +566,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                           pending→confirmed→preparing steps, since order_items
                           has no 'confirmed' equivalent; items only drive
                           auto-derivation once everything hits ready/served. */}
-                      {(nextStatus || ['confirmed', 'preparing', 'ready', 'served'].includes(order.status)) && (
+                      {(nextStatus || ['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status)) && (
                         <div className="px-2 pb-2 flex gap-2">
                           <Button
                             className={`w-full text-white text-xs ${col.actionBg}`}
@@ -573,7 +578,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                           >
                             {col.action}
                           </Button>
-                          {['confirmed', 'preparing', 'ready', 'served'].includes(order.status) && (
+                          {['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status) && (
                             <Button
                               variant="outline"
                               size="sm"

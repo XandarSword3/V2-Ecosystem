@@ -213,7 +213,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   const acceptOrder = (orderId: string) => updateOrderStatus(orderId, 'confirmed');
   const startPreparing = (orderId: string) => updateOrderStatus(orderId, 'preparing');
   const markReady = (orderId: string) => updateOrderStatus(orderId, 'ready');
-  const markServed = (orderId: string) => updateOrderStatus(orderId, 'served');
+  const markServed = (orderId: string) => updateOrderStatus(orderId, 'delivered');
   const markCompleted = (orderId: string) => updateOrderStatus(orderId, 'completed');
 
   // Add item to existing order
@@ -801,7 +801,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
               <h3 className="text-lg font-bold mb-4">Open Tabs & Unpaid Orders</h3>
               <div className="space-y-3">
                 {orders
-                  .filter(o => ['ready', 'served'].includes(o.status))
+                  .filter(o => ['ready', 'delivered'].includes(o.status))
                   .map(order => (
                     <div
                       key={order.id}
