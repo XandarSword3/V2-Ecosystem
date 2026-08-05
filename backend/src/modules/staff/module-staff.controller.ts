@@ -5,6 +5,7 @@ import { validateBody } from '../../validation/schemas.js';
 import { emitToUnit } from '../../socket/index.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
+import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
 import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
 import dayjs from 'dayjs';
 
@@ -333,138 +334,42 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     // Valid status transitions. 'delivered' is the real instant_transaction
     // engine state (instant-transaction.ts) — staff-facing UI still calls
     // this step "Served", but the value written to transactions.status has
-    // to match what the engine actually recognizes.
+    // to match what the engine actually recognizes. Fast-fail here before
+    // touching the DB; changeInstantTransactionOrderStatus independently
+    // validates against the real engine either way.
     const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, error: 'Invalid status' });
     }
 
-    // Update the order in the unified transactions table
-    // Use engine framework for state transitions
-    const engineService = getEngineService();
-    
-    // Get current order to determine state transition
-    const { data: currentOrder, error: fetchError } = await supabase
-      .from('transactions')
-      .select('status, module_id, metadata')
-      .eq('engine_type', 'instant_transaction')
-      .eq('id', orderId)
-      .single();
-      
-    if (fetchError || !currentOrder) throw fetchError || new Error('Order not found');
-    
-    // Map status to engine action. Was missing 'confirmed' entirely (every
-    // "Accept" tap from the KDS 500'd) and asked for a 'mark_served' action
-    // that has never existed on the engine (every "Served" tap 400'd) —
-    // the engine's real name for that step is 'deliver' → 'delivered'.
-    let engineAction: string;
-    switch (status) {
-      case 'confirmed': engineAction = 'confirm'; break;
-      case 'preparing': engineAction = 'start_preparation'; break;
-      case 'ready': engineAction = 'mark_ready'; break;
-      case 'delivered': engineAction = 'deliver'; break;
-      case 'completed': engineAction = 'complete'; break;
-      case 'cancelled': engineAction = 'cancel'; break;
-      default: throw new Error(`Invalid status: ${status}`);
-    }
-    
-    // Execute state transition via engine
-    // Read module config to determine the correct engine type dynamically
-    const { data: moduleConfig } = await supabase
-      .from('modules')
-      .select('engine_type')
-      .eq('id', currentOrder.module_id)
-      .single();
-    
-    // Use TEMPLATE_TO_ENGINE constant for consistent mapping
-    const engineType = TEMPLATE_TO_ENGINE[moduleConfig?.engine_type] || 'instant_transaction';
+    // This used to be two separate implementations of the same responsibility
+    // — this one (hardcoded status→action switch, no module scoping, no
+    // discount reversal on cancel) and dynamic-module.router.ts's
+    // PATCH /orders/:id/status (engine-driven, properly module-scoped, does
+    // discount reversal, but never emitted the socket event the KDS needs).
+    // Both routes now delegate to the same function. See order-status.service.ts.
+    const result = await changeInstantTransactionOrderStatus(supabase, {
+      orderId,
+      moduleId: module.id,
+      moduleSlug: slug,
+      moduleEngineTypeRaw: module.engine_type,
+      requestedStatus: status,
+      // Deliberately not actorForUser(req) here: mark_ready/deliver on the
+      // engine only allow actor 'staff' (not 'admin'), but this route is
+      // reachable by admins/managers too (staffRoles). Forcing 'staff'
+      // regardless of real role is what makes "Mark Ready"/"Served" work
+      // for everyone this route is meant to serve — switching to
+      // actorForUser would silently 400 those buttons for admins/managers.
+      actor: 'staff',
+      userId,
+      tenantId: req.user?.tenantId,
+    });
 
-    const transitionResult = await engineService.transitionState(
-      engineType,
-      currentOrder.status,
-      engineAction,
-      'staff',
-      { 
-        orderId,
-        staffId: userId,
-        ...(status === 'preparing' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
-        ...(status === 'ready' ? { actual_ready_time: new Date().toISOString() } : {}),
-        ...(status === 'delivered' ? { served_at: new Date().toISOString() } : {}),
-        ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {}),
-        ...(status === 'cancelled' ? { cancelled_at: new Date().toISOString() } : {}),
-      }
-    );
-
-    // transitionState only validates + runs in-memory side effects — it never
-    // touches the database. Both of these were previously missing: the
-    // .allowed check (a rejected transition was silently treated as success)
-    // and the actual write-back (the row was re-selected unchanged and
-    // returned as if the update had happened). Fixed 2026-07-02 — see
-    // CONTEXT.md. This also makes Phase 3 occupancy derivation
-    // (service_locations) trustworthy, since it reads this same status column.
-    if (!transitionResult.allowed) {
-      return res.status(400).json({
-        success: false,
-        error: transitionResult.error || `Cannot transition order from '${currentOrder.status}' to '${status}'`,
-      });
+    if (!result.ok) {
+      return res.status(result.status).json({ success: false, error: result.error });
     }
 
-    const existingMetadata = (currentOrder as { metadata?: Record<string, unknown> }).metadata ?? {};
-    const now = new Date().toISOString();
-    const timestampFields: Record<string, string> = {
-      ...(status === 'preparing' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
-      ...(status === 'ready' ? { actual_ready_time: now } : {}),
-      ...(status === 'delivered' ? { served_at: now } : {}),
-      ...(status === 'cancelled' ? { cancelled_at: now } : {}),
-    };
-
-    const { data: order, error: updateError } = await supabase
-      .from('transactions')
-      .update({
-        status: transitionResult.targetState,
-        updated_at: now,
-        ...(status === 'completed' ? { completed_at: now } : {}),
-        metadata: { ...existingMetadata, ...timestampFields },
-      })
-      .eq('id', orderId)
-      .select('*')
-      .single();
-
-    if (updateError) throw updateError;
-
-    // Real-time notify the KDS — same gap as order creation, nothing
-    // previously emitted this despite KitchenView listening for it.
-    try {
-      const orderMeta = (order.metadata ?? {}) as Record<string, unknown>;
-      emitToUnit(req.user?.tenantId || 'default', slug, 'order:status', {
-        id: order.id,
-        status: order.status,
-        tableNumber: orderMeta.table_number ?? orderMeta.table_id ?? null,
-      });
-      emitToUnit(req.user?.tenantId || 'default', order.module_id, 'order:status', {
-        id: order.id,
-        status: order.status,
-        tableNumber: orderMeta.table_number ?? orderMeta.table_id ?? null,
-      });
-    } catch (socketErr: any) {
-      logger.warn('Failed to emit order:status', socketErr.message);
-    }
-
-    // Log activity (non-critical, don't fail if table doesn't exist)
-    try {
-      await supabase.from('activity_logs').insert({
-        user_id: userId,
-        action: 'order_status_update',
-        resource_type: 'order',
-        resource_id: orderId,
-        details: { newStatus: status, moduleSlug: slug },
-        tenant_id: req.user?.tenantId,
-      });
-    } catch (logError: any) {
-      logger.warn('Failed to log activity:', logError.message);
-    }
-
-    res.json({ success: true, data: order });
+    res.json({ success: true, data: result.order });
   } catch (error: any) {
     logger.error('Error updating order status:', error);
     res.status(500).json({ success: false, error: 'Failed to update order', message: error.message });

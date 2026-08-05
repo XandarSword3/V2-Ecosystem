@@ -14,6 +14,7 @@ import { resolveTaxCategory } from '../services/tax.service.js';
 import { generateQRCodeImage } from '../utils/qr-security.js';
 import { customizationService } from '../modules/customization/services/customization.service.js';
 import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reversal.js';
+import { actorForUser, resolveAction, changeInstantTransactionOrderStatus } from '../engines/order-status.service.js';
 import { emitToUnit } from '../socket/index.js';
 
 // Import parsers
@@ -198,61 +199,6 @@ function enforceServiceLocationOwnership(req: Request, res: Response, next: Next
       });
       res.status(500).json({ success: false, error: 'Unable to validate module access' });
     });
-}
-
-function actorForUser(req: Request): 'system' | 'staff' | 'customer' | 'admin' {
-  const roles = req.user?.roles ?? [];
-  if (roles.includes('super_admin') || roles.includes('admin') || roles.includes('manager')) {
-    return 'admin';
-  }
-  if (roles.some((role) => role.includes('staff'))) {
-    return 'staff';
-  }
-  return 'customer';
-}
-
-/**
- * Resolve the action name for a target state or legacy alias.
- * Clients send target state names (e.g. 'confirmed') or legacy aliases
- * (e.g. 'active', 'used') — map them to the real action name the
- * state machine expects (e.g. 'confirm', 'validate_entry', 'record_exit').
- */
-function resolveAction(
-  templateType: string,
-  currentState: string,
-  targetStateOrAction: string,
-  actor: 'system' | 'staff' | 'customer' | 'admin',
-): string {
-  const available = engineService.getAvailableActions(templateType, currentState, actor);
-
-  // 1. Direct action name match (already correct)
-  if (available.find((a) => a.action === targetStateOrAction)) return targetStateOrAction;
-
-  // 2. Target state name match (client sent destination state, not action)
-  const stateMatch = available.find((a) => a.targetState === targetStateOrAction);
-  if (stateMatch) return stateMatch.action;
-
-  // 3. Legacy action name aliases (old API surface → new action names)
-  const ACTION_ALIASES: Record<string, string> = {
-    // shared_capacity_access
-    'validate':        'validate_entry',
-    'complete':        'record_exit',
-    // time_exclusive_reservation (old status names used as actions)
-    'active':          'check_in',
-    'used':            'check_out',
-    'check_in':        'check_in',
-    'check_out':       'check_out',
-    'cancel':          'cancel',
-    'cancelled':       'cancel',
-    'confirm':         'confirm',
-    'confirmed':       'confirm',
-    'no_show':         'mark_no_show',
-  };
-  const aliasedAction = ACTION_ALIASES[targetStateOrAction];
-  if (aliasedAction && available.find((a) => a.action === aliasedAction)) return aliasedAction;
-
-  // Fall through: return as-is (will fail gracefully in transitionState)
-  return targetStateOrAction;
 }
 
 function asNumber(input: unknown, fallback = 0): number {
@@ -1348,74 +1294,29 @@ function buildInstantTransactionRouter(router: Router): void {
       }
 
       const supabase = getSupabase();
-      const { data: current, error: currentError } = await supabase
-        .from('transactions')
-        .select('id, status, customer_id, metadata')
-        .eq('engine_type', 'instant_transaction')
-        .eq('id', req.params.id)
-        .eq('module_id', mounted.id)
-        .maybeSingle();
+      const result = await changeInstantTransactionOrderStatus(supabase, {
+        orderId: req.params.id,
+        moduleId: mounted.id,
+        moduleSlug: mounted.slug,
+        moduleEngineTypeRaw: mounted.engine_type,
+        requestedStatus: newStatus,
+        // Forced 'staff', not actorForUser(req): this route is staff/manager/
+        // admin/super_admin-only (never actually reachable by a customer, so
+        // actorForUser could only ever resolve to 'staff' or 'admin' here
+        // anyway) — and mark_ready/deliver on the engine only allow actor
+        // 'staff'. Matches module-staff.controller.ts's KDS endpoint, which
+        // this route needs to behave identically to now that both call the
+        // same function (this one's also what offline-sync replay hits).
+        actor: 'staff',
+        userId: req.user?.userId,
+        tenantId: req.user?.tenantId,
+      });
 
-      if (currentError) throw currentError;
-      if (!current) return res.status(404).json({ success: false, error: 'Order not found' });
-
-      const actor = actorForUser(req);
-      const action = resolveAction(mounted.engine_type, current.status, newStatus, actor);
-      const transition = await engineService.transitionState(
-        mounted.engine_type,
-        current.status,
-        action,
-        actor,
-        { moduleId: mounted.id },
-      );
-
-      if (!transition.allowed) {
-        return res.status(400).json({ success: false, error: transition.error ?? 'Invalid status transition' });
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, error: result.error });
       }
 
-      const currentMetadata = (current.metadata ?? {}) as Record<string, unknown>;
-      const isCancelling = transition.targetState === 'cancelled';
-      // Guard against reversing twice — a refund via payment.controller.ts's
-      // processRefundById can also reach this order and reverses the same
-      // way; whichever happens first sets discountsReversedAt.
-      const alreadyReversed = Boolean(currentMetadata.discountsReversedAt);
-      const updatedMetadata =
-        isCancelling && !alreadyReversed
-          ? { ...currentMetadata, discountsReversedAt: new Date().toISOString() }
-          : currentMetadata;
-
-      const { data, error } = await supabase
-        .from('transactions')
-        .update({
-          status: transition.targetState,
-          updated_at: new Date().toISOString(),
-          ...(isCancelling && !alreadyReversed ? { metadata: updatedMetadata } : {}),
-        })
-        .eq('id', req.params.id)
-        .eq('module_id', mounted.id)
-        .select('id, status, updated_at')
-        .single();
-
-      if (error) throw error;
-
-      // Give back whatever coupon/gift card this order consumed at creation
-      // (see discount-reversal.ts). Previously cancelling an order never
-      // touched coupon usage counts or gift card balances at all — a
-      // customer could cancel and re-book indefinitely on the same coupon,
-      // or a cancelled order's gift card balance was just gone.
-      if (isCancelling && !alreadyReversed) {
-        const discounts = Array.isArray((currentMetadata as { discounts?: unknown }).discounts)
-          ? ((currentMetadata as { discounts: any[] }).discounts)
-          : [];
-        if (discounts.length > 0) {
-          await reverseDiscounts(supabase, discounts, {
-            userId: current.customer_id ?? undefined,
-            orderId: current.id,
-          });
-        }
-      }
-
-      res.json({ success: true, data });
+      res.json({ success: true, data: result.order });
     } catch (error) {
       logger.error('[Dynamic Router] PATCH /orders/:id/status failed', error);
       res.status(500).json({ success: false, error: 'Failed to update order status' });
