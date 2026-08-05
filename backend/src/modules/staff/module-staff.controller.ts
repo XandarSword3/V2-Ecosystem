@@ -330,8 +330,11 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
     }
 
-    // Valid status transitions
-    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'served', 'completed', 'cancelled'];
+    // Valid status transitions. 'delivered' is the real instant_transaction
+    // engine state (instant-transaction.ts) — staff-facing UI still calls
+    // this step "Served", but the value written to transactions.status has
+    // to match what the engine actually recognizes.
+    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, error: 'Invalid status' });
     }
@@ -350,12 +353,16 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       
     if (fetchError || !currentOrder) throw fetchError || new Error('Order not found');
     
-    // Map status to engine action
+    // Map status to engine action. Was missing 'confirmed' entirely (every
+    // "Accept" tap from the KDS 500'd) and asked for a 'mark_served' action
+    // that has never existed on the engine (every "Served" tap 400'd) —
+    // the engine's real name for that step is 'deliver' → 'delivered'.
     let engineAction: string;
     switch (status) {
+      case 'confirmed': engineAction = 'confirm'; break;
       case 'preparing': engineAction = 'start_preparation'; break;
       case 'ready': engineAction = 'mark_ready'; break;
-      case 'served': engineAction = 'mark_served'; break;
+      case 'delivered': engineAction = 'deliver'; break;
       case 'completed': engineAction = 'complete'; break;
       case 'cancelled': engineAction = 'cancel'; break;
       default: throw new Error(`Invalid status: ${status}`);
@@ -382,7 +389,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
         staffId: userId,
         ...(status === 'preparing' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
         ...(status === 'ready' ? { actual_ready_time: new Date().toISOString() } : {}),
-        ...(status === 'served' ? { served_at: new Date().toISOString() } : {}),
+        ...(status === 'delivered' ? { served_at: new Date().toISOString() } : {}),
         ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {}),
         ...(status === 'cancelled' ? { cancelled_at: new Date().toISOString() } : {}),
       }
@@ -407,7 +414,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     const timestampFields: Record<string, string> = {
       ...(status === 'preparing' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
       ...(status === 'ready' ? { actual_ready_time: now } : {}),
-      ...(status === 'served' ? { served_at: now } : {}),
+      ...(status === 'delivered' ? { served_at: now } : {}),
       ...(status === 'cancelled' ? { cancelled_at: now } : {}),
     };
 
@@ -473,11 +480,12 @@ const ITEM_STATUS_FLOW = ['pending', 'preparing', 'ready', 'served'];
  * is enforced directly here rather than via transitionState).
  *
  * Once every item on an order reaches 'ready' or 'served', the parent
- * order is auto-advanced to match via the real engine transition (actor
- * 'system'), so staff don't have to separately bump the order after
- * bumping its last item. If the order-level transition isn't currently
- * allowed for any reason, the item status update still succeeds — the
- * order just won't auto-advance that time.
+ * order is auto-advanced to match (ready→ready, served→the engine's real
+ * 'delivered') via the real engine transition, actor 'staff', so staff
+ * don't have to separately bump the order after bumping its last item.
+ * If the order-level transition isn't currently allowed for any reason,
+ * the item status update still succeeds — the order just won't
+ * auto-advance that time.
  *
  * Known gap: no per-item cancel yet. An 86'd item mid-prep still has to
  * go through order-level cancel for now.
@@ -560,7 +568,18 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
     // milestone. Only for 'ready'/'served' — 'preparing' has no order-level
     // action worth forcing, and a cancelled/completed order is never
     // touched by this regardless of item states.
+    //
+    // Two bugs fixed here: this used to run as actor 'system', but
+    // mark_ready's allowedActors on the engine is ['staff'] only — so this
+    // was rejected every single time, never just "sometimes." Runs as
+    // 'staff' now, which is accurate anyway: a staff member did trigger
+    // this, just indirectly by bumping the order's last item. It also used
+    // to ask for a 'mark_served' action that has never existed on the
+    // engine — the item milestone is still called 'served', but the order
+    // status it derives to is the engine's real 'delivered'.
     if (status === 'ready' || status === 'served') {
+      const derivedOrderStatus = status === 'ready' ? 'ready' : 'delivered';
+
       const { data: siblingItems, error: siblingError } = await supabase
         .from('order_items')
         .select('status')
@@ -569,15 +588,15 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
       const allAtStatus = !siblingError && (siblingItems ?? []).length > 0
         && (siblingItems ?? []).every((i) => i.status === status);
 
-      if (allAtStatus && parentOrder.status !== status
+      if (allAtStatus && parentOrder.status !== derivedOrderStatus
           && parentOrder.status !== 'cancelled' && parentOrder.status !== 'completed') {
         const engineService = getEngineService();
-        const engineAction = status === 'ready' ? 'mark_ready' : 'mark_served';
+        const engineAction = status === 'ready' ? 'mark_ready' : 'deliver';
         const transitionResult = await engineService.transitionState(
           'instant_transaction',
           parentOrder.status,
           engineAction,
-          'system',
+          'staff',
           { orderId, derivedFromItems: true },
         );
 
