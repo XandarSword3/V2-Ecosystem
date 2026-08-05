@@ -766,7 +766,7 @@ Authorization: Bearer <access_token>
         summary: 'Get orders (staff only)',
         security: [{ bearerAuth: [] as string[] }],
         parameters: [
-          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'preparing', 'ready', 'served', 'completed', 'cancelled'] } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'] } },
           { name: 'date', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 100 } },
@@ -811,7 +811,7 @@ Authorization: Bearer <access_token>
                 properties: {
                   status: {
                     type: 'string',
-                    enum: ['pending', 'preparing', 'ready', 'served', 'completed', 'cancelled'],
+                    enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'],
                   },
                 },
               },
@@ -1817,7 +1817,7 @@ Authorization: Bearer <access_token>
         properties: {
           id: { type: 'string', format: 'uuid' },
           orderNumber: { type: 'string' },
-          status: { type: 'string', enum: ['pending', 'preparing', 'ready', 'served', 'completed', 'cancelled'] },
+          status: { type: 'string', enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'] },
           orderType: { type: 'string', enum: ['dine_in', 'takeaway', 'delivery'] },
           customerName: { type: 'string' },
           customerPhone: { type: 'string' },
