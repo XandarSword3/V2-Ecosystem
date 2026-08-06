@@ -305,7 +305,7 @@ class CustomizationController {
         return;
       }
 
-      const customizations = await customizationService.getCustomizationsForEntity(entityType, entityId);
+      const customizations = await customizationService.getCustomizationsForEntity(entityType as CustomizableEntityType, entityId);
 
       logger.info('[CustomizationController] getCustomizationsForEntity result', {
         count: customizations.length,

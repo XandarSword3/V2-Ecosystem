@@ -65,6 +65,8 @@ const getSessionIcon = (startTime: string) => {
 
 export default function DynamicSessionsPage() {
   const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const router = useRouter();
   const { modules } = useSiteSettings();
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
@@ -215,7 +217,7 @@ export default function DynamicSessionsPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => router.push(`/admin/${slug}/sessions/import`)}
+            onClick={() => router.push(`/${propertySlug}/admin/${slug}/sessions/import`)}
           >
             <Upload className="w-4 h-4 mr-2" />
             Import

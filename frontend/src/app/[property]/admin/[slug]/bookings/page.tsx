@@ -77,6 +77,7 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
 
 export default function DynamicBookingsPage() {
   const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
   const router = useRouter();
   const { modules } = useSiteSettings();
   const tc = useTranslations('adminCommon');
@@ -165,7 +166,7 @@ export default function DynamicBookingsPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             {tc('refresh')}
           </Button>
-          <Button variant="outline" onClick={() => router.push(`/admin/${currentModule?.slug}/bookings/import`)}>
+          <Button variant="outline" onClick={() => router.push(`/${propertySlug}/admin/${currentModule?.slug}/bookings/import`)}>
             <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>

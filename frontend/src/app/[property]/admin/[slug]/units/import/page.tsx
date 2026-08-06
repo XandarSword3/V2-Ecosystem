@@ -21,6 +21,7 @@ interface ReservationUnit extends Record<string, unknown> {
 
 export default function UnitImportPage() {
   const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
   const router = useRouter();
   const { modules } = useSiteSettings();
 
@@ -44,7 +45,7 @@ export default function UnitImportPage() {
   $300/night, Weekly discount 15%
   Amenities: Fireplace, Hot tub, Kitchen, Parking`}
       moduleId={currentModule?.id}
-      onBack={() => router.push(`/admin/${slug}/bookings`)}
+      onBack={() => router.push(`/${propertySlug}/admin/${slug}/bookings`)}
       renderPreviewItem={(item, onChange) => (
         <div className="space-y-3">
           <div className="flex items-start gap-3">

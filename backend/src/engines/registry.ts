@@ -73,8 +73,12 @@ export function createStateMachine(engineType: EngineType): StateMachine {
   
   // Register engine-specific side effects
   if (engineType === 'instant_transaction') {
-    // Deduct inventory when order is confirmed (preparation starts)
-    sm.addSideEffect('confirm', deductInventorySideEffect);
+    // Inventory is now deducted at order-creation time (POST /orders, via
+    // deduct_inventory_for_order_items) rather than on 'confirm' — deducting
+    // here too would double-deduct once the confirm transition is actually
+    // wired up to persist a status change. deductInventorySideEffect is kept
+    // as a module export in case a future engine needs confirm-time
+    // deduction; it's just no longer registered here.
     // Restore inventory if order is cancelled
     sm.addSideEffect('cancel', restoreInventorySideEffect);
   }

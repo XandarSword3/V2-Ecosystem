@@ -310,6 +310,89 @@ export async function getReviewStatsByServiceType(serviceType?: string): Promise
   };
 }
 
+/**
+ * Submit product item review (Phase 4.1)
+ */
+export async function submitProductReview(
+  params: {
+    tenantId: string;
+    propertyId: string;
+    orderId?: string | null;
+    orderItemId?: string | null;
+    catalogItemId?: string | null;
+    rating: number;
+    text?: string | null;
+    userId?: string | null;
+  }
+) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('product_reviews')
+    .insert({
+      tenant_id: params.tenantId,
+      property_id: params.propertyId,
+      order_id: params.orderId ?? null,
+      order_item_id: params.orderItemId ?? null,
+      product_id: params.catalogItemId ?? null,
+      rating: params.rating,
+      text: params.text ?? '',
+      user_id: params.userId ?? null,
+    })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Submit staff review (Phase 4.2)
+ */
+export async function submitStaffReview(
+  params: {
+    tenantId: string;
+    propertyId: string;
+    staffId: string;
+    orderId?: string | null;
+    rating: number;
+    text?: string | null;
+  }
+) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('staff_reviews')
+    .insert({
+      tenant_id: params.tenantId,
+      property_id: params.propertyId,
+      staff_id: params.staffId,
+      order_id: params.orderId ?? null,
+      rating: params.rating,
+      text: params.text ?? null,
+    })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Get product item rating summary
+ */
+export async function getProductItemRating(catalogItemId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('product_reviews')
+    .select('rating')
+    .eq('product_id', catalogItemId);
+
+  if (error) throw error;
+  const count = data?.length ?? 0;
+  const sum = (data ?? []).reduce((acc, r) => acc + r.rating, 0);
+  const averageRating = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
+  return { count, averageRating };
+}
+
 // Export all functions as a service object for convenience
 export const reviewsService = {
   getApprovedReviews,
@@ -322,6 +405,9 @@ export const reviewsService = {
   getReviewById,
   getReviewsByUser,
   getReviewStatsByServiceType,
+  submitProductReview,
+  submitStaffReview,
+  getProductItemRating,
 };
 
 export default reviewsService;

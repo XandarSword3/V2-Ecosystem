@@ -1,3 +1,4 @@
+import { useParams } from 'next/navigation';
 'use client';
 
 /**
@@ -1066,6 +1067,9 @@ function SystemStatus({ services, isLoading }: { services: SystemService[]; isLo
 // ============================================
 
 export default function CommandCenter() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const [kpiData, setKpiData] = useState<Record<string, KPIData>>({
     totalRevenue: { value: 0, previousValue: 0, change: 0, changePercent: 0, sparkline: [0,0,0,0,0,0,0] },
     activeTransactions: { value: 0, previousValue: 0, change: 0, changePercent: 0, sparkline: [0,0,0,0,0,0,0] },
@@ -1224,7 +1228,7 @@ export default function CommandCenter() {
   }, []);
 
   const handleViewAlerts = useCallback(() => {
-    window.location.href = '/admin/alerts';
+    window.location.href = `/${propertySlug}/admin/alerts`;
   }, []);
 
   return (

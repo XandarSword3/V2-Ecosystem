@@ -28,6 +28,7 @@ import managerRoutes from '../modules/manager/manager.routes.js';
 import moduleStaffRoutes from '../modules/staff/module-staff.routes.js';
 import devicesRoutes from '../modules/devices/devices.routes.js';
 import promotionsRoutes from '../modules/promotions/promotions.routes.js';
+import financeRoutes from '../modules/finance/finance.routes.js';
 // NEW: Terminology System
 import terminologyRoutes from './terminology.routes.js';
 import { getSupabase } from '../database/connection.js';
@@ -89,6 +90,7 @@ router.use('/payments', paymentRoutes);
 router.use('/admin', adminRoutes);
 router.use('/reviews', reviewsRoutes);
 router.use('/support', supportRoutes);
+router.use('/finance', financeRoutes);
 
 // NEW: Terminology System
 router.use('/terminology', terminologyRoutes);

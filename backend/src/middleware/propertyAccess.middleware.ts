@@ -35,6 +35,13 @@ export async function validatePropertyAccess(req: Request, res: Response, next: 
     return next();
   }
 
+  // If property was already resolved by resolveProperty (e.g. via X-Property-Slug),
+  // sync it to (req as any).propertyId so downstream controllers use the exact route property.
+  if (req.property?.id) {
+    (req as any).propertyId = req.property.id;
+    return next();
+  }
+
   // Super admins can access any property (spans all tenants by design)
   if (req.user?.roles?.includes('super_admin')) {
     (req as any).propertyId = propertyId;

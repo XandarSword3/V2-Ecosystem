@@ -106,22 +106,35 @@ export async function invalidatePropertyCache(groupId?: string | null, code?: st
 // Lookups
 // ============================================
 
-async function lookupBySlug(groupId: string, slug: string): Promise<PropertyRecord | null> {
-  const cacheKey = `slug:${groupId}:${slug}`;
+async function lookupBySlug(tenantId: string | null, groupId: string | null, slug: string): Promise<PropertyRecord | null> {
+  const cacheKey = `slug:${tenantId ?? 'null'}:${groupId ?? 'null'}:${slug}`;
   const cached = await getCached(cacheKey);
   if (cached !== undefined) return cached;
 
   try {
     const supabase = getSupabase();
-    const { data, error } = await supabase
+    let query = supabase
       .from('properties')
-      .select('id, name, group_id, property_code')
-      .eq('group_id', groupId)
-      .eq('property_code', slug)
-      .maybeSingle();
+      .select('id, name, group_id, property_code, public_slug');
+
+    if (groupId) {
+      query = query.or(`group_id.eq.${groupId},group_id.is.null`);
+    }
+    if (tenantId) {
+      query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+    if (isUuid) {
+      query = query.eq('id', slug);
+    } else {
+      query = query.or(`public_slug.eq.${slug},public_slug.eq.${slug}-property,property_code.eq.${slug}`);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
-      logger.warn('[PROPERTY] Slug lookup error', { groupId, slug, error: error.message });
+      logger.warn('[PROPERTY] Slug lookup error', { tenantId, groupId, slug, error: error.message });
       await setCached(cacheKey, null);
       return null;
     }
@@ -130,18 +143,15 @@ async function lookupBySlug(groupId: string, slug: string): Promise<PropertyReco
     await setCached(cacheKey, property);
     return property;
   } catch (err) {
-    logger.error('[PROPERTY] Unexpected slug lookup failure', { groupId, slug, err });
+    logger.error('[PROPERTY] Unexpected slug lookup failure', { tenantId, groupId, slug, err });
     return null;
   }
 }
 
-/**
- * Single-property fallback, scoped to a group (or globally, when groupId is
- * null, for legacy single-tenant deployments). Returns the lone property if
- * and only if exactly one exists in scope — anything else (zero, or more
- * than one without a slug to disambiguate) returns null and lets downstream
- * code fall back to global/system settings, same as no property context.
- */
+// ============================================
+// Single property lookup
+// ============================================
+
 async function lookupSingleProperty(groupId: string | null): Promise<PropertyRecord | null> {
   const cacheKey = groupId ? `single:${groupId}` : 'single:__global__';
   const cached = await getCached(cacheKey);
@@ -174,15 +184,23 @@ async function lookupSingleProperty(groupId: string | null): Promise<PropertyRec
 // Middleware
 // ============================================
 
-/**
- * Resolve property from request context and attach to req.property.
- * Priority 0 accepts x-property-id but validates the UUID against the DB
- * before trusting it — admin/staff flows only, validated separately by
- * validatePropertyAccess. Falls through to slug/fallback for public traffic.
- */
 export async function resolveProperty(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const startTime = Date.now();
-  // Priority 0: explicit x-property-id header (e.g. admin dashboard preview or local development override)
+  const groupId = req.tenant?.property_group_id ?? null;
+  const tenantId = req.tenant?.id ?? null;
+
+  // Priority 1: explicit slug header (e.g. set from URL path /[property]/...)
+  const propertySlugHeader = req.headers['x-property-slug'] as string | undefined;
+  if (propertySlugHeader) {
+    const property = await lookupBySlug(tenantId, groupId, propertySlugHeader);
+    if (property) {
+      req.property = property;
+      logger.info(`[PropertyResolution] Resolved property "${property.name}" (${property.id}) via X-Property-Slug="${propertySlugHeader}" [${Date.now() - startTime}ms]`);
+      return next();
+    }
+  }
+
+  // Priority 2: explicit x-property-id header (fallback if no slug header provided or matched)
   const propertyIdHeader = req.headers['x-property-id'] as string | undefined;
   if (propertyIdHeader) {
     try {
@@ -194,7 +212,7 @@ export async function resolveProperty(req: Request, _res: Response, next: NextFu
         .maybeSingle();
       if (!error && data) {
         req.property = data as PropertyRecord;
-        console.log(`[PropertyResolution] Property found via x-property-id: ${Date.now() - startTime}ms`);
+        logger.info(`[PropertyResolution] Resolved property "${data.name}" (${data.id}) via x-property-id header [${Date.now() - startTime}ms]`);
         return next();
       }
     } catch (err) {
@@ -202,44 +220,24 @@ export async function resolveProperty(req: Request, _res: Response, next: NextFu
     }
   }
 
-  const groupId = req.tenant?.property_group_id ?? null;
-
-  // Priority 1: explicit slug header, scoped to the resolved tenant's group.
-  // Only meaningful when a tenant (and therefore a group) is known — a slug
-  // with no group to scope it to can't be safely resolved.
-  const propertySlugHeader = req.headers['x-property-slug'] as string | undefined;
-  if (propertySlugHeader && groupId) {
-    const property = await lookupBySlug(groupId, propertySlugHeader);
-    if (property) {
-      req.property = property;
-      return next();
-    }
-    // Slug present but didn't resolve (typo, stale DNS, property renamed) —
-    // fall through to the single-property fallback rather than dead-ending.
-  }
-
-  // Priority 2: single-property fallback, scoped to the tenant's group.
-  // Covers the overwhelming majority case (starter tier, maxProperties: 1) —
-  // nothing to disambiguate, so no header is even necessary.
+  // Priority 3: single-property fallback, scoped to the tenant's group.
   if (groupId) {
     const property = await lookupSingleProperty(groupId);
     if (property) {
       req.property = property;
+      logger.info(`[PropertyResolution] Resolved single property fallback "${property.name}" (${property.id}) [${Date.now() - startTime}ms]`);
       return next();
     }
   }
 
-  // Priority 3: legacy single-tenant mode — no tenant resolved at all, but
-  // the whole deployment has exactly one property. Same "nothing to
-  // disambiguate" rule, one level up.
+  // Priority 4: legacy single-tenant mode — no tenant resolved at all, but whole deployment has 1 property.
   if (!req.tenant) {
     const property = await lookupSingleProperty(null);
     if (property) {
       req.property = property;
+      logger.info(`[PropertyResolution] Resolved legacy single-tenant property "${property.name}" (${property.id}) [${Date.now() - startTime}ms]`);
     }
   }
 
-  const totalTime = Date.now() - startTime;
-  console.log(`[PropertyResolution] Total time: ${totalTime}ms`);
   next();
 }

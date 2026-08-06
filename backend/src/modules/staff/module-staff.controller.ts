@@ -53,7 +53,7 @@ export async function getModuleOrders(req: Request, res: Response) {
     let query = supabase
       .from('transactions')
       .select(`
-        id, customer_id, engine_type, status, amount, created_at,
+        id, customer_id, staff_id, engine_type, status, amount, created_at,
         reference_id, reference_table, metadata, service_location_id
       `)
       .eq('engine_type', 'instant_transaction')
@@ -157,13 +157,24 @@ export async function getModuleOrders(req: Request, res: Response) {
         || (meta.table_number as string | undefined)
         || (meta.table_id as string | undefined)
         || null;
+      const rawPaymentMethod = (meta.payment_method as string | undefined) ?? 'cash';
+      const isOnlinePayment = ['stripe', 'card', 'online', 'credit_card'].includes(rawPaymentMethod.toLowerCase());
+      const paymentStatus = (meta.payment_status as string | undefined) ?? (
+        isOnlinePayment
+          ? (order.status !== 'cancelled' ? 'paid' : 'refunded')
+          : (order.status === 'completed' ? 'paid' : 'unpaid')
+      );
       return {
         id: order.id,
         orderNumber: (meta.order_number as string | undefined) ?? null,
         customerName: (meta.customer_name as string) || 'Guest',
         customerId: order.customer_id,
+        staffId: (order as { staff_id?: string | null }).staff_id ?? null,
         orderType: order.engine_type,
         status: order.status,
+        paymentMethod: rawPaymentMethod,
+        paymentStatus,
+        isPaidOnline: isOnlinePayment,
         items: itemsByOrder[order.id] ?? [],
         totalAmount: order.amount,
         serviceLocationId,

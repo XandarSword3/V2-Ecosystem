@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { ImportWizard } from '@/components/admin/ImportWizard';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
@@ -19,6 +19,9 @@ interface Coupon extends Record<string, unknown> {
 }
 
 export default function CouponImportPage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const router = useRouter();
 
   return (
@@ -30,7 +33,7 @@ export default function CouponImportPage() {
 • Summer Sale 2024: 15% off, min order $50, expires 2024-08-31
 • Welcome Discount: $10 off first purchase, applies to all
 • Weekend Special: 20% off all module orders, valid weekends only`}
-      onBack={() => router.push('/admin/coupons')}
+      onBack={() => router.push(`/${propertySlug}/admin/coupons`)}
       renderPreviewItem={(item, onChange) => (
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center">
           <div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
@@ -62,6 +62,8 @@ interface WastageForm {
 
 export default function StaffDashboard() {
   const router = useRouter();
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
   const { user, isAuthenticated, isLoading } = useAuth();
   const { modules } = useSiteSettings();
   const t = useTranslations('staff');
@@ -355,7 +357,7 @@ export default function StaffDashboard() {
       return {
         title: m.name,
         description,
-        href: `/staff/modules/${m.slug}`,
+        href: `/${propertySlug}/staff/modules/${m.slug}`,
         icon,
         color,
         bgColor,
