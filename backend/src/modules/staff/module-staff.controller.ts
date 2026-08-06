@@ -589,6 +589,95 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
   }
 }
 
+/**
+ * Split an order's bill into equal shares for staff to collect payment
+ * against separately. Deliberately does NOT create new transactions or
+ * touch `amount`/`status` — actual payment collection already goes through
+ * the existing cash-payment endpoint per share. This just persists the
+ * split intent (method + per-share amounts) onto the order so staff
+ * re-opening it see the same breakdown instead of re-deriving it.
+ *
+ * Frontend contract (KitchenView.splitBill): { method: 'equal', parts }.
+ * Only 'equal' is implemented — itemized/by-seat splitting needs its own
+ * UI to assign items to a share and isn't wired on the frontend yet.
+ */
+export async function splitModuleOrder(req: Request, res: Response) {
+  try {
+    const { slug, orderId } = req.params;
+    const { method = 'equal', parts } = req.body as { method?: string; parts?: number };
+    const supabase = getSupabase();
+
+    if (method !== 'equal') {
+      return res.status(400).json({ success: false, error: `Unsupported split method '${method}' — only 'equal' is implemented` });
+    }
+
+    const partsCount = Number(parts);
+    if (!Number.isInteger(partsCount) || partsCount < 2 || partsCount > 20) {
+      return res.status(400).json({ success: false, error: 'parts must be an integer between 2 and 20' });
+    }
+
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (!module || module.engine_type !== 'instant_transaction') {
+      return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
+    }
+
+    const { data: order, error: orderError } = await supabase
+      .from('transactions')
+      .select('id, amount, status, metadata')
+      .eq('id', orderId)
+      .eq('module_id', module.id)
+      .single();
+
+    if (orderError || !order) {
+      return res.status(404).json({ success: false, error: 'Order not found for this module' });
+    }
+
+    if (order.status === 'cancelled' || order.status === 'completed') {
+      return res.status(400).json({ success: false, error: `Cannot split a bill on a ${order.status} order` });
+    }
+
+    // Whole cents per share, remainder distributed one cent at a time to
+    // the first N shares so they sum exactly to `amount` — no floating
+    // point drift, nobody's charged a rounded-away cent.
+    const totalCents = Math.round((order.amount as number) * 100);
+    const baseCents = Math.floor(totalCents / partsCount);
+    const remainderCents = totalCents - baseCents * partsCount;
+    const shares = Array.from({ length: partsCount }, (_, i) =>
+      (baseCents + (i < remainderCents ? 1 : 0)) / 100
+    );
+
+    const existingMeta = (order.metadata ?? {}) as Record<string, unknown>;
+    const billSplit = {
+      method: 'equal',
+      parts: partsCount,
+      shares,
+      splitAt: new Date().toISOString(),
+    };
+
+    const { data: updatedOrder, error: updateError } = await supabase
+      .from('transactions')
+      .update({
+        metadata: { ...existingMeta, billSplit },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .select('id, metadata')
+      .single();
+
+    if (updateError) throw updateError;
+
+    res.json({ success: true, data: { orderId, billSplit: (updatedOrder?.metadata as any)?.billSplit } });
+  } catch (error: any) {
+    logger.error('Error splitting order bill:', error);
+    res.status(500).json({ success: false, error: 'Failed to split bill', message: error.message });
+  }
+}
+
 // ============================================
 // BOOKINGS (for multi_day_booking modules)
 // ============================================
