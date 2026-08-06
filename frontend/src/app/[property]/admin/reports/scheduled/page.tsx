@@ -1,3 +1,4 @@
+import { useParams } from 'next/navigation';
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -49,6 +50,9 @@ const SCHEDULE_TYPES: { value: ScheduleType; label: string; icon: string }[] = [
 ];
 
 export default function ScheduledReportsPage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const [reports, setReports] = useState<ScheduledReport[]>([]);
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; category?: string }>>([]);
   const [loading, setLoading] = useState(true);
@@ -236,7 +240,7 @@ export default function ScheduledReportsPage() {
       {/* Header */}
       <motion.div variants={fadeInUp} className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/admin/reports">
+          <Link href={`/${propertySlug}/admin/reports`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-4 w-4" />
             </Button>

@@ -19,7 +19,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getEngineService } from './engine-service.js';
 import { TEMPLATE_TO_ENGINE } from './types.js';
 import { reverseDiscounts } from './discount-reversal.js';
-import { emitToUnit } from '../socket/index.js';
+import { emitToUnit, emitToOrder } from '../socket/index.js';
 import { logger } from '../utils/logger.js';
 
 export type Actor = 'system' | 'staff' | 'customer' | 'admin';
@@ -196,6 +196,7 @@ export async function changeInstantTransactionOrderStatus(
     };
     emitToUnit(tenantId || 'default', moduleSlug, 'order:status', payload);
     emitToUnit(tenantId || 'default', moduleId, 'order:status', payload);
+    emitToOrder(order.id, 'order:status', payload);
   } catch (socketErr: any) {
     logger.warn('Failed to emit order:status', socketErr.message);
   }

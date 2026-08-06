@@ -392,7 +392,7 @@ router.post(
     // Build pricing context
     const pricingContext: PricingContext = {
       moduleId,
-      conditions: conditions || { orderType: orderType },
+      conditions: conditions || { orderType: orderType, paymentMethod: req.body.paymentMethod },
       customerId,
       couponCode,
       giftCardCodes,

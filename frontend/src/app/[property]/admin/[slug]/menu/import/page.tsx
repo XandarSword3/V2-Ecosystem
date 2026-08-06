@@ -41,6 +41,7 @@ interface MenuItem extends Record<string, unknown> {
 
 export default function MenuImportPage() {
   const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
   const router = useRouter();
   const { modules } = useSiteSettings();
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
@@ -57,7 +58,7 @@ export default function MenuImportPage() {
 • Burger with cheese +$2, bacon +$3
 • Ingredients: Tomato, Mozzarella, Basil for Margherita`}
       moduleId={currentModule?.id}
-      onBack={() => router.push(`/admin/${slug}/menu`)}
+      onBack={() => router.push(`/${propertySlug}/admin/${slug}/menu`)}
       renderPreviewItem={(item, onChange) => (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="col-span-1">

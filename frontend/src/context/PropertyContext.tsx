@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { usePathname } from 'next/navigation';
 import { getStoredPropertyId, isValidPropertyId, setStoredPropertyId } from '@/lib/property-id';
 
 interface Property {
@@ -10,6 +11,8 @@ interface Property {
   name: string;
   type: string;
   public_slug: string;
+  property_code?: string;
+  slug?: string;
 }
 
 interface PropertyAccess {
@@ -30,6 +33,42 @@ interface PropertyContextType {
 
 const PropertyContext = createContext<PropertyContextType | undefined>(undefined);
 
+const GLOBAL_ROUTE_SEGMENTS = new Set([
+  'login', 'register', 'forgot-password', 'reset-password',
+  'install', 'platform-admin', 'cookie-policy', 'terms', 'privacy',
+  'offline', 'error', 'global-error', 'api', 'nexus',
+]);
+
+function extractUrlPropertySlug(): string | null {
+  if (typeof window === 'undefined') return null;
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  if (pathSegments.length === 0) return null;
+  const first = pathSegments[0];
+  if (GLOBAL_ROUTE_SEGMENTS.has(first)) {
+    return null;
+  }
+  return first;
+}
+
+function isSlugMatch(p: any, urlSlug: string): boolean {
+  if (!urlSlug || !p) return false;
+  const s = urlSlug.toLowerCase();
+  const ps = (p.public_slug || '').toLowerCase();
+  const pc = (p.property_code || '').toLowerCase();
+  const slug = (p.slug || '').toLowerCase();
+  const name = (p.name || '').toLowerCase().replace(/['\s]/g, '-');
+
+  return (
+    ps === s ||
+    ps === `${s}-property` ||
+    ps.replace(/-property$/, '') === s ||
+    pc === s ||
+    slug === s ||
+    name === s ||
+    name.startsWith(s)
+  );
+}
+
 export function PropertyProvider({ children }: { children: ReactNode }) {
   const [properties, setProperties] = useState<PropertyAccess[]>([]);
   const [activePropertyId, setActivePropertyIdState] = useState<string | null>(null);
@@ -41,28 +80,42 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
       // Fetch accessible properties from backend
       const res = await api.get('/multi-property/my-properties');
       const data = res.data.properties || [];
-      setProperties(data.map((p: any) => ({
+      const mapped: PropertyAccess[] = data.map((p: any) => ({
         property_id: p.id,
         access_level: p.access_level,
         is_primary: p.is_primary,
         property: p
-      })));
+      }));
+      setProperties(mapped);
 
       if (data.length > 0) {
-        const storedId = getStoredPropertyId();
-        const hasAccessToStored = storedId && data.find((p: any) => p.id === storedId);
+        // Priority 1: Match property against current URL slug (e.g. /default/admin -> "default")
+        const urlSlug = extractUrlPropertySlug();
+        let matchedProp = urlSlug
+          ? data.find((p: any) => isSlugMatch(p, urlSlug))
+          : null;
 
-        if (hasAccessToStored) {
-          setActivePropertyIdState(storedId);
+        if (matchedProp) {
+          setActivePropertyIdState(matchedProp.id);
+          setStoredPropertyId(matchedProp.id);
         } else {
-          const primary = data.find((p: any) => p.is_primary) || data[0];
-          const primaryId = primary?.id;
-          if (isValidPropertyId(primaryId)) {
-            setActivePropertyIdState(primaryId);
-            setStoredPropertyId(primaryId);
+          // Priority 2: Pre-stored ID if user has access
+          const storedId = getStoredPropertyId();
+          const hasAccessToStored = storedId && data.find((p: any) => p.id === storedId);
+
+          if (hasAccessToStored) {
+            setActivePropertyIdState(storedId);
           } else {
-            setActivePropertyIdState(null);
-            setStoredPropertyId(null);
+            // Priority 3: Primary property or first property
+            const primary = data.find((p: any) => p.is_primary) || data[0];
+            const primaryId = primary?.id;
+            if (isValidPropertyId(primaryId)) {
+              setActivePropertyIdState(primaryId);
+              setStoredPropertyId(primaryId);
+            } else {
+              setActivePropertyIdState(null);
+              setStoredPropertyId(null);
+            }
           }
         }
       } else {
@@ -77,17 +130,29 @@ export function PropertyProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const pathname = usePathname();
+
   useEffect(() => {
     fetchProperties();
   }, []);
+
+  // Sync activePropertyId if URL route changes to a different property slug
+  useEffect(() => {
+    if (!properties || properties.length === 0) return;
+    const urlSlug = extractUrlPropertySlug();
+    if (urlSlug) {
+      const matched = properties.find((pa) => isSlugMatch(pa.property, urlSlug));
+      if (matched && matched.property_id !== activePropertyId) {
+        setActivePropertyIdState(matched.property_id);
+        setStoredPropertyId(matched.property_id);
+      }
+    }
+  }, [properties, activePropertyId, pathname]);
 
   const setActiveProperty = (id: string) => {
     if (!isValidPropertyId(id)) return;
     setActivePropertyIdState(id);
     setStoredPropertyId(id);
-    // Optionally we can force a page reload to refresh all data, 
-    // or rely on components listening to this context.
-    // window.location.reload(); 
   };
 
   const activePropertyAccess = properties.find(p => p.property_id === activePropertyId);

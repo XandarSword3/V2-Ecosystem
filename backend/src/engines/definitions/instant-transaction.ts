@@ -100,6 +100,20 @@ export const instantTransactionStateMachine: StateMachineDefinition<InstantTrans
       allowedActors: ['admin'],
       guardDescription: 'Only admin can cancel orders in preparation (requires refund + inventory reversal)',
     },
+    {
+      from: 'ready',
+      to: 'cancelled',
+      action: 'cancel',
+      allowedActors: ['admin'],
+      guardDescription: 'Admin-only comp/void after food is ready — requires refund + inventory reversal',
+    },
+    {
+      from: 'delivered',
+      to: 'cancelled',
+      action: 'cancel',
+      allowedActors: ['admin'],
+      guardDescription: 'Admin-only comp/void after delivery — requires refund + inventory reversal',
+    },
   ],
 };
 

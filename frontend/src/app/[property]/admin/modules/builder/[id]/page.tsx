@@ -24,6 +24,7 @@ const ZOOM_MAX = 200;
 
 export default function ModuleBuilderPage() {
   const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
   const router = useRouter();
   const id = params.id as string;
 
@@ -96,7 +97,7 @@ export default function ModuleBuilderPage() {
             Retry
           </button>
           <button
-            onClick={() => router.push('/admin/modules')}
+            onClick={() => router.push(`/${propertySlug}/admin/modules`)}
             className="mt-4 ml-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300"
           >
             Back to Modules

@@ -1,3 +1,4 @@
+import { useParams } from 'next/navigation';
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -100,6 +101,9 @@ const BAR_COLORS = [
 ];
 
 export default function AdminReportsPage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const t = useTranslations('adminReports');
   const tc = useTranslations('adminCommon');
   const { activePropertyId } = useProperty();
@@ -315,7 +319,7 @@ export default function AdminReportsPage() {
 
           {activeTab === 'overview' && (
             <>
-              <Link href="/admin/reports/scheduled">
+              <Link href={`/${propertySlug}/admin/reports/scheduled`}>
                 <Button variant="outline">
                   <CalendarClock className="w-4 h-4 mr-2" />
                   Scheduled
