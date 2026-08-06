@@ -126,6 +126,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
   ];
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Array<{ id: string; title: string; message: string; time: string; read: boolean; is_read?: boolean; created_at?: string }>>([]);
@@ -417,26 +418,45 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       </AnimatePresence>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 w-20 bg-slate-800 border-r border-slate-700 pt-16">
-        <nav className="flex-1 py-4 space-y-2 px-3">
+      <aside
+        className={cn(
+          'hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 pt-16 bg-slate-800 border-r border-slate-700 transition-all duration-300',
+          sidebarOpen ? 'w-64' : 'w-20'
+        )}
+      >
+        {/* Collapse toggle */}
+        <div className="flex items-center justify-end px-3 py-2 border-b border-slate-700">
+          <button
+            onClick={() => setSidebarOpen((v) => !v)}
+            className="p-1.5 rounded-lg hover:bg-slate-700"
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            <Menu className="h-4 w-4 text-slate-400" />
+          </button>
+        </div>
+
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600">
           {filteredNavigation.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
             return (
               <Link key={item.href} href={item.href}>
                 <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   className={cn(
-                    'flex flex-col items-center gap-1 py-3 rounded-xl transition-colors',
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors',
+                    !sidebarOpen && 'justify-center',
                     isActive
                       ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                       : 'text-slate-400 hover:bg-slate-700 hover:text-white'
                   )}
                   title={item.name}
                 >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-[10px] font-medium">{item.name}</span>
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {sidebarOpen && (
+                    <span className="text-sm font-medium truncate">{item.name}</span>
+                  )}
                 </motion.div>
               </Link>
             );
@@ -445,17 +465,20 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
         <div className="p-3 border-t border-slate-700">
           <button
             onClick={handleLogout}
-            className="w-full flex flex-col items-center gap-1 py-3 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
+            className={cn(
+              'w-full flex items-center gap-3 px-3 py-2.5 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors',
+              !sidebarOpen && 'justify-center'
+            )}
             title="Logout"
           >
-            <LogOut className="h-5 w-5" />
-            <span className="text-[10px] font-medium">Logout</span>
+            <LogOut className="h-5 w-5 shrink-0" />
+            {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="lg:pl-20 pt-16 min-h-screen">
+      <main className={cn('pt-16 min-h-screen transition-all duration-300', sidebarOpen ? 'lg:pl-64' : 'lg:pl-20')}>
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 10 }}
