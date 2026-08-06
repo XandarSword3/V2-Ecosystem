@@ -107,7 +107,10 @@ const ITEM_STATUS_STYLE: Record<ItemStatus, { bg: string; border: string; text: 
 const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
   pending: 'Start',
   preparing: 'Ready',
-  ready: 'Serve',
+  // Kitchen's job stops at 'ready'. Advancing an item to 'served' (and the
+  // order-level auto-derivation to 'delivered' that follows) is Dispatch's
+  // action now — see DispatchBoard — not something the kitchen board offers.
+  ready: null,
   served: null,
 };
 
@@ -568,16 +571,26 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                           auto-derivation once everything hits ready/served. */}
                       {(nextStatus || ['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status)) && (
                         <div className="px-2 pb-2 flex gap-2">
-                          <Button
-                            className={`w-full text-white text-xs ${col.actionBg}`}
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateOrderStatus(order.id, nextStatus);
-                            }}
-                          >
-                            {col.action}
-                          </Button>
+                          {order.status === 'ready' ? (
+                            // No quick-action here on purpose: bumping straight
+                            // from ready to delivered from the kitchen board
+                            // skips Dispatch entirely. That handoff now only
+                            // happens from DispatchBoard.
+                            <span className="w-full text-center text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 py-1.5">
+                              Waiting on Dispatch
+                            </span>
+                          ) : (
+                            <Button
+                              className={`w-full text-white text-xs ${col.actionBg}`}
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateOrderStatus(order.id, nextStatus);
+                              }}
+                            >
+                              {col.action}
+                            </Button>
+                          )}
                           {['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status) && (
                             <Button
                               variant="outline"
@@ -689,7 +702,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                     Record Cash Payment
                   </Button>
                 )}
-                {selectedOrder.status !== 'completed' && (
+                {selectedOrder.status !== 'completed' && selectedOrder.status !== 'ready' && (
                   <Button
                     className="flex-1"
                     onClick={() => {
@@ -702,6 +715,11 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                   >
                     Advance Status
                   </Button>
+                )}
+                {selectedOrder.status === 'ready' && (
+                  <div className="flex-1 flex items-center justify-center text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                    Waiting on Dispatch
+                  </div>
                 )}
               </div>
               <Button
