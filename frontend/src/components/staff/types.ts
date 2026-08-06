@@ -20,6 +20,14 @@ export interface Order {
   totalAmount: number;
   createdAt: string;
   tableNumber?: string;
+  // Added alongside the DispatchBoard work — resolved server-side from
+  // transactions.service_location_id against service_locations, falling
+  // back to metadata.table_number for orders with no location tied to them
+  // (see getModuleOrders). null/undefined means "no destination on file",
+  // not "takeaway" specifically — the board that groups on this should
+  // bucket that case explicitly rather than assume.
+  destination?: string | null;
+  serviceLocationId?: string | null;
 }
 
 // Order-level flow — must match the real instant_transaction engine states
