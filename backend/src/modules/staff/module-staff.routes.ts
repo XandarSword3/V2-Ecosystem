@@ -42,6 +42,7 @@ router.patch('/modules/:slug/orders/:orderId/status', authorize(...staffRoles), 
 
 // Update a single item's status (item-level KDS)
 router.patch('/modules/:slug/orders/:orderId/items/:itemId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleOrderItemStatus);
+router.post('/modules/:slug/orders/:orderId/split', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.splitModuleOrder);
 
 // ============================================
 // Multi-Day Booking Operations (accommodation, villas, etc.)
