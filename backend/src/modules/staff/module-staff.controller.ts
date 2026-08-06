@@ -54,7 +54,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       .from('transactions')
       .select(`
         id, customer_id, engine_type, status, amount, created_at,
-        reference_id, reference_table, metadata
+        reference_id, reference_table, metadata, service_location_id
       `)
       .eq('engine_type', 'instant_transaction')
       .eq('module_id', moduleId || module.id)
@@ -119,9 +119,44 @@ export async function getModuleOrders(req: Request, res: Response) {
       }
     }
 
+    // Fetch service_locations for this page of orders. `transactions` has a
+    // real service_location_id FK, but until now nothing here selected it —
+    // destination was read from freeform metadata.table_number instead,
+    // which only holds up for orders that happened to be tagged that way at
+    // creation and doesn't reflect the actual service_locations record (name,
+    // active/inactive, etc). Same two-plain-queries approach as the
+    // items -> catalog_items lookup above, for the same reason: no embedded
+    // PostgREST join to rely on a FK relationship name.
+    const locationIds = [...new Set(
+      (orders || []).map((o) => (o as { service_location_id?: string | null }).service_location_id).filter(Boolean)
+    )] as string[];
+    const locationNameById = new Map<string, string>();
+    if (locationIds.length > 0) {
+      const { data: locationRows, error: locationsError } = await supabase
+        .from('service_locations')
+        .select('id, name')
+        .in('id', locationIds);
+
+      if (locationsError) {
+        logger.warn('Failed to fetch service_locations for module orders list — falling back to metadata', locationsError.message);
+      } else {
+        for (const row of locationRows || []) {
+          locationNameById.set(row.id, row.name);
+        }
+      }
+    }
+
     // Transform data for frontend
     const transformedOrders = (orders || []).map(order => {
       const meta = (order.metadata ?? {}) as Record<string, unknown>;
+      const serviceLocationId = (order as { service_location_id?: string | null }).service_location_id ?? null;
+      // Real service_locations name wins when we have it; metadata is the
+      // fallback for orders with no service_location_id at all (takeaway,
+      // pickup-only orders were never tied to a physical location).
+      const destination = (serviceLocationId && locationNameById.get(serviceLocationId))
+        || (meta.table_number as string | undefined)
+        || (meta.table_id as string | undefined)
+        || null;
       return {
         id: order.id,
         orderNumber: (meta.order_number as string | undefined) ?? null,
@@ -131,7 +166,11 @@ export async function getModuleOrders(req: Request, res: Response) {
         status: order.status,
         items: itemsByOrder[order.id] ?? [],
         totalAmount: order.amount,
-        tableNumber: meta.table_number ?? meta.table_id ?? null,
+        serviceLocationId,
+        destination,
+        // Kept for any existing frontend code still reading tableNumber —
+        // same value, new name is clearer once this isn't just restaurant tables.
+        tableNumber: destination,
         createdAt: order.created_at,
       };
     });
