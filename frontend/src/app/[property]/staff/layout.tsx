@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Shield,
   Search,
+  Truck,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -57,6 +58,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
     is_active?: boolean;
     isActive?: boolean;
     template_type?: string;
+    engine_type?: string;
   }
   const [modules, setModules] = useState<ModuleData[]>([]);
 
@@ -92,12 +94,28 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       roles: ['super_admin', 'admin', 'manager', 'staff']
     },
     // Dynamic modules - roles based on module slug pattern
-    ...modules.map(module => ({
-      name: module.name,
-      href: `/${propertySlug}/staff/modules/${module.slug}`,
-      icon: ChefHat, // Default icon
-      roles: ['super_admin', 'admin', 'manager', 'staff', `${module.slug}_staff`, `${module.slug}_admin`]
-    })),
+    ...modules.flatMap(module => {
+      const items: NavItem[] = [
+        {
+          name: module.name,
+          href: `/${propertySlug}/staff/modules/${module.slug}`,
+          icon: ChefHat, // Default icon
+          roles: ['super_admin', 'admin', 'manager', 'staff', `${module.slug}_staff`, `${module.slug}_admin`]
+        },
+      ];
+      // Dispatch is Engine A-only (instant_transaction) — see the guard on
+      // DispatchPage/getModuleOrders for why. Nothing to route to for the
+      // other engine types.
+      if (module.engine_type === 'instant_transaction') {
+        items.push({
+          name: `${module.name} Dispatch`,
+          href: `/${propertySlug}/staff/modules/${module.slug}/dispatch`,
+          icon: Truck,
+          roles: ['super_admin', 'admin', 'manager', 'staff', `${module.slug}_staff`, `${module.slug}_admin`]
+        });
+      }
+      return items;
+    }),
     // Static utilities
     { 
       name: t('nav.ticketScanner'), 
