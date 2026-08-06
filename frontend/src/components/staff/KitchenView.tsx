@@ -431,7 +431,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         toast.error('Invalid split parts');
         return;
       }
-      await api.post(`/${slug}/orders/${orderId}/split`, { method: 'equal', parts });
+      await api.post(`/staff/modules/${slug}/orders/${orderId}/split`, { method: 'equal', parts });
       toast.success('Bill split created');
       loadOrders();
     } catch (error: any) {
