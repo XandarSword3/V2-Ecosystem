@@ -576,13 +576,19 @@ export class ShiftsController {
         .eq('property_id', propertyId);
       const staffIds = (staffMembers || []).map(sm => sm.user_id).filter(Boolean);
 
-      const [transactionsResult, activeShifts] = await Promise.all([
+      const [transactionsResult, activeShifts, productReviewsResult, staffReviewsResult] = await Promise.all([
         supabase.from('transactions').select('id, amount, status, created_at, engine_type, module_id').eq('property_id', propertyId),
         supabase.from('staff_shifts').select('id, status, department').eq('status', 'active').in('staff_id', staffIds),
+        supabase.from('product_reviews').select('rating').eq('property_id', propertyId).gte('created_at', startIso).lte('created_at', endIso),
+        supabase.from('staff_reviews').select('rating').eq('property_id', propertyId).gte('created_at', startIso).lte('created_at', endIso),
       ]);
 
       const transactions = transactionsResult.data || [];
       const totalActiveStaff = (activeShifts.data || []).length;
+      const productRatings = (productReviewsResult.data || []).map((r) => r.rating);
+      const staffRatings = (staffReviewsResult.data || []).map((r) => r.rating);
+      const calcAvg = (ratings: number[]) =>
+        ratings.length > 0 ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : 0;
 
       const withinToday = (createdAt?: string | null) => {
         if (!createdAt) return false;
@@ -608,7 +614,14 @@ export class ShiftsController {
         };
       });
 
-      res.json({ success: true, data: modules, date_range: { start: startIso, end: endIso } });
+      const reviewsSummary = {
+        product_reviews_count: productRatings.length,
+        product_average_rating: calcAvg(productRatings),
+        staff_reviews_count: staffRatings.length,
+        staff_average_rating: calcAvg(staffRatings),
+      };
+
+      res.json({ success: true, data: modules, reviews_summary: reviewsSummary, date_range: { start: startIso, end: endIso } });
     } catch (error: any) {
       logger.error('Error fetching manager summary:', error);
       res.status(500).json({ success: false, error: 'Failed to fetch manager summary', message: error.message });

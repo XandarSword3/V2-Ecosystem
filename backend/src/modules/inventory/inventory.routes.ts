@@ -55,6 +55,7 @@ router.post('/physical-count', ...staffAuth, inventoryAdvancedController.recordP
 router.get('/variance-report', ...adminAuth, inventoryAdvancedController.getVarianceReport.bind(inventoryAdvancedController));
 
 // ── Advanced: Purchase Orders ──
+router.get('/purchase-orders', ...staffAuth, inventoryAdvancedController.getPurchaseOrders.bind(inventoryAdvancedController));
 router.post('/purchase-orders', ...adminAuth, inventoryAdvancedController.createPurchaseOrder.bind(inventoryAdvancedController));
 router.post('/purchase-orders/:id/receive', ...adminAuth, inventoryAdvancedController.receivePurchaseOrder.bind(inventoryAdvancedController));
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { ImportWizard } from '@/components/admin/ImportWizard';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
@@ -40,6 +40,9 @@ const priorityColors: Record<string, string> = {
 };
 
 export default function HousekeepingImportPage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const router = useRouter();
 
   return (
@@ -59,7 +62,7 @@ export default function HousekeepingImportPage() {
 
 • Pool Maintenance: Weekly deep clean
   Category: pool, Priority: urgent, Duration: 60 min`}
-      onBack={() => router.push('/admin/housekeeping')}
+      onBack={() => router.push(`/${propertySlug}/admin/housekeeping`)}
       renderPreviewItem={(item, onChange) => (
         <div className="space-y-2">
           <div className="flex items-center gap-2">

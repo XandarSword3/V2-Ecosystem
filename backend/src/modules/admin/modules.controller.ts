@@ -74,17 +74,10 @@ export const getModule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
 
-    // SECURITY FIX: tenant/property scoping — same dual-source resolution as
-    // getModules() above. This handler is mounted on both the authenticated
-    // /admin/modules/:id (req.user present) and the unauthenticated public
-    // /api/modules/:slug (app.ts, resolveTenant + resolveProperty only, no
-    // auth). Previously applied NEITHER filter, despite the middleware chain
-    // populating req.tenant/req.property identically to the getModules route
-    // right above it — any tenant's module row was fetchable by anyone who
-    // knew or guessed its id/slug. Matching getModules' scoping here closes
-    // that cross-tenant read.
     const propertyId = req.property?.id ?? ((req as any).propertyId as string | undefined);
     const tenantId = req.user ? getCallerTenantId(req) : (req.tenant?.id ?? null);
+
+    logger.info(`[ModulesController] getModule identifier="${id}" propertyId="${propertyId ?? 'none'}" tenantId="${tenantId ?? 'none'}"`);
 
     const applyScope = (q: any) => {
       let scoped = q;
@@ -93,26 +86,32 @@ export const getModule = asyncHandler(async (req: Request, res: Response) => {
       return scoped;
     };
 
-    // Try to fetch by id first
-    const { data: initialData, error: initialError } = await applyScope(
-      supabase.from('modules').select('*').eq('id', id)
-    ).maybeSingle();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    let data: any = null;
 
-    let data = initialData;
-    const error = initialError;
+    if (isUuid) {
+      const { data: byId, error: idError } = await applyScope(
+        supabase.from('modules').select('*').eq('id', id)
+      ).maybeSingle();
+      if (idError) throw idError;
+      data = byId;
+    }
 
-    // If not found by id, try slug
-    if ((error || !data) && id) {
+    if (!data && id) {
       const { data: bySlug, error: slugErr } = await applyScope(
         supabase.from('modules').select('*').eq('slug', id)
       ).maybeSingle();
 
       if (slugErr) throw slugErr;
-      if (!bySlug) return res.status(404).json({ success: false, error: 'Module not found' });
+      if (!bySlug) {
+        logger.warn(`[ModulesController] Module not found for identifier="${id}" propertyId="${propertyId ?? 'none'}" tenantId="${tenantId ?? 'none'}"`);
+        return res.status(404).json({ success: false, error: 'Module not found' });
+      }
 
       data = bySlug;
     }
 
+    logger.info(`[ModulesController] Found module "${data.name}" (${data.id}, slug="${data.slug}")`);
     res.json({ success: true, data });
 });
 

@@ -357,7 +357,7 @@ export default function DynamicMenuPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => router.push(`/admin/${slug}/menu/import`)}
+            onClick={() => router.push(`/${propertySlug}/admin/${slug}/menu/import`)}
             className="flex items-center gap-2"
           >
             <Upload className="w-4 h-4" />

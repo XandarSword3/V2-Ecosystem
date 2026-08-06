@@ -210,6 +210,14 @@ export function initializeSocketServer(httpServer: HttpServer) {
     // Standard heartbeat
     socket.on('heartbeat', () => socket.emit('heartbeat:ack', { timestamp: Date.now() }));
 
+    // Anonymous & authenticated order room join for live tracking (Phase 3.3)
+    socket.on('order:join', (data: { orderId?: string }) => {
+      if (typeof data?.orderId === 'string' && data.orderId) {
+        socket.join(`order:${data.orderId}`);
+        logger.info(`Socket ${socket.id} joined order room order:${data.orderId}`);
+      }
+    });
+
     // Route tracking: client emits 'page:update' on every navigation.
     // Updates currentPage and lastActivity on the stored connection so the
     // admin cockpit reflects where each user currently is.
@@ -409,6 +417,11 @@ export function emitToUser(userId: string, event: string, data: unknown) {
   // Emit to both namespaces to ensure delivery
   getIO().to(`user:${userId}`).emit(event, data);
   getIO().of('/admin').to(`user:${userId}`).emit(event, data);
+}
+
+export function emitToOrder(orderId: string, event: string, data: unknown) {
+  getIO().to(`order:${orderId}`).emit(event, data);
+  getIO().of('/admin').to(`order:${orderId}`).emit(event, data);
 }
 
 // FLAG resolved: unit rooms are now tenant-namespaced (`tenant:{id}:unit:{slug}`).

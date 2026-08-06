@@ -1,3 +1,4 @@
+import { useParams } from 'next/navigation';
 'use client';
 
 import React from 'react';
@@ -50,6 +51,9 @@ const integrations = [
 ];
 
 export default function IntegrationsPage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   return (
     <div className="space-y-6">
       <div>
@@ -85,7 +89,7 @@ export default function IntegrationsPage() {
             </p>
             {integration.status === 'available' && integration.href ? (
               <Link
-                href={integration.href}
+                href={`/${propertySlug}${integration.href}`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors text-sm font-medium"
               >
                 Configure →

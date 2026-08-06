@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { ImportWizard } from '@/components/admin/ImportWizard';
 import { Input } from '@/components/ui/Input';
 import { Palette } from 'lucide-react';
@@ -23,6 +23,9 @@ const tierColors: Record<string, string> = {
 };
 
 export default function LoyaltyImportPage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const router = useRouter();
 
   return (
@@ -35,7 +38,7 @@ export default function LoyaltyImportPage() {
 • Silver: 500-999 points, 1.2x multiplier, benefits: free drink
 • Gold: 1000+ points, 1.5x multiplier, benefits: free breakfast, late checkout
 • Color codes: Bronze #CD7F32, Silver #C0C0C0, Gold #FFD700`}
-      onBack={() => router.push('/admin/loyalty')}
+      onBack={() => router.push(`/${propertySlug}/admin/loyalty`)}
       renderPreviewItem={(item, onChange) => (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
           <div className="flex items-center gap-2">

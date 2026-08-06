@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
@@ -49,6 +49,9 @@ function ThemeModeSelector() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AppearanceSettingsPage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const router = useRouter();
 
   return (
@@ -108,7 +111,7 @@ export default function AppearanceSettingsPage() {
                 </div>
               </div>
               <Button
-                onClick={() => router.push('/admin/settings/brand')}
+                onClick={() => router.push(`/${propertySlug}/admin/settings/brand`)}
                 className="shrink-0 flex items-center gap-2"
               >
                 Brand Settings

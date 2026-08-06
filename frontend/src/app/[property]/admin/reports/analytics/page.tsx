@@ -1,3 +1,4 @@
+import { useParams } from 'next/navigation';
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -191,6 +192,9 @@ function normalizeExecutiveData(raw: any): ExecutiveData | null {
 }
 
 export default function AnalyticsReportsPage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const t = useTranslations('adminReports');
   const [executiveData, setExecutiveData] = useState<ExecutiveData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -736,13 +740,13 @@ export default function AnalyticsReportsPage() {
             <CardTitle className="text-lg">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Link href="/admin/reports">
+            <Link href={`/${propertySlug}/admin/reports`}>
               <Button variant="outline" className="w-full justify-start">
                 <BarChart2 className="w-4 h-4 mr-2" />
                 Legacy Reports Dashboard
               </Button>
             </Link>
-            <Link href="/admin/reports/scheduled">
+            <Link href={`/${propertySlug}/admin/reports/scheduled`}>
               <Button variant="outline" className="w-full justify-start">
                 <Clock className="w-4 h-4 mr-2" />
                 Scheduled Reports

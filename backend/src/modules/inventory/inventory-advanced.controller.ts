@@ -273,7 +273,7 @@ export class InventoryAdvancedController {
           variance_cost,
           status,
           item:inventory_items!item_id(name, sku, unit, cost_per_unit),
-          counter:users!counted_by(full_name)
+          counter:users!fk_variance_counted_by(full_name)
         `)
         .order('count_date', { ascending: false });
 
@@ -307,6 +307,40 @@ export class InventoryAdvancedController {
     } catch (error: any) {
       logger.error('Error fetching variance report:', error);
       res.status(500).json({ success: false, error: 'Failed to fetch variance report', message: error.message });
+    }
+  }
+
+  /**
+   * Get purchase orders
+   */
+  async getPurchaseOrders(req: Request, res: Response) {
+    try {
+      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
+      const { status } = req.query;
+      const supabase = getSupabase();
+
+      let query = supabase
+        .from('inventory_purchase_orders')
+        .select(`
+          *,
+          supplier:inventory_suppliers(id, name, contact_name),
+          items:inventory_purchase_order_items(
+            *,
+            inventory_item:inventory_items(id, name, sku, unit)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (status) query = query.eq('status', status as string);
+
+      const { data: orders, error } = await query.limit(100);
+
+      if (error) throw error;
+
+      res.json({ success: true, data: orders || [] });
+    } catch (error: any) {
+      logger.error('Error fetching purchase orders:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch purchase orders', message: error.message });
     }
   }
 

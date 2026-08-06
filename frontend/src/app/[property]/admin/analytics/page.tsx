@@ -1,3 +1,4 @@
+import { useParams } from 'next/navigation';
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -36,6 +37,9 @@ interface Alert {
 }
 
 export default function AnalyticsDashboard() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   useTranslations('admin.analytics');
   const [metrics, setMetrics] = useState<LiveMetric[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -198,7 +202,7 @@ export default function AnalyticsDashboard() {
 
       {/* Quick Actions */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = '/admin/alerts'}>
+        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `/${propertySlug}/admin/alerts`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
@@ -212,7 +216,7 @@ export default function AnalyticsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = '/admin/query-builder'}>
+        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `/${propertySlug}/admin/query-builder`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5" />
@@ -226,7 +230,7 @@ export default function AnalyticsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = '/admin/guest-segments'}>
+        <Card className="cursor-pointer hover:bg-gray-50" onClick={() => window.location.href = `/${propertySlug}/admin/guest-segments`}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />

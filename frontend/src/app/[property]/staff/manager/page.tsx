@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { useProperty } from '@/context/PropertyContext';
@@ -82,6 +82,9 @@ interface PerformanceData {
 }
 
 export default function ManagerDashboard() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || 'default';
+
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
   
@@ -583,7 +586,7 @@ export default function ManagerDashboard() {
               <CardContent className="space-y-3">
                 {/* Dynamic active modules */}
                 {(activeModules || []).slice(0, 6).map((m: any) => (
-                  <Link key={m.id} href={`/staff/${m.slug}`} className="block">
+                  <Link key={m.id} href={`/${propertySlug}/staff/${m.slug}`} className="block">
                     <Button variant="outline" className="w-full justify-start gap-3">
                       {m.template_type === 'menu_service' && <ChefHat className="w-5 h-5 text-amber-500" />}
                       {m.template_type === 'multi_day_booking' && <Calendar className="w-5 h-5 text-indigo-500" />}
@@ -592,7 +595,7 @@ export default function ManagerDashboard() {
                     </Button>
                   </Link>
                 ))}
-                <Link href="/admin/housekeeping" className="block">
+                <Link href={`/${propertySlug}/admin/housekeeping`} className="block">
                   <Button variant="outline" className="w-full justify-start gap-3">
                     <ClipboardList className="w-5 h-5 text-purple-500" />
                     Housekeeping Tasks
@@ -867,7 +870,7 @@ export default function ManagerDashboard() {
                   <p className="text-sm text-slate-500">Volume, avg value, status</p>
                 </div>
               </Button>
-              <Link href="/admin/reports/scheduled" className="block">
+              <Link href={`/${propertySlug}/admin/reports/scheduled`} className="block">
                 <Button variant="outline" className="h-auto p-4 justify-start gap-4 w-full">
                   <div className="w-12 h-12 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                     <Calendar className="w-6 h-6 text-amber-600" />
@@ -891,7 +894,7 @@ export default function ManagerDashboard() {
                 <RefreshCw className={`w-3.5 h-3.5 mr-1 ${inventoryLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              <Link href="/admin/inventory">
+              <Link href={`/${propertySlug}/admin/inventory`}>
                 <Button size="sm" variant="outline">
                   <Eye className="w-3.5 h-3.5 mr-1" />
                   Full Inventory

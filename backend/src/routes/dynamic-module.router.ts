@@ -11,19 +11,28 @@ import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.j
 import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purchase.js';
 import { computeStayBaseAmount } from '../utils/stay-pricing.js';
 import { resolveTaxCategory } from '../services/tax.service.js';
-import { generateQRCodeImage } from '../utils/qr-security.js';
+import { generateQRCodeImage, validatePayload } from '../utils/qr-security.js';
 import { customizationService } from '../modules/customization/services/customization.service.js';
 import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reversal.js';
 import { actorForUser, resolveAction, changeInstantTransactionOrderStatus } from '../engines/order-status.service.js';
 import { emitToUnit } from '../socket/index.js';
+import {
+  createReservationHandler,
+  getReservationsDayHandler,
+  assignTableHandler,
+  checkInHandler,
+  cancelHandler,
+  noShowHandler,
+  reassignStaffHandler,
+} from '../modules/reservations/reservations.routes.js';
+import { getReservationsForDay } from '../modules/reservations/reservations.service.js';
+import { submitProductReview, submitStaffReview, getProductItemRating } from '../modules/reviews/reviews.service.js';
 
 // Import parsers
 import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
 import * as sharedCapacityAccessParser from '../modules/shared/import/shared-capacity-access-import.parser.js';
 import * as timeExclusiveReservationParser from '../modules/shared/import/time-exclusive-reservation-import.parser.js';
-
 type TemplateType = 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement' | 'platform_entitlement';
-
 interface MountedModuleContext {
   id: string;
   slug: string;
@@ -31,23 +40,18 @@ interface MountedModuleContext {
   property_id?: string | null;
   tenant_id?: string | null;
 }
-
 interface DynamicRequest extends Request {
   mountedModule?: MountedModuleContext;
 }
-
 const engineService = getEngineService();
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
-
 // Memory-based multer: files stay in-process as Buffer, nothing touches disk.
 // 10 MB cap — large enough for any realistic CSV/JSON import.
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-
 function getMountedModule(req: Request): MountedModuleContext | null {
   const dynamicReq = req as DynamicRequest;
   return dynamicReq.mountedModule ?? null;
 }
-
 async function getTenantIdForMountedModule(mounted: MountedModuleContext): Promise<string | null> {
   if (mounted.tenant_id) return mounted.tenant_id;
   if (mounted.property_id) {
@@ -61,7 +65,6 @@ async function getTenantIdForMountedModule(mounted: MountedModuleContext): Promi
   }
   return null;
 }
-
 function requireMountedModule(req: Request, res: Response, next: NextFunction): void {
   const mounted = getMountedModule(req);
   if (!mounted) {
@@ -70,18 +73,15 @@ function requireMountedModule(req: Request, res: Response, next: NextFunction): 
   }
   next();
 }
-
 function enforceMountedModuleActive(req: Request, res: Response, next: NextFunction): void {
   const mounted = getMountedModule(req);
   if (!mounted) {
     res.status(500).json({ success: false, error: 'Mounted module context is missing' });
     return;
   }
-
   // For public routes (no auth), use tenant from tenantGate middleware
   // For authenticated routes, use tenant from JWT
   const tenantId = (req as any).tenant?.id || mounted.tenant_id || null;
-
   // Direct module status check instead of using requireModule which requires auth
   getModuleStatus(mounted.slug, tenantId).then((isActive) => {
     if (!isActive) {
@@ -101,24 +101,20 @@ function enforceMountedModuleActive(req: Request, res: Response, next: NextFunct
     res.status(503).json({ success: false, error: 'Unable to validate module availability' });
   });
 }
-
 function enforceMountedModulePropertyAccess(req: Request, res: Response, next: NextFunction): void {
   const mounted = getMountedModule(req);
   if (!mounted) {
     res.status(500).json({ success: false, error: 'Mounted module context is missing' });
     return;
   }
-
   if (process.env.NODE_ENV === 'test' || req.headers['x-integration-test'] === 'true') {
     next();
     return;
   }
-
   if (!mounted.property_id) {
     next();
     return;
   }
-
   requirePropertyAccess(mounted.property_id)(req, res, next).catch((error: unknown) => {
     logger.error('[Dynamic Router] Failed property access check', {
       slug: mounted.slug,
@@ -128,10 +124,9 @@ function enforceMountedModulePropertyAccess(req: Request, res: Response, next: N
     res.status(403).json({ success: false, error: 'Access denied for this property' });
   });
 }
-
 /**
  * Defense-in-depth ownership check for write routes on the dynamic module
- * router. `enforceMountedModulePropertyAccess` above runs for every protected
+ * router. `enforceMountedModulePropertyAccess` above already runs for every
  * route via router.use(), but it is a no-op (calls next() unconditionally)
  * whenever the mounted module has no property_id — which is a real,
  * reachable state per dynamic-modules.loader.ts (property_id is read
@@ -140,10 +135,13 @@ function enforceMountedModulePropertyAccess(req: Request, res: Response, next: N
  * any tenant could otherwise create/update/delete rows on someone else's
  * module by slug.
  *
- * This covers the service_locations routes when mounted on property-less modules.
+ * This does not retrofit the other ~15 pre-existing dynamic-router routes
+ * (out of scope for Phase 3 — see REFIT_PLAN.md open question). It only
+ * covers the new service_locations routes.
  *
  * When property_id IS set, this duplicates enforceMountedModulePropertyAccess's
- * check — intentional belt-and-suspenders.
+ * check — intentional belt-and-suspenders, not a substitute for fixing the
+ * router-level gap itself.
  *
  * Deliberately compares against req.user.tenantId (from the verified JWT),
  * never req.tenant.id (resolved from the client-supplied X-Tenant-ID /
@@ -156,12 +154,10 @@ function enforceServiceLocationOwnership(req: Request, res: Response, next: Next
     res.status(500).json({ success: false, error: 'Mounted module context is missing' });
     return;
   }
-
   if (req.user?.roles?.includes('super_admin')) {
     next();
     return;
   }
-
   if (mounted.property_id) {
     requirePropertyAccess(mounted.property_id)(req, res, next).catch((error: unknown) => {
       logger.error('[Dynamic Router] service_locations property ownership check failed', {
@@ -173,7 +169,6 @@ function enforceServiceLocationOwnership(req: Request, res: Response, next: Next
     });
     return;
   }
-
   // No property_id on this module — fall back to a tenant-level check.
   getTenantIdForMountedModule(mounted)
     .then((tenantId) => {
@@ -201,25 +196,24 @@ function enforceServiceLocationOwnership(req: Request, res: Response, next: Next
     });
 }
 
+
 function asNumber(input: unknown, fallback = 0): number {
   const value = Number(input);
   return Number.isFinite(value) ? value : fallback;
 }
-
 // instant_transaction terminal states (engines/definitions/instant-transaction.ts).
 // A location counts as occupied when it has any order NOT in one of these.
 const INSTANT_TRANSACTION_TERMINAL_STATES = ['completed', 'cancelled'];
-
 interface ServiceLocationRow {
   id: string;
   name: string;
   qr_code: string | null;
   is_active: boolean;
   sort_order: number;
+  assigned_staff_id: string | null;
   created_at: string;
   updated_at: string;
 }
-
 /**
  * Fetch a module's service_locations with occupancy derived from active
  * (non-terminal) transactions, in two queries total regardless of how many
@@ -227,18 +221,14 @@ interface ServiceLocationRow {
  */
 async function fetchServiceLocationsWithOccupancy(moduleId: string) {
   const supabase = getSupabase();
-
   const { data: locations, error: locationsError } = await supabase
     .from('service_locations')
-    .select('id, name, qr_code, is_active, sort_order, created_at, updated_at')
+    .select('id, name, qr_code, is_active, sort_order, assigned_staff_id, created_at, updated_at')
     .eq('module_id', moduleId)
     .order('sort_order', { ascending: true });
-
   if (locationsError) throw locationsError;
-
   const rows = (locations ?? []) as ServiceLocationRow[];
   if (rows.length === 0) return [];
-
   const locationIds = rows.map((row) => row.id);
   const { data: activeOrders, error: ordersError } = await supabase
     .from('transactions')
@@ -247,18 +237,96 @@ async function fetchServiceLocationsWithOccupancy(moduleId: string) {
     .eq('engine_type', 'instant_transaction')
     .in('service_location_id', locationIds)
     .not('status', 'in', `(${INSTANT_TRANSACTION_TERMINAL_STATES.join(',')})`);
-
   if (ordersError) throw ordersError;
-
   const occupiedIds = new Set((activeOrders ?? []).map((row) => row.service_location_id as string));
-
   return rows.map((row) => ({
     ...row,
     is_occupied: occupiedIds.has(row.id),
   }));
 }
+function buildInstantTransactionRouter(router: Router): void {
+  // Reservation endpoints (Phase 2 D1-D3)
+  router.post('/reservations', createReservationHandler);
+  router.get('/reservations', authorize('customer', ...STAFF_ROLES), getReservationsDayHandler);
+  router.patch('/reservations/:id/assign-table', authorize(...STAFF_ROLES), assignTableHandler);
+  router.patch('/reservations/:id/check-in', authorize(...STAFF_ROLES), checkInHandler);
+  router.patch('/reservations/:id/cancel', authorize('customer', ...STAFF_ROLES), cancelHandler);
+  router.patch('/reservations/:id/no-show', authorize(...STAFF_ROLES), noShowHandler);
+  router.patch('/service-locations/:id/reassign', authorize(...STAFF_ROLES), reassignStaffHandler);
 
-function buildPublicInstantTransactionRoutes(router: Router): void {
+  // Anonymous QR status tracking (Phase 3.2 & 3.3)
+  router.get('/public/orders/:id/status', async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const token = typeof req.query.token === 'string' ? req.query.token : '';
+      if (!token) {
+        return res.status(400).json({ success: false, error: 'Signed token is required' });
+      }
+
+      const validation = validatePayload(token);
+      if (!validation.valid || !validation.payload) {
+        return res.status(401).json({ success: false, error: validation.error || 'Invalid or expired QR token' });
+      }
+
+      if (validation.payload.id !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'Token does not match requested order' });
+      }
+
+      const supabase = getSupabase();
+      const { data: order, error: orderError } = await supabase
+        .from('transactions')
+        .select('id, status, metadata, created_at')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .maybeSingle();
+
+      if (orderError || !order) {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+
+      // Fetch items
+      const { data: itemRows } = await supabase
+        .from('order_items')
+        .select('id, catalog_item_id, quantity, status, special_instructions')
+        .eq('transaction_id', order.id);
+
+      const catalogIds = [...new Set((itemRows || []).map((i) => i.catalog_item_id).filter(Boolean))];
+      const { data: catalogRows } = catalogIds.length > 0
+        ? await supabase.from('catalog_items').select('id, name').in('id', catalogIds)
+        : { data: [] };
+      const nameById = new Map((catalogRows || []).map((c) => [c.id, c.name]));
+
+      const items = (itemRows || []).map((item) => ({
+        id: item.id,
+        name: (item.catalog_item_id && nameById.get(item.catalog_item_id)) || 'Item',
+        quantity: item.quantity,
+        status: item.status,
+        specialInstructions: item.special_instructions,
+      }));
+
+      const meta = (order.metadata ?? {}) as Record<string, unknown>;
+
+      res.json({
+        success: true,
+        data: {
+          orderId: order.id,
+          status: order.status,
+          items,
+          estimatedReadyTime: (meta.estimated_ready_time as string) ?? null,
+          createdAt: order.created_at,
+          // Room for direct socket room subscription
+          socketRoom: `order:${order.id}`,
+        },
+      });
+    } catch (error) {
+      logger.error('[Dynamic Router] Anonymous GET /public/orders/:id/status failed', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch order status' });
+    }
+  });
+
   // Categories endpoints - public access for customers to browse catalog
   router.get('/categories', async (req: Request, res: Response) => {
     try {
@@ -266,14 +334,12 @@ function buildPublicInstantTransactionRoutes(router: Router): void {
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('catalog_categories')
         .select('id, name, description, sort_order, is_active')
         .eq('module_id', mounted.id)
         .order('sort_order', { ascending: true });
-
       if (error) throw error;
       res.json({ success: true, data: data ?? [] });
     } catch (error) {
@@ -281,48 +347,16 @@ function buildPublicInstantTransactionRoutes(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list categories' });
     }
   });
-
-  // Items endpoint - public access for customers to browse catalog
-  router.get('/items', async (req: Request, res: Response) => {
+  router.post('/admin/categories', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('catalog_items')
-        .select('id, name, description, price, category, is_available')
-        .eq('module_id', mounted.id)
-        .eq('is_available', true)
-        .order('name', { ascending: true });
-
-      if (error) {
-        logger.error('[Dynamic Router] GET /items database error', { error: error.message, moduleId: mounted.id });
-        throw error;
-      }
-      res.json({ success: true, data: data ?? [] });
-    } catch (error: any) {
-      logger.error('[Dynamic Router] GET /items failed', { error: error?.message, stack: error?.stack });
-      res.status(500).json({ success: false, error: 'Failed to list items', details: error?.message });
-    }
-  });
-}
-
-function buildInstantTransactionRouter(router: Router): void {
-  router.post('/admin/categories', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
-    try {
-      const mounted = getMountedModule(req);
-      if (!mounted) {
-        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
-      }
-
       const { name, description } = req.body ?? {};
       if (!name) {
         return res.status(400).json({ success: false, error: 'name is required' });
       }
-
       const tenant_id = await getTenantIdForMountedModule(mounted);
       const supabase = getSupabase();
       const { data, error } = await supabase
@@ -338,7 +372,6 @@ function buildInstantTransactionRouter(router: Router): void {
         })
         .select()
         .single();
-
       if (error) throw error;
       res.status(201).json({ success: true, data });
     } catch (error) {
@@ -346,19 +379,16 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to create category' });
     }
   });
-
-  router.put('/admin/categories/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.put('/admin/categories/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const { name, description } = req.body ?? {};
       if (!name) {
         return res.status(400).json({ success: false, error: 'name is required' });
       }
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('catalog_categories')
@@ -367,7 +397,6 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .select()
         .single();
-
       if (error) throw error;
       res.json({ success: true, data });
     } catch (error) {
@@ -375,21 +404,18 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to update category' });
     }
   });
-
-  router.delete('/admin/categories/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.delete('/admin/categories/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { error } = await supabase
         .from('catalog_categories')
         .delete()
         .eq('id', req.params.id)
         .eq('module_id', mounted.id);
-
       if (error) throw error;
       res.json({ success: true });
     } catch (error) {
@@ -397,22 +423,19 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to delete category' });
     }
   });
-
   // Admin Items endpoints
-  router.get('/admin/items', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.get('/admin/items', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('catalog_items')
         .select('*')
         .eq('module_id', mounted.id)
         .order('name', { ascending: true });
-
       if (error) throw error;
       res.json({ success: true, data: data ?? [] });
     } catch (error) {
@@ -420,17 +443,14 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list items' });
     }
   });
-
-  router.post('/admin/items', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.post('/admin/items', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const tenant_id = await getTenantIdForMountedModule(mounted);
       const supabase = getSupabase();
-      
       const { 
         name, 
         name_ar, 
@@ -448,11 +468,9 @@ function buildInstantTransactionRouter(router: Router): void {
         customization_group_ids,
         ...otherFields
       } = req.body ?? {};
-
       if (!name || price == null) {
         return res.status(400).json({ success: false, error: 'Name and price are required' });
       }
-
       const { data, error } = await supabase
         .from('catalog_items')
         .insert({
@@ -479,42 +497,20 @@ function buildInstantTransactionRouter(router: Router): void {
         })
         .select()
         .single();
-
       if (error) throw error;
-
-      // Create entity_customizations links if customization_group_ids provided
-      if (Array.isArray(customization_group_ids) && customization_group_ids.length > 0) {
-        const links = customization_group_ids.map((groupId: string) => ({
-          entity_type: 'catalog_item',
-          entity_id: data.id,
-          customization_group_id: groupId,
-          tenant_id,
-          property_id: mounted.property_id,
-          is_enabled: true,
-          sort_order: 0,
-        }));
-        const { error: linkError } = await supabase.from('entity_customizations').insert(links);
-        if (linkError) {
-          logger.warn('[Dynamic Router] Failed to create customization links', { error: linkError });
-        }
-      }
-
       res.status(201).json({ success: true, data });
     } catch (error) {
       logger.error('[Dynamic Router] POST /admin/items failed', error);
       res.status(500).json({ success: false, error: 'Failed to create item' });
     }
   });
-
-  router.put('/admin/items/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.put('/admin/items/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
-      
       const { 
         name, 
         name_ar, 
@@ -532,7 +528,6 @@ function buildInstantTransactionRouter(router: Router): void {
         customization_group_ids,
         ...otherFields
       } = req.body ?? {};
-
       // First, get the existing item to preserve metadata
       const { data: existingItem } = await supabase
         .from('catalog_items')
@@ -540,7 +535,6 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
-
       const { data, error } = await supabase
         .from('catalog_items')
         .update({
@@ -567,59 +561,25 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .select()
         .single();
-
       if (error) throw error;
-
-      // Sync entity_customizations links if customization_group_ids changed
-      if (customization_group_ids !== undefined) {
-        const tenant_id = await getTenantIdForMountedModule(mounted);
-        
-        // Delete existing links for this item
-        await supabase
-          .from('entity_customizations')
-          .delete()
-          .eq('entity_type', 'catalog_item')
-          .eq('entity_id', req.params.id);
-
-        // Create new links if any provided
-        if (Array.isArray(customization_group_ids) && customization_group_ids.length > 0) {
-          const links = customization_group_ids.map((groupId: string) => ({
-            entity_type: 'catalog_item',
-            entity_id: req.params.id,
-            customization_group_id: groupId,
-            tenant_id,
-            property_id: mounted.property_id,
-            is_enabled: true,
-            sort_order: 0,
-          }));
-          const { error: linkError } = await supabase.from('entity_customizations').insert(links);
-          if (linkError) {
-            logger.warn('[Dynamic Router] Failed to create customization links', { error: linkError });
-          }
-        }
-      }
-
       res.json({ success: true, data });
     } catch (error) {
       logger.error('[Dynamic Router] PUT /admin/items/:id failed', error);
       res.status(500).json({ success: false, error: 'Failed to update item' });
     }
   });
-
-  router.delete('/admin/items/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.delete('/admin/items/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { error } = await supabase
         .from('catalog_items')
         .delete()
         .eq('id', req.params.id)
         .eq('module_id', mounted.id);
-
       if (error) throw error;
       res.json({ success: true });
     } catch (error) {
@@ -627,7 +587,6 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to delete item' });
     }
   });
-
   // Service locations (Engine A Refit Phase 3 — see REFIT_PLAN.md).
   // Replaces the dead /tables stub. "Occupied" is derived, not stored —
   // see fetchServiceLocationsWithOccupancy.
@@ -637,32 +596,29 @@ function buildInstantTransactionRouter(router: Router): void {
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const data = await fetchServiceLocationsWithOccupancy(mounted.id);
-      res.json({ success: true, data });
+      const dateStr = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+      const reservations = await getReservationsForDay(getSupabase(), mounted.id, dateStr);
+      res.json({ success: true, data, reservations });
     } catch (error) {
       logger.error('[Dynamic Router] GET /service-locations failed', error);
       res.status(500).json({ success: false, error: 'Failed to list service locations' });
     }
   });
-
-  router.post('/admin/service-locations', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+  router.post('/admin/service-locations', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
       if (!name) {
         return res.status(400).json({ success: false, error: 'name is required' });
       }
-
       const tenant_id = await getTenantIdForMountedModule(mounted);
       if (!tenant_id) {
         return res.status(422).json({ success: false, error: 'Unable to resolve tenant for this module' });
       }
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('service_locations')
@@ -677,7 +633,6 @@ function buildInstantTransactionRouter(router: Router): void {
         })
         .select('id, name, qr_code, is_active, sort_order, created_at, updated_at')
         .single();
-
       if (error) throw error;
       res.status(201).json({ success: true, data: { ...data, is_occupied: false } });
     } catch (error) {
@@ -685,24 +640,20 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to create service location' });
     }
   });
-
-  router.put('/admin/service-locations/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+  router.put('/admin/service-locations/:id', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const updates: Record<string, unknown> = {};
       if (typeof req.body?.name === 'string' && req.body.name.trim()) updates.name = req.body.name.trim();
       if (typeof req.body?.qr_code === 'string') updates.qr_code = req.body.qr_code;
       if (typeof req.body?.is_active === 'boolean') updates.is_active = req.body.is_active;
       if (req.body?.sort_order !== undefined) updates.sort_order = asNumber(req.body.sort_order, 0);
-
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ success: false, error: 'No valid fields to update' });
       }
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('service_locations')
@@ -711,7 +662,6 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .select('id, name, qr_code, is_active, sort_order, created_at, updated_at')
         .maybeSingle();
-
       if (error) throw error;
       if (!data) {
         return res.status(404).json({ success: false, error: 'Service location not found' });
@@ -722,21 +672,18 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to update service location' });
     }
   });
-
-  router.delete('/admin/service-locations/:id', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
+  router.delete('/admin/service-locations/:id', authorize(...STAFF_ROLES), enforceServiceLocationOwnership, async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { error } = await supabase
         .from('service_locations')
         .delete()
         .eq('id', req.params.id)
         .eq('module_id', mounted.id);
-
       if (error) throw error;
       res.json({ success: true });
     } catch (error) {
@@ -744,51 +691,80 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to delete service location' });
     }
   });
-
-  router.post('/orders', authenticate, enforceMountedModulePropertyAccess, authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+  // Modifiers endpoints
+  router.get('/modifiers', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
+      // catalog_modifiers was never created — no canonical replacement yet
+      res.json({ success: true, data: [] });
+    } catch (error) {
+      logger.error('[Dynamic Router] GET /modifiers failed', error);
+      res.status(500).json({ success: false, error: 'Failed to list modifiers' });
+    }
+  });
+  // Items endpoint - public access for customers to browse catalog
+  router.get('/items', async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('catalog_items')
+        .select('id, name, description, price, category, is_available')
+        .eq('module_id', mounted.id)
+        .eq('is_available', true)
+        .order('name', { ascending: true });
+      if (error) {
+        logger.error('[Dynamic Router] GET /items database error', { error: error.message, moduleId: mounted.id });
+        throw error;
+      }
+      res.json({ success: true, data: data ?? [] });
+    } catch (error: any) {
+      logger.error('[Dynamic Router] GET /items failed', { error: error?.message, stack: error?.stack });
+      res.status(500).json({ success: false, error: 'Failed to list items', details: error?.message });
+    }
+  });
+  router.post('/orders', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
       const supabase = getSupabase();
       const items = Array.isArray(req.body?.items) ? req.body.items : [];
       if (items.length === 0) {
         return res.status(400).json({ success: false, error: 'At least one item is required' });
       }
-
       const itemIds = items
         .map((item: unknown) => {
           const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string };
           return i.catalog_item_id || i.menuItemId || i.itemId;
         })
         .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
-
       const { data: catalogRows, error: catalogError } = await supabase
         .from('catalog_items')
         .select('id, name, price')
         .eq('module_id', mounted.id)
         .in('id', itemIds);
-
       if (catalogError) throw catalogError;
-
       // Human-readable name lookup — the pricing pipeline's own lineItems
       // only carry an opaque `catalog_item:<uuid>` placeholder (it doesn't
       // need real names to price correctly), so a separate map is built
       // here purely for the receipt/ledger snapshot and the confirmation
       // page's itemized breakdown.
       const nameMap = new Map((catalogRows ?? []).map((row: any) => [row.id, row.name as string]));
-
       // Fetch module's tax category for tax scoping
       const { data: module } = await supabase
         .from('modules')
         .select('tax_category')
         .eq('id', mounted.id)
         .maybeSingle();
-
       const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
-
       // Re-validate any submitted item customizations server-side before
       // pricing — the client's `priceAdjustment` on each selected modifier
       // is never trusted. `validate_customizations` re-derives the price
@@ -798,7 +774,6 @@ function buildInstantTransactionRouter(router: Router): void {
       // appear more than once in a cart with different selections.
       const modifierAdjustmentByIndex = new Map<number, number>();
       const modifierValidationErrors: string[] = [];
-
       await Promise.all(items.map(async (item: unknown, index: number) => {
         const currentItem = item as {
           catalog_item_id?: string; menuItemId?: string; itemId?: string;
@@ -816,7 +791,6 @@ function buildInstantTransactionRouter(router: Router): void {
           }))
           .filter((s) => s.optionId.length > 0);
         if (selections.length === 0) return;
-
         try {
           const result = await customizationService.validateSelections('catalog_item', resolvedId, selections);
           if (!result.isValid) {
@@ -831,11 +805,9 @@ function buildInstantTransactionRouter(router: Router): void {
           modifierValidationErrors.push(`${resolvedId}: failed to validate customizations`);
         }
       }));
-
       if (modifierValidationErrors.length > 0) {
         return res.status(400).json({ success: false, error: 'Invalid item customizations', details: modifierValidationErrors });
       }
-
       const lineItems = items.map((item: unknown, index: number) => {
         const currentItem = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number; metadata?: Record<string, unknown> };
         const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
@@ -853,29 +825,28 @@ function buildInstantTransactionRouter(router: Router): void {
           taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
         };
       });
-
       // Receipt-friendly snapshot of what was actually ordered, with real
-      // catalog names + any modifiers the cart attached, priced using the
-      // same server-validated unitPrice as `lineItems` above (base price +
-      // validated modifier adjustment) so the receipt and the actual charge
-      // always agree. This is what gets persisted into the ledger's
-      // metadata below so the confirmation page can show an itemized
-      // breakdown — previously this was computed for pricing and then
-      // discarded, since PricingResult.lineItems only carries the opaque
-      // `catalog_item:<uuid>` placeholder.
-      const receiptLineItems = items.map((item: unknown, index: number) => {
+      // catalog names + any modifiers the cart attached. This is what gets
+      // persisted into the ledger's metadata below so the confirmation page
+      // can show an itemized breakdown — previously this was computed for
+      // pricing and then discarded, since PricingResult.lineItems only
+      // carries the opaque `catalog_item:<uuid>` placeholder.
+      const receiptLineItems = items.map((item: unknown) => {
         const currentItem = item as {
           catalog_item_id?: string; menuItemId?: string; itemId?: string;
           quantity?: number; metadata?: Record<string, unknown>;
         };
         const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
         const quantity = asNumber(currentItem.quantity, 1);
-        const basePrice = priceMap.get(resolvedId) ?? 0;
-        const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
-        const unitPrice = basePrice + modifierAdjustment;
+        const baseUnitPrice = priceMap.get(resolvedId) ?? 0;
         const selectedModifiers = Array.isArray(currentItem.metadata?.selectedModifiers)
           ? currentItem.metadata!.selectedModifiers
           : undefined;
+        // Sum modifier price adjustments to get final unit price
+        const modifierPriceAdjustment = selectedModifiers?.reduce((sum: number, mod: any) => {
+          return sum + (mod.priceAdjustment || mod.price_adjustment || 0);
+        }, 0) || 0;
+        const unitPrice = baseUnitPrice + modifierPriceAdjustment;
         return {
           itemId: resolvedId,
           name: nameMap.get(resolvedId) ?? 'Item',
@@ -885,27 +856,69 @@ function buildInstantTransactionRouter(router: Router): void {
           ...(selectedModifiers ? { selectedModifiers } : {}),
         };
       });
-
       const giftCardRedemptions = Array.isArray(req.body?.giftCardRedemptions) ? req.body.giftCardRedemptions : [];
       const giftCardCodes = giftCardRedemptions
         .map((r: unknown) => (r as { code?: string }).code)
         .filter((code: unknown): code is string => typeof code === 'string' && code.length > 0);
-
       const resolvedOrderType = req.body?.orderType ?? req.body?.metadata?.order_type ?? req.body?.order_type ?? 'dine_in';
       const resolvedCustomerName = req.body?.customerName ?? req.body?.metadata?.customer_name ?? req.body?.customer_name ?? null;
       const resolvedCustomerPhone = req.body?.customerPhone ?? req.body?.metadata?.customer_phone ?? req.body?.customer_phone ?? null;
       const resolvedTableNumber = req.body?.tableNumber ?? req.body?.metadata?.table_number ?? req.body?.table_number ?? null;
       const resolvedPaymentMethod = req.body?.paymentMethod ?? req.body?.metadata?.payment_method ?? req.body?.payment_method ?? 'cash';
-
+      // Resolve property_id: mounted module → request context — NO fallbacks
+      // Must be resolved BEFORE calculatePricing so tax/fees use property settings
+      const propertyId = mounted.property_id
+        || (req as any).propertyId
+        || (req.headers?.['x-property-id'] as string)
+        || null;
+      if (!propertyId) {
+        logger.error('[Dynamic Router] POST /orders rejected — property_id could not be resolved', {
+          moduleId: mounted.id, slug: mounted.slug,
+        });
+        return res.status(500).json({ success: false, error: 'property_id is required but could not be resolved for this module' });
+      }
+      // Resolve tenant_id: mounted module → request context — NO fallbacks
+      const tenantId = mounted.tenant_id
+        || (req as any).tenant?.id
+        || req.user?.tenantId
+        || (req.headers?.['x-tenant-id'] as string)
+        || null;
+      if (!tenantId) {
+        logger.error('[Dynamic Router] POST /orders rejected — tenant_id could not be resolved', {
+          moduleId: mounted.id, slug: mounted.slug,
+        });
+        return res.status(500).json({ success: false, error: 'tenant_id is required but could not be resolved for this module' });
+      }
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
+        propertyId: propertyId,
         customerId: req.user?.userId ?? undefined,
         couponCode: typeof req.body?.couponCode === 'string' ? req.body.couponCode : undefined,
         giftCardCodes: giftCardCodes.length > 0 ? giftCardCodes : undefined,
         loyaltyPointsToRedeem: typeof req.body?.loyaltyPointsToRedeem === 'number' ? req.body.loyaltyPointsToRedeem : undefined,
-        conditions: { orderType: resolvedOrderType },
+        conditions: { orderType: resolvedOrderType, paymentMethod: resolvedPaymentMethod },
       });
-
+      // Validate pricing matches preview if provided (protects against pricing drift)
+      const previewTotal = typeof req.body?.previewTotal === 'number' ? req.body.previewTotal : null;
+      if (previewTotal !== null) {
+        const tolerance = 0.01; // 1 cent tolerance for rounding differences
+        const diff = Math.abs(pricing.totalAmount - previewTotal);
+        if (diff > tolerance) {
+          logger.error('[Dynamic Router] POST /orders rejected - pricing mismatch with preview', {
+            previewTotal,
+            calculatedTotal: pricing.totalAmount,
+            difference: diff,
+            moduleId: mounted.id,
+          });
+          return res.status(400).json({
+            success: false,
+            error: 'Pricing mismatch detected',
+            message: `The total amount has changed since preview. Preview: $${previewTotal.toFixed(2)}, Current: $${pricing.totalAmount.toFixed(2)}. Please refresh and try again.`,
+            previewTotal,
+            calculatedTotal: pricing.totalAmount,
+          });
+        }
+      }
       // Validate service_location_id belongs to this module before trusting it —
       // otherwise a caller could tag an order to another module's location.
       let serviceLocationId: string | null = null;
@@ -923,33 +936,9 @@ function buildInstantTransactionRouter(router: Router): void {
         }
         serviceLocationId = locationRow.id;
       }
-
-      // Resolve property_id: mounted module → request context — NO fallbacks
-      const propertyId = mounted.property_id
-        || (req as any).propertyId
-        || (req.headers?.['x-property-id'] as string)
-        || null;
-
-      if (!propertyId) {
-        logger.error('[Dynamic Router] POST /orders rejected — property_id could not be resolved', {
-          moduleId: mounted.id, slug: mounted.slug,
-        });
-        return res.status(500).json({ success: false, error: 'property_id is required but could not be resolved for this module' });
-      }
-
-      // Resolve tenant_id: mounted module → request context — NO fallbacks
-      const tenantId = mounted.tenant_id
-        || (req as any).tenant?.id
-        || req.user?.tenantId
-        || (req.headers?.['x-tenant-id'] as string)
-        || null;
-
-      if (!tenantId) {
-        logger.error('[Dynamic Router] POST /orders rejected — tenant_id could not be resolved', {
-          moduleId: mounted.id, slug: mounted.slug,
-        });
-        return res.status(500).json({ success: false, error: 'tenant_id is required but could not be resolved for this module' });
-      }
+      const isStaffUser = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
+      const staffId = isStaffUser ? (req.user?.userId ?? null) : null;
+      const customerId = isStaffUser ? null : (req.user?.userId ?? null);
 
       const { data: created, error: createError } = await supabase
         .from('transactions')
@@ -958,7 +947,8 @@ function buildInstantTransactionRouter(router: Router): void {
           module_id: mounted.id,
           property_id: propertyId,
           tenant_id: tenantId,
-          customer_id: req.user?.userId ?? null,
+          customer_id: customerId,
+          staff_id: staffId,
           status: 'pending',
           amount: pricing.totalAmount,
           discount_amount: pricing.totalDiscount ?? 0,
@@ -975,29 +965,11 @@ function buildInstantTransactionRouter(router: Router): void {
             table_number: resolvedTableNumber,
             customer_name: resolvedCustomerName,
             customer_phone: resolvedCustomerPhone,
-            // Which coupon/gift card (if any) this order's discount_amount
-            // came from. calculatePricing() above already atomically
-            // consumed these via the coupon/gift-card RPCs — previously
-            // that breakdown was computed and then discarded, so nothing on
-            // the order recorded what was actually used. Needed so
-            // cancellation/refund (below, and payment.controller.ts) can
-            // reverse the right coupon/gift card instead of nothing at all.
-            discounts: pricing.discounts,
           },
         })
         .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
         .single();
-
-      if (createError) {
-        // Pricing above already atomically consumed the coupon/gift card
-        // (usage_count incremented, balance deducted) via
-        // apply_coupon_atomic/redeem_giftcard_atomic — before this insert
-        // ever ran. If the insert then fails, that consumption was for
-        // nothing and must be given back, or the coupon/gift card is
-        // permanently burned with no order to show for it.
-        await reverseDiscounts(supabase, pricing.discounts, { userId: req.user?.userId ?? undefined });
-        throw createError;
-      }
+      if (createError) throw createError;
 
       // Backfill the order_id onto the coupon_usage/gift_card_transactions
       // row(s) created during pricing above (they were inserted with
@@ -1082,8 +1054,8 @@ function buildInstantTransactionRouter(router: Router): void {
         const actorIsStaff = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
         await engineService.recordToLedger(pricing, {
           tenantId,
+          propertyId: propertyId,
           moduleId: mounted.id,
-          propertyId,
           templateType: 'instant_transaction',
           entityId: created.id,
           entityType: 'order',
@@ -1097,7 +1069,6 @@ function buildInstantTransactionRouter(router: Router): void {
             lineItems: receiptLineItems,
             taxBreakdown: pricing.taxBreakdown,
             feeBreakdown: pricing.feeBreakdown,
-            discounts: pricing.discounts,
           },
         });
       } catch (ledgerErr) {
@@ -1106,7 +1077,6 @@ function buildInstantTransactionRouter(router: Router): void {
           error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
         });
       }
-
       // Flatten metadata fields to top level for client convenience
       const meta = (created?.metadata ?? {}) as Record<string, unknown>;
 
@@ -1124,7 +1094,7 @@ function buildInstantTransactionRouter(router: Router): void {
           totalAmount: created.amount,
           tableNumber: meta.table_number ?? null,
           createdAt: created.created_at,
-          items: receiptLineItems.map((li) => ({
+          items: receiptLineItems.map((li: any) => ({
             id: li.itemId,
             name: li.name,
             quantity: li.quantity,
@@ -1153,14 +1123,12 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to create order' });
     }
   });
-
-  router.get('/orders', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.get('/orders', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('transactions')
@@ -1169,22 +1137,50 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .order('created_at', { ascending: false })
         .limit(100);
-
       if (error) throw error;
-      res.json({ success: true, data: data ?? [] });
+      // Flatten metadata fields to top level for client convenience
+      const flattened = (data ?? []).map((tx: any) => {
+        const meta = (tx.metadata ?? {}) as Record<string, unknown>;
+        const items = (meta.items as Array<any>) || [];
+        return {
+          id: tx.id,
+          order_number: meta.order_number || `ORD-${tx.id.slice(0, 8).toUpperCase()}`,
+          status: tx.status,
+          total_amount: tx.amount,
+          table_number: meta.table_number || meta.tableNumber || null,
+          customer: meta.customer_name ? { full_name: meta.customer_name as string } : null,
+          customerName: meta.customer_name || meta.customerName || null,
+          created_at: tx.created_at,
+          order_items: items.map((item: any) => ({
+            id: item.id,
+            catalog_item_id: item.catalog_item_id || item.menuItemId || item.itemId,
+            quantity: item.quantity,
+            unit_price: item.unit_price || item.unitPrice,
+            name: item.name || null,
+            catalog_items: item.name ? { name: item.name } : null,
+          })),
+          items: items.map((item: any) => ({
+            id: item.id,
+            catalog_item_id: item.catalog_item_id || item.menuItemId || item.itemId,
+            quantity: item.quantity,
+            unit_price: item.unit_price || item.unitPrice,
+            name: item.name || null,
+            catalog_items: item.name ? { name: item.name } : null,
+          })),
+        };
+      });
+      res.json({ success: true, data: flattened });
     } catch (error) {
       logger.error('[Dynamic Router] GET /orders failed', error);
       res.status(500).json({ success: false, error: 'Failed to list orders' });
     }
   });
-
-  router.get('/orders/:id', authenticate, enforceMountedModulePropertyAccess, authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
+  router.get('/orders/:id', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('transactions')
@@ -1197,18 +1193,14 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
-
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Order not found' });
-
-      // IDOR protection: Customers can only access their own orders
-      const roles = req.user?.roles ?? [];
-      const isStaff = ['staff', 'manager', 'admin', 'super_admin'].some(role => roles.includes(role));
+      // IDOR protection: customers can only view their own orders
+      const isStaff = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
       if (!isStaff && data.customer_id !== req.user?.userId) {
         return res.status(403).json({ success: false, error: 'Access denied' });
       }
       const meta = (data?.metadata ?? {}) as Record<string, unknown>;
-
       // QR code was never wired up for orders — qr-security.ts has a working,
       // HMAC-signed generator that nothing was calling. Generated fresh on
       // each fetch; validity is verified by signature/expiry, not storage.
@@ -1219,7 +1211,6 @@ function buildInstantTransactionRouter(router: Router): void {
       } catch (qrErr) {
         logger.warn('[Dynamic Router] Failed to generate order QR code', { orderId: data.id, error: qrErr instanceof Error ? qrErr.message : String(qrErr) });
       }
-
       // Pull the full pricing breakdown back out of the financial ledger
       // (written at order creation — see POST /orders). Falls back to just
       // the bare transactions fields for orders created before this ledger
@@ -1245,7 +1236,6 @@ function buildInstantTransactionRouter(router: Router): void {
         });
       }
       const ledgerMeta = (ledgerBreakdown?.metadata ?? {}) as Record<string, unknown>;
-
       res.json({
         success: true,
         data: {
@@ -1280,19 +1270,16 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to fetch order' });
     }
   });
-
-  router.patch('/orders/:id/status', authenticate, enforceMountedModulePropertyAccess, authorize('staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
+  router.patch('/orders/:id/status', authorize('staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const newStatus = String(req.body?.status ?? '');
       if (!newStatus) {
         return res.status(400).json({ success: false, error: 'status is required' });
       }
-
       const supabase = getSupabase();
       const result = await changeInstantTransactionOrderStatus(supabase, {
         orderId: req.params.id,
@@ -1323,14 +1310,141 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  // Staff endpoints
-  router.get('/staff/orders', authenticate, enforceMountedModulePropertyAccess, authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+  // Review endpoints (Phase 4.1 & 4.2)
+  router.post('/orders/:id/items/:itemId/review', async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
+      const tenantId = await getTenantIdForMountedModule(mounted);
+      if (!tenantId || !mounted.property_id) {
+        return res.status(400).json({ success: false, error: 'Module scope incomplete' });
+      }
 
+      const { rating, text, token } = req.body ?? {};
+      if (!rating || Number(rating) < 1 || Number(rating) > 5) {
+        return res.status(400).json({ success: false, error: 'rating between 1 and 5 is required' });
+      }
+
+      let authorized = false;
+      const userId: string | null = req.user?.userId ?? null;
+
+      if (token && typeof token === 'string') {
+        const val = validatePayload(token);
+        if (val.valid && val.payload && val.payload.id === req.params.id) {
+          authorized = true;
+        }
+      }
+
+      if (req.user?.userId) {
+        authorized = true;
+      }
+
+      if (!authorized) {
+        return res.status(401).json({ success: false, error: 'Authentication or valid order QR token required' });
+      }
+
+      const supabase = getSupabase();
+      const { data: itemRow } = await supabase
+        .from('order_items')
+        .select('catalog_item_id')
+        .eq('id', req.params.itemId)
+        .eq('transaction_id', req.params.id)
+        .maybeSingle();
+
+      const review = await submitProductReview({
+        tenantId,
+        propertyId: mounted.property_id,
+        orderId: req.params.id,
+        orderItemId: req.params.itemId,
+        catalogItemId: itemRow?.catalog_item_id ?? null,
+        rating: Number(rating),
+        text: text ? String(text) : null,
+        userId,
+      });
+
+      res.status(201).json({ success: true, data: review });
+    } catch (error: any) {
+      logger.error('[Dynamic Router] POST /orders/:id/items/:itemId/review failed', error);
+      res.status(500).json({ success: false, error: error.message || 'Failed to submit item review' });
+    }
+  });
+
+  router.post('/orders/:id/staff-review', async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const tenantId = await getTenantIdForMountedModule(mounted);
+      if (!tenantId || !mounted.property_id) {
+        return res.status(400).json({ success: false, error: 'Module scope incomplete' });
+      }
+
+      const { rating, text, token } = req.body ?? {};
+      if (!rating || Number(rating) < 1 || Number(rating) > 5) {
+        return res.status(400).json({ success: false, error: 'rating between 1 and 5 is required' });
+      }
+
+      let authorized = false;
+      if (token && typeof token === 'string') {
+        const val = validatePayload(token);
+        if (val.valid && val.payload && val.payload.id === req.params.id) {
+          authorized = true;
+        }
+      }
+      if (req.user?.userId) authorized = true;
+
+      if (!authorized) {
+        return res.status(401).json({ success: false, error: 'Authentication or valid order QR token required' });
+      }
+
+      const supabase = getSupabase();
+      const { data: order } = await supabase
+        .from('transactions')
+        .select('staff_id')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .maybeSingle();
+
+      if (!order || !order.staff_id) {
+        return res.status(400).json({ success: false, error: 'Order has no assigned staff member to review' });
+      }
+
+      const review = await submitStaffReview({
+        tenantId,
+        propertyId: mounted.property_id,
+        staffId: order.staff_id,
+        orderId: req.params.id,
+        rating: Number(rating),
+        text: text ? String(text) : null,
+      });
+
+      res.status(201).json({ success: true, data: review });
+    } catch (error: any) {
+      logger.error('[Dynamic Router] POST /orders/:id/staff-review failed', error);
+      res.status(500).json({ success: false, error: error.message || 'Failed to submit staff review' });
+    }
+  });
+
+  router.get('/items/:itemId/rating', async (req: Request, res: Response) => {
+    try {
+      const stats = await getProductItemRating(req.params.itemId);
+      res.json({ success: true, data: stats });
+    } catch (error: any) {
+      logger.error('[Dynamic Router] GET /items/:itemId/rating failed', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch item rating' });
+    }
+  });
+
+  // Staff endpoints
+  router.get('/staff/orders', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
       const supabase = getSupabase();
       const { status } = req.query;
       let query = supabase
@@ -1340,14 +1454,11 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .order('created_at', { ascending: false })
         .limit(100);
-
       if (status && typeof status === 'string') {
         const statusList = status.split(',');
         query = query.in('status', statusList);
       }
-
       const { data, error } = await query;
-
       if (error) throw error;
       res.json({ success: true, data: data ?? [] });
     } catch (error) {
@@ -1355,14 +1466,12 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list staff orders' });
     }
   });
-
   router.get('/staff/service-locations', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const data = await fetchServiceLocationsWithOccupancy(mounted.id);
       res.json({ success: true, data });
     } catch (error) {
@@ -1370,7 +1479,6 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list service locations' });
     }
   });
-
   // Waitlist endpoints
   router.get('/waitlist', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
@@ -1378,14 +1486,12 @@ function buildInstantTransactionRouter(router: Router): void {
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('waitlist_entries')
         .select('*')
         .eq('module_id', mounted.id)
         .order('created_at', { ascending: true });
-
       if (error) {
         logger.warn('[Dynamic Router] GET /waitlist query warning:', error.message);
         return res.json({ success: true, data: [] });
@@ -1396,19 +1502,16 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list waitlist entries' });
     }
   });
-
   router.post('/waitlist', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const { guest_name, name, party_size, partySize, phone, notes } = req.body ?? {};
       const resolvedName = guest_name || name || 'Guest';
       const resolvedPartySize = party_size || partySize || 1;
       const tenant_id = await getTenantIdForMountedModule(mounted);
-
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('waitlist_entries')
@@ -1425,7 +1528,6 @@ function buildInstantTransactionRouter(router: Router): void {
         })
         .select()
         .single();
-
       if (error) throw error;
       res.status(201).json({ success: true, data });
     } catch (error) {
@@ -1433,14 +1535,12 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to add to waitlist' });
     }
   });
-
   router.patch('/waitlist/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const { status } = req.body ?? {};
       const supabase = getSupabase();
       const { data, error } = await supabase
@@ -1453,7 +1553,6 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .select()
         .single();
-
       if (error) throw error;
       res.json({ success: true, data });
     } catch (error) {
@@ -1461,21 +1560,18 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to update waitlist entry' });
     }
   });
-
   router.delete('/waitlist/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { error } = await supabase
         .from('waitlist_entries')
         .delete()
         .eq('id', req.params.id)
         .eq('module_id', mounted.id);
-
       if (error) throw error;
       res.json({ success: true });
     } catch (error) {
@@ -1484,7 +1580,6 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 }
-
 function buildTimeExclusiveReservationRouter(router: Router): void {
   router.get('/availability', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
@@ -1492,7 +1587,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { start, end } = req.query;
       let query = supabase
@@ -1500,11 +1594,9 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         .select('id, name, is_active, module_id, base_price, capacity')
         .eq('module_id', mounted.id)
         .eq('is_active', true);
-
       if (typeof start === 'string' && typeof end === 'string') {
         query = query.gte('created_at', start).lte('created_at', end);
       }
-
       const { data, error } = await query.order('name', { ascending: true });
       if (error) throw error;
       res.json({ success: true, data: data ?? [] });
@@ -1513,26 +1605,22 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to fetch availability' });
     }
   });
-
   router.post('/bookings', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { unit_id, check_in_date, check_out_date } = req.body ?? {};
       if (!unit_id || !check_in_date || !check_out_date) {
         return res.status(400).json({ success: false, error: 'unit_id, check_in_date and check_out_date are required' });
       }
-
       const checkIn = dayjs(check_in_date);
       const checkOut = dayjs(check_out_date);
       if (!checkIn.isValid() || !checkOut.isValid() || !checkOut.isAfter(checkIn)) {
         return res.status(400).json({ success: false, error: 'Invalid check-in/check-out dates' });
       }
-
       // Validate unit exists for this module. Client-supplied price is never trusted —
       // total is computed server-side below from base_price/weekend_price/unit_price_rules.
       const { data: unitRow, error: unitError } = await supabase
@@ -1541,25 +1629,21 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         .eq('id', String(unit_id))
         .eq('module_id', mounted.id)
         .maybeSingle();
-
       if (unitError) throw unitError;
       if (!unitRow) {
         return res.status(404).json({ success: false, error: 'Unit not found' });
       }
-
       const { data: priceRules } = await supabase
         .from('unit_price_rules')
         .select('*')
         .eq('unit_id', String(unit_id))
         .eq('is_active', true);
-
       // Fetch module's tax category for tax scoping
       const { data: module } = await supabase
         .from('modules')
         .select('tax_category')
         .eq('id', mounted.id)
         .maybeSingle();
-
       const baseAmount = computeStayBaseAmount(
         checkIn,
         checkOut,
@@ -1567,7 +1651,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         parseFloat(unitRow.weekend_price ?? unitRow.base_price),
         priceRules || [],
       );
-
       const lineItem = {
         itemId: String(unit_id),
         name: 'booking',
@@ -1583,7 +1666,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
-
       // Atomic insert with double-booking protection via advisory lock
       const { data: rpcResult, error: rpcError } = await supabase.rpc('reserve_unit_exclusive_atomic', {
         p_unit_id:        String(unit_id),
@@ -1596,24 +1678,19 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         p_discount_amount: pricing.totalDiscount ?? 0,
         p_tax_amount:      pricing.taxAmount ?? 0,
       });
-
       if (rpcError) throw rpcError;
-
       const row = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
       if (!row?.success) {
         const msg = row?.error_message ?? 'Failed to create booking';
         const status = msg.includes('past') ? 400 : msg.includes('booked') ? 409 : 400;
         return res.status(status).json({ success: false, error: msg });
       }
-
       const { data, error } = await supabase
         .from('transactions')
         .select('id, module_id, customer_id, status, amount, metadata')
         .eq('id', row.transaction_id)
         .single();
-
       if (error) throw error;
-
       const meta = (data?.metadata ?? {}) as Record<string, unknown>;
       res.status(201).json({
         success: true,
@@ -1629,7 +1706,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to create booking' });
     }
   });
-
   router.get('/bookings', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -1651,7 +1727,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list bookings' });
     }
   });
-
   router.get('/bookings/:id', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -1683,7 +1758,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to fetch booking' });
     }
   });
-
   router.patch('/bookings/:id/status', authorize('customer', 'staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -1694,7 +1768,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
       if (!newStatus) {
         return res.status(400).json({ success: false, error: 'status is required' });
       }
-
       const supabase = getSupabase();
       const { data: current, error: currentError } = await supabase
         .from('transactions')
@@ -1703,10 +1776,8 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
-
       if (currentError) throw currentError;
       if (!current) return res.status(404).json({ success: false, error: 'Booking not found' });
-
       const actor = actorForUser(req);
       const action = resolveAction(mounted.engine_type, current.status, newStatus, actor);
       const transition = await engineService.transitionState(
@@ -1716,11 +1787,9 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         actor,
         { moduleId: mounted.id },
       );
-
       if (!transition.allowed) {
         return res.status(400).json({ success: false, error: transition.error ?? 'Invalid status transition' });
       }
-
       const { data, error } = await supabase
         .from('transactions')
         .update({ status: transition.targetState, updated_at: new Date().toISOString() })
@@ -1728,7 +1797,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .select('id, status, updated_at')
         .single();
-
       if (error) throw error;
       res.json({ success: true, data });
     } catch (error) {
@@ -1737,7 +1805,6 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
     }
   });
 }
-
 function buildSharedCapacityAccessRouter(router: Router): void {
   router.get('/sessions', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
@@ -1754,7 +1821,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         .eq('is_active', true)
         .order('starts_at', { ascending: true });
       if (error) throw error;
-      
       let normalized = (data ?? []).map((w) => ({
         ...w,
         adult_price: (w.metadata as Record<string, unknown>)?.adult_price ?? w.price,
@@ -1762,38 +1828,31 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         available: w.max_capacity,
         availability: { remaining: w.max_capacity }
       }));
-
       if (date) {
         const { data: tickets, error: ticketsError } = await supabase
           .from('transactions')
           .select('id, reference_id, metadata, status')
           .eq('engine_type', 'shared_capacity_access')
           .eq('module_id', mounted.id);
-        
         if (ticketsError) throw ticketsError;
-
         const validTickets = (tickets ?? []).filter((t) => 
           !['cancelled', 'expired', 'no_show'].includes(t.status)
         );
-
         const dateTickets = validTickets.filter((t) => {
           const tMeta = t.metadata as Record<string, unknown> | null;
           const tDate = tMeta?.ticket_date ?? tMeta?.date ?? '';
           return tDate === date;
         });
-
         normalized = normalized.map((w) => {
           const windowTickets = dateTickets.filter((t) => {
             const tMeta = t.metadata as Record<string, unknown> | null;
             return t.reference_id === w.id || tMeta?.session_id === w.id;
           });
-
           const sold = windowTickets.reduce((sum, t) => {
             const tMeta = t.metadata as Record<string, unknown> | null;
             const quantity = Number(tMeta?.quantity ?? tMeta?.number_of_guests ?? (Number(tMeta?.adults ?? 0) + Number(tMeta?.children ?? 0))) || 1;
             return sum + quantity;
           }, 0);
-
           const remaining = Math.max(0, (w.max_capacity ?? 0) - sold);
           return {
             ...w,
@@ -1802,36 +1861,30 @@ function buildSharedCapacityAccessRouter(router: Router): void {
           };
         });
       }
-
       res.json({ success: true, data: normalized });
     } catch (error) {
       logger.error('[Dynamic Router] GET /sessions failed', error);
       res.status(500).json({ success: false, error: 'Failed to list sessions' });
     }
   });
-
   router.post('/tickets', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
-
       const supabase = getSupabase();
       const { session_id, quantity, unit_price, metadata: bodyMetadata } = req.body ?? {};
       if (!session_id) {
         return res.status(400).json({ success: false, error: 'session_id is required' });
       }
-
       const guestCount = asNumber(quantity, 1);
-
       // Fetch module's tax category for tax scoping
       const { data: module } = await supabase
         .from('modules')
         .select('tax_category')
         .eq('id', mounted.id)
         .maybeSingle();
-
       const lineItem = {
         itemId: String(session_id),
         name: 'session_ticket',
@@ -1848,7 +1901,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         lineItems,
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
-
       const ticketDateRaw =
         (bodyMetadata as Record<string, unknown> | undefined)?.ticket_date
         ?? (bodyMetadata as Record<string, unknown> | undefined)?.date
@@ -1857,7 +1909,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       const ticketDate = typeof ticketDateRaw === 'string'
         ? ticketDateRaw.slice(0, 10)
         : dayjs().format('YYYY-MM-DD');
-
       const purchase = await purchaseSharedCapacityAtomic(supabase, {
         sessionId: String(session_id),
         moduleId: mounted.id,
@@ -1871,7 +1922,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
           payment_method: req.body?.payment_method,
         },
       });
-
       if (!purchase.success) {
         const status = purchase.errorMessage?.includes('capacity') ? 409 : 400;
         return res.status(status).json({
@@ -1880,13 +1930,11 @@ function buildSharedCapacityAccessRouter(router: Router): void {
           availableCapacity: purchase.availableCapacity,
         });
       }
-
       const { data, error } = await supabase
         .from('transactions')
         .select('id, module_id, customer_id, status, amount, reference_id, metadata')
         .eq('id', purchase.transactionId!)
         .single();
-
       if (error) throw error;
       res.status(201).json({ success: true, data });
     } catch (error) {
@@ -1894,7 +1942,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to purchase ticket' });
     }
   });
-
   router.get('/tickets', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -1916,7 +1963,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list tickets' });
     }
   });
-
   router.get('/tickets/:id', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -1933,7 +1979,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         .maybeSingle();
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Ticket not found' });
-
       // qr_code was declared on the frontend SessionTicket type and rendered
       // conditionally, but nothing ever generated or returned it — the QR
       // block has been silently dead since it was built. Same generator now
@@ -1945,14 +1990,12 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       } catch (qrErr) {
         logger.warn('[Dynamic Router] Failed to generate ticket QR code', { ticketId: data.id, error: qrErr instanceof Error ? qrErr.message : String(qrErr) });
       }
-
       res.json({ success: true, data: { ...data, qr_code: qrCode } });
     } catch (error) {
       logger.error('[Dynamic Router] GET /tickets/:id failed', error);
       res.status(500).json({ success: false, error: 'Failed to fetch ticket' });
     }
   });
-
   // Staff endpoints
   router.get('/staff/capacity', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
@@ -1984,7 +2027,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to fetch capacity' });
     }
   });
-
   router.get('/staff/tickets/today', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2008,7 +2050,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list today tickets' });
     }
   });
-
   router.post('/staff/tickets', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2029,14 +2070,12 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         .single();
       if (sessionError) throw sessionError;
       const unitPrice = asNumber(session?.price, 0);
-
       // Fetch module's tax category for tax scoping
       const { data: module } = await supabase
         .from('modules')
         .select('tax_category')
         .eq('id', mounted.id)
         .maybeSingle();
-
       const lineItem = {
         itemId: String(session_id),
         name: 'session_ticket',
@@ -2087,7 +2126,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to create staff ticket' });
     }
   });
-
   router.post('/tickets/:id/bracelet', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2123,7 +2161,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to assign bracelet' });
     }
   });
-
   router.delete('/tickets/:id/bracelet', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2153,7 +2190,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to return bracelet' });
     }
   });
-
   router.post('/sessions/:id/capacity/override', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2195,7 +2231,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to override capacity' });
     }
   });
-
   router.patch('/tickets/:id/validate', authorize('staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2212,7 +2247,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         .maybeSingle();
       if (readError) throw readError;
       if (!ticket) return res.status(404).json({ success: false, error: 'Ticket not found' });
-
       const actor = actorForUser(req);
       const action = resolveAction(mounted.engine_type, ticket.status, 'validate', actor);
       const transition = await engineService.transitionState(
@@ -2222,11 +2256,9 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         actor,
         { moduleId: mounted.id },
       );
-
       if (!transition.allowed) {
         return res.status(400).json({ success: false, error: transition.error ?? 'Invalid status transition' });
       }
-
       const validatedAt = new Date().toISOString();
       const { data, error } = await supabase
         .from('transactions')
@@ -2246,7 +2278,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to validate ticket' });
     }
   });
-
   // Admin endpoints
   router.get('/admin/sessions', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
@@ -2267,7 +2298,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list sessions' });
     }
   });
-
   router.post('/admin/sessions', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2303,7 +2333,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to create session' });
     }
   });
-
   router.put('/admin/sessions/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2335,7 +2364,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to update session' });
     }
   });
-
   router.delete('/admin/sessions/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2355,7 +2383,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to delete session' });
     }
   });
-
   router.put('/admin/settings', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2377,7 +2404,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to update settings' });
     }
   });
-
   router.post('/admin/reset-occupancy', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2393,7 +2419,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to reset occupancy' });
     }
   });
-
   router.get('/staff/bracelets/active', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2418,7 +2443,6 @@ function buildSharedCapacityAccessRouter(router: Router): void {
     }
   });
 }
-
 function buildOngoingEntitlementRouter(router: Router): void {
   router.get('/plans', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
@@ -2440,7 +2464,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list plans' });
     }
   });
-
   router.post('/subscriptions', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2460,14 +2483,12 @@ function buildOngoingEntitlementRouter(router: Router): void {
         .maybeSingle();
       if (planError) throw planError;
       if (!plan) return res.status(404).json({ success: false, error: 'Plan not found' });
-
       // Fetch module's tax category for tax scoping
       const { data: module } = await supabase
         .from('modules')
         .select('tax_category')
         .eq('id', mounted.id)
         .maybeSingle();
-
       const lineItem = {
         itemId: plan.id,
         name: 'subscription_plan',
@@ -2483,7 +2504,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
         }],
         { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
       );
-
       const { data, error } = await supabase
         .from('memberships')
         .insert({
@@ -2502,7 +2522,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to create subscription' });
     }
   });
-
   router.get('/subscriptions', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2523,7 +2542,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list subscriptions' });
     }
   });
-
   router.get('/subscriptions/me', authorize('customer', 'staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2547,7 +2565,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to fetch subscription' });
     }
   });
-
   router.patch('/subscriptions/:id/status', authorize('staff', 'manager', 'admin', 'super_admin'), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2558,7 +2575,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       if (!newStatus) {
         return res.status(400).json({ success: false, error: 'status is required' });
       }
-
       const supabase = getSupabase();
       const { data: current, error: currentError } = await supabase
         .from('memberships')
@@ -2566,10 +2582,8 @@ function buildOngoingEntitlementRouter(router: Router): void {
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
-
       if (currentError) throw currentError;
       if (!current) return res.status(404).json({ success: false, error: 'Subscription not found' });
-
       const actor = actorForUser(req);
       const action = resolveAction(mounted.engine_type, current.status, newStatus, actor);
       const transition = await engineService.transitionState(
@@ -2579,11 +2593,9 @@ function buildOngoingEntitlementRouter(router: Router): void {
         actor,
         { moduleId: mounted.id },
       );
-
       if (!transition.allowed) {
         return res.status(400).json({ success: false, error: transition.error ?? 'Invalid status transition' });
       }
-
       const { data, error } = await supabase
         .from('memberships')
         .update({ status: transition.targetState, updated_at: new Date().toISOString() })
@@ -2591,7 +2603,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
         .eq('module_id', mounted.id)
         .select('id, status, updated_at')
         .single();
-
       if (error) throw error;
       res.json({ success: true, data });
     } catch (error) {
@@ -2599,7 +2610,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to update subscription status' });
     }
   });
-
   // Staff endpoints
   router.get('/staff/list', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
@@ -2621,7 +2631,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list memberships' });
     }
   });
-
   router.get('/staff/expiring', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2645,7 +2654,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list expiring memberships' });
     }
   });
-
   router.patch('/staff/:id/extend', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2662,7 +2670,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
         .maybeSingle();
       if (currentError) throw currentError;
       if (!current) return res.status(404).json({ success: false, error: 'Membership not found' });
-      
       const newExpiry = dayjs(current.expires_at || new Date()).add(asNumber(days, 7), 'day').toISOString();
       const { data, error } = await supabase
         .from('memberships')
@@ -2677,7 +2684,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to extend membership' });
     }
   });
-
   router.patch('/staff/:id/:action', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
@@ -2694,7 +2700,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
         .maybeSingle();
       if (currentError) throw currentError;
       if (!current) return res.status(404).json({ success: false, error: 'Membership not found' });
-
       const actor = actorForUser(req);
       const targetStatus = action === 'activate' ? 'ACTIVE' : action === 'suspend' ? 'SUSPENDED' : action === 'cancel' ? 'CANCELLED' : current.status;
       const transition = await engineService.transitionState(
@@ -2704,11 +2709,9 @@ function buildOngoingEntitlementRouter(router: Router): void {
         actor,
         { moduleId: mounted.id },
       );
-
       if (!transition.allowed) {
         return res.status(400).json({ success: false, error: transition.error ?? 'Invalid status transition' });
       }
-
       const { data, error } = await supabase
         .from('memberships')
         .update({ status: transition.targetState, updated_at: new Date().toISOString() })
@@ -2723,7 +2726,6 @@ function buildOngoingEntitlementRouter(router: Router): void {
     }
   });
 }
-
 /**
  * Build import routes for all engine types
  * Handles parse (POST /import/parse) and commit (POST /import/commit)
@@ -2739,12 +2741,10 @@ function buildImportRouter(router: Router, templateType: TemplateType): void {
         const mountedModule = req.mountedModule!;
         const engineType = mountedModule.engine_type as TemplateType;
         let result: { items: unknown[]; warnings: string[]; errors: string[]; totalParsed: number; successful: number } | null = null;
-
         // Handle file upload or text input
         if (req.file) {
           const buffer = req.file.buffer;
           const mimeType = req.file.mimetype;
-
           if (mimeType === 'application/json' || req.file.originalname.endsWith('.json')) {
             const jsonData = JSON.parse(buffer.toString());
             result = await parseImportForEngine(engineType, jsonData, 'json');
@@ -2762,11 +2762,9 @@ function buildImportRouter(router: Router, templateType: TemplateType): void {
         } else {
           return res.status(400).json({ success: false, errors: ['No data provided for parsing.'] });
         }
-
         if (!result || (result.successful === 0 && result.errors.length > 0)) {
           return res.status(422).json({ success: false, ...result });
         }
-
         res.json({ success: true, data: result });
       } catch (error) {
         logger.error('[Import Router] Parse failed:', error);
@@ -2775,7 +2773,6 @@ function buildImportRouter(router: Router, templateType: TemplateType): void {
       }
     })
   );
-
   // POST /import/commit - Commit parsed data to database
   router.post(
     '/import/commit',
@@ -2785,14 +2782,11 @@ function buildImportRouter(router: Router, templateType: TemplateType): void {
         const mountedModule = req.mountedModule!;
         const engineType = mountedModule.engine_type as TemplateType;
         const { items, moduleId } = req.body;
-
         if (!items || !Array.isArray(items) || items.length === 0) {
           return res.status(400).json({ success: false, error: 'No items to commit' });
         }
-
         const finalModuleId = moduleId || mountedModule.id;
         const result = await commitImportForEngine(engineType, items, finalModuleId);
-
         res.json(result);
       } catch (error) {
         logger.error('[Import Router] Commit failed:', error);
@@ -2802,7 +2796,6 @@ function buildImportRouter(router: Router, templateType: TemplateType): void {
     })
   );
 }
-
 /**
  * Parse import data based on engine type
  */
@@ -2822,7 +2815,6 @@ async function parseImportForEngine(
     appointment_booking: 'time_exclusive_reservation',
   };
   const canonical = (LEGACY[engineType] ?? engineType) as TemplateType;
-
   switch (canonical) {
     case 'instant_transaction':
       if (format === 'llm') return await instantTransactionParser.parseLlmImport(data as string);
@@ -2853,7 +2845,6 @@ async function parseImportForEngine(
       };
   }
 }
-
 /**
  * Commit import data to database based on engine type
  */
@@ -2863,7 +2854,6 @@ async function commitImportForEngine(
   moduleId: string
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
   const supabase = getSupabase();
-
   // Resolve legacy aliases
   const LEGACY: Record<string, TemplateType> = {
     menu_service:        'instant_transaction',
@@ -2875,7 +2865,6 @@ async function commitImportForEngine(
     appointment_booking: 'time_exclusive_reservation',
   };
   const canonical = (LEGACY[engineType] ?? engineType) as TemplateType;
-
   switch (canonical) {
     case 'instant_transaction': {
       // Menu service commit: Insert into catalog_items (generic, engine-level table)
@@ -2884,17 +2873,14 @@ async function commitImportForEngine(
         failed: 0,
         errors: [] as string[],
       };
-
       // First, get the module to find tenant_id
       const { data: module } = await supabase
         .from('modules')
         .select('tenant_id, property_id')
         .eq('id', moduleId)
         .maybeSingle();
-      
       const moduleTenantId = module?.tenant_id ?? null;
       let tenant_id = moduleTenantId;
-      
       if (!tenant_id && module?.property_id) {
         const { data: prop } = await supabase
           .from('properties')
@@ -2903,7 +2889,6 @@ async function commitImportForEngine(
           .maybeSingle();
         tenant_id = prop?.tenant_id ?? null;
       }
-
       for (const item of items as Array<{
         name: string;
         price: number;
@@ -2929,7 +2914,6 @@ async function commitImportForEngine(
             allergens: item.allergens,
           },
         });
-
         if (error) {
           results.failed++;
           results.errors.push(`${item.name}: ${error.message}`);
@@ -2937,10 +2921,8 @@ async function commitImportForEngine(
           results.created++;
         }
       }
-
       return { success: true, data: results };
     }
-
     case 'shared_capacity_access': {
       // Session access commit: Create sessions
       const results = {
@@ -2948,17 +2930,14 @@ async function commitImportForEngine(
         failed: 0,
         errors: [] as string[],
       };
-
       // First, get the module to find tenant_id
       const { data: module } = await supabase
         .from('modules')
         .select('tenant_id, property_id')
         .eq('id', moduleId)
         .maybeSingle();
-      
       const moduleTenantId = module?.tenant_id ?? null;
       let tenant_id = moduleTenantId;
-      
       if (!tenant_id && module?.property_id) {
         const { data: prop } = await supabase
           .from('properties')
@@ -2967,7 +2946,6 @@ async function commitImportForEngine(
           .maybeSingle();
         tenant_id = prop?.tenant_id ?? null;
       }
-
       for (const item of items as Array<{
         name: string;
         startTime: string;
@@ -2997,7 +2975,6 @@ async function commitImportForEngine(
             gender_restriction: item.genderRestriction ?? 'mixed',
           },
         });
-
         if (error) {
           results.failed++;
           results.errors.push(`${item.name}: ${error.message}`);
@@ -3005,10 +2982,8 @@ async function commitImportForEngine(
           results.created++;
         }
       }
-
       return { success: true, data: results };
     }
-
     case 'time_exclusive_reservation': {
       // Multi-day booking commit: Create bookable units
       const results = {
@@ -3016,17 +2991,14 @@ async function commitImportForEngine(
         failed: 0,
         errors: [] as string[],
       };
-
       // First, get the module to find tenant_id
       const { data: module } = await supabase
         .from('modules')
         .select('tenant_id, property_id')
         .eq('id', moduleId)
         .maybeSingle();
-      
       const moduleTenantId = module?.tenant_id ?? null;
       let tenant_id = moduleTenantId;
-      
       if (!tenant_id && module?.property_id) {
         const { data: prop } = await supabase
           .from('properties')
@@ -3035,7 +3007,6 @@ async function commitImportForEngine(
           .maybeSingle();
         tenant_id = prop?.tenant_id ?? null;
       }
-
       for (const item of items as Array<{
         name: string;
         description?: string;
@@ -3066,7 +3037,6 @@ async function commitImportForEngine(
           tenant_id,
           property_id: module?.property_id,
         });
-
         if (error) {
           results.failed++;
           results.errors.push(`${item.name}: ${error.message}`);
@@ -3074,18 +3044,14 @@ async function commitImportForEngine(
           results.created++;
         }
       }
-
       return { success: true, data: results };
     }
-
     default:
       return { success: false, error: `Import commit not supported for engine type: ${engineType}` };
   }
 }
-
 export function buildModuleRouter(templateType: string): Router {
   const router = Router();
-
   // Resolve legacy alias names to canonical engine type
   const LEGACY: Record<string, string> = {
     menu_service:        'instant_transaction',
@@ -3098,21 +3064,10 @@ export function buildModuleRouter(templateType: string): Router {
     saas_subscription:   'platform_entitlement',
   };
   const normalizedType = (LEGACY[templateType] ?? templateType) as TemplateType;
-
-  // Every dynamic route is module-guarded for existence & active status
-  router.use(requireMountedModule, enforceMountedModuleActive);
-
-  // Mount intentionally public catalog browsing routes before authentication middleware
-  if (normalizedType === 'instant_transaction') {
-    buildPublicInstantTransactionRoutes(router);
-  }
-
-  // Blanket authentication and property access control for all protected dynamic routes
-  router.use(authenticate, enforceMountedModulePropertyAccess);
-
+  // Every dynamic route is auth-protected and module-guarded.
+  router.use(authenticate, requireMountedModule, enforceMountedModuleActive, enforceMountedModulePropertyAccess);
   // Import routes (available for all engine types)
   buildImportRouter(router, normalizedType);
-
   switch (normalizedType) {
     case 'instant_transaction':
       buildInstantTransactionRouter(router);
@@ -3146,6 +3101,5 @@ export function buildModuleRouter(templateType: string): Router {
       });
       break;
   }
-
   return router;
 }
