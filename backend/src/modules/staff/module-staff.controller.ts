@@ -45,7 +45,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
-    if (module.engine_type !== 'instant_transaction' && module.engine_type !== 'menu_service') {
+    if (module.engine_type !== 'instant_transaction') {
       return res.status(400).json({ success: false, error: 'Module is not a menu service' });
     }
 
@@ -197,6 +197,95 @@ export async function getModuleOrders(req: Request, res: Response) {
   }
 }
 
+// ============================================
+// TABLES / SERVICE LOCATIONS (for instant_transaction modules)
+// ============================================
+
+/**
+ * List service_locations for a module, with occupancy derived from live
+ * transactions (per the design note on the service_locations table itself:
+ * occupancy is derived, not stored). "Occupied" = any non-terminal
+ * instant_transaction transaction tied to that location — terminal states
+ * are 'completed' and 'cancelled' (see engines/definitions/instant-transaction.ts).
+ *
+ * NOTE: this reads occupancy off `service_location_id`, the real FK on
+ * transactions. splitModuleTable/mergeModuleTables below now key off the
+ * same FK (migrated off the legacy `metadata.table_id` string in the same
+ * change) so splits/merges are reflected here correctly. See
+ * ENGINE_A_STAFF_WORKFLOW_PLAN.md Phase 1. Rows created before this
+ * migration may still be missing service_location_id — run
+ * `backfill-service-location-id.ts` to backfill them from their old
+ * metadata.table_id value.
+ */
+export async function getModuleTables(req: Request, res: Response) {
+  try {
+    const { slug } = req.params;
+    const supabase = getSupabase();
+
+    const { data: module, error: moduleError } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (moduleError || !module) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
+    if (module.engine_type !== 'instant_transaction') {
+      return res.status(400).json({ success: false, error: 'Module is not a menu service' });
+    }
+
+    const { data: locations, error: locationsError } = await supabase
+      .from('service_locations')
+      .select('id, name, qr_code, is_active, sort_order')
+      .eq('module_id', module.id)
+      .order('sort_order', { ascending: true });
+
+    if (locationsError) throw locationsError;
+
+    const locationIds = (locations || []).map((l) => l.id);
+    const occupiedByLocation = new Map<string, string>(); // location id -> open transaction id
+
+    if (locationIds.length > 0) {
+      const { data: openTx, error: openTxError } = await supabase
+        .from('transactions')
+        .select('id, service_location_id')
+        .eq('engine_type', 'instant_transaction')
+        .eq('module_id', module.id)
+        .not('status', 'in', '(completed,cancelled)')
+        .in('service_location_id', locationIds);
+
+      if (openTxError) throw openTxError;
+
+      for (const tx of openTx || []) {
+        const locId = (tx as { service_location_id?: string | null }).service_location_id;
+        // First open transaction wins if there's ever more than one — that
+        // itself would be a data issue worth surfacing later, not silently
+        // picking the latest.
+        if (locId && !occupiedByLocation.has(locId)) {
+          occupiedByLocation.set(locId, tx.id);
+        }
+      }
+    }
+
+    const tables = (locations || []).map((loc) => ({
+      id: loc.id,
+      name: loc.name,
+      qrCode: loc.qr_code,
+      isActive: loc.is_active,
+      sortOrder: loc.sort_order,
+      isOccupied: occupiedByLocation.has(loc.id),
+      openTransactionId: occupiedByLocation.get(loc.id) ?? null,
+    }));
+
+    res.json({ success: true, data: tables });
+  } catch (error: any) {
+    logger.error('Error fetching module tables:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch tables', message: error.message });
+  }
+}
+
 export async function splitModuleTable(req: Request, res: Response) {
   try {
     const { slug, tableId } = req.params;
@@ -213,8 +302,26 @@ export async function splitModuleTable(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || (module.engine_type !== 'instant_transaction' && module.engine_type !== 'menu_service')) {
+    if (!module || (module.engine_type !== 'instant_transaction')) {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
+    }
+
+    // tableId / newTableId are service_locations.id (the real FK) — verify both
+    // belong to this module before touching any transactions. Previously "the
+    // table" was identified via metadata->>table_id, a free-text field with no
+    // referential integrity; service_location_id is now the single source of
+    // truth per ENGINE_A_STAFF_WORKFLOW_PLAN.md Phase 0/1.
+    const { data: locations, error: locationsError } = await supabase
+      .from('service_locations')
+      .select('id')
+      .eq('module_id', module.id)
+      .in('id', [tableId, newTableId]);
+
+    if (locationsError) throw locationsError;
+
+    const foundIds = new Set((locations || []).map((l) => l.id));
+    if (!foundIds.has(tableId) || !foundIds.has(newTableId)) {
+      return res.status(404).json({ success: false, error: 'Source or target service location not found for this module' });
     }
 
     // Tabs are open instant_transactions with tab_state: 'open' in metadata
@@ -223,7 +330,7 @@ export async function splitModuleTable(req: Request, res: Response) {
       .select('id, customer_id, metadata')
       .eq('engine_type', 'instant_transaction')
       .eq('status', 'pending')
-      .filter('metadata->>table_id', 'eq', tableId)
+      .eq('service_location_id', tableId)
       .filter('metadata->>tab_state', 'eq', 'open')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -238,7 +345,7 @@ export async function splitModuleTable(req: Request, res: Response) {
       .select('id')
       .eq('engine_type', 'instant_transaction')
       .eq('status', 'pending')
-      .filter('metadata->>table_id', 'eq', newTableId)
+      .eq('service_location_id', newTableId)
       .filter('metadata->>tab_state', 'eq', 'open')
       .maybeSingle();
 
@@ -246,7 +353,9 @@ export async function splitModuleTable(req: Request, res: Response) {
       return res.status(409).json({ success: false, error: 'Target table already has an open tab' });
     }
 
-    const sourceMeta = sourceTab.metadata as Record<string, any>;
+    // Drop any legacy table_id off the carried-forward metadata so splits
+    // stop propagating the field this migration is retiring.
+    const { table_id: _legacyTableId, ...sourceMeta } = (sourceTab.metadata ?? {}) as Record<string, any>;
     const { data: newTab, error: createError } = await supabase
       .from('transactions')
       .insert({
@@ -255,9 +364,9 @@ export async function splitModuleTable(req: Request, res: Response) {
         customer_id: sourceTab.customer_id,
         module_id: module.id,
         amount: 0,
+        service_location_id: newTableId,
         metadata: {
           ...sourceMeta,
-          table_id: newTableId,
           tab_state: 'open',
           split_from: sourceTab.id,
         },
@@ -298,8 +407,22 @@ export async function mergeModuleTables(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || (module.engine_type !== 'instant_transaction' && module.engine_type !== 'menu_service')) {
+    if (!module || (module.engine_type !== 'instant_transaction')) {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
+    }
+
+    // Same service_location_id validation as splitModuleTable — see comment there.
+    const { data: locations, error: locationsError } = await supabase
+      .from('service_locations')
+      .select('id')
+      .eq('module_id', module.id)
+      .in('id', [tableId, targetTableId]);
+
+    if (locationsError) throw locationsError;
+
+    const foundIds = new Set((locations || []).map((l) => l.id));
+    if (!foundIds.has(tableId) || !foundIds.has(targetTableId)) {
+      return res.status(404).json({ success: false, error: 'Source or target service location not found for this module' });
     }
 
     const { data: sourceTab } = await supabase
@@ -307,7 +430,7 @@ export async function mergeModuleTables(req: Request, res: Response) {
       .select('id, metadata')
       .eq('engine_type', 'instant_transaction')
       .eq('status', 'pending')
-      .filter('metadata->>table_id', 'eq', tableId)
+      .eq('service_location_id', tableId)
       .filter('metadata->>tab_state', 'eq', 'open')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -318,7 +441,7 @@ export async function mergeModuleTables(req: Request, res: Response) {
       .select('id, metadata')
       .eq('engine_type', 'instant_transaction')
       .eq('status', 'pending')
-      .filter('metadata->>table_id', 'eq', targetTableId)
+      .eq('service_location_id', targetTableId)
       .filter('metadata->>tab_state', 'eq', 'open')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -328,7 +451,9 @@ export async function mergeModuleTables(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Both source and target tables must have open tabs' });
     }
 
-    // Reassign all orders from source tab to target tab (via metadata)
+    // Reassign all orders from source tab to target tab (via metadata) — this
+    // link (order -> tab via metadata.tab_id) is a separate concept from which
+    // table the tab itself sits at, and is unaffected by this migration.
     const { data: ordersToMove } = await supabase
       .from('transactions')
       .select('id, metadata')
@@ -377,7 +502,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       .eq('slug', slug)
       .single();
 
-    if (!module || (module.engine_type !== 'instant_transaction' && module.engine_type !== 'menu_service')) {
+    if (!module || (module.engine_type !== 'instant_transaction')) {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
     }
 
