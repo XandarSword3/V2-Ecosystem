@@ -39,6 +39,21 @@ router.get('/modules/:slug/orders/live', authorize(...staffRoles), verifyStaffMo
 router.post('/modules/:slug/tables/:tableId/split', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.splitModuleTable);
 router.post('/modules/:slug/tables/:tableId/merge', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.mergeModuleTables);
 
+// Get catalog menu items for POS order entry
+router.get('/modules/:slug/menu', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.getModuleMenu);
+
+// Create order (POS staff order entry)
+router.post('/modules/:slug/orders', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.createModuleOrder);
+
+// Add items to existing order
+router.post('/modules/:slug/orders/:orderId/items', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.addModuleOrderItem);
+
+// Process payment for order
+router.post('/modules/:slug/orders/:orderId/pay', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.payModuleOrder);
+
+// Generate receipt / print job for order
+router.post('/modules/:slug/orders/:orderId/print', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.printModuleOrderReceipt);
+
 // Update order status
 router.put('/modules/:slug/orders/:orderId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleOrderStatus);
 router.patch('/modules/:slug/orders/:orderId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleOrderStatus);
@@ -46,6 +61,7 @@ router.patch('/modules/:slug/orders/:orderId/status', authorize(...staffRoles), 
 // Update a single item's status (item-level KDS)
 router.patch('/modules/:slug/orders/:orderId/items/:itemId/status', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.updateModuleOrderItemStatus);
 router.post('/modules/:slug/orders/:orderId/split', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.splitModuleOrder);
+
 
 // ============================================
 // Multi-Day Booking Operations (accommodation, villas, etc.)

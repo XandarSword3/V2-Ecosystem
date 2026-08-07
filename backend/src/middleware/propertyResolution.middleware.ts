@@ -66,7 +66,7 @@ declare global {
 // Redis cache
 // ============================================
 
-const CACHE_TTL = 30; // 30 seconds
+const CACHE_TTL = 300; // 5 minutes - match tenant cache TTL to reduce DB hits
 const CACHE_KEY_PREFIX = 'property:';
 
 async function getCached(key: string): Promise<PropertyRecord | null | undefined> {

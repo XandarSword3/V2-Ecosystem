@@ -1753,4 +1753,447 @@ export async function searchCustomers(req: Request, res: Response) {
   }
 }
 
+/**
+ * Create a staff order for a module (instant_transaction POS)
+ * POST /staff/modules/:slug/orders
+ */
+export async function createModuleOrder(req: Request, res: Response) {
+  try {
+    const { slug } = req.params;
+    const { serviceLocationId, tableNumber, customerName, customerId, items, notes } = req.body;
+    const userId = req.user?.userId;
+    const tenantId = req.user?.tenantId;
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    const supabase = getSupabase();
+
+    const { data: module, error: moduleError } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (moduleError || !module) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
+    if (module.engine_type !== 'instant_transaction') {
+      return res.status(400).json({ success: false, error: 'Module is not an instant_transaction module' });
+    }
+
+    // Verify service location if provided
+    let locationName = tableNumber;
+    let locationId = serviceLocationId;
+    if (serviceLocationId) {
+      const { data: loc } = await supabase
+        .from('service_locations')
+        .select('id, name')
+        .eq('id', serviceLocationId)
+        .eq('module_id', module.id)
+        .single();
+      if (loc) {
+        locationName = loc.name;
+        locationId = loc.id;
+      }
+    }
+
+    const orderItemsInput = Array.isArray(items) ? items : [];
+    let calculatedAmount = 0;
+    for (const item of orderItemsInput) {
+      const qty = Number(item.quantity || item.qty || 1);
+      const price = Number(item.unitPrice || item.price || 0);
+      calculatedAmount += qty * price;
+    }
+
+    const orderNumber = `ORD-${Date.now().toString(36).toUpperCase().slice(-5)}`;
+
+    const { data: transaction, error: txError } = await supabase
+      .from('transactions')
+      .insert({
+        engine_type: 'instant_transaction',
+        status: 'confirmed',
+        amount: Math.round(calculatedAmount * 100) / 100,
+        module_id: module.id,
+        service_location_id: locationId || null,
+        staff_id: userId || null,
+        customer_id: customerId || null,
+        tenant_id: tenantId,
+        property_id: propertyId,
+        metadata: {
+          order_number: orderNumber,
+          customer_name: customerName || 'Guest',
+          table_number: locationName || null,
+          table_id: locationId || null,
+          notes: notes || null,
+          payment_status: 'unpaid',
+          payment_method: 'cash',
+        },
+      })
+      .select()
+      .single();
+
+    if (txError) throw txError;
+
+    const createdItems: any[] = [];
+    if (orderItemsInput.length > 0) {
+      const itemInserts = orderItemsInput.map((i: any) => ({
+        transaction_id: transaction.id,
+        catalog_item_id: i.catalogItemId || i.itemId || i.id,
+        quantity: Number(i.quantity || i.qty || 1),
+        unit_price: Number(i.unitPrice || i.price || 0),
+        subtotal: Math.round(Number(i.quantity || i.qty || 1) * Number(i.unitPrice || i.price || 0) * 100) / 100,
+        special_instructions: i.notes || i.instructions || null,
+        status: 'pending',
+      }));
+
+      const { data: insertedItems, error: itemsError } = await supabase
+        .from('order_items')
+        .insert(itemInserts)
+        .select('*');
+
+      if (itemsError) {
+        logger.warn('Failed inserting order items for staff order:', itemsError.message);
+      } else {
+        createdItems.push(...(insertedItems || []));
+      }
+    }
+
+    const resultPayload = {
+      id: transaction.id,
+      orderNumber,
+      customerName: customerName || 'Guest',
+      status: transaction.status,
+      totalAmount: transaction.amount,
+      serviceLocationId: locationId || null,
+      tableNumber: locationName || null,
+      items: createdItems,
+      createdAt: transaction.created_at,
+    };
+
+    try {
+      emitToUnit(tenantId || 'default', slug, 'order:new', resultPayload);
+      emitToUnit(tenantId || 'default', module.id, 'order:new', resultPayload);
+    } catch (sErr: any) {
+      logger.warn('Failed emitting order:new socket event:', sErr.message);
+    }
+
+    res.status(201).json({ success: true, data: resultPayload });
+  } catch (error: any) {
+    logger.error('Error creating module order:', error);
+    res.status(500).json({ success: false, error: 'Failed to create order', message: error.message });
+  }
+}
+
+/**
+ * Add an item to an existing staff module order
+ * POST /staff/modules/:slug/orders/:orderId/items
+ */
+export async function addModuleOrderItem(req: Request, res: Response) {
+  try {
+    const { slug, orderId } = req.params;
+    const { catalogItemId, itemId, quantity, unitPrice, price, notes } = req.body;
+    const supabase = getSupabase();
+
+    const targetCatalogId = catalogItemId || itemId;
+    const qty = Number(quantity || 1);
+    const itemPrice = Number(unitPrice || price || 0);
+
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (!module || module.engine_type !== 'instant_transaction') {
+      return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
+    }
+
+    const { data: order, error: fetchErr } = await supabase
+      .from('transactions')
+      .select('id, amount, status, metadata')
+      .eq('id', orderId)
+      .eq('module_id', module.id)
+      .single();
+
+    if (fetchErr || !order) {
+      return res.status(404).json({ success: false, error: 'Order not found for this module' });
+    }
+
+    if (['completed', 'cancelled'].includes(order.status)) {
+      return res.status(400).json({ success: false, error: `Cannot add items to a ${order.status} order` });
+    }
+
+    const subtotal = Math.round(qty * itemPrice * 100) / 100;
+
+    const { data: newItem, error: insertErr } = await supabase
+      .from('order_items')
+      .insert({
+        transaction_id: order.id,
+        catalog_item_id: targetCatalogId,
+        quantity: qty,
+        unit_price: itemPrice,
+        subtotal,
+        special_instructions: notes || null,
+        status: 'pending',
+      })
+      .select('*')
+      .single();
+
+    if (insertErr) throw insertErr;
+
+    const newTotal = Math.round(((order.amount || 0) + subtotal) * 100) / 100;
+    await supabase
+      .from('transactions')
+      .update({ amount: newTotal, updated_at: new Date().toISOString() })
+      .eq('id', order.id);
+
+    try {
+      const updatePayload = { orderId: order.id, status: order.status, addedItem: newItem };
+      emitToUnit(req.user?.tenantId || 'default', slug, 'order:updated', updatePayload);
+    } catch (sErr: any) {
+      logger.warn('Failed emitting socket event for added order item:', sErr.message);
+    }
+
+    res.json({ success: true, data: newItem });
+  } catch (error: any) {
+    logger.error('Error adding item to order:', error);
+    res.status(500).json({ success: false, error: 'Failed to add item to order', message: error.message });
+  }
+}
+
+/**
+ * Process payment for a staff order
+ * POST /staff/modules/:slug/orders/:orderId/pay
+ */
+export async function payModuleOrder(req: Request, res: Response) {
+  try {
+    const { slug, orderId } = req.params;
+    const { paymentMethod = 'cash', amountPaid, tipAmount = 0 } = req.body;
+    const userId = req.user?.userId;
+    const supabase = getSupabase();
+
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (!module || module.engine_type !== 'instant_transaction') {
+      return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
+    }
+
+    const { data: order, error: orderErr } = await supabase
+      .from('transactions')
+      .select('id, amount, status, metadata')
+      .eq('id', orderId)
+      .eq('module_id', module.id)
+      .single();
+
+    if (orderErr || !order) {
+      return res.status(404).json({ success: false, error: 'Order not found for this module' });
+    }
+
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ success: false, error: 'Cannot pay for a cancelled order' });
+    }
+
+    const orderMeta = (order.metadata ?? {}) as Record<string, any>;
+    const paidAmount = Number(amountPaid ?? order.amount);
+    const tip = Number(tipAmount || 0);
+    const changeAmount = Math.max(0, Math.round((paidAmount - (order.amount + tip)) * 100) / 100);
+
+    const updatedMetadata = {
+      ...orderMeta,
+      payment_status: 'paid',
+      payment_method: paymentMethod,
+      paid_at: new Date().toISOString(),
+      amount_paid: paidAmount,
+      tip_amount: tip,
+      change_amount: changeAmount,
+      paid_by_staff_id: userId || null,
+    };
+
+    const targetStatus = ['delivered', 'ready', 'preparing', 'confirmed', 'pending'].includes(order.status)
+      ? 'completed'
+      : order.status;
+
+    const { data: updatedOrder, error: updateErr } = await supabase
+      .from('transactions')
+      .update({
+        status: targetStatus,
+        metadata: updatedMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    try {
+      emitToUnit(req.user?.tenantId || 'default', slug, 'order:updated', {
+        orderId: order.id,
+        status: targetStatus,
+        paymentStatus: 'paid',
+      });
+    } catch (sErr: any) {
+      logger.warn('Failed emitting socket event for paid order:', sErr.message);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: updatedOrder.id,
+        status: updatedOrder.status,
+        paymentStatus: 'paid',
+        paymentMethod,
+        totalAmount: updatedOrder.amount,
+        amountPaid: paidAmount,
+        changeAmount,
+        tipAmount: tip,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error paying module order:', error);
+    res.status(500).json({ success: false, error: 'Failed to process payment', message: error.message });
+  }
+}
+
+/**
+ * Generate print payload for an order receipt or kitchen ticket
+ * POST /staff/modules/:slug/orders/:orderId/print
+ */
+export async function printModuleOrderReceipt(req: Request, res: Response) {
+  try {
+    const { slug, orderId } = req.params;
+    const { printType = 'receipt' } = req.body;
+    const supabase = getSupabase();
+
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, name, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (!module || module.engine_type !== 'instant_transaction') {
+      return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
+    }
+
+    const { data: order, error: orderErr } = await supabase
+      .from('transactions')
+      .select('id, amount, status, created_at, metadata, service_location_id')
+      .eq('id', orderId)
+      .eq('module_id', module.id)
+      .single();
+
+    if (orderErr || !order) {
+      return res.status(404).json({ success: false, error: 'Order not found for this module' });
+    }
+
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('id, catalog_item_id, quantity, unit_price, subtotal, special_instructions')
+      .eq('transaction_id', order.id);
+
+    const catalogIds = [...new Set((items || []).map((i) => i.catalog_item_id).filter(Boolean))];
+    const { data: catalogItems } = catalogIds.length > 0
+      ? await supabase.from('catalog_items').select('id, name').in('id', catalogIds)
+      : { data: [] };
+
+    const nameMap = new Map((catalogItems || []).map((c) => [c.id, c.name]));
+    const formattedItems = (items || []).map((i) => ({
+      name: nameMap.get(i.catalog_item_id) || 'Item',
+      quantity: i.quantity,
+      unitPrice: i.unit_price,
+      subtotal: i.subtotal,
+      instructions: i.special_instructions,
+    }));
+
+    const meta = (order.metadata ?? {}) as Record<string, any>;
+    const printPayload = {
+      printType,
+      moduleName: module.name,
+      orderId: order.id,
+      orderNumber: meta.order_number || order.id.slice(0, 8),
+      tableNumber: meta.table_number || null,
+      customerName: meta.customer_name || 'Guest',
+      createdAt: order.created_at,
+      items: formattedItems,
+      totalAmount: order.amount,
+      paymentStatus: meta.payment_status || 'unpaid',
+      paymentMethod: meta.payment_method || 'cash',
+      printedAt: new Date().toISOString(),
+    };
+
+    res.json({ success: true, data: printPayload });
+  } catch (error: any) {
+    logger.error('Error printing order receipt:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate print job', message: error.message });
+  }
+}
+
+/**
+ * Fetch catalog categories and active catalog items for order entry UI
+ * GET /staff/modules/:slug/menu
+ */
+export async function getModuleMenu(req: Request, res: Response) {
+  try {
+    const { slug } = req.params;
+    const supabase = getSupabase();
+
+    const { data: module, error: moduleErr } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (moduleErr || !module) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
+    if (module.engine_type !== 'instant_transaction') {
+      return res.status(400).json({ success: false, error: 'Module is not an instant_transaction module' });
+    }
+
+    const [categoriesRes, itemsRes] = await Promise.all([
+      supabase
+        .from('catalog_categories')
+        .select('id, name, description, sort_order')
+        .eq('module_id', module.id)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('catalog_items')
+        .select('id, category_id, name, description, price, unit_price, image_url, is_available')
+        .eq('module_id', module.id)
+        .eq('is_available', true)
+        .order('name', { ascending: true }),
+    ]);
+
+    if (categoriesRes.error) throw categoriesRes.error;
+    if (itemsRes.error) throw itemsRes.error;
+
+    const formattedItems = (itemsRes.data || []).map((item) => ({
+      id: item.id,
+      categoryId: item.category_id,
+      name: item.name,
+      description: item.description,
+      price: item.price ?? item.unit_price ?? 0,
+      unitPrice: item.unit_price ?? item.price ?? 0,
+      imageUrl: item.image_url,
+      isAvailable: item.is_available,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        categories: categoriesRes.data || [],
+        items: formattedItems,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error fetching module menu:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch module menu', message: error.message });
+  }
+}
+
+
 

@@ -5,10 +5,11 @@ import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { SessionAccessDashboard } from '@/components/staff/SessionAccessDashboard';
-import { KitchenView } from '@/components/staff/KitchenView';
+import StaffPOSTemplate from '@/components/pos-templates/StaffPOSTemplate';
 import { MultiDayBookingDashboard } from './components/MultiDayBookingDashboard';
 import { MembershipDashboard } from '@/components/staff/MembershipDashboard';
 import { GenericModuleDashboard } from '@/components/staff/GenericModuleDashboard';
+
 
 interface ModuleData {
   id: string;
@@ -89,11 +90,10 @@ export default function ModulesSlugPage() {
   switch (module.engine_type) {
     case 'instant_transaction':
       return (
-        <KitchenView
-          slug={slug}
-          moduleName={module.name}
+        <StaffPOSTemplate
           moduleId={module.id}
-          requireReservation={module.require_reservation}
+          moduleSlug={slug}
+          moduleName={module.name}
         />
       );
 

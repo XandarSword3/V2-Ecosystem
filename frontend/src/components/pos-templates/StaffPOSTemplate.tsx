@@ -69,6 +69,8 @@ interface Order {
   orderType: string;
   prepStartedAt?: string;
   etaMinutes?: number;
+  paymentMethod?: string;
+  paymentStatus?: string;
 }
 
 interface OrderItem {
@@ -130,16 +132,41 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
         const [tablesRes, ordersRes, shiftRes] = await Promise.all([
           api.get(`/staff/modules/${moduleSlug}/tables`),
           api.get(`/staff/modules/${moduleSlug}/orders`, {
-            params: { status: 'pending,confirmed,preparing,ready' }
+            params: { status: 'pending,confirmed,preparing,ready,completed,delivered' }
           }),
           api.get('/staff/shifts/me/current'),
         ]);
-        setTables(tablesRes.data.data || []);
+
+        // Normalize tables: backend returns { id, name, isOccupied, openTransactionId }
+        // but Table interface expects { id, number, capacity, status }
+        const rawTables = tablesRes.data.data || [];
+        setTables(rawTables.map((t: any) => ({
+          id: t.id,
+          number: t.number || t.name || 'Table',
+          capacity: t.capacity || t.seats || 4,
+          status: t.status || (t.isOccupied ? 'occupied' : 'available'),
+          currentOrder: t.currentOrder || null,
+          openTransactionId: t.openTransactionId || null,
+        })));
+
         setOrders(ordersRes.data.data || []);
         setKitchenOrders((ordersRes.data.data || []).filter(
           (o: Order) => ['confirmed', 'preparing'].includes(o.status)
         ));
-        setCurrentShift(shiftRes.data.data);
+
+        // Normalize shift: backend returns snake_case (opening_cash, start_time)
+        // but Shift interface expects camelCase (openingCash, startTime)
+        const shiftData = shiftRes.data.data;
+        if (shiftData) {
+          setCurrentShift({
+            id: shiftData.id,
+            startTime: shiftData.startTime || shiftData.start_time || shiftData.actual_start || shiftData.actualStart || '',
+            endTime: shiftData.endTime || shiftData.end_time || shiftData.actual_end || undefined,
+            openingCash: Number(shiftData.opening_cash ?? shiftData.openingCash ?? 0),
+            closingCash: shiftData.closing_cash != null ? Number(shiftData.closing_cash) : (shiftData.closingCash != null ? Number(shiftData.closingCash) : undefined),
+            status: shiftData.status || 'active',
+          });
+        }
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -254,7 +281,15 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   const startShift = async (openingCash: number) => {
     try {
       const res = await api.post('/staff/shifts', { openingCash, moduleId });
-      setCurrentShift(res.data.data);
+      const d = res.data.data;
+      setCurrentShift({
+        id: d.id,
+        startTime: d.startTime || d.start_time || d.actual_start || '',
+        endTime: d.endTime || d.end_time || undefined,
+        openingCash: Number(d.opening_cash ?? d.openingCash ?? openingCash),
+        closingCash: undefined,
+        status: d.status || 'active',
+      });
       setShowShiftModal(false);
       toast.success('Shift started');
     } catch (error) {
@@ -276,11 +311,24 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   // Process payment
   const processPayment = async (orderId: string, method: string, amount: number, tip?: number) => {
     try {
-      await api.post(`/staff/modules/${moduleSlug}/orders/${orderId}/pay`, {
+      const res = await api.post(`/staff/modules/${moduleSlug}/orders/${orderId}/pay`, {
         paymentMethod: method,
-        amount,
-        tip,
+        amountPaid: amount,
+        tipAmount: tip,
       });
+      // Update local order state so Cashier view reflects the payment immediately
+      setOrders(prev => prev.map(o =>
+        o.id === orderId
+          ? { ...o, status: res.data.data?.status || 'completed', paymentMethod: method, paymentStatus: 'paid' }
+          : o
+      ));
+      // Release the table if the order was for a table
+      const paidOrder = orders.find(o => o.id === orderId);
+      if (paidOrder?.tableNumber) {
+        setTables(prev => prev.map(t =>
+          t.number === paidOrder.tableNumber ? { ...t, status: 'available', currentOrder: undefined } : t
+        ));
+      }
       toast.success('Payment processed');
       setShowPaymentModal(false);
       setSelectedOrder(null);
@@ -334,7 +382,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
   const fetchMenuItems = async () => {
     try {
       const res = await api.get(`/staff/modules/${moduleSlug}/menu`);
-      setMenuItems(res.data.data || []);
+      const menuData = res.data.data;
+      setMenuItems(Array.isArray(menuData) ? menuData : menuData?.items || []);
     } catch (error) {
       toast.error('Failed to load menu');
     }
@@ -400,7 +449,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-bold">{moduleName}</h1>
             <span className="text-sm text-gray-500">
-              {user?.fullName} | Shift started {formatTime(currentShift.startTime)}
+              {user?.fullName} | Shift started {formatTime((currentShift as any).actual_start || (currentShift as any).actualStart || (currentShift as any).start_time || currentShift.startTime)}
             </span>
           </div>
 
@@ -841,6 +890,14 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {(() => {
+                    const cashSales = orders
+                      .filter(o => (o.paymentStatus === 'paid' || o.status === 'completed') && (o.paymentMethod === 'cash' || o.paymentMethod === 'Cash'))
+                      .reduce((sum, o) => sum + o.totalAmount, 0);
+                    const cashIn = cashSales; // TODO: add pay-in transactions when tracked
+                    const cashOut = 0; // TODO: add pay-out transactions when tracked
+                    const expectedCash = (currentShift.openingCash || 0) + cashIn - cashOut;
+                    return (
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Opening</span>
@@ -848,17 +905,19 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
                     </div>
                     <div className="flex justify-between text-green-600">
                       <span>Cash In</span>
-                      <span>+{formatCurrency(0)}</span>
+                      <span>+{formatCurrency(cashIn)}</span>
                     </div>
                     <div className="flex justify-between text-red-600">
                       <span>Cash Out</span>
-                      <span>-{formatCurrency(0)}</span>
+                      <span>-{formatCurrency(cashOut)}</span>
                     </div>
                     <div className="border-t pt-2 flex justify-between font-bold">
                       <span>Expected</span>
-                      <span>{formatCurrency(currentShift.openingCash)}</span>
+                      <span>{formatCurrency(expectedCash)}</span>
                     </div>
                   </div>
+                    );
+                  })()}
                   <div className="grid grid-cols-2 gap-2 mt-4">
                     <Button variant="outline" size="sm" onClick={() => { setCashModalType('in'); setShowCashModal(true); }}>Pay In</Button>
                     <Button variant="outline" size="sm" onClick={() => { setCashModalType('out'); setShowCashModal(true); }}>Pay Out</Button>
