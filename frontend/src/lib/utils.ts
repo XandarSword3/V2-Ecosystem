@@ -24,31 +24,47 @@ export function formatCurrency(amount: number | string | undefined | null, curre
   }).format(convertedAmount);
 }
 
-export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(date?: string | Date | null, options?: Intl.DateTimeFormatOptions): string {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     ...options,
   };
-  return new Intl.DateTimeFormat('en-US', defaultOptions).format(new Date(date));
+  return new Intl.DateTimeFormat('en-US', defaultOptions).format(d);
 }
 
-export function formatTime(date: string | Date): string {
+export function formatTime(date?: string | Date | null): string {
+  if (!date) return '';
+  if (typeof date === 'string' && /^\d{2}:\d{2}/.test(date)) {
+    const today = new Date().toISOString().split('T')[0];
+    const parsed = new Date(`${today}T${date}`);
+    if (!isNaN(parsed.getTime())) {
+      return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' }).format(parsed);
+    }
+  }
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
   return new Intl.DateTimeFormat('en-US', {
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(date));
+  }).format(d);
 }
 
-export function formatDateTime(date: string | Date): string {
+export function formatDateTime(date?: string | Date | null): string {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
   return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(date));
+  }).format(d);
 }
 
 export function getOrderStatusColor(status: string): string {

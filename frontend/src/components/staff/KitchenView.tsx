@@ -580,15 +580,17 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto">
         {statusFlow.map((status) => {
           const columnOrders = orders.filter((o) => o.status === status);
-          const columnColors: Record<string, { bg: string; border: string; text: string; action: string; actionBg: string; label: string }> = {
+          const columnColors: Record<string, { bg: string; border: string; text: string; action: string | null; actionBg: string; label: string }> = {
             confirmed: { bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-300 dark:border-blue-700', text: 'text-blue-700 dark:text-blue-300', action: 'Start Prep', actionBg: 'bg-blue-600 hover:bg-blue-700', label: 'Confirmed' },
             preparing: { bg: 'bg-orange-50 dark:bg-orange-900/10', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-orange-300', action: 'Mark Ready', actionBg: 'bg-orange-500 hover:bg-orange-600', label: 'Preparing' },
             ready: { bg: 'bg-green-50 dark:bg-green-900/10', border: 'border-green-300 dark:border-green-700', text: 'text-green-700 dark:text-green-300', action: 'Served', actionBg: 'bg-emerald-600 hover:bg-emerald-700', label: 'Ready' },
             // Key is 'delivered' to match the engine's real status name — label
             // stays 'Served' since that's the term staff actually use.
             delivered: { bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-300 dark:border-purple-700', text: 'text-purple-700 dark:text-purple-300', action: 'Complete', actionBg: 'bg-gray-600 hover:bg-gray-700', label: 'Served' },
+            completed: { bg: 'bg-gray-50 dark:bg-gray-900/10', border: 'border-gray-300 dark:border-gray-700', text: 'text-gray-700 dark:text-gray-300', action: null, actionBg: '', label: 'Completed' },
           };
           const col = columnColors[status];
+          if (!col) return null;
           const nextStatus = statusFlow[statusFlow.indexOf(status) + 1];
 
           return (

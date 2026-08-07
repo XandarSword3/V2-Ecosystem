@@ -41,6 +41,7 @@ class RedisCache {
   private isConnected = false;
   private connectionAttempts = 0;
   private maxRetries = 3;
+  private memoryCache = new Map<string, { value: string; expiresAt: number }>();
 
   /**
    * Initialize Redis connection
@@ -111,63 +112,78 @@ class RedisCache {
    * Get a value from cache
    */
   async get<T>(key: string): Promise<T | null> {
-    if (!this.isAvailable()) return null;
+    if (this.isAvailable()) {
+      try {
+        const value = await this.client!.get(key);
+        if (value) return JSON.parse(value) as T;
+      } catch (error) {
+        logger.error(`Cache get error for key ${key}:`, error);
+      }
+    }
 
-    try {
-      const value = await this.client!.get(key);
-      if (!value) return null;
-      return JSON.parse(value) as T;
-    } catch (error) {
-      logger.error(`Cache get error for key ${key}:`, error);
+    const item = this.memoryCache.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiresAt) {
+      this.memoryCache.delete(key);
       return null;
     }
+    return JSON.parse(item.value) as T;
   }
 
   /**
    * Set a value in cache with optional TTL
    */
   async set(key: string, value: unknown, ttlSeconds: number = CacheTTL.MEDIUM): Promise<boolean> {
-    if (!this.isAvailable()) return false;
-
-    try {
-      const serialized = JSON.stringify(value);
-      await this.client!.set(key, serialized, 'EX', ttlSeconds);
-      return true;
-    } catch (error) {
-      logger.error(`Cache set error for key ${key}:`, error);
-      return false;
+    const serialized = JSON.stringify(value);
+    if (this.isAvailable()) {
+      try {
+        await this.client!.set(key, serialized, 'EX', ttlSeconds);
+      } catch (error) {
+        logger.error(`Cache set error for key ${key}:`, error);
+      }
     }
+    this.memoryCache.set(key, { value: serialized, expiresAt: Date.now() + ttlSeconds * 1000 });
+    return true;
   }
 
   /**
    * Delete a key from cache
    */
   async del(key: string): Promise<boolean> {
-    if (!this.isAvailable()) return false;
-
-    try {
-      await this.client!.del(key);
-      return true;
-    } catch (error) {
-      logger.error(`Cache delete error for key ${key}:`, error);
-      return false;
+    this.memoryCache.delete(key);
+    if (this.isAvailable()) {
+      try {
+        await this.client!.del(key);
+      } catch (error) {
+        logger.error(`Cache delete error for key ${key}:`, error);
+      }
     }
+    return true;
   }
 
   /**
    * Delete multiple keys matching a pattern
    */
   async delPattern(pattern: string): Promise<number> {
-    if (!this.isAvailable()) return 0;
-
-    try {
-      const keys = await this.client!.keys(pattern);
-      if (keys.length === 0) return 0;
-      return await this.client!.del(...keys);
-    } catch (error) {
-      logger.error(`Cache delete pattern error for ${pattern}:`, error);
-      return 0;
+    let deletedCount = 0;
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    for (const k of this.memoryCache.keys()) {
+      if (regex.test(k)) {
+        this.memoryCache.delete(k);
+        deletedCount++;
+      }
     }
+    if (this.isAvailable()) {
+      try {
+        const keys = await this.client!.keys(pattern);
+        if (keys.length > 0) {
+          deletedCount += await this.client!.del(...keys);
+        }
+      } catch (error) {
+        logger.error(`Cache delete pattern error for ${pattern}:`, error);
+      }
+    }
+    return deletedCount;
   }
 
   /**

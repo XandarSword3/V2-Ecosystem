@@ -6,14 +6,18 @@ import { logActivity } from '../../utils/activityLogger.js';
 import { z } from 'zod';
 
 // Validation schemas
+// Validation schemas
 const createShiftSchema = z.object({
-  staffId: z.string().uuid(),
-  shiftDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/),
+  staffId: z.string().uuid().optional(),
+  shiftDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   breakMinutes: z.number().min(0).default(0),
   department: z.string().optional(),
   notes: z.string().optional(),
+  openingCash: z.number().optional(),
+  opening_cash: z.number().optional(),
+  moduleId: z.string().optional(),
 });
 
 const updateShiftSchema = createShiftSchema.partial().extend({
@@ -131,7 +135,7 @@ export const getStaffShifts = asyncHandler(async (req: Request, res: Response) =
 
 /**
  * POST /api/staff/shifts
- * Create a new shift
+ * Create a new shift (or ad-hoc POS shift start for staff)
  */
 export const createShift = asyncHandler(async (req: Request, res: Response) => {
     const validation = createShiftSchema.safeParse(req.body);
@@ -151,21 +155,60 @@ export const createShift = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const data = validation.data;
 
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const timeStr = now.toTimeString().slice(0, 5); // "HH:MM"
+
+    const targetStaffId = data.staffId || userId;
+    const shiftDate = data.shiftDate || todayStr;
+    const startTime = data.startTime || timeStr;
+    const endTime = data.endTime || '23:59';
+    const openingCash = Number(data.openingCash ?? data.opening_cash ?? 0);
+    const isAdHocStart = !data.staffId || data.openingCash !== undefined || data.opening_cash !== undefined;
+
+    // Check if there is already an active or scheduled shift for this staff member today
+    const { data: existingShift } = await supabase
+      .from('staff_shifts')
+      .select('*')
+      .eq('staff_id', targetStaffId)
+      .eq('shift_date', shiftDate)
+      .in('status', ['scheduled', 'active'])
+      .order('start_time', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingShift && isAdHocStart) {
+      const { data: updated, error: updateErr } = await supabase
+        .from('staff_shifts')
+        .update({
+          status: 'active',
+          actual_start: existingShift.actual_start || now.toISOString(),
+          opening_cash: openingCash,
+          ...(data.notes ? { notes: data.notes } : {}),
+        })
+        .eq('id', existingShift.id)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+      res.json({ success: true, data: updated });
+      return;
+    }
+
     const { data: shift, error } = await supabase
       .from('staff_shifts')
       .insert({
-        staff_id: data.staffId,
-        shift_date: data.shiftDate,
-        start_time: data.startTime,
-        end_time: data.endTime,
-        break_minutes: data.breakMinutes,
-        department: data.department,
-        notes: data.notes,
+        staff_id: targetStaffId,
+        shift_date: shiftDate,
+        start_time: startTime,
+        end_time: endTime,
+        break_minutes: data.breakMinutes || 0,
+        department: data.department || null,
+        notes: data.notes || null,
+        opening_cash: openingCash,
+        actual_start: isAdHocStart ? now.toISOString() : null,
+        status: isAdHocStart ? 'active' : 'scheduled',
         created_by: userId,
-        // NOTE: staff_shifts.tenant_id/property_id are NOT NULL in the schema
-        // but this insert never set them before this fix — every createShift
-        // call was failing the NOT NULL constraint. Same recurring pattern as
-        // the transactions.tenant_id bug from the instant_transaction audit.
         tenant_id: tenantId,
         property_id: propertyId,
       })
@@ -176,14 +219,15 @@ export const createShift = asyncHandler(async (req: Request, res: Response) => {
 
     await logActivity({
       user_id: userId,
-      action: 'CREATE_SHIFT',
+      action: isAdHocStart ? 'START_SHIFT' : 'CREATE_SHIFT',
       resource: 'staff_shifts',
       resource_id: shift.id,
-      details: { staff_id: data.staffId, date: data.shiftDate },
+      details: { staff_id: targetStaffId, date: shiftDate, opening_cash: openingCash },
     });
 
     res.status(201).json({ success: true, data: shift });
 });
+
 
 /**
  * PUT /api/staff/shifts/:id
