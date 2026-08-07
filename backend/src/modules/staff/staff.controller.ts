@@ -142,6 +142,12 @@ export const createShift = asyncHandler(async (req: Request, res: Response) => {
 
     const userId = req.user?.userId;
     if (!userId) throw new Error('Authentication required');
+    const tenantId = req.user?.tenantId;
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    if (!tenantId || !propertyId) {
+      res.status(400).json({ success: false, error: 'Tenant/property context required' });
+      return;
+    }
     const supabase = getSupabase();
     const data = validation.data;
 
@@ -156,6 +162,12 @@ export const createShift = asyncHandler(async (req: Request, res: Response) => {
         department: data.department,
         notes: data.notes,
         created_by: userId,
+        // NOTE: staff_shifts.tenant_id/property_id are NOT NULL in the schema
+        // but this insert never set them before this fix — every createShift
+        // call was failing the NOT NULL constraint. Same recurring pattern as
+        // the transactions.tenant_id bug from the instant_transaction audit.
+        tenant_id: tenantId,
+        property_id: propertyId,
       })
       .select()
       .single();
@@ -345,6 +357,195 @@ export const clockOut = asyncHandler(async (req: Request, res: Response) => {
       workedHours,
       message: `Clocked out. Total worked: ${workedHours} hours`,
     });
+});
+
+/**
+ * GET /api/staff/shifts/me/current
+ * Get the caller's current active/scheduled-for-today shift.
+ * Ported from manager/shifts.controller.ts getCurrentShift — same logic,
+ * now under the canonical /staff/shifts path.
+ */
+export const getCurrentShift = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
+    const supabase = getSupabase();
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data: shift, error } = await supabase
+      .from('staff_shifts')
+      .select('*')
+      .eq('staff_id', userId)
+      .eq('shift_date', today)
+      .in('status', ['scheduled', 'active'])
+      .order('start_time', { ascending: true })
+      .limit(1)
+      .single();
+
+    // No shift found is not an error
+    if (error && error.code !== 'PGRST116') throw error;
+
+    res.json({ success: true, data: shift || null });
+});
+
+/**
+ * GET /api/staff/shifts/today
+ * Today's schedule + summary counts, gated to managerRoles.
+ * Ported from manager/shifts.controller.ts getTodaySchedule — same shape
+ * ({ data, summary }) so existing frontend callers work unchanged once
+ * repointed to this path.
+ */
+export const getTodaySchedule = asyncHandler(async (req: Request, res: Response) => {
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    const supabase = getSupabase();
+    const today = new Date().toISOString().split('T')[0];
+
+    let query = supabase
+      .from('staff_shifts')
+      .select('*')
+      .eq('shift_date', today)
+      .neq('status', 'cancelled');
+
+    if (propertyId) {
+      const { data: staffMembers } = await supabase
+        .from('user_property_access')
+        .select('user_id')
+        .eq('property_id', propertyId);
+      const staffIds = (staffMembers || []).map((sm) => sm.user_id).filter(Boolean);
+      query = query.in('staff_id', staffIds);
+    }
+
+    const { data: shifts, error } = await query.order('start_time', { ascending: true });
+    if (error) throw error;
+
+    const staffIdsList = [...new Set((shifts || []).map((s) => s.staff_id).filter(Boolean))];
+    let staffMap: Record<string, any> = {};
+    if (staffIdsList.length > 0) {
+      const { data: staff } = await supabase.from('users').select('id, full_name').in('id', staffIdsList);
+      staffMap = (staff || []).reduce((acc, s) => { acc[s.id] = s; return acc; }, {} as Record<string, any>);
+    }
+
+    const enrichedShifts = (shifts || []).map((s) => ({
+      ...s,
+      staff_name: staffMap[s.staff_id]?.full_name || 'Unknown',
+    }));
+
+    const summary = {
+      total: enrichedShifts.length,
+      active: enrichedShifts.filter((s) => s.status === 'active').length,
+      scheduled: enrichedShifts.filter((s) => s.status === 'scheduled').length,
+      completed: enrichedShifts.filter((s) => s.status === 'completed').length,
+      missed: enrichedShifts.filter((s) => s.status === 'missed').length,
+    };
+
+    res.json({ success: true, data: enrichedShifts, summary });
+});
+
+/**
+ * POST /api/staff/shifts/:id/close
+ * End-of-shift cash-drawer close: records closingCash, finalizes actual_end
+ * if not already clocked out. Distinct from clock-out — this is the POS
+ * drawer-close step StaffPOSTemplate calls separately.
+ */
+export const closeShift = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { closingCash } = req.body as { closingCash?: number };
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
+    const supabase = getSupabase();
+
+    const { data: shift, error: fetchError } = await supabase
+      .from('staff_shifts')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !shift) {
+      res.status(404).json({ success: false, error: 'Shift not found' });
+      return;
+    }
+    if (shift.staff_id !== userId) {
+      res.status(403).json({ success: false, error: 'Not authorized for this shift' });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updateData: Record<string, unknown> = {
+      closing_cash: closingCash ?? null,
+      status: 'completed',
+    };
+    if (!shift.actual_end) updateData.actual_end = now;
+
+    const { data: updated, error } = await supabase
+      .from('staff_shifts')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json({ success: true, data: updated, message: 'Shift closed' });
+});
+
+/**
+ * POST /api/staff/shifts/:id/cash
+ * Cash drawer pay-in / pay-out during an open shift.
+ */
+const cashMovementSchema = z.object({
+  type: z.enum(['in', 'out']),
+  amount: z.number().positive(),
+  note: z.string().optional(),
+});
+
+export const recordCashMovement = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const validation = cashMovementSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({ success: false, error: 'Validation failed', details: validation.error.issues });
+      return;
+    }
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
+    const tenantId = req.user?.tenantId;
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    if (!tenantId || !propertyId) {
+      res.status(400).json({ success: false, error: 'Tenant/property context required' });
+      return;
+    }
+    const supabase = getSupabase();
+
+    const { data: shift, error: fetchError } = await supabase
+      .from('staff_shifts')
+      .select('id, staff_id')
+      .eq('id', id)
+      .single();
+    if (fetchError || !shift) {
+      res.status(404).json({ success: false, error: 'Shift not found' });
+      return;
+    }
+    if (shift.staff_id !== userId) {
+      res.status(403).json({ success: false, error: 'Not authorized for this shift' });
+      return;
+    }
+
+    const { type, amount, note } = validation.data;
+    const { data: movement, error } = await supabase
+      .from('shift_cash_movements')
+      .insert({
+        shift_id: id,
+        type,
+        amount,
+        note,
+        created_by: userId,
+        tenant_id: tenantId,
+        property_id: propertyId,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json({ success: true, data: movement });
 });
 
 // ============================================

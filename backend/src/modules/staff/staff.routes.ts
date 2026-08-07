@@ -19,6 +19,16 @@ const staffRoles = ['admin', 'super_admin', 'manager', 'staff'];
 // Get my shifts (any staff)
 router.get('/shifts/me', staffController.getMyShifts);
 
+// Current shift for the calling staff member (ported from /manager/shifts/current)
+router.get('/shifts/me/current', staffController.getCurrentShift);
+
+// Today's schedule + summary, manager-only (ported from /manager/shifts/today)
+router.get('/shifts/today', authorize(...managerRoles), staffController.getTodaySchedule);
+
+// Cash-drawer close and pay-in/pay-out (StaffPOSTemplate shift/drawer tab)
+router.post('/shifts/:id/close', authorize(...staffRoles), staffController.closeShift);
+router.post('/shifts/:id/cash', authorize(...staffRoles), staffController.recordCashMovement);
+
 // Get all shifts (managers/admins)
 router.get('/shifts', authorize(...managerRoles), staffController.getAllShifts);
 

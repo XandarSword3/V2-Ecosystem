@@ -737,3 +737,13 @@ export class ShiftsController {
 }
 
 export const shiftsController = new ShiftsController();
+
+
+/*
+ * ARCHIVED 2026-08-07 — Engine A shift-system consolidation.
+ * Superseded by /staff/shifts/* (backend/src/modules/staff/staff.controller.ts),
+ * which had the richer swap-request + adjustments workflow. All methods here
+ * except getManagerSummary were duplicates; getManagerSummary was extracted
+ * to manager-summary.controller.ts since it isn't shift management. This
+ * file is kept for reference/rollback, not imported anywhere anymore.
+ */
