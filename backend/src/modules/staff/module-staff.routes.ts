@@ -28,6 +28,9 @@ router.get('/customers/search', authorize(...staffRoles), moduleStaffController.
 // Menu Service Orders (menu-service, kiosk, etc.)
 // ============================================
 
+// Get service_locations ("tables") for a module, with derived occupancy
+router.get('/modules/:slug/tables', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.getModuleTables);
+
 // Get orders for a module (active/live orders)
 router.get('/modules/:slug/orders', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.getModuleOrders);
 
