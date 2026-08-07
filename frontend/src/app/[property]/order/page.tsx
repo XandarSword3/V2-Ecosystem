@@ -173,6 +173,10 @@ function TableOrderContent() {
         notes: item.notes,
       })),
       module_id: restaurantModule?.id,
+      moduleId: restaurantModule?.id,
+      // See offline-sync.ts createOfflineOrder — required for replay to hit
+      // the right module route (`/${moduleSlug}/orders`), not `/undefined/orders`.
+      moduleSlug: restaurantModule?.slug,
     };
 
     try {

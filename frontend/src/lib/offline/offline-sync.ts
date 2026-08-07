@@ -328,6 +328,12 @@ export async function resolveConflict(
  */
 export async function createOfflineOrder(orderData: {
   moduleId: string;
+  // Required, not cosmetic: resolveSyncAction's replay POST is
+  // `/${data.moduleSlug}/orders` (the dynamic module router is mounted by
+  // slug, not id) — without this, every offline-created order replays to
+  // `/undefined/orders` and fails silently after retries exhaust, with the
+  // order stuck unsynced in the local store looking like it went through.
+  moduleSlug: string;
   tableId?: string;
   tableNumber?: string;
   items: Array<{ menuItemId: string; quantity: number; notes?: string; modifiers?: any[] }>;
