@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Truck, Clock, RefreshCw, MapPin, User, CheckCircle2 } from 'lucide-react';
 import { Order, ItemStatus } from './types';
+import { PaymentDialog } from './PaymentDialog';
 
 export interface DispatchBoardProps {
   slug: string;
@@ -68,6 +69,7 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingOrderIds, setPendingOrderIds] = useState<Set<string>>(new Set());
+  const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
   const { socket } = useSocket();
 
   const loadOrders = async () => {
@@ -154,6 +156,8 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
       // the round trip for their own action to visibly register.
       setOrders((prev) => prev.filter((o) => o.id !== order.id));
       toast.success(`Delivered to ${order.destination || order.customerName}`);
+      // Open payment dialog after successful delivery
+      setPaymentOrder(order);
     } catch (error) {
       console.error('Failed to mark order delivered:', error);
       toast.error('Failed to mark delivered — still showing as ready');
@@ -164,6 +168,11 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
         return next;
       });
     }
+  };
+
+  const handlePaymentComplete = () => {
+    setPaymentOrder(null);
+    loadOrders();
   };
 
   const groups = orders.reduce<Record<string, Order[]>>((acc, order) => {
@@ -288,6 +297,24 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
             </section>
           ))}
         </div>
+      )}
+
+      {/* Payment Dialog */}
+      {paymentOrder && (
+        <PaymentDialog
+          order={{
+            id: paymentOrder.id,
+            orderNumber: paymentOrder.orderNumber || paymentOrder.id.slice(0, 8),
+            totalAmount: paymentOrder.totalAmount,
+            items: paymentOrder.items.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+            })),
+          }}
+          onClose={() => setPaymentOrder(null)}
+          onComplete={handlePaymentComplete}
+          slug={slug}
+        />
       )}
     </div>
   );

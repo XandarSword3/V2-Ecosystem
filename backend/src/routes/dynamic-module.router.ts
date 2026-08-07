@@ -39,6 +39,7 @@ interface MountedModuleContext {
   engine_type: string;
   property_id?: string | null;
   tenant_id?: string | null;
+  require_reservation?: boolean | null;
 }
 interface DynamicRequest extends Request {
   mountedModule?: MountedModuleContext;
@@ -245,14 +246,94 @@ async function fetchServiceLocationsWithOccupancy(moduleId: string) {
   }));
 }
 function buildInstantTransactionRouter(router: Router): void {
-  // Reservation endpoints (Phase 2 D1-D3)
-  router.post('/reservations', createReservationHandler);
-  router.get('/reservations', authorize('customer', ...STAFF_ROLES), getReservationsDayHandler);
-  router.patch('/reservations/:id/assign-table', authorize(...STAFF_ROLES), assignTableHandler);
-  router.patch('/reservations/:id/check-in', authorize(...STAFF_ROLES), checkInHandler);
-  router.patch('/reservations/:id/cancel', authorize('customer', ...STAFF_ROLES), cancelHandler);
-  router.patch('/reservations/:id/no-show', authorize(...STAFF_ROLES), noShowHandler);
-  router.patch('/service-locations/:id/reassign', authorize(...STAFF_ROLES), reassignStaffHandler);
+  // Middleware to check if module requires reservation workflow (Phase 5)
+  const requireReservationMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      if (mounted.require_reservation === false) {
+        return res.status(400).json({ success: false, error: 'This module does not support reservation workflow' });
+      }
+      next();
+    } catch (error) {
+      return res.status(500).json({ success: false, error: 'Failed to check module configuration' });
+    }
+  };
+
+  // Reservation endpoints (Phase 2 D1-D3) - only available if require_reservation is true
+  router.post('/reservations', requireReservationMiddleware, createReservationHandler);
+  router.get('/reservations', authorize('customer', ...STAFF_ROLES), requireReservationMiddleware, getReservationsDayHandler);
+  router.patch('/reservations/:id/assign-table', authorize(...STAFF_ROLES), requireReservationMiddleware, assignTableHandler);
+  router.patch('/reservations/:id/check-in', authorize(...STAFF_ROLES), requireReservationMiddleware, checkInHandler);
+  router.patch('/reservations/:id/cancel', authorize('customer', ...STAFF_ROLES), requireReservationMiddleware, cancelHandler);
+  router.patch('/reservations/:id/no-show', authorize(...STAFF_ROLES), requireReservationMiddleware, noShowHandler);
+  router.patch('/service-locations/:id/reassign', authorize(...STAFF_ROLES), requireReservationMiddleware, reassignStaffHandler);
+
+  // Transaction completion with table freeing (Phase 4)
+  router.patch('/transactions/:id/complete', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+
+      const supabase = getSupabase();
+      const { data: transaction, error: txError } = await supabase
+        .from('transactions')
+        .select('id, service_location_id, module_id')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .single();
+
+      if (txError || !transaction) {
+        return res.status(404).json({ success: false, error: 'Transaction not found' });
+      }
+
+      // Mark transaction as completed
+      const { error: updateError } = await supabase
+        .from('transactions')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq('id', req.params.id);
+
+      if (updateError) throw updateError;
+
+      // Free the table if this transaction was tied to a service location
+      if (transaction.service_location_id) {
+        const { data: reservation } = await supabase
+          .from('reservations')
+          .select('id, tenant_id, module_id')
+          .eq('service_location_id', transaction.service_location_id)
+          .eq('status', 'seated')
+          .maybeSingle();
+
+        if (reservation) {
+          await supabase
+            .from('reservations')
+            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .eq('id', reservation.id);
+
+          // Emit socket event to update floor map
+          emitToUnit(reservation.tenant_id, reservation.module_id, 'table:freed', {
+            serviceLocationId: transaction.service_location_id,
+            reservationId: reservation.id,
+          });
+
+          logger.info('[Dynamic Router] Transaction completed, table freed', {
+            transactionId: req.params.id,
+            serviceLocationId: transaction.service_location_id,
+            reservationId: reservation.id,
+          });
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('[Dynamic Router] Transaction completion failed', error);
+      res.status(500).json({ success: false, error: 'Failed to complete transaction' });
+    }
+  });
 
   // Anonymous QR status tracking (Phase 3.2 & 3.3)
   router.get('/public/orders/:id/status', async (req: Request, res: Response) => {
