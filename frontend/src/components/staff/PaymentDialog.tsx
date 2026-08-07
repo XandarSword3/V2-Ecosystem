@@ -75,19 +75,19 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
 
       if (paymentMethod === 'cash') {
         await api.post('/payments/record-cash', {
-          referenceType: 'restaurant_order',
+          referenceType: 'instant_transaction',
           referenceId: order.id,
           amount,
         });
       } else if (paymentMethod === 'card') {
         await api.post('/payments/create-intent', {
           amount: amount * 100, // Convert to cents
-          referenceType: 'restaurant_order',
+          referenceType: 'instant_transaction',
           referenceId: order.id,
         });
       } else if (paymentMethod === 'room_charge') {
         await api.post('/payments/record-manual', {
-          referenceType: 'restaurant_order',
+          referenceType: 'instant_transaction',
           referenceId: order.id,
           amount,
           method: 'room_charge',
@@ -102,7 +102,11 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
       } else {
         toast.success('Payment recorded');
         // Mark transaction as completed to free the table
-        await api.patch(`/staff/modules/${slug}/transactions/${order.id}/complete`);
+        // NOTE: this hits dynamic-module.router.ts, which is mounted at the
+        // API root per-slug (apiRouter.use(getDynamicModulesRouter())) —
+        // there is no /staff/modules prefix on this route, unlike the
+        // module-staff.routes.ts endpoints (which ARE mounted under /staff/modules).
+        await api.patch(`/${slug}/transactions/${order.id}/complete`);
         onComplete();
         onClose();
       }
