@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useSocket } from '@/lib/socket';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -29,8 +29,8 @@ interface Reservation {
   notes: string | null;
 }
 
-export default function FloorMapPage({ params }: { params: { slug: string } }) {
-  const { slug } = params;
+export default function FloorMapPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params);
   const [locations, setLocations] = useState<ServiceLocation[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
@@ -42,7 +42,7 @@ export default function FloorMapPage({ params }: { params: { slug: string } }) {
 
   const loadFloorData = async () => {
     try {
-      const response = await api.get(`/staff/modules/${slug}/service-locations`);
+      const response = await api.get(`/${slug}/service-locations`);
       setLocations(response.data.data || []);
       setReservations(response.data.reservations || []);
     } catch (error) {
@@ -82,7 +82,7 @@ export default function FloorMapPage({ params }: { params: { slug: string } }) {
 
   const handleCheckIn = async (reservationId: string) => {
     try {
-      await api.patch(`/staff/modules/${slug}/reservations/${reservationId}/check-in`);
+      await api.patch(`/${slug}/reservations/${reservationId}/check-in`);
       toast.success('Reservation checked in');
       loadFloorData();
       setShowCheckInDialog(false);
@@ -93,7 +93,7 @@ export default function FloorMapPage({ params }: { params: { slug: string } }) {
 
   const handleWalkIn = async (locationId: string, partySize: number, guestName: string) => {
     try {
-      await api.post(`/staff/modules/${slug}/reservations`, {
+      await api.post(`/${slug}/reservations`, {
         serviceLocationId: locationId,
         partySize,
         guestName,
@@ -109,7 +109,7 @@ export default function FloorMapPage({ params }: { params: { slug: string } }) {
 
   const handleReassignStaff = async (locationId: string, staffId: string | null) => {
     try {
-      await api.patch(`/staff/modules/${slug}/service-locations/${locationId}/reassign`, { staffId });
+      await api.patch(`/${slug}/service-locations/${locationId}/reassign`, { staffId });
       toast.success('Staff reassigned');
       loadFloorData();
     } catch (error) {
