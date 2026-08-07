@@ -1305,7 +1305,7 @@ function buildInstantTransactionRouter(router: Router): void {
       }
       // Unknown/foreign catalog_item_id check — an id that resolved to
       // nothing in catalogRows would silently price at 0 otherwise.
-      const unknownIds = itemIds.filter((id) => !priceMap.has(id));
+      const unknownIds = itemIds.filter((id: string) => !priceMap.has(id));
       if (unknownIds.length > 0) {
         return res.status(400).json({ success: false, error: 'Unknown catalog item(s) for this module', details: unknownIds });
       }
