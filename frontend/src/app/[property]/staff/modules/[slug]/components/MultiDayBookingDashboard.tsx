@@ -485,6 +485,10 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
                 <span className="text-gray-500">Total</span>
                 <span className="font-bold">{formatCurrency(selectedBooking.total_amount || 0)}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Deposit Status</span>
+                <span className="font-medium">{selectedBooking.payment_status || 'pending'}</span>
+              </div>
               {selectedBooking.special_requests && (
                 <div className="bg-yellow-50 p-3 rounded">
                   <span className="font-medium">Notes:</span> {selectedBooking.special_requests}
