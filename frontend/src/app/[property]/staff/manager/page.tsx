@@ -163,7 +163,7 @@ export default function ManagerDashboard() {
         api.get('/admin/audit-logs', { params: { limit: 50 }, signal }).catch(() => ({ data: { data: [] } })),
         api.get('/admin/dashboard', { signal }).catch(() => ({ data: { data: null } })),
         api.get('/manager/approvals/pending', { signal }).catch(() => ({ data: { data: [] } })),
-        api.get('/manager/shifts/today', { signal }).catch(() => ({ data: { data: [], summary: null } })),
+        api.get('/staff/shifts/today', { signal }).catch(() => ({ data: { data: [], summary: null } })),
         api.get('/manager/summary', { signal }).catch(() => ({ data: { data: [] } })),
       ]);
       // FIX Iter-14: Bail out if aborted before processing results
@@ -586,7 +586,7 @@ export default function ManagerDashboard() {
               <CardContent className="space-y-3">
                 {/* Dynamic active modules */}
                 {(activeModules || []).slice(0, 6).map((m: any) => (
-                  <Link key={m.id} href={`/${propertySlug}/staff/${m.slug}`} className="block">
+                  <Link key={m.id} href={`/${propertySlug}/staff/modules/${m.slug}`} className="block">
                     <Button variant="outline" className="w-full justify-start gap-3">
                       {m.template_type === 'menu_service' && <ChefHat className="w-5 h-5 text-amber-500" />}
                       {m.template_type === 'multi_day_booking' && <Calendar className="w-5 h-5 text-indigo-500" />}
@@ -792,7 +792,7 @@ export default function ManagerDashboard() {
                       size="sm"
                       onClick={async () => {
                         try {
-                          await api.delete(`/manager/shifts/${shift.id}`);
+                          await api.delete(`/staff/shifts/${shift.id}`);
                           toast.success('Shift deleted');
                           loadDashboardData();
                         } catch {
@@ -1054,10 +1054,10 @@ export default function ManagerDashboard() {
                         breakMinutes: shiftForm.breakMinutes || 0,
                       };
                       if (editingShift) {
-                        await api.put(`/manager/shifts/${editingShift.id}`, payload);
+                        await api.put(`/staff/shifts/${editingShift.id}`, payload);
                         toast.success('Shift updated');
                       } else {
-                        await api.post('/manager/shifts', payload);
+                        await api.post('/staff/shifts', payload);
                         toast.success('Shift created');
                       }
                       setShowShiftForm(false);
