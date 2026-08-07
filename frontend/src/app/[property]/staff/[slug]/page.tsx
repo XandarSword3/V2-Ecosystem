@@ -23,6 +23,7 @@ interface ModuleData {
   template_type?: string;
   description?: string;
   is_active: boolean;
+  require_reservation?: boolean | null;
 }
 
 export default function ModulePage() {
@@ -88,7 +89,14 @@ export default function ModulePage() {
   // see the note on ModuleData above.
   switch (module.engine_type) {
     case 'instant_transaction':
-      return <KitchenView slug={slug} moduleName={module.name} moduleId={module.id} />;
+      return (
+        <KitchenView
+          slug={slug}
+          moduleName={module.name}
+          moduleId={module.id}
+          requireReservation={module.require_reservation}
+        />
+      );
 
     case 'shared_capacity_access':
       return <SessionAccessDashboard slug={slug} moduleName={module.name} />;

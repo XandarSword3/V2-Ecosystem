@@ -1204,6 +1204,238 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to create order' });
     }
   });
+  // Add item(s) to an already-created order. Distinct from POST /orders
+  // (creation-time bundling) — this is the "kitchen forgot the fries"
+  // increment path, which nothing in the app could do before this (see
+  // handoff notes: DispatchBoard only updates item status, floorMap's
+  // reservation carries no item list). Staff-only: this is an
+  // operational floor action, not a customer self-service one.
+  //
+  // Pricing note: calculatePricing() is called on ONLY the new items,
+  // with no couponCode/giftCardCodes/loyaltyPointsToRedeem in context.
+  // Those three are the only side-effecting paths in the pricing
+  // pipeline (coupon usage rows, gift card balance deduction, loyalty
+  // point burn) and are gated strictly behind those context fields —
+  // omitting them means this call is a pure computation, safe to run
+  // again on an order that was already priced once at creation. Tax and
+  // fees are computed per line-item batch (category/rate-scoped, not
+  // "have we already charged this order" stateful), so the result is
+  // correctly additive: existing totals + this call's totals = truth.
+  // Discounts are deliberately NOT recomputed or reapplied here.
+  router.post('/orders/:id/items', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { data: order, error: orderError } = await supabase
+        .from('transactions')
+        .select('id, module_id, tenant_id, property_id, status, amount, tax_amount, service_charge, discount_amount, metadata')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .maybeSingle();
+      if (orderError) throw orderError;
+      if (!order) {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+      if (INSTANT_TRANSACTION_TERMINAL_STATES.includes(order.status)) {
+        return res.status(400).json({ success: false, error: `Cannot add items to a ${order.status} order` });
+      }
+      const items = Array.isArray(req.body?.items) ? req.body.items : [];
+      if (items.length === 0) {
+        return res.status(400).json({ success: false, error: 'At least one item is required' });
+      }
+      const itemIds = items
+        .map((item: unknown) => {
+          const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string };
+          return i.catalog_item_id || i.menuItemId || i.itemId;
+        })
+        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+      const { data: catalogRows, error: catalogError } = await supabase
+        .from('catalog_items')
+        .select('id, name, price')
+        .eq('module_id', mounted.id)
+        .in('id', itemIds);
+      if (catalogError) throw catalogError;
+      const nameMap = new Map((catalogRows ?? []).map((row: any) => [row.id, row.name as string]));
+      const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
+      const { data: moduleRow } = await supabase
+        .from('modules')
+        .select('tax_category')
+        .eq('id', mounted.id)
+        .maybeSingle();
+      // Re-validate customizations server-side, same as POST /orders —
+      // never trust a client-supplied priceAdjustment.
+      const modifierAdjustmentByIndex = new Map<number, number>();
+      const modifierValidationErrors: string[] = [];
+      await Promise.all(items.map(async (item: unknown, index: number) => {
+        const currentItem = item as {
+          catalog_item_id?: string; menuItemId?: string; itemId?: string;
+          metadata?: Record<string, unknown>;
+        };
+        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+        const rawSelections = Array.isArray(currentItem.metadata?.selectedModifiers)
+          ? currentItem.metadata!.selectedModifiers as Array<Record<string, unknown>>
+          : [];
+        const selections = rawSelections
+          .map((m) => ({
+            groupId: String(m.groupId ?? ''),
+            optionId: String(m.optionId ?? ''),
+            quantity: asNumber(m.quantity, 1),
+          }))
+          .filter((s) => s.optionId.length > 0);
+        if (selections.length === 0) return;
+        try {
+          const result = await customizationService.validateSelections('catalog_item', resolvedId, selections);
+          if (!result.isValid) {
+            modifierValidationErrors.push(...result.validationErrors.map((e) => `${resolvedId}: ${e}`));
+            return;
+          }
+          modifierAdjustmentByIndex.set(index, result.totalPriceAdjustment);
+        } catch (err) {
+          logger.error('[Dynamic Router] Failed to validate item customizations (add-items)', {
+            itemId: resolvedId, error: err instanceof Error ? err.message : String(err),
+          });
+          modifierValidationErrors.push(`${resolvedId}: failed to validate customizations`);
+        }
+      }));
+      if (modifierValidationErrors.length > 0) {
+        return res.status(400).json({ success: false, error: 'Invalid item customizations', details: modifierValidationErrors });
+      }
+      // Unknown/foreign catalog_item_id check — an id that resolved to
+      // nothing in catalogRows would silently price at 0 otherwise.
+      const unknownIds = itemIds.filter((id) => !priceMap.has(id));
+      if (unknownIds.length > 0) {
+        return res.status(400).json({ success: false, error: 'Unknown catalog item(s) for this module', details: unknownIds });
+      }
+      const lineItems = items.map((item: unknown, index: number) => {
+        const currentItem = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number; metadata?: Record<string, unknown> };
+        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+        const basePrice = priceMap.get(resolvedId) ?? 0;
+        const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
+        const lineItem = {
+          itemId: resolvedId,
+          name: `catalog_item:${resolvedId}`,
+          quantity: asNumber(currentItem.quantity, 1),
+          unitPrice: basePrice + modifierAdjustment,
+          metadata: currentItem.metadata || {},
+        };
+        return {
+          ...lineItem,
+          taxCategory: resolveTaxCategory(lineItem, moduleRow?.tax_category ?? 'all'),
+        };
+      });
+      const resolvedPaymentMethod = (order.metadata as any)?.payment_method ?? 'cash';
+      const resolvedOrderType = (order.metadata as any)?.order_type ?? 'dine_in';
+      // No couponCode / giftCardCodes / loyaltyPointsToRedeem passed —
+      // see comment above the route: this keeps the call side-effect-free.
+      const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
+        moduleId: mounted.id,
+        propertyId: order.property_id ?? undefined,
+        conditions: { orderType: resolvedOrderType, paymentMethod: resolvedPaymentMethod },
+      });
+      const orderItemRows = items.map((item: unknown, index: number) => {
+        const currentItem = item as {
+          catalog_item_id?: string; menuItemId?: string; itemId?: string;
+          quantity?: number; metadata?: Record<string, unknown>;
+        };
+        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+        const quantity = asNumber(currentItem.quantity, 1);
+        const basePrice = priceMap.get(resolvedId) ?? 0;
+        const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
+        const unitPrice = basePrice + modifierAdjustment;
+        const specialInstructions = (currentItem.metadata?.specialInstructions
+          ?? currentItem.metadata?.notes
+          ?? null) as string | null;
+        return {
+          transaction_id: order.id,
+          catalog_item_id: resolvedId || null,
+          quantity,
+          unit_price: unitPrice,
+          subtotal: unitPrice * quantity,
+          special_instructions: specialInstructions,
+          status: 'pending',
+          tenant_id: order.tenant_id,
+          property_id: order.property_id,
+        };
+      });
+      const { data: insertedItems, error: orderItemsError } = await supabase
+        .from('order_items')
+        .insert(orderItemRows)
+        .select();
+      if (orderItemsError) throw orderItemsError;
+      const { data: updatedOrder, error: updateError } = await supabase
+        .from('transactions')
+        .update({
+          amount: asNumber(order.amount, 0) + pricing.totalAmount,
+          tax_amount: asNumber(order.tax_amount, 0) + pricing.taxAmount,
+          service_charge: asNumber(order.service_charge, 0) + pricing.serviceCharge,
+        })
+        .eq('id', order.id)
+        .select('id, module_id, status, amount, tax_amount, service_charge, discount_amount, service_location_id, created_at, metadata')
+        .single();
+      if (updateError) throw updateError;
+      // Non-fatal, matches POST /orders: the order_items + transactions
+      // update above are already the authoritative record of what
+      // happened; the ledger entry only enriches it.
+      try {
+        const actorIsStaff = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
+        await engineService.recordToLedger(pricing, {
+          tenantId: order.tenant_id,
+          propertyId: order.property_id ?? undefined,
+          moduleId: mounted.id,
+          templateType: 'instant_transaction',
+          entityId: order.id,
+          entityType: 'order',
+          transactionType: 'adjustment',
+          actorType: req.user ? (actorIsStaff ? 'staff' : 'customer') : 'system',
+          actorId: req.user?.userId,
+          entityState: updatedOrder.status,
+          paymentMethod: resolvedPaymentMethod,
+          notes: 'Items added to existing order',
+          metadata: {
+            addedLineItems: items.map((item: unknown) => {
+              const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number };
+              const resolvedId = i.catalog_item_id || i.menuItemId || i.itemId || '';
+              return { itemId: resolvedId, name: nameMap.get(resolvedId) ?? 'Item', quantity: asNumber(i.quantity, 1) };
+            }),
+            taxBreakdown: pricing.taxBreakdown,
+            feeBreakdown: pricing.feeBreakdown,
+          },
+        });
+      } catch (ledgerErr) {
+        logger.warn('[Dynamic Router] Failed to record item-addition to financial ledger', {
+          orderId: order.id,
+          error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+        });
+      }
+      // Notify the KDS the same way POST /orders does — a distinct event
+      // name so KitchenView (or the eventual order-entry shell) can choose
+      // to merge into an existing ticket rather than render a new one.
+      try {
+        const kdsPayload = {
+          id: order.id,
+          addedItems: items.map((item: unknown) => {
+            const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number };
+            const resolvedId = i.catalog_item_id || i.menuItemId || i.itemId || '';
+            return { id: resolvedId, name: nameMap.get(resolvedId) ?? 'Item', quantity: asNumber(i.quantity, 1) };
+          }),
+        };
+        emitToUnit(order.tenant_id, mounted.slug, 'order:items:added', kdsPayload);
+        emitToUnit(order.tenant_id, mounted.id, 'order:items:added', kdsPayload);
+      } catch (socketErr) {
+        logger.warn('[Dynamic Router] Failed to emit order:items:added', {
+          orderId: order.id,
+          error: socketErr instanceof Error ? socketErr.message : String(socketErr),
+        });
+      }
+      res.status(201).json({ success: true, data: { order: updatedOrder, addedItems: insertedItems ?? [] } });
+    } catch (error) {
+      logger.error('[Dynamic Router] POST /orders/:id/items failed', error);
+      res.status(500).json({ success: false, error: 'Failed to add items to order' });
+    }
+  });
   router.get('/orders', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);

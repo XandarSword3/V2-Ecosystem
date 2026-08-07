@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useSocket } from '@/lib/socket';
 import { formatCurrency, formatTime } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -14,17 +14,34 @@ import {
   XCircle,
   Check,
   ChevronRight,
+  Plus,
+  Minus,
+  ShoppingCart,
 } from 'lucide-react';
 import { Order, OrderItem, ItemStatus, statusFlow, itemStatusFlow } from './types';
 
 import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
-import { createOfflineOrderStatusUpdate } from '@/lib/offline/offline-sync';
+import { createOfflineOrderStatusUpdate, createOfflineOrder } from '@/lib/offline/offline-sync';
 import { DataFreshnessFooter } from '@/components/offline/DataFreshnessFooter';
 
 export interface KitchenViewProps {
   slug: string;
   moduleName: string;
   moduleId: string;
+  // Modules with require_reservation=true get order creation through the
+  // floor-map -> reservation -> check-in pipeline instead; the "New Order"
+  // button below only makes sense when that pipeline doesn't exist for this
+  // module. Defaults to showing the button (undefined/null treated as
+  // false) to match requireReservationMiddleware's own "=== false" check on
+  // the backend — an unset flag means no reservation gate exists.
+  requireReservation?: boolean | null;
+}
+
+interface StaffMenuItem {
+  id: string;
+  name: string;
+  price: number;
+  is_available?: boolean;
 }
 
 // ============================================
@@ -167,7 +184,7 @@ function ItemStatusChip({
   );
 }
 
-export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
+export function KitchenView({ slug, moduleName, moduleId, requireReservation }: KitchenViewProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -176,9 +193,133 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
   const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(new Set());
   const { socket } = useSocket();
 
+  // ============================================
+  // New Order / Add Item — replaces the removed window.prompt() flow.
+  // Menu is loaded lazily (on first modal open) via the staff-scoped
+  // /admin/items endpoint, not the customer /items one — staff need to see
+  // unavailable items too, not just what's live on the public menu.
+  // ============================================
+  const [menuItems, setMenuItems] = useState<StaffMenuItem[]>([]);
+  const [menuLoaded, setMenuLoaded] = useState(false);
+  const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
+  const [newOrderCart, setNewOrderCart] = useState<Map<string, number>>(new Map());
+  const [newOrderTable, setNewOrderTable] = useState('');
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [addItemCart, setAddItemCart] = useState<Map<string, number>>(new Map());
+  const [isAddingItems, setIsAddingItems] = useState(false);
+
+  const ensureMenuLoaded = async () => {
+    if (menuLoaded) return;
+    try {
+      const response = await api.get(`/${slug}/admin/items`);
+      setMenuItems(response.data?.data ?? []);
+    } catch (error) {
+      console.error('Failed to load staff menu:', error);
+      toast.error('Failed to load menu items');
+    } finally {
+      setMenuLoaded(true);
+    }
+  };
+
+  const adjustCartQuantity = (
+    setCart: Dispatch<SetStateAction<Map<string, number>>>,
+    itemId: string,
+    delta: number,
+  ) => {
+    setCart((prev) => {
+      const next = new Map(prev);
+      const current = next.get(itemId) ?? 0;
+      const updated = current + delta;
+      if (updated <= 0) next.delete(itemId);
+      else next.set(itemId, updated);
+      return next;
+    });
+  };
+
+  const submitNewOrder = async () => {
+    if (newOrderCart.size === 0) {
+      toast.error('Add at least one item');
+      return;
+    }
+    const items = Array.from(newOrderCart.entries()).map(([menuItemId, quantity]) => ({
+      catalog_item_id: menuItemId,
+      menuItemId,
+      quantity,
+    }));
+    setIsSubmittingOrder(true);
+    try {
+      await api.post(`/${slug}/orders`, {
+        table_number: newOrderTable || undefined,
+        items,
+      });
+      toast.success('Order created');
+      setNewOrderCart(new Map());
+      setNewOrderTable('');
+      setIsNewOrderOpen(false);
+      loadOrders();
+    } catch (error) {
+      if (!isOnline()) {
+        await createOfflineOrder({
+          moduleId,
+          moduleSlug: slug,
+          tableNumber: newOrderTable || undefined,
+          items: items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
+        });
+        toast.info('Order queued offline', { icon: '⏳' });
+        setNewOrderCart(new Map());
+        setNewOrderTable('');
+        setIsNewOrderOpen(false);
+        return;
+      }
+      console.error('Failed to create order:', error);
+      toast.error('Failed to create order');
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
+  // Add item(s) to an already-open order — see POST /:slug/orders/:id/items
+  // on the backend. Online-only for now: unlike order creation and
+  // order-level status updates, there's no offline replay path wired for
+  // this yet, and a kitchen-side "add to an order that already exists"
+  // action is far less likely to happen mid-outage than initial order entry.
+  const submitAddItems = async (orderId: string) => {
+    if (addItemCart.size === 0) {
+      toast.error('Add at least one item');
+      return;
+    }
+    if (!isOnline()) {
+      toast.error('Adding items needs a connection');
+      return;
+    }
+    const items = Array.from(addItemCart.entries()).map(([menuItemId, quantity]) => ({
+      catalog_item_id: menuItemId,
+      menuItemId,
+      quantity,
+    }));
+    setIsAddingItems(true);
+    try {
+      await api.post(`/${slug}/orders/${orderId}/items`, { items });
+      toast.success('Items added to order');
+      setAddItemCart(new Map());
+      loadOrders();
+    } catch (error) {
+      console.error('Failed to add items:', error);
+      toast.error('Failed to add items to order');
+    } finally {
+      setIsAddingItems(false);
+    }
+  };
+
   useEffect(() => {
     loadOrders();
   }, [moduleId]);
+
+  // Fresh cart per order — otherwise a leftover selection from whichever
+  // order was open last would silently ride along into a different order.
+  useEffect(() => {
+    setAddItemCart(new Map());
+  }, [selectedOrder?.id]);
 
   useEffect(() => {
     if (socket && moduleId) {
@@ -410,6 +551,19 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Only shown when this module has no reservation/check-in pipeline
+              to create orders through — see requireReservation doc above. */}
+          {requireReservation === false && (
+            <Button
+              onClick={() => {
+                setIsNewOrderOpen(true);
+                ensureMenuLoaded();
+              }}
+            >
+              <ShoppingCart className="h-4 w-4 mr-1.5" />
+              New Order
+            </Button>
+          )}
           <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" />
             <span className="font-mono font-medium">
@@ -607,6 +761,68 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                   <span>{formatCurrency(selectedOrder.totalAmount)}</span>
                 </div>
               </div>
+
+              {/* Add item(s) to this order — the increment path that was
+                  missing entirely before (see POST /:slug/orders/:id/items).
+                  Not offered on a terminal order; matches the backend's own
+                  completed/cancelled check. */}
+              {selectedOrder.status !== 'completed' && selectedOrder.status !== 'cancelled' && (
+                <div className="mt-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Add Item</h3>
+                    {!menuLoaded && (
+                      <button
+                        type="button"
+                        className="text-xs text-primary underline"
+                        onClick={ensureMenuLoaded}
+                      >
+                        Load menu
+                      </button>
+                    )}
+                  </div>
+                  {menuLoaded && (
+                    <>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {menuItems.map((mi) => {
+                          const qty = addItemCart.get(mi.id) ?? 0;
+                          return (
+                            <div key={mi.id} className="flex items-center justify-between text-sm py-1">
+                              <span className="truncate flex-1">{mi.name}</span>
+                              <span className="text-gray-400 text-xs mr-2">{formatCurrency(mi.price)}</span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  className="p-1 rounded border border-gray-200 dark:border-gray-600 disabled:opacity-30"
+                                  disabled={qty === 0}
+                                  onClick={() => adjustCartQuantity(setAddItemCart, mi.id, -1)}
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <span className="w-5 text-center text-xs">{qty}</span>
+                                <button
+                                  type="button"
+                                  className="p-1 rounded border border-gray-200 dark:border-gray-600"
+                                  onClick={() => adjustCartQuantity(setAddItemCart, mi.id, 1)}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <Button
+                        className="w-full mt-3"
+                        size="sm"
+                        disabled={addItemCart.size === 0 || isAddingItems}
+                        onClick={() => submitAddItems(selectedOrder.id)}
+                      >
+                        {isAddingItems ? 'Adding…' : 'Add to Order'}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col gap-3">
@@ -643,6 +859,101 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         </div>
       )}
       {/* Order Details Modal ... */}
+
+      {/* New Order Modal — replaces the removed window.prompt() flow with a
+          real item picker against the staff menu, for modules that have no
+          reservation pipeline (require_reservation === false) to create
+          orders through otherwise. */}
+      {isNewOrderOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="New order"
+          onKeyDown={(e) => { if (e.key === 'Escape') setIsNewOrderOpen(false); }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold">New Order</h2>
+              <Button variant="ghost" size="icon" aria-label="Close" onClick={() => setIsNewOrderOpen(false)}>
+                <XCircle className="h-6 w-6" />
+              </Button>
+            </div>
+
+            <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4">
+              <div>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Table number (optional)</label>
+                <input
+                  type="text"
+                  value={newOrderTable}
+                  onChange={(e) => setNewOrderTable(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-200 dark:border-gray-600 bg-transparent px-3 py-2 text-sm"
+                  placeholder="e.g. 12"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Items</label>
+                {!menuLoaded ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                  </div>
+                ) : menuItems.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-4 text-center">No menu items found</p>
+                ) : (
+                  <div className="space-y-1">
+                    {menuItems.map((mi) => {
+                      const qty = newOrderCart.get(mi.id) ?? 0;
+                      return (
+                        <div key={mi.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 dark:border-gray-700/50 last:border-0">
+                          <div className="min-w-0 flex-1">
+                            <span className="truncate block">{mi.name}</span>
+                            {mi.is_available === false && (
+                              <span className="text-[10px] text-red-500">Unavailable</span>
+                            )}
+                          </div>
+                          <span className="text-gray-400 text-xs mr-3">{formatCurrency(mi.price)}</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              className="p-1 rounded border border-gray-200 dark:border-gray-600 disabled:opacity-30"
+                              disabled={qty === 0}
+                              onClick={() => adjustCartQuantity(setNewOrderCart, mi.id, -1)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-5 text-center text-xs">{qty}</span>
+                            <button
+                              type="button"
+                              className="p-1 rounded border border-gray-200 dark:border-gray-600"
+                              onClick={() => adjustCartQuantity(setNewOrderCart, mi.id, 1)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setIsNewOrderOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={newOrderCart.size === 0 || isSubmittingOrder}
+                onClick={submitNewOrder}
+              >
+                {isSubmittingOrder ? 'Creating…' : 'Create Order'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="mt-auto">
