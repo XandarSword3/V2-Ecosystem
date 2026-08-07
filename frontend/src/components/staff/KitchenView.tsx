@@ -18,7 +18,7 @@ import {
 import { Order, OrderItem, ItemStatus, statusFlow, itemStatusFlow } from './types';
 
 import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
-import { createOfflineOrderStatusUpdate, createOfflineOrder, createOfflineCashPayment } from '@/lib/offline/offline-sync';
+import { createOfflineOrderStatusUpdate } from '@/lib/offline/offline-sync';
 import { DataFreshnessFooter } from '@/components/offline/DataFreshnessFooter';
 
 export interface KitchenViewProps {
@@ -268,7 +268,8 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
             // 'delivered' is the engine's real name for this step (see
             // instant-transaction.ts) — the board used to ask for 'served'
             // here, which no order could ever actually reach.
-            status: 'pending,confirmed,preparing,ready,delivered',
+            // Confirmation gate: exclude 'pending' — only confirmed orders reach kitchen
+            status: 'confirmed,preparing,ready,delivered',
             moduleId: moduleId,
           },
         });
@@ -386,59 +387,6 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
     }
   };
 
-  const createStaffOrder = async () => {
-    try {
-      const itemId = window.prompt('Menu item ID');
-      if (!itemId) return;
-      const quantityRaw = window.prompt('Quantity', '1');
-      const quantity = Number(quantityRaw || '1');
-      if (!Number.isFinite(quantity) || quantity < 1) {
-        toast.error('Invalid quantity');
-        return;
-      }
-      const tableNumber = window.prompt('Table number (optional)') || undefined;
-
-      const orderData = {
-        tableId: tableNumber, // API expects tableId or table_number depending on endpoint
-        items: [{ menuItemId: itemId, quantity }],
-      };
-
-      try {
-        await api.post(`/${slug}/orders`, {
-          table_number: tableNumber,
-          items: [{ catalog_item_id: itemId, quantity }],
-        });
-        toast.success('Staff order created');
-        loadOrders();
-      } catch (error) {
-        if (!isOnline()) {
-          await createOfflineOrder(orderData as any);
-          toast.info('Staff order queued offline', { icon: '⏳' });
-          return;
-        }
-        toast.error('Failed to create staff order');
-      }
-    } catch (error) {
-      toast.error('Failed to create staff order');
-    }
-  };
-
-  const splitBill = async (orderId: string) => {
-    try {
-      const partsRaw = window.prompt('Split into how many parts?', '2');
-      const parts = Number(partsRaw || '2');
-      if (!Number.isFinite(parts) || parts < 2) {
-        toast.error('Invalid split parts');
-        return;
-      }
-      await api.post(`/staff/modules/${slug}/orders/${orderId}/split`, { method: 'equal', parts });
-      toast.success('Bill split created');
-      loadOrders();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to split bill');
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -462,7 +410,6 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button onClick={createStaffOrder}>New Order</Button>
           <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" />
             <span className="font-mono font-medium">
@@ -480,7 +427,6 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
         {statusFlow.map((status) => {
           const columnOrders = orders.filter((o) => o.status === status);
           const columnColors: Record<string, { bg: string; border: string; text: string; action: string; actionBg: string; label: string }> = {
-            pending: { bg: 'bg-yellow-50 dark:bg-yellow-900/10', border: 'border-yellow-300 dark:border-yellow-700', text: 'text-yellow-700 dark:text-yellow-300', action: 'Accept', actionBg: 'bg-green-600 hover:bg-green-700', label: 'Pending' },
             confirmed: { bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-300 dark:border-blue-700', text: 'text-blue-700 dark:text-blue-300', action: 'Start Prep', actionBg: 'bg-blue-600 hover:bg-blue-700', label: 'Confirmed' },
             preparing: { bg: 'bg-orange-50 dark:bg-orange-900/10', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-orange-300', action: 'Mark Ready', actionBg: 'bg-orange-500 hover:bg-orange-600', label: 'Preparing' },
             ready: { bg: 'bg-green-50 dark:bg-green-900/10', border: 'border-green-300 dark:border-green-700', text: 'text-green-700 dark:text-green-300', action: 'Served', actionBg: 'bg-emerald-600 hover:bg-emerald-700', label: 'Ready' },
@@ -488,7 +434,7 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
             // stays 'Served' since that's the term staff actually use.
             delivered: { bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-300 dark:border-purple-700', text: 'text-purple-700 dark:text-purple-300', action: 'Complete', actionBg: 'bg-gray-600 hover:bg-gray-700', label: 'Served' },
           };
-          const col = columnColors[status] || columnColors.pending;
+          const col = columnColors[status];
           const nextStatus = statusFlow[statusFlow.indexOf(status) + 1];
 
           return (
@@ -591,18 +537,6 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
                               {col.action}
                             </Button>
                           )}
-                          {['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                splitBill(order.id);
-                              }}
-                            >
-                              Split Bill
-                            </Button>
-                          )}
                         </div>
                       )}
                     </div>
@@ -677,31 +611,6 @@ export function KitchenView({ slug, moduleName, moduleId }: KitchenViewProps) {
 
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col gap-3">
               <div className="flex gap-3">
-                {selectedOrder.status !== 'completed' && (
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                    onClick={async () => {
-                      if (isOnline()) {
-                        await api.post('/payments/cash', {
-                          referenceType: 'restaurant_order',
-                          referenceId: selectedOrder.id,
-                          amount: selectedOrder.totalAmount
-                        });
-                        toast.success('Payment recorded');
-                      } else {
-                        await createOfflineCashPayment({
-                          referenceType: 'restaurant_order',
-                          referenceId: selectedOrder.id,
-                          amount: selectedOrder.totalAmount
-                        });
-                        toast.info('Cash payment queued offline', { icon: '💵' });
-                      }
-                      setSelectedOrder(null);
-                    }}
-                  >
-                    Record Cash Payment
-                  </Button>
-                )}
                 {selectedOrder.status !== 'completed' && selectedOrder.status !== 'ready' && (
                   <Button
                     className="flex-1"

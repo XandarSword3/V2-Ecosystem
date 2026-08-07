@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { emitToUser } from '../../socket/index.js';
+import { emitToUser, emitToUnit } from '../../socket/index.js';
 import { logger } from '../../utils/logger.js';
 
 export interface ReservationParams {
@@ -226,6 +226,39 @@ export async function checkInReservation(
     .single();
 
   if (error) throw error;
+
+  // Wire check-in to transaction confirmation: find pending transactions for this
+  // service_location and flip them to confirmed so they reach the kitchen board
+  if (finalLocationId) {
+    const { data: pendingTransactions } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('service_location_id', finalLocationId)
+      .eq('module_id', existing.module_id)
+      .eq('status', 'pending');
+
+    if (pendingTransactions && pendingTransactions.length > 0) {
+      const transactionIds = pendingTransactions.map((t: { id: string }) => t.id);
+      
+      await supabase
+        .from('transactions')
+        .update({ status: 'confirmed', updated_at: now })
+        .in('id', transactionIds);
+
+      // Emit socket event for real-time update to kitchen board
+      emitToUnit(existing.tenant_id, existing.module_id, 'order:confirmed', {
+        serviceLocationId: finalLocationId,
+        transactionIds,
+      });
+
+      logger.info('[Reservations] Check-in confirmed pending transactions', {
+        reservationId,
+        serviceLocationId: finalLocationId,
+        transactionIds,
+      });
+    }
+  }
+
   return data;
 }
 

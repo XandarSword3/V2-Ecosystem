@@ -13,6 +13,7 @@ interface ActiveModuleRow {
   template_type?: string; // Backward compatibility
   property_id?: string | null;
   tenant_id?: string | null;
+  require_reservation?: boolean | null;
 }
 
 export function getDynamicModulesRouter(): express.Router {
@@ -24,7 +25,7 @@ export async function loadDynamicModules(): Promise<void> {
 
   const { data: modules, error } = await supabase
     .from('modules')
-    .select('id, slug, engine_type, property_id, tenant_id')
+    .select('id, slug, engine_type, property_id, tenant_id, require_reservation')
     .eq('is_active', true)
     .not('slug', 'is', null)
     .not('engine_type', 'is', null);
@@ -68,7 +69,7 @@ export async function loadDynamicModules(): Promise<void> {
     dynamicModulesRouter.use(`/${slug}`, (req, res, next) => {
       const dynReq = req as express.Request & {
         tenant?: { id: string };
-        mountedModule?: { id: string; slug: string; engine_type: string; property_id?: string | null; tenant_id?: string | null };
+        mountedModule?: { id: string; slug: string; engine_type: string; property_id?: string | null; tenant_id?: string | null; require_reservation?: boolean | null };
       };
 
       // tenantGate runs ahead of this router in app.ts's apiRouter chain,
@@ -113,6 +114,7 @@ export async function loadDynamicModules(): Promise<void> {
         engine_type: selected.engine_type,
         property_id: selected.property_id,
         tenant_id: selected.tenant_id,
+        require_reservation: selected.require_reservation,
       };
 
       const moduleRouter = routersByEngineType.get(selected.engine_type)!;
