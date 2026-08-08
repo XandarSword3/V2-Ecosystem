@@ -20,6 +20,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  DollarSign,
+  CreditCard,
 } from 'lucide-react';
 
 import { isOnline } from '@/lib/offline/offline-storage';
@@ -43,6 +45,18 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [pendingBookingId, setPendingBookingId] = useState<string | null>(null);
   const [outstandingAmount, setOutstandingAmount] = useState(0);
+
+  // Folio settlement states
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [settlementBookingId, setSettlementBookingId] = useState<string | null>(null);
+  const [settlementBalance, setSettlementBalance] = useState<number>(0);
+  const [settlementEntries, setSettlementEntries] = useState<Array<any>>([]);
+  const [settlementMethod, setSettlementMethod] = useState<'cash' | 'card'>('cash');
+  const [isSettling, setIsSettling] = useState(false);
+
+  // Running folio balance for selected booking modal
+  const [selectedFolioBalance, setSelectedFolioBalance] = useState<number | null>(null);
+
   const [newBookingForm, setNewBookingForm] = useState({
     unitId: '',
     customerName: '',
@@ -84,6 +98,60 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
     }
   }, [socket, moduleId, fetchBookings]);
 
+  useEffect(() => {
+    if (!selectedBooking) {
+      setSelectedFolioBalance(null);
+      return;
+    }
+    api
+      .get(`/payments/folio-balance/${selectedBooking.id}`)
+      .then((res) => {
+        setSelectedFolioBalance(res.data?.data?.balance ?? 0);
+      })
+      .catch(() => {
+        setSelectedFolioBalance(0);
+      });
+  }, [selectedBooking]);
+
+  const openSettlementModal = async (bookingId: string, balance: number) => {
+    setSettlementBookingId(bookingId);
+    setSettlementBalance(balance);
+    setShowSettlementModal(true);
+    try {
+      const res = await api.get(`/payments/folio-balance/${bookingId}`);
+      if (res.data?.data) {
+        setSettlementEntries(res.data.data.entries || []);
+        setSettlementBalance(res.data.data.balance ?? balance);
+      }
+    } catch {
+      // Keep initial balance fallback
+    }
+  };
+
+  const handleSettleAndCheckout = async () => {
+    if (!settlementBookingId || settlementBalance <= 0) return;
+    setIsSettling(true);
+    try {
+      await api.post('/payments/folio-settle', {
+        bookingId: settlementBookingId,
+        amount: settlementBalance,
+        method: settlementMethod,
+        notes: 'Folio settled at check-out',
+      });
+
+      await api.patch(`/staff/modules/${slug}/bookings/${settlementBookingId}/status`, { status: 'checked_out' });
+      setBookings((prev) => prev.map((b) => (b.id === settlementBookingId ? { ...b, status: 'checked_out' } : b)));
+      toast.success('Folio settled and guest checked out successfully!');
+      setShowSettlementModal(false);
+      setSettlementBookingId(null);
+      setSelectedBooking(null);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to settle folio');
+    } finally {
+      setIsSettling(false);
+    }
+  };
+
   const updateBookingStatus = async (bookingId: string, status: string) => {
     try {
       await api.patch(`/staff/modules/${slug}/bookings/${bookingId}/status`, { status });
@@ -96,6 +164,11 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
         setPendingBookingId(bookingId);
         setOutstandingAmount(outstanding);
         setShowPaymentModal(true);
+        return;
+      }
+      if (status === 'checked_out' && (error?.response?.status === 409 || error?.response?.data?.error === 'FOLIO_BALANCE_DUE')) {
+        const balance = Number(error?.response?.data?.balance || 0);
+        openSettlementModal(bookingId, balance);
         return;
       }
       if (!isOnline()) {
@@ -489,6 +562,12 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
                 <span className="text-gray-500">Deposit Status</span>
                 <span className="font-medium">{selectedBooking.payment_status || 'pending'}</span>
               </div>
+              <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg text-sm">
+                <span className="font-semibold text-blue-900 dark:text-blue-200">Room Folio Balance</span>
+                <span className={`font-bold ${selectedFolioBalance && selectedFolioBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                  {selectedFolioBalance !== null ? formatCurrency(selectedFolioBalance) : '...'}
+                </span>
+              </div>
               {selectedBooking.special_requests && (
                 <div className="bg-yellow-50 p-3 rounded">
                   <span className="font-medium">Notes:</span> {selectedBooking.special_requests}
@@ -616,6 +695,88 @@ export function MultiDayBookingDashboard({ slug, moduleName, moduleId }: MultiDa
                 <Button variant="outline" className="flex-1" onClick={() => setShowPaymentModal(false)}>Cancel</Button>
                 <Button className="flex-1" onClick={handleRecordPayment}>Record Payment</Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Folio Settlement Modal (Enforced at Check-Out) */}
+      {showSettlementModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settlement-title"
+          onClick={() => setShowSettlementModal(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowSettlementModal(false); }}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 id="settlement-title" className="text-xl font-bold text-gray-900 dark:text-gray-100">Folio Balance Due</h3>
+              <Button variant="ghost" size="icon" aria-label="Close" onClick={() => setShowSettlementModal(false)}>
+                <XCircle className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl">
+              <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
+                This room has unpaid charges on its folio. Settle the balance below to complete check-out.
+              </p>
+              <div className="mt-3 flex justify-between items-baseline">
+                <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">Balance Due:</span>
+                <span className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {formatCurrency(settlementBalance)}
+                </span>
+              </div>
+            </div>
+
+            {settlementEntries.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-xs font-semibold uppercase text-gray-500 mb-2">Itemized Charges</label>
+                <div className="max-h-36 overflow-y-auto space-y-1.5 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900">
+                  {settlementEntries.map((entry, idx) => (
+                    <div key={idx} className="flex justify-between text-xs py-1 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {entry.metadata?.description || (entry.event_type === 'charge' ? 'Room Charge' : 'Settlement')}
+                      </span>
+                      <span className={entry.event_type === 'charge' ? 'font-semibold text-gray-900 dark:text-gray-100' : 'font-semibold text-green-600'}>
+                        {entry.event_type === 'charge' ? '+' : '-'}{formatCurrency(Number(entry.amount))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <label className="block text-xs font-semibold uppercase text-gray-500 mb-2">Settlement Method</label>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant={settlementMethod === 'cash' ? 'default' : 'outline'}
+                  onClick={() => setSettlementMethod('cash')}
+                  className="flex items-center justify-center gap-2"
+                >
+                  <DollarSign className="w-4 h-4" />
+                  Cash
+                </Button>
+                <Button
+                  variant={settlementMethod === 'card' ? 'default' : 'outline'}
+                  onClick={() => setSettlementMethod('card')}
+                  className="flex items-center justify-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  Card
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setShowSettlementModal(false)}>
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={handleSettleAndCheckout} disabled={isSettling}>
+                {isSettling ? 'Settling...' : `Settle ${formatCurrency(settlementBalance)} & Check Out`}
+              </Button>
             </div>
           </div>
         </div>
