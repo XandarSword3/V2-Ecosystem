@@ -3,6 +3,7 @@ import { getSupabase } from '../../database/connection.js';
 import { logger } from '../../utils/logger.js';
 import { validateBody } from '../../validation/schemas.js';
 import { emitToUnit } from '../../socket/index.js';
+import { autoAssignStaffToLocation, reassignStaffToLocation } from '../reservations/reservations.service.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
@@ -120,14 +121,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       }
     }
 
-    // Fetch service_locations for this page of orders. `transactions` has a
-    // real service_location_id FK, but until now nothing here selected it —
-    // destination was read from freeform metadata.table_number instead,
-    // which only holds up for orders that happened to be tagged that way at
-    // creation and doesn't reflect the actual service_locations record (name,
-    // active/inactive, etc). Same two-plain-queries approach as the
-    // items -> catalog_items lookup above, for the same reason: no embedded
-    // PostgREST join to rely on a FK relationship name.
+    // Fetch service_locations for this page of orders.
     const locationIds = [...new Set(
       (orders || []).map((o) => (o as { service_location_id?: string | null }).service_location_id).filter(Boolean)
     )] as string[];
@@ -147,13 +141,27 @@ export async function getModuleOrders(req: Request, res: Response) {
       }
     }
 
+    // Fetch staff names for orders with staff_id
+    const staffIds = [...new Set(
+      (orders || []).map((o) => (o as { staff_id?: string | null }).staff_id).filter(Boolean)
+    )] as string[];
+    const staffNameById = new Map<string, string>();
+    if (staffIds.length > 0) {
+      const { data: staffRows } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', staffIds);
+
+      for (const row of staffRows || []) {
+        const name = row.full_name || row.email || 'Staff';
+        staffNameById.set(row.id, name);
+      }
+    }
+
     // Transform data for frontend
     const transformedOrders = (orders || []).map(order => {
       const meta = (order.metadata ?? {}) as Record<string, unknown>;
       const serviceLocationId = (order as { service_location_id?: string | null }).service_location_id ?? null;
-      // Real service_locations name wins when we have it; metadata is the
-      // fallback for orders with no service_location_id at all (takeaway,
-      // pickup-only orders were never tied to a physical location).
       const destination = (serviceLocationId && locationNameById.get(serviceLocationId))
         || (meta.table_number as string | undefined)
         || (meta.table_id as string | undefined)
@@ -165,12 +173,15 @@ export async function getModuleOrders(req: Request, res: Response) {
           ? (order.status !== 'cancelled' ? 'paid' : 'refunded')
           : (order.status === 'completed' ? 'paid' : 'unpaid')
       );
+      const staffId = (order as { staff_id?: string | null }).staff_id ?? null;
+      const staffName = staffId ? (staffNameById.get(staffId) ?? null) : null;
       return {
         id: order.id,
         orderNumber: getOrderNumber(order.id, meta),
         customerName: (meta.customer_name as string) || 'Guest',
         customerId: order.customer_id,
-        staffId: (order as { staff_id?: string | null }).staff_id ?? null,
+        staffId,
+        staffName,
         orderType: order.engine_type,
         status: order.status,
         paymentMethod: rawPaymentMethod,
@@ -180,8 +191,6 @@ export async function getModuleOrders(req: Request, res: Response) {
         totalAmount: order.amount,
         serviceLocationId,
         destination,
-        // Kept for any existing frontend code still reading tableNumber —
-        // same value, new name is clearer once this isn't just restaurant tables.
         tableNumber: destination,
         createdAt: order.created_at,
       };
@@ -1894,6 +1903,29 @@ export async function createModuleOrder(req: Request, res: Response) {
 
     if (txError) throw txError;
 
+    // Deduct inventory atomically with audit trail; roll back on stock failure
+    if (orderItemsInput.length > 0) {
+      const deductionPayload = orderItemsInput.map((i: any) => ({
+        catalog_item_id: i.catalogItemId || i.itemId || i.id,
+        quantity: Number(i.quantity || i.qty || 1),
+      }));
+      const { error: deductError } = await supabase.rpc('deduct_inventory_for_order_items', {
+        p_items: deductionPayload,
+        p_user_id: userId || null,
+        p_order_id: transaction.id,
+      });
+
+      if (deductError) {
+        logger.warn('Staff order creation rejected due to insufficient stock:', deductError.message);
+        await supabase.from('transactions').delete().eq('id', transaction.id);
+        return res.status(400).json({
+          success: false,
+          error: 'INSUFFICIENT_STOCK',
+          message: deductError.message || 'One or more items in the order are out of stock',
+        });
+      }
+    }
+
     const createdItems: any[] = [];
     if (orderItemsInput.length > 0) {
       const itemInserts = orderItemsInput.map((i: any) => ({
@@ -2253,6 +2285,139 @@ export async function getModuleMenu(req: Request, res: Response) {
   } catch (error: any) {
     logger.error('Error fetching module menu:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch module menu', message: error.message });
+  }
+}
+
+/**
+ * Seat a walk-in guest at a service location (table)
+ * POST /staff/modules/:slug/walk-in
+ */
+export async function createWalkInSeating(req: Request, res: Response) {
+  try {
+    const { slug } = req.params;
+    const { serviceLocationId, partySize = 2, guestName = 'Walk-in Guest', guestPhone, notes } = req.body;
+    const supabase = getSupabase();
+    const tenantId = (req.user as any)?.tenantId;
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, property_id, tenant_id')
+      .eq('slug', slug)
+      .single();
+
+    if (!module) {
+      return res.status(404).json({ success: false, error: 'Module not found' });
+    }
+
+    const effectiveTenantId = tenantId || module.tenant_id;
+    const effectivePropertyId = propertyId || module.property_id;
+
+    const { data: reservation, error: resError } = await supabase
+      .from('reservations')
+      .insert({
+        tenant_id: effectiveTenantId,
+        property_id: effectivePropertyId,
+        module_id: module.id,
+        service_location_id: serviceLocationId || null,
+        party_size: Number(partySize),
+        reserved_for: new Date().toISOString(),
+        duration_minutes: 90,
+        status: 'seated',
+        guest_name: guestName,
+        guest_phone: guestPhone || null,
+        notes: notes || 'Walk-in',
+        checked_in_at: new Date().toISOString(),
+        created_by: req.user?.userId || null,
+      })
+      .select('*')
+      .single();
+
+    if (resError) throw resError;
+
+    let assignedStaffId: string | null = null;
+    if (serviceLocationId) {
+      assignedStaffId = await autoAssignStaffToLocation(supabase, {
+        tenantId: effectiveTenantId,
+        propertyId: effectivePropertyId,
+        moduleId: module.id,
+        serviceLocationId,
+      });
+
+      if (assignedStaffId) {
+        await supabase
+          .from('reservations')
+          .update({ assigned_staff_id: assignedStaffId })
+          .eq('id', reservation.id);
+      }
+    }
+
+    emitToUnit(effectiveTenantId, module.id, 'walkin:seated', {
+      reservationId: reservation.id,
+      serviceLocationId,
+      assignedStaffId,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        ...reservation,
+        assigned_staff_id: assignedStaffId,
+      },
+    });
+  } catch (error: any) {
+    logger.error('Error creating walk-in seating:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to seat walk-in' });
+  }
+}
+
+/**
+ * Free a service location (table), unassigning staff and completing open orders
+ * POST /staff/service-locations/:id/free
+ */
+export async function freeServiceLocation(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const supabase = getSupabase();
+
+    // 1. Unassign staff
+    await reassignStaffToLocation(supabase, id, null);
+
+    // 2. Complete active transactions on this location
+    const { data: activeTxs } = await supabase
+      .from('transactions')
+      .select('id, tenant_id, module_id')
+      .eq('service_location_id', id)
+      .eq('engine_type', 'instant_transaction')
+      .not('status', 'in', '(completed,cancelled)');
+
+    if (activeTxs && activeTxs.length > 0) {
+      const txIds = activeTxs.map((t) => t.id);
+      await supabase
+        .from('transactions')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .in('id', txIds);
+
+      const firstTx = activeTxs[0];
+      if (firstTx) {
+        emitToUnit(firstTx.tenant_id, firstTx.module_id, 'location:freed', {
+          serviceLocationId: id,
+          freedTransactionIds: txIds,
+        });
+      }
+    }
+
+    // 3. Mark active reservations on this table as completed
+    await supabase
+      .from('reservations')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .eq('service_location_id', id)
+      .in('status', ['booked', 'seated']);
+
+    return res.json({ success: true, message: 'Table freed successfully' });
+  } catch (error: any) {
+    logger.error('Error freeing service location:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to free table' });
   }
 }
 

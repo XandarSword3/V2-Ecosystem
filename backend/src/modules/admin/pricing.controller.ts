@@ -7,7 +7,7 @@ import { AppError } from '../../utils/AppError';
 import { seasonalPricingService } from '../../services/seasonal-pricing.service';
 import { logger } from '../../utils/logger';
 import { getCallerTenantId } from '../../security/tenant-scope.js';
-import { engineService } from '../../engines/engine-service.js';
+import { getEngineService } from '../../engines/engine-service.js';
 import { resolveTaxCategory, getModuleTaxCategory } from '../../services/tax.service.js';
 import { getEngineByTemplate } from '../../engines/registry.js';
 import { resolveAndPriceCatalogItems, type CatalogItemRequest } from '../../services/catalog-pricing.service.js';
@@ -428,7 +428,7 @@ router.post(
     // so preview and confirmation can never drift — same engine.pricing config, same
     // coupon/gift-card/loyalty resolvers, same math.
     const pipelineStart = Date.now();
-    const result = await engineService.calculatePricing(templateType, lineItems, pricingContext);
+    const result = await getEngineService().calculatePricing(templateType, lineItems, pricingContext);
     console.log(`[PricingController] RequestID: ${requestId} - Pipeline calculation: ${Date.now() - pipelineStart}ms`);
 
     const responseStart = Date.now();

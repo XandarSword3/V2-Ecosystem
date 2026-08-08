@@ -1036,6 +1036,45 @@ function buildInstantTransactionRouter(router: Router): void {
         .single();
       if (createError) throw createError;
 
+      // Deduct inventory atomically with audit trail; roll back transaction on stock failure
+      try {
+        const inventoryItemsPayload = catalogResult.resolvedItems.map((item, index) => {
+          const currentItem = items[index] as {
+            catalog_item_id?: string; menuItemId?: string; itemId?: string;
+            quantity?: number;
+          };
+          const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+          return {
+            catalog_item_id: resolvedId,
+            quantity: item.quantity,
+          };
+        });
+
+        const { error: deductErr } = await supabase.rpc('deduct_inventory_for_order_items', {
+          p_items: inventoryItemsPayload,
+          p_user_id: req.user?.userId ?? null,
+          p_order_id: created.id,
+        });
+
+        if (deductErr) {
+          logger.warn('[Dynamic Router] Inventory deduction failed, rolling back order:', deductErr.message);
+          await supabase.from('transactions').delete().eq('id', created.id);
+          return res.status(400).json({
+            success: false,
+            error: 'INSUFFICIENT_STOCK',
+            message: 'One or more items in your order are out of stock',
+          });
+        }
+      } catch (invErr: any) {
+        logger.error('[Dynamic Router] Exception during inventory deduction:', invErr);
+        await supabase.from('transactions').delete().eq('id', created.id);
+        return res.status(400).json({
+          success: false,
+          error: 'INSUFFICIENT_STOCK',
+          message: invErr?.message || 'Insufficient stock to fulfill order',
+        });
+      }
+
       // Backfill the order_id onto the coupon_usage/gift_card_transactions
       // row(s) created during pricing above (they were inserted with
       // order_id NULL since the order didn't exist yet) so this order can be

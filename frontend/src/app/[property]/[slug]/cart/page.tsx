@@ -161,8 +161,14 @@ export default function ModuleCartPage() {
             name: item.name,
             unitPrice: item.price + (item.modifierTotal || 0),
             quantity: item.quantity,
-            taxCategory: (item as any).taxCategory || (item as any).category,
-            moduleId: (item as any).moduleId || moduleId,
+            taxCategory: item.category,
+            moduleId: item.moduleId || moduleId,
+            // Must match the shape /orders sends: resolveAndPriceCatalogItems only
+            // computes modifierAdjustment from metadata.selectedModifiers — without
+            // this, preview silently reprices every item at base price only.
+            metadata: item.selectedModifiers && item.selectedModifiers.length > 0
+              ? { selectedModifiers: item.selectedModifiers }
+              : undefined,
           })),
           moduleId,
           orderType,

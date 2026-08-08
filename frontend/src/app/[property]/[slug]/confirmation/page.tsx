@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
+import { useSocket } from '@/lib/socket';
+import { toast } from 'sonner';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
@@ -198,6 +200,7 @@ function ConfirmationContent() {
   const tCommon = useTranslations('common');
   const currency = useSettingsStore((s) => s.currency);
   const { modules } = useSiteSettings();
+  const { socket } = useSocket();
 
   const [ticket, setTicket] = useState<SessionTicket | null>(null);
   const [order, setOrder] = useState<OrderConfirmation | null>(null);
@@ -219,7 +222,37 @@ function ConfirmationContent() {
       return;
     }
     fetchConfirmation();
+
+    if (confirmationType === 'order') {
+      const intervalId = setInterval(fetchConfirmation, 5000);
+      return () => clearInterval(intervalId);
+    }
   }, [itemId, confirmationType]);
+
+  // Live order status updates via WebSockets
+  useEffect(() => {
+    if (socket && itemId && confirmationType === 'order') {
+      socket.emit('join:order', itemId);
+      socket.emit('join:room', `order:${itemId}`);
+
+      const handleOrderUpdate = (update: { orderId?: string; id?: string; status: string }) => {
+        const targetId = update.orderId || update.id;
+        if (!targetId || targetId === itemId) {
+          setOrder((prev) => (prev ? { ...prev, status: update.status } : prev));
+          toast.info(`Order status: ${update.status.replace('_', ' ')}`);
+        }
+      };
+
+      socket.on('order:status', handleOrderUpdate);
+      socket.on('order-status-updated', handleOrderUpdate);
+
+      return () => {
+        socket.emit('leave:order', itemId);
+        socket.off('order:status', handleOrderUpdate);
+        socket.off('order-status-updated', handleOrderUpdate);
+      };
+    }
+  }, [socket, itemId, confirmationType]);
 
   const fetchConfirmation = async () => {
     try {

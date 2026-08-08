@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { emitToUser, emitToUnit } from '../../socket/index.js';
 import { logger } from '../../utils/logger.js';
+import { notificationService } from '../../services/notifications.service.js';
 
 export interface ReservationParams {
   tenantId: string;
@@ -175,6 +176,17 @@ export async function autoAssignStaffToLocation(
       propertyId,
       assignedAt: new Date().toISOString(),
     });
+
+    // 6. Persistent in-app notification so the assignment is visible even if the staff member missed the socket event
+    notificationService.create({
+      userId: selectedStaffId,
+      type: 'table_assignment',
+      title: 'New Table Assigned',
+      message: `You have been assigned to a new table (${serviceLocationId}).`,
+      priority: 'high',
+      targetType: 'service_location',
+      targetId: serviceLocationId,
+    }).catch((err) => logger.error('Failed to create table assignment notification', err));
   }
 
   return selectedStaffId;
@@ -309,6 +321,17 @@ export async function reassignStaffToLocation(
       assignedAt: new Date().toISOString(),
       reassigned: true,
     });
+
+    // Persistent in-app notification for reassignment
+    notificationService.create({
+      userId: staffId,
+      type: 'table_assignment',
+      title: 'Table Reassigned to You',
+      message: `You have been reassigned to table (${serviceLocationId}).`,
+      priority: 'high',
+      targetType: 'service_location',
+      targetId: serviceLocationId,
+    }).catch((err) => logger.error('Failed to create reassignment notification', err));
   }
 
   return data;
