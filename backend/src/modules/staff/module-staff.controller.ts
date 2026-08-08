@@ -2383,7 +2383,13 @@ export async function freeServiceLocation(req: Request, res: Response) {
     // 1. Unassign staff
     await reassignStaffToLocation(supabase, id, null);
 
-    // 2. Complete active transactions on this location
+    // 2. Complete active transactions on this location — routed through the
+    // consolidated status-change path (see order-status.service.ts) instead
+    // of a raw .update(). That function was deliberately consolidated from
+    // two divergent implementations into one; a direct update here would
+    // reintroduce a third path that skips the order:status/emitToOrder push
+    // (open KDS/dispatch screens for the order wouldn't see the change) and
+    // the audit-log write that every other status change gets.
     const { data: activeTxs } = await supabase
       .from('transactions')
       .select('id, tenant_id, module_id')
@@ -2392,17 +2398,42 @@ export async function freeServiceLocation(req: Request, res: Response) {
       .not('status', 'in', '(completed,cancelled)');
 
     if (activeTxs && activeTxs.length > 0) {
-      const txIds = activeTxs.map((t) => t.id);
-      await supabase
-        .from('transactions')
-        .update({ status: 'completed', updated_at: new Date().toISOString() })
-        .in('id', txIds);
+      const moduleIds = [...new Set(activeTxs.map((t) => t.module_id))];
+      const { data: modulesData } = await supabase
+        .from('modules')
+        .select('id, slug, engine_type')
+        .in('id', moduleIds);
+      const moduleById = new Map((modulesData || []).map((m) => [m.id, m]));
+
+      const freedTransactionIds: string[] = [];
+      for (const tx of activeTxs) {
+        const module = moduleById.get(tx.module_id);
+        if (!module) {
+          logger.warn(`freeServiceLocation: module ${tx.module_id} not found for order ${tx.id}, skipping`);
+          continue;
+        }
+        const result = await changeInstantTransactionOrderStatus(supabase, {
+          orderId: tx.id,
+          moduleId: module.id,
+          moduleSlug: module.slug,
+          moduleEngineTypeRaw: module.engine_type,
+          requestedStatus: 'completed',
+          actor: 'staff',
+          userId: req.user?.userId,
+          tenantId: tx.tenant_id,
+        });
+        if (result.ok) {
+          freedTransactionIds.push(tx.id);
+        } else {
+          logger.warn(`freeServiceLocation: failed to complete order ${tx.id}: ${result.error}`);
+        }
+      }
 
       const firstTx = activeTxs[0];
-      if (firstTx) {
+      if (firstTx && freedTransactionIds.length > 0) {
         emitToUnit(firstTx.tenant_id, firstTx.module_id, 'location:freed', {
           serviceLocationId: id,
-          freedTransactionIds: txIds,
+          freedTransactionIds,
         });
       }
     }
