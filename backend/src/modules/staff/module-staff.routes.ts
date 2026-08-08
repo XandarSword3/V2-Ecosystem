@@ -39,6 +39,10 @@ router.get('/modules/:slug/orders/live', authorize(...staffRoles), verifyStaffMo
 router.post('/modules/:slug/tables/:tableId/split', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.splitModuleTable);
 router.post('/modules/:slug/tables/:tableId/merge', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.mergeModuleTables);
 
+// Service locations / floor map actions
+router.post('/modules/:slug/walk-in', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.createWalkInSeating);
+router.post('/service-locations/:id/free', authorize(...staffRoles), moduleStaffController.freeServiceLocation);
+
 // Get catalog menu items for POS order entry
 router.get('/modules/:slug/menu', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.getModuleMenu);
 

@@ -9,6 +9,7 @@ import { businessMetricsService } from './business-metrics.service.js';
 import { emitToRole, getIO } from '../socket/index.js';
 import { runMembershipRenewalJob } from '../jobs/membership-renewal.job.js';
 import { processApprovedDeletions } from '../modules/gdpr/gdpr.service.js';
+import { runLoyaltyBirthdayBonusJob, runLoyaltyPointExpiryJob } from '../jobs/loyalty-maintenance.job.js';
 
 export class SchedulerService {
   /**
@@ -46,6 +47,9 @@ export class SchedulerService {
 
     // GDPR: Process approved data deletion requests at 1:00 AM
     this.scheduleGDPRDeletionProcessing();
+
+    // Loyalty: birthday bonuses and point expiry, daily at 5:00 AM
+    this.scheduleLoyaltyMaintenance();
     
     logger.info('Scheduler service initialized.');
   }
@@ -357,5 +361,28 @@ export class SchedulerService {
     });
 
     logger.info('Scheduled GDPR deletion processing job (0 1 * * *)');
+  }
+
+  /**
+   * Loyalty maintenance: grants configured birthday bonuses and expires
+   * point batches past loyalty_settings.points_expiry_days. Both settings
+   * existed in the admin UI with no job actually enforcing them.
+   * Runs daily at 5:00 AM.
+   */
+  private static scheduleLoyaltyMaintenance() {
+    cron.schedule('0 5 * * *', async () => {
+      logger.info('Starting scheduled loyalty maintenance...');
+      try {
+        const birthdayResult = await runLoyaltyBirthdayBonusJob();
+        const expiryResult = await runLoyaltyPointExpiryJob();
+        logger.info(
+          `Loyalty maintenance completed. Birthday bonuses: ${birthdayResult.awarded}, expired batches: ${expiryResult.expiredBatches} (${expiryResult.membersAffected} members)`
+        );
+      } catch (error) {
+        logger.error('Scheduled loyalty maintenance failed:', error);
+      }
+    });
+
+    logger.info('Scheduled loyalty maintenance job (0 5 * * *)');
   }
 }
