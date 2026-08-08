@@ -27,8 +27,6 @@ import {
   AlertCircle,
   Shield,
   Search,
-  Truck,
-  MapPin,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -105,26 +103,10 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
           roles: ['super_admin', 'admin', 'manager', 'staff', `${module.slug}_staff`, `${module.slug}_admin`]
         },
       ];
-      // Dispatch and Floor Map are Engine A-only (instant_transaction) — see the guard on
-      // the DispatchPage/getModuleOrders for why. Nothing to route to for the
-      // other engine types.
-      // Floor Map only shown if require_reservation is true (Phase 5)
-      if (module.engine_type === 'instant_transaction') {
-        if (module.require_reservation !== false) {
-          items.push({
-            name: `${module.name} Floor Map`,
-            href: `/${propertySlug}/staff/modules/${module.slug}/floorMap`,
-            icon: MapPin,
-            roles: ['super_admin', 'admin', 'manager', 'staff', `${module.slug}_staff`, `${module.slug}_admin`]
-          });
-        }
-        items.push({
-          name: `${module.name} Dispatch`,
-          href: `/${propertySlug}/staff/modules/${module.slug}/dispatch`,
-          icon: Truck,
-          roles: ['super_admin', 'admin', 'manager', 'staff', `${module.slug}_staff`, `${module.slug}_admin`]
-        });
-      }
+      // Floor Map and Dispatch used to be separate routes here. They're now
+      // tabs inside the module page itself (StaffPOSTemplate), reachable
+      // without leaving the Orders/Kitchen/Cashier workspace — see
+      // StaffPOSTemplate's ViewMode. Nothing to add to nav for them anymore.
       return items;
     }),
     // Static utilities

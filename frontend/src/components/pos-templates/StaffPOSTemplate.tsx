@@ -45,7 +45,11 @@ import {
   Play,
   Eye,
   Camera,
+  MapPin,
+  Truck,
 } from 'lucide-react';
+import { ReservationFloorMap } from '@/components/staff/ReservationFloorMap';
+import { DispatchBoard } from '@/components/staff/DispatchBoard';
 
 // Types
 interface Table {
@@ -97,11 +101,14 @@ interface StaffPOSTemplateProps {
   moduleId: string;
   moduleSlug: string;
   moduleName: string;
+  // Floor Map (host-stand tab) only makes sense for modules that take
+  // reservations. Mirrors the gate that used to live in the sidebar nav.
+  requireReservation?: boolean | null;
 }
 
-type ViewMode = 'floor' | 'orders' | 'kitchen' | 'cashier';
+type ViewMode = 'floor' | 'orders' | 'kitchen' | 'cashier' | 'floorplan' | 'dispatch';
 
-export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: StaffPOSTemplateProps) {
+export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, requireReservation }: StaffPOSTemplateProps) {
   const t = useTranslations();
   const { user } = useAuth();
   const { socket } = useSocket();
@@ -456,10 +463,14 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
           {/* View Mode Tabs */}
           <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
             {[
-              { mode: 'floor' as ViewMode, icon: LayoutGrid, label: 'Floor' },
+              { mode: 'floor' as ViewMode, icon: LayoutGrid, label: 'Stations' },
               { mode: 'orders' as ViewMode, icon: UtensilsCrossed, label: 'Orders' },
               { mode: 'kitchen' as ViewMode, icon: ChefHat, label: 'Kitchen' },
               { mode: 'cashier' as ViewMode, icon: CreditCard, label: 'Cashier' },
+              ...(requireReservation !== false
+                ? [{ mode: 'floorplan' as ViewMode, icon: MapPin, label: 'Floor Map' }]
+                : []),
+              { mode: 'dispatch' as ViewMode, icon: Truck, label: 'Dispatch' },
             ].map(({ mode, icon: Icon, label }) => (
               <button
                 key={mode}
@@ -959,6 +970,14 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName }: S
               </Card>
             </div>
           </div>
+        )}
+
+        {viewMode === 'floorplan' && requireReservation !== false && (
+          <ReservationFloorMap slug={moduleSlug} />
+        )}
+
+        {viewMode === 'dispatch' && (
+          <DispatchBoard slug={moduleSlug} moduleName={moduleName} moduleId={moduleId} />
         )}
       </main>
 
