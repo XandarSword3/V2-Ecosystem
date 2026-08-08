@@ -4,6 +4,10 @@ export interface OrderItem {
   id: string;
   name: string;
   quantity: number;
+  // FIX: backend (getModuleOrders) has always returned this per item —
+  // it just wasn't declared here, so callers silently dropped it instead
+  // of a type error catching the gap.
+  unitPrice: number;
   specialInstructions?: string;
   // Backend now returns this (module-staff.controller.ts getModuleOrders,
   // order_items.status column, defaults to 'pending' if null).
