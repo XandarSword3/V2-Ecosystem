@@ -12,6 +12,7 @@ import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purcha
 import { computeStayBaseAmount } from '../utils/stay-pricing.js';
 import { resolveTaxCategory } from '../services/tax.service.js';
 import { generateQRCodeImage, validatePayload } from '../utils/qr-security.js';
+import { getOrderNumber } from '../utils/order-number.js';
 import { customizationService } from '../modules/customization/services/customization.service.js';
 import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reversal.js';
 import { actorForUser, resolveAction, changeInstantTransactionOrderStatus } from '../engines/order-status.service.js';
@@ -1035,6 +1036,45 @@ function buildInstantTransactionRouter(router: Router): void {
         .single();
       if (createError) throw createError;
 
+      // Deduct inventory atomically with audit trail; roll back transaction on stock failure
+      try {
+        const inventoryItemsPayload = catalogResult.resolvedItems.map((item, index) => {
+          const currentItem = items[index] as {
+            catalog_item_id?: string; menuItemId?: string; itemId?: string;
+            quantity?: number;
+          };
+          const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
+          return {
+            catalog_item_id: resolvedId,
+            quantity: item.quantity,
+          };
+        });
+
+        const { error: deductErr } = await supabase.rpc('deduct_inventory_for_order_items', {
+          p_items: inventoryItemsPayload,
+          p_user_id: req.user?.userId ?? null,
+          p_order_id: created.id,
+        });
+
+        if (deductErr) {
+          logger.warn('[Dynamic Router] Inventory deduction failed, rolling back order:', deductErr.message);
+          await supabase.from('transactions').delete().eq('id', created.id);
+          return res.status(400).json({
+            success: false,
+            error: 'INSUFFICIENT_STOCK',
+            message: 'One or more items in your order are out of stock',
+          });
+        }
+      } catch (invErr: any) {
+        logger.error('[Dynamic Router] Exception during inventory deduction:', invErr);
+        await supabase.from('transactions').delete().eq('id', created.id);
+        return res.status(400).json({
+          success: false,
+          error: 'INSUFFICIENT_STOCK',
+          message: invErr?.message || 'Insufficient stock to fulfill order',
+        });
+      }
+
       // Backfill the order_id onto the coupon_usage/gift_card_transactions
       // row(s) created during pricing above (they were inserted with
       // order_id NULL since the order didn't exist yet) so this order can be
@@ -1148,7 +1188,7 @@ function buildInstantTransactionRouter(router: Router): void {
       try {
         const kdsPayload = {
           id: created.id,
-          orderNumber: meta.order_number ?? created.id.slice(0, 8),
+          orderNumber: getOrderNumber(created.id, meta),
           customerName: meta.customer_name ?? 'Guest',
           orderType: meta.order_type ?? 'dine_in',
           status: created.status,
@@ -1394,7 +1434,7 @@ function buildInstantTransactionRouter(router: Router): void {
         const items = (meta.items as Array<any>) || [];
         return {
           id: tx.id,
-          order_number: meta.order_number || `ORD-${tx.id.slice(0, 8).toUpperCase()}`,
+          order_number: getOrderNumber(tx.id, meta),
           status: tx.status,
           total_amount: tx.amount,
           table_number: meta.table_number || meta.tableNumber || null,
@@ -1490,7 +1530,12 @@ function buildInstantTransactionRouter(router: Router): void {
         success: true,
         data: {
           ...data,
-          order_number: data.id.slice(0, 8).toUpperCase(),
+          // FIX: this used to always derive the number from the raw
+          // transaction id (data.id.slice(0,8).toUpperCase()), ignoring
+          // the real order_number written into metadata at creation.
+          // Result: the customer confirmation page showed a completely
+          // different number than every staff view for the same order.
+          order_number: getOrderNumber(data.id, meta),
           total_amount: data.amount,
           tax_amount: data.tax_amount,
           discount_amount: data.discount_amount,

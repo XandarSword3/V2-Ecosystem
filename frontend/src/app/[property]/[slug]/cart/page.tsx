@@ -161,8 +161,14 @@ export default function ModuleCartPage() {
             name: item.name,
             unitPrice: item.price + (item.modifierTotal || 0),
             quantity: item.quantity,
-            taxCategory: (item as any).taxCategory || (item as any).category,
-            moduleId: (item as any).moduleId || moduleId,
+            taxCategory: item.category,
+            moduleId: item.moduleId || moduleId,
+            // Must match the shape /orders sends: resolveAndPriceCatalogItems only
+            // computes modifierAdjustment from metadata.selectedModifiers — without
+            // this, preview silently reprices every item at base price only.
+            metadata: item.selectedModifiers && item.selectedModifiers.length > 0
+              ? { selectedModifiers: item.selectedModifiers }
+              : undefined,
           })),
           moduleId,
           orderType,
@@ -503,7 +509,7 @@ export default function ModuleCartPage() {
                   >
                     {moduleItems.map((item, index) => (
                       <motion.div
-                        key={item.id}
+                        key={item.uniqueKey || item.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
@@ -563,7 +569,7 @@ export default function ModuleCartPage() {
                               whileTap={{ scale: 0.9 }}
                               onClick={() => {
                                 if (item.quantity === 1) {
-                                  removeItem(item.id);
+                                  removeItem(item.id, item.uniqueKey);
                                 } else {
                                   addItem({ ...item, quantity: -1 });
                                 }
@@ -892,7 +898,7 @@ export default function ModuleCartPage() {
                 <div className="p-6 space-y-6">
                   <div className="space-y-3 max-h-48 overflow-y-auto">
                     {moduleItems.map((item) => (
-                      <div key={item.id} className="text-sm">
+                      <div key={item.uniqueKey || item.id} className="text-sm">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-2">
                             <span className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xs font-bold flex-shrink-0">

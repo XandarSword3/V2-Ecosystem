@@ -47,9 +47,12 @@ import {
   Camera,
   MapPin,
   Truck,
+  ChevronRight,
 } from 'lucide-react';
 import { ReservationFloorMap } from '@/components/staff/ReservationFloorMap';
 import { DispatchBoard } from '@/components/staff/DispatchBoard';
+import type { ItemStatus } from '@/components/staff/types';
+import { itemStatusFlow } from '@/components/staff/types';
 
 // Types
 interface Table {
@@ -65,6 +68,7 @@ interface Order {
   id: string;
   orderNumber: string;
   tableNumber?: string;
+  staffName?: string;
   status: string;
   items: OrderItem[];
   totalAmount: number;
@@ -108,6 +112,90 @@ interface StaffPOSTemplateProps {
 
 type ViewMode = 'floor' | 'orders' | 'kitchen' | 'cashier' | 'floorplan' | 'dispatch';
 
+// ============================================
+// Item-level status chip — tap to advance
+// ============================================
+// Ported from components/staff/KitchenView.tsx, which had this (plus item-
+// level advance, offline queueing, and a data-freshness footer) but was
+// never actually wired into Engine A's staff workspace — it only existed
+// on the archived staff-slug-legacy route, which Next.js's `_archived`
+// naming excludes from routing entirely. This tab was still running the
+// original order-level-only view underneath. Following the same reasoning
+// DispatchBoard's ElapsedTimer duplication used (small, two call sites,
+// not worth a shared import yet): copied here rather than importing
+// KitchenView wholesale, since KitchenView does its own independent
+// orders fetch + socket subscriptions that would duplicate the fetching
+// and socket handling StaffPOSTemplate already does for every tab.
+const ITEM_STATUS_STYLE: Record<ItemStatus, { bg: string; border: string; text: string; dot: string }> = {
+  pending: { bg: 'bg-gray-50 dark:bg-gray-800', border: 'border-gray-200 dark:border-gray-700', text: 'text-gray-600 dark:text-gray-300', dot: 'bg-gray-400' },
+  preparing: { bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-300 dark:border-amber-700', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
+  ready: { bg: 'bg-teal-50 dark:bg-teal-900/20', border: 'border-teal-300 dark:border-teal-700', text: 'text-teal-700 dark:text-teal-300', dot: 'bg-teal-500' },
+  served: { bg: 'bg-gray-50 dark:bg-gray-800/60', border: 'border-gray-200 dark:border-gray-700', text: 'text-gray-400 dark:text-gray-500', dot: 'bg-gray-400' },
+};
+
+// Kitchen's job stops at 'ready' — advancing to 'served' is Dispatch's action
+// (see DispatchBoard), not something offered from this tab.
+const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
+  pending: 'Start',
+  preparing: 'Ready',
+  ready: null,
+  served: null,
+};
+
+function ItemStatusChip({
+  item,
+  onAdvance,
+  disabled,
+}: {
+  item: OrderItem;
+  onAdvance: (item: OrderItem) => void;
+  disabled: boolean;
+}) {
+  const status = (item.status as ItemStatus) ?? 'pending';
+  const style = ITEM_STATUS_STYLE[status] ?? ITEM_STATUS_STYLE.pending;
+  const nextLabel = ITEM_NEXT_ACTION_LABEL[status];
+  const isReady = status === 'ready' || status === 'served';
+
+  return (
+    <div className={`p-2 rounded-lg border ${style.border} ${style.bg}`}>
+      <div className="flex justify-between items-start gap-2">
+        <div className="min-w-0">
+          <span className={`font-bold text-lg ${isReady ? 'line-through text-gray-400' : ''}`}>
+            {item.quantity}x {item.name}
+          </span>
+          {item.station && (
+            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+              {item.station}
+            </span>
+          )}
+        </div>
+        {isReady ? (
+          <Check className="h-5 w-5 text-teal-500 shrink-0" />
+        ) : nextLabel ? (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdvance(item);
+            }}
+            className={`shrink-0 flex items-center gap-0.5 text-xs font-bold uppercase tracking-wide px-2 py-1 rounded ${style.text} bg-white dark:bg-gray-900 border ${style.border} hover:brightness-95 active:scale-95 transition disabled:opacity-40 disabled:pointer-events-none`}
+          >
+            {nextLabel}
+            <ChevronRight className="h-3 w-3" />
+          </button>
+        ) : null}
+      </div>
+      {item.modifiers && item.modifiers.length > 0 && (
+        <p className="text-sm text-gray-600 mt-1">+ {item.modifiers.join(', ')}</p>
+      )}
+      {item.notes && (
+        <p className="text-sm text-orange-600 mt-1 font-medium">⚠ {item.notes}</p>
+      )}
+    </div>
+  );
+}
+
 export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, requireReservation }: StaffPOSTemplateProps) {
   const t = useTranslations();
   const { user } = useAuth();
@@ -125,6 +213,9 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [kitchenOrders, setKitchenOrders] = useState<Order[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  // Item-level status updates in flight (Kitchen tab) — disables the chip's
+  // advance button and lets a failed PATCH roll the optimistic bump back.
+  const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(new Set());
   // Cash drawer modal
   const [showCashModal, setShowCashModal] = useState(false);
   const [cashModalType, setCashModalType] = useState<'in' | 'out'>('in');
@@ -233,6 +324,18 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
         });
       };
 
+      // Item-level status, emitted by PATCH .../orders/:orderId/items/:itemId/status
+      // (module-staff.controller.ts updateModuleOrderItemStatus). Keeps every
+      // open Kitchen tab in sync when one station bumps an item.
+      const handleItemStatusUpdate = (update: { orderId: string; itemId: string; status: string }) => {
+        const applyToOrder = (o: Order) =>
+          o.id === update.orderId
+            ? { ...o, items: o.items.map(i => i.id === update.itemId ? { ...i, status: update.status } : i) }
+            : o;
+        setOrders(prev => prev.map(applyToOrder));
+        setKitchenOrders(prev => prev.map(applyToOrder));
+      };
+
       // FIX: 'table:update' is never emitted anywhere in the backend.
       // 'table:freed' is real (emitted on transaction completion, currently
       // only for reservation-linked orders — see dynamic-module.router.ts)
@@ -248,11 +351,13 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
 
       socket.on('order:new', handleNewOrder);
       socket.on('order:status', handleStatusUpdate);
+      socket.on('order:item:status', handleItemStatusUpdate);
       socket.on('table:freed', handleTableFreed);
 
       return () => {
         socket.off('order:new', handleNewOrder);
         socket.off('order:status', handleStatusUpdate);
+        socket.off('order:item:status', handleItemStatusUpdate);
         socket.off('table:freed', handleTableFreed);
       };
     }
@@ -268,6 +373,47 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       toast.success(`Order updated to ${status}`);
     } catch (error) {
       toast.error('Failed to update order');
+    }
+  };
+
+  // Item-level status (Kitchen tab). Separate from updateOrderStatus above —
+  // order_items isn't a registered engine entity, so the backend enforces
+  // its own forward-only flow directly (module-staff.controller.ts
+  // updateModuleOrderItemStatus) rather than via the engine state machine.
+  // The parent order auto-advances once every item hits 'ready'/'served',
+  // which arrives back over the existing 'order:status' socket handler —
+  // no need to guess at it here.
+  const advanceItem = async (orderId: string, item: OrderItem) => {
+    const currentStatus = item.status;
+    const nextIndex = itemStatusFlow.indexOf((currentStatus as ItemStatus) ?? 'pending') + 1;
+    const nextStatus = itemStatusFlow[nextIndex];
+    if (!nextStatus) return;
+
+    setPendingItemIds(prev => new Set(prev).add(item.id));
+    const applyStatus = (status: string) => (o: Order) =>
+      o.id === orderId
+        ? { ...o, items: o.items.map(i => i.id === item.id ? { ...i, status } : i) }
+        : o;
+
+    // Optimistic update so the chip flips immediately under a tap.
+    setOrders(prev => prev.map(applyStatus(nextStatus)));
+    setKitchenOrders(prev => prev.map(applyStatus(nextStatus)));
+
+    try {
+      await api.patch(`/staff/modules/${moduleSlug}/orders/${orderId}/items/${item.id}/status`, {
+        status: nextStatus,
+      });
+    } catch (error) {
+      // Roll back the optimistic bump
+      setOrders(prev => prev.map(applyStatus(currentStatus)));
+      setKitchenOrders(prev => prev.map(applyStatus(currentStatus)));
+      toast.error(`Failed to update ${item.name}`);
+    } finally {
+      setPendingItemIds(prev => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
     }
   };
 
@@ -687,8 +833,13 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                         <div className="flex justify-between items-start">
                           <div>
                             <CardTitle className="text-lg">#{order.orderNumber}</CardTitle>
-                            <p className="text-sm text-gray-500">
-                              {order.tableNumber ? `Table ${order.tableNumber}` : order.orderType}
+                            <p className="text-sm text-gray-500 flex items-center gap-1.5 flex-wrap">
+                              <span>{order.tableNumber ? `Table ${order.tableNumber}` : order.orderType}</span>
+                              {order.staffName && (
+                                <span className="text-[11px] bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium px-1.5 py-0.5 rounded">
+                                  Server: {order.staffName}
+                                </span>
+                              )}
                             </p>
                           </div>
                           <div className="text-right">
@@ -827,32 +978,12 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                     <CardContent>
                       <div className="space-y-2 mb-4">
                         {order.items.map(item => (
-                          <div
+                          <ItemStatusChip
                             key={item.id}
-                            className={`p-2 rounded-lg ${item.status === 'ready'
-                                ? 'bg-green-100 dark:bg-green-900/30 line-through'
-                                : 'bg-gray-50 dark:bg-gray-700'
-                              }`}
-                          >
-                            <div className="flex justify-between items-start">
-                              <span className="font-bold text-lg">{item.quantity}x {item.name}</span>
-                              {item.station && (
-                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                                  {item.station}
-                                </span>
-                              )}
-                            </div>
-                            {item.modifiers && item.modifiers.length > 0 && (
-                              <p className="text-sm text-gray-600 mt-1">
-                                + {item.modifiers.join(', ')}
-                              </p>
-                            )}
-                            {item.notes && (
-                              <p className="text-sm text-orange-600 mt-1 font-medium">
-                                ⚠ {item.notes}
-                              </p>
-                            )}
-                          </div>
+                            item={item}
+                            disabled={pendingItemIds.has(item.id)}
+                            onAdvance={(i) => advanceItem(order.id, i)}
+                          />
                         ))}
                       </div>
                       <Button

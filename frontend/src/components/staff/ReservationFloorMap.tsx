@@ -50,13 +50,23 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showWalkInDialog, setShowWalkInDialog] = useState(false);
+  const [walkInTableId, setWalkInTableId] = useState<string>('');
+  const [walkInPartySize, setWalkInPartySize] = useState<number>(2);
+  const [walkInGuestName, setWalkInGuestName] = useState<string>('');
   const { socket } = useSocket();
 
   const loadFloorData = async () => {
     try {
       const response = await api.get(`/${slug}/service-locations`);
-      setLocations(response.data.data || []);
+      const locs = response.data.data || [];
+      setLocations(locs);
       setReservations(response.data.reservations || []);
+
+      // Default walk-in table selection
+      const firstFree = locs.find((l: ServiceLocation) => !l.is_occupied);
+      if (firstFree && !walkInTableId) {
+        setWalkInTableId(firstFree.id);
+      }
     } catch (error) {
       console.error('Failed to load floor data:', error);
       toast.error('Failed to load floor map');
@@ -98,15 +108,67 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
       toast.success('Reservation checked in');
       loadFloorData();
     } catch (error) {
+      console.error('Check-in failed:', error);
       toast.error('Failed to check in reservation');
     }
   };
 
-  const getLocationStatus = (location: ServiceLocation): string => {
-    if (!location.is_active) return 'inactive';
+  const handleSeatWalkIn = async () => {
+    if (!walkInTableId) {
+      toast.error('Please select a table');
+      return;
+    }
+    try {
+      await api.post(`/staff/modules/${slug}/walk-in`, {
+        serviceLocationId: walkInTableId,
+        partySize: walkInPartySize,
+        guestName: walkInGuestName || 'Walk-in Guest',
+      });
+      toast.success('Walk-in guest seated');
+      setShowWalkInDialog(false);
+      setWalkInGuestName('');
+      loadFloorData();
+    } catch (error) {
+      console.error('Walk-in seating failed:', error);
+      toast.error('Failed to seat walk-in');
+    }
+  };
+
+  const handleReassignStaff = async () => {
+    if (!selectedLocation) return;
+    const staffId = prompt('Enter Staff User ID to assign (leave empty to unassign):');
+    if (staffId === null) return;
+    try {
+      await api.patch(`/service-locations/${selectedLocation.id}/reassign`, {
+        staffId: staffId.trim() || null,
+      });
+      toast.success('Staff reassigned');
+      loadFloorData();
+    } catch (error) {
+      console.error('Reassign staff failed:', error);
+      toast.error('Failed to reassign staff');
+    }
+  };
+
+  const handleFreeTable = async () => {
+    if (!selectedLocation) return;
+    try {
+      await api.post(`/staff/service-locations/${selectedLocation.id}/free`);
+      toast.success('Table freed');
+      setSelectedLocation(null);
+      loadFloorData();
+    } catch (error) {
+      console.error('Free table failed:', error);
+      toast.error('Failed to free table');
+    }
+  };
+
+  const getLocationStatus = (location: ServiceLocation): 'free' | 'occupied' | 'reserved' => {
     if (location.is_occupied) return 'occupied';
-    const reservation = reservations.find(r => r.service_location_id === location.id && r.status === 'booked');
-    if (reservation) return 'reserved';
+    const hasReservation = reservations.some(
+      (r) => r.service_location_id === location.id && r.status === 'booked'
+    );
+    if (hasReservation) return 'reserved';
     return 'free';
   };
 
@@ -220,11 +282,11 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
               })()}
 
               <div className="space-y-2">
-                <Button variant="outline" className="w-full" size="sm">
+                <Button variant="outline" className="w-full" size="sm" onClick={handleReassignStaff}>
                   Reassign Staff
                 </Button>
                 {selectedLocation.is_occupied && (
-                  <Button variant="outline" className="w-full" size="sm">
+                  <Button variant="outline" className="w-full" size="sm" onClick={handleFreeTable}>
                     <XCircle className="h-4 w-4 mr-2" />
                     Free Table
                   </Button>
@@ -247,26 +309,42 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Select Table</label>
-                <select className="w-full border rounded-md px-3 py-2">
-                  {locations.filter(l => getLocationStatus(l) === 'free').map(loc => (
+                <select
+                  value={walkInTableId}
+                  onChange={(e) => setWalkInTableId(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                >
+                  {locations.filter((l) => getLocationStatus(l) === 'free').map((loc) => (
                     <option key={loc.id} value={loc.id}>{loc.name}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Party Size</label>
-                <input type="number" min="1" defaultValue="2" className="w-full border rounded-md px-3 py-2" />
+                <input
+                  type="number"
+                  min="1"
+                  value={walkInPartySize}
+                  onChange={(e) => setWalkInPartySize(Number(e.target.value))}
+                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Guest Name</label>
-                <input type="text" className="w-full border rounded-md px-3 py-2" />
+                <input
+                  type="text"
+                  placeholder="Guest Name (e.g. John)"
+                  value={walkInGuestName}
+                  onChange={(e) => setWalkInGuestName(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+                />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <Button variant="outline" className="flex-1" onClick={() => setShowWalkInDialog(false)}>
                 Cancel
               </Button>
-              <Button className="flex-1" onClick={() => setShowWalkInDialog(false)}>
+              <Button className="flex-1" onClick={handleSeatWalkIn}>
                 Seat
               </Button>
             </div>

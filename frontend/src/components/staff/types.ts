@@ -18,6 +18,7 @@ export interface Order {
   id: string;
   orderNumber: string;
   customerName: string;
+  staffName?: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery';
   status: string;
   items: OrderItem[];
