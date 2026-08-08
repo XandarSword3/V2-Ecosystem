@@ -135,7 +135,7 @@ export default function CartPage() {
                   <Card>
                     <CardContent className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
                       {moduleItems.map((item) => (
-                        <div key={item.id} className="p-4 flex items-center gap-4">
+                        <div key={item.uniqueKey || item.id} className="p-4 flex items-center gap-4">
                           {item.imageUrl && (
                             <img
                               src={item.imageUrl}
@@ -189,7 +189,7 @@ export default function CartPage() {
                           <div className="flex items-center gap-3">
                              <div className="flex items-center border rounded-lg dark:border-slate-700">
                               <button
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                onClick={() => updateQuantity(item.id, item.quantity - 1, item.uniqueKey)}
                                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               >
                                 <Minus className="w-4 h-4" />
@@ -198,14 +198,14 @@ export default function CartPage() {
                                 {item.quantity}
                               </span>
                               <button
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                onClick={() => updateQuantity(item.id, item.quantity + 1, item.uniqueKey)}
                                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               >
                                 <Plus className="w-4 h-4" />
                               </button>
                             </div>
                             <button
-                              onClick={() => removeItem(item.id)}
+                              onClick={() => removeItem(item.id, item.uniqueKey)}
                               className="p-2 text-slate-400 hover:text-red-500 transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />

@@ -11,16 +11,16 @@ import { useParams } from 'next/navigation';
 
 interface LoyaltyAccount {
   id: string;
-  currentPoints: number;
-  totalPointsEarned: number;
-  totalPointsRedeemed: number;
+  available_points: number;
+  total_points: number;
+  lifetime_points: number;
   tier: {
     id: string;
     name: string;
-    pointsMultiplier: number;
+    points_multiplier: number;
     benefits: string[];
     color: string;
-  };
+  } | null;
   nextTier?: {
     name: string;
     pointsRequired: number;
@@ -81,7 +81,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
           style={{ backgroundColor: tierColor }}
         >
           <Award className="w-4 h-4" />
-          <span>{formatNumber(account.currentPoints)}</span>
+          <span>{formatNumber(account.available_points || 0)}</span>
         </div>
       </Link>
     );
@@ -103,7 +103,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
           </div>
           <div className="flex-1 text-white">
             <p className="text-sm opacity-80">{account.tier?.name || 'Member'}</p>
-            <p className="text-2xl font-bold">{formatNumber(account.currentPoints)} pts</p>
+            <p className="text-2xl font-bold">{formatNumber(account.available_points || 0)} pts</p>
           </div>
           <ChevronRight className="w-5 h-5 text-white/60" />
         </motion.div>
@@ -135,14 +135,14 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
         </div>
         
         <div className="text-center py-4">
-          <p className="text-5xl font-bold">{formatNumber(account.currentPoints)}</p>
+          <p className="text-5xl font-bold">{formatNumber(account.available_points || 0)}</p>
           <p className="text-sm opacity-80">Available Points</p>
         </div>
         
-        {account.tier?.pointsMultiplier > 1 && (
+        {account.tier && account.tier.points_multiplier && account.tier.points_multiplier > 1 && (
           <div className="flex items-center justify-center gap-2 mt-2 text-sm">
             <TrendingUp className="w-4 h-4" />
-            <span>{account.tier.pointsMultiplier}x points on all purchases</span>
+            <span>{account.tier.points_multiplier}x points on all purchases</span>
           </div>
         )}
       </div>
@@ -169,13 +169,13 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
         <div className="grid grid-cols-2 gap-4 text-center">
           <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
             <p className="text-2xl font-bold text-slate-900 dark:text-white">
-              {formatNumber(account.totalPointsEarned)}
+              {formatNumber(account.lifetime_points || 0)}
             </p>
             <p className="text-xs text-slate-500">Total Earned</p>
           </div>
           <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
             <p className="text-2xl font-bold text-slate-900 dark:text-white">
-              {formatNumber(account.totalPointsRedeemed)}
+              {formatNumber(Math.max(0, (account.lifetime_points || 0) - (account.available_points || 0)))}
             </p>
             <p className="text-xs text-slate-500">Total Redeemed</p>
           </div>

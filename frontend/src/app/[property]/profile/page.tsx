@@ -792,13 +792,13 @@ export default function ProfilePage() {
                     <div>
                       <span className="text-amber-100 text-xs font-semibold tracking-wider uppercase">Resort Rewards</span>
                       <h2 className="text-3xl font-extrabold mt-1 flex items-center gap-2">
-                        {loyaltyData?.tier || 'Member Tier'}
+                        {loyaltyData?.tier?.name || 'Member Tier'}
                         <Sparkles className="w-6 h-6 text-yellow-300" />
                       </h2>
                     </div>
                     <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl text-right border border-white/30">
                       <div className="text-xs text-amber-100 font-medium">Balance</div>
-                      <div className="text-2xl font-black">{loyaltyData?.points || 0} pts</div>
+                      <div className="text-2xl font-black">{loyaltyData?.available_points || 0} pts</div>
                     </div>
                   </div>
 
@@ -806,12 +806,12 @@ export default function ProfilePage() {
                   <div className="mt-6 pt-4 border-t border-amber-400/40">
                     <div className="flex justify-between text-xs text-amber-100 mb-1.5">
                       <span>Current Progress</span>
-                      <span>Next Tier: {loyaltyData?.nextTier || 'Gold'}</span>
+                      <span>Next Tier: {loyaltyData?.nextTier?.name || 'Max Tier'}</span>
                     </div>
                     <div className="w-full bg-amber-900/40 h-2.5 rounded-full overflow-hidden">
                       <div
                         className="bg-yellow-300 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, ((loyaltyData?.points || 0) / 1000) * 100)}%` }}
+                        style={{ width: `${Math.min(100, ((loyaltyData?.available_points || 0) / 1000) * 100)}%` }}
                       />
                     </div>
                   </div>
