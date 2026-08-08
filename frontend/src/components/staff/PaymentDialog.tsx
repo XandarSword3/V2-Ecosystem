@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
-import { CreditCard, DollarSign, Wallet, X } from 'lucide-react';
+import { CreditCard, DollarSign, Wallet, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
@@ -28,12 +28,52 @@ interface SplitShare {
   method?: PaymentMethod;
 }
 
+interface CheckedInRoom {
+  id: string;
+  bookingNumber: string;
+  unitName: string;
+  unitNumber: string;
+  guestName: string;
+  guestPhone: string;
+  balance: number;
+}
+
 export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [splitMode, setSplitMode] = useState<'none' | 'equal' | 'itemized'>('none');
   const [splitCount, setSplitCount] = useState(2);
   const [shares, setShares] = useState<SplitShare[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Room charge selection states
+  const [roomSearch, setRoomSearch] = useState('');
+  const [checkedInRooms, setCheckedInRooms] = useState<CheckedInRoom[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<CheckedInRoom | null>(null);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+
+  useEffect(() => {
+    if (paymentMethod !== 'room_charge') return;
+    let active = true;
+    setLoadingRooms(true);
+    api
+      .get(`/staff/modules/${slug}/checked-in-rooms`, { params: { search: roomSearch } })
+      .then((res) => {
+        if (active) {
+          setCheckedInRooms(res.data.data || []);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setCheckedInRooms([]);
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingRooms(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [paymentMethod, roomSearch, slug]);
 
   const calculateSplit = () => {
     if (splitMode === 'equal') {
@@ -45,7 +85,6 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
       }));
     }
     if (splitMode === 'itemized') {
-      // For itemized split, each item becomes a share
       return order.items.map((item, i) => ({
         id: `share-${i}`,
         amount: (item.unitPrice || 0) * item.quantity,
@@ -86,11 +125,14 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
           referenceId: order.id,
         });
       } else if (paymentMethod === 'room_charge') {
-        await api.post('/payments/record-manual', {
-          referenceType: 'instant_transaction',
-          referenceId: order.id,
-          amount,
-          method: 'room_charge',
+        if (!selectedRoom) {
+          toast.error('Please select a checked-in room');
+          setIsProcessing(false);
+          return;
+        }
+        await api.post('/payments/room-charge', {
+          orderId: order.id,
+          bookingId: selectedRoom.id,
         });
       }
 
@@ -100,18 +142,18 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
         ));
         toast.success('Share payment recorded');
       } else {
-        toast.success('Payment recorded');
+        toast.success(
+          paymentMethod === 'room_charge' && selectedRoom
+            ? `Charged ${formatCurrency(amount)} to ${selectedRoom.unitNumber ? `Room ${selectedRoom.unitNumber}` : selectedRoom.unitName} (${selectedRoom.guestName})`
+            : 'Payment recorded'
+        );
         // Mark transaction as completed to free the table
-        // NOTE: this hits dynamic-module.router.ts, which is mounted at the
-        // API root per-slug (apiRouter.use(getDynamicModulesRouter())) —
-        // there is no /staff/modules prefix on this route, unlike the
-        // module-staff.routes.ts endpoints (which ARE mounted under /staff/modules).
         await api.patch(`/${slug}/transactions/${order.id}/complete`);
         onComplete();
         onClose();
       }
-    } catch (error) {
-      toast.error('Payment failed');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Payment failed');
     } finally {
       setIsProcessing(false);
     }
@@ -259,6 +301,73 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
                   Room Charge
                 </Button>
               </div>
+
+              {paymentMethod === 'room_charge' && (
+                <div className="mt-4 p-4 border border-blue-100 dark:border-blue-900 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl space-y-3">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Select Checked-In Guest / Room
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search room number or guest name..."
+                      value={roomSearch}
+                      onChange={(e) => setRoomSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {loadingRooms ? (
+                    <div className="text-center py-4 text-sm text-gray-500">Searching checked-in rooms...</div>
+                  ) : checkedInRooms.length === 0 ? (
+                    <div className="text-center py-4 text-sm text-gray-500">
+                      No active checked-in rooms found
+                    </div>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                      {checkedInRooms.map((room) => {
+                        const isSelected = selectedRoom?.id === room.id;
+                        return (
+                          <div
+                            key={room.id}
+                            onClick={() => setSelectedRoom(room)}
+                            className={`p-3 rounded-lg cursor-pointer border transition flex items-center justify-between text-sm ${
+                              isSelected
+                                ? 'border-blue-600 bg-blue-100/70 dark:bg-blue-900/60 text-blue-900 dark:text-blue-100 font-medium'
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600'
+                            }`}
+                          >
+                            <div>
+                              <div className="font-semibold text-gray-900 dark:text-gray-100">
+                                {room.unitNumber ? `Room ${room.unitNumber}` : room.unitName}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {room.guestName} {room.guestPhone ? `(${room.guestPhone})` : ''}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-[10px] uppercase tracking-wider text-gray-400">Folio Balance</div>
+                              <div className="font-bold text-xs text-gray-800 dark:text-gray-200">{formatCurrency(room.balance)}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {selectedRoom && (
+                    <div className="p-3 bg-white dark:bg-gray-900 rounded-lg text-xs border border-blue-200 dark:border-blue-800 flex justify-between items-center">
+                      <span>
+                        Selected: <strong className="font-semibold text-blue-700 dark:text-blue-300">{selectedRoom.unitNumber ? `Room ${selectedRoom.unitNumber}` : selectedRoom.unitName}</strong> ({selectedRoom.guestName})
+                      </span>
+                      <button type="button" onClick={() => setSelectedRoom(null)} className="text-gray-400 hover:text-gray-600">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
