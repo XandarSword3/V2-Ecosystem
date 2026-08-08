@@ -71,6 +71,9 @@ router.post('/modules/:slug/orders/:orderId/split', authorize(...staffRoles), ve
 // Multi-Day Booking Operations (accommodation, villas, etc.)
 // ============================================
 
+// Get checked-in rooms for POS room charging
+router.get('/modules/:slug/checked-in-rooms', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.getCheckedInRooms);
+
 // Get bookings for a module
 router.get('/modules/:slug/bookings', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.getModuleBookings);
 

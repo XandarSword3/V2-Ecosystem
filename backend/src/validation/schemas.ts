@@ -133,10 +133,22 @@ export const recordCashPaymentSchema = z.object({
 });
 
 export const recordManualPaymentSchema = z.object({
-  referenceType: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
+  referenceType: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement', 'order']),
   referenceId: uuidSchema,
   amount: z.number().positive().max(100000),
-  method: z.enum(['cash', 'whish', 'omt', 'other_transfer']),
+  method: z.enum(['cash', 'card', 'room_charge', 'whish', 'omt', 'other_transfer']),
+  notes: sanitizedString(500).optional(),
+});
+
+export const postRoomChargeSchema = z.object({
+  orderId: uuidSchema,
+  bookingId: uuidSchema,
+});
+
+export const settleRoomFolioSchema = z.object({
+  bookingId: uuidSchema,
+  amount: z.number().positive().max(100000),
+  method: z.enum(['cash', 'card', 'whish', 'omt', 'other_transfer']),
   notes: sanitizedString(500).optional(),
 });
 

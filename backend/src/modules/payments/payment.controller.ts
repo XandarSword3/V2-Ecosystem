@@ -4,7 +4,7 @@ import Stripe from 'stripe';
 import { getSupabase } from "../../database/connection.js";
 import { config } from "../../config/index";
 import { logger } from "../../utils/logger.js";
-import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPaymentSchema, validateBody } from "../../validation/schemas.js";
+import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPaymentSchema, postRoomChargeSchema, settleRoomFolioSchema, validateBody } from "../../validation/schemas.js";
 import { awardLoyaltyPointsForPayment } from './loyalty-integration.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { normalizeReferenceType } from './reference-type-adapter.js';
@@ -739,3 +739,211 @@ export const refundPayment = asyncHandler(async (req: Request, res: Response) =>
     res.status(status).json({ success: false, error: message });
   }
 });
+
+// ── Room Charge Folio Handlers ──────────────────────────────────────────
+
+export const postRoomCharge = asyncHandler(async (req: Request, res: Response) => {
+  const { orderId, bookingId } = validateBody(postRoomChargeSchema, req.body);
+  const supabase = getSupabase();
+
+  // 1. Verify POS Order exists and is pending / unpaid
+  const { data: order, error: orderErr } = await supabase
+    .from('transactions')
+    .select('id, total_amount, amount, status, metadata, tenant_id, property_id, engine_type')
+    .eq('id', orderId)
+    .single();
+
+  if (orderErr || !order) {
+    return res.status(404).json({ success: false, error: 'Order not found' });
+  }
+
+  if (order.status === 'completed' || order.status === 'paid') {
+    return res.status(400).json({ success: false, error: 'Order is already paid' });
+  }
+
+  // 2. Verify Booking exists and is checked_in
+  const { data: booking, error: bookingErr } = await supabase
+    .from('transactions')
+    .select('id, status, engine_type, metadata, tenant_id, property_id')
+    .eq('id', bookingId)
+    .single();
+
+  if (bookingErr || !booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+
+  if (booking.status !== 'checked_in' || booking.engine_type !== 'time_exclusive_reservation') {
+    return res.status(400).json({ success: false, error: 'Booking must be an active checked-in room reservation' });
+  }
+
+  const amount = Number(order.total_amount || order.amount || 0);
+
+  // 3. Write charge entry to payment_ledger
+  const { data: ledgerEntry, error: ledgerErr } = await supabase
+    .from('payment_ledger')
+    .insert({
+      reference_type: 'room_folio',
+      reference_id: bookingId,
+      event_type: 'charge',
+      amount: amount.toFixed(2),
+      currency: 'USD',
+      status: 'completed',
+      tenant_id: order.tenant_id,
+      property_id: order.property_id,
+      metadata: {
+        pos_order_id: orderId,
+        staff_id: req.user!.userId,
+        description: `POS Order charge (${orderId.slice(0, 8)})`,
+      },
+    })
+    .select()
+    .single();
+
+  if (ledgerErr) throw ledgerErr;
+
+  // 4. Insert row in payments table for record keeping
+  await supabase
+    .from('payments')
+    .insert({
+      reference_type: 'order',
+      reference_id: orderId,
+      amount: amount.toFixed(2),
+      currency: 'USD',
+      method: 'room_charge',
+      status: 'completed',
+      processed_by: req.user!.userId,
+      processed_at: new Date().toISOString(),
+      notes: `Charged to Room Folio (Booking ${bookingId})`,
+      tenant_id: order.tenant_id,
+      property_id: order.property_id,
+    });
+
+  // 5. Update reference order status to paid
+  await updateReferencePaymentStatus('order', orderId, 'paid');
+
+  res.status(201).json({
+    success: true,
+    data: {
+      ledgerEntry,
+      orderId,
+      bookingId,
+      amount,
+    },
+  });
+});
+
+export const getFolioBalance = asyncHandler(async (req: Request, res: Response) => {
+  const { bookingId } = req.params;
+  const supabase = getSupabase();
+
+  const { data: entries, error } = await supabase
+    .from('payment_ledger')
+    .select('*')
+    .eq('reference_type', 'room_folio')
+    .eq('reference_id', bookingId)
+    .eq('status', 'completed')
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  const charges = (entries || []).filter((e) => e.event_type === 'charge');
+  const settlements = (entries || []).filter((e) => e.event_type === 'settlement');
+
+  const totalCharges = charges.reduce((acc, e) => acc + Number(e.amount), 0);
+  const totalSettlements = settlements.reduce((acc, e) => acc + Number(e.amount), 0);
+  const balance = Math.max(0, Number((totalCharges - totalSettlements).toFixed(2)));
+
+  res.json({
+    success: true,
+    data: {
+      bookingId,
+      totalCharges,
+      totalSettlements,
+      balance,
+      entries: entries || [],
+    },
+  });
+});
+
+export const settleFolioBalance = asyncHandler(async (req: Request, res: Response) => {
+  const validatedData = validateBody(settleRoomFolioSchema, req.body);
+  const { bookingId, amount, method, notes } = validatedData;
+
+  const supabase = getSupabase();
+
+  // Verify booking exists
+  const { data: booking, error: bookingErr } = await supabase
+    .from('transactions')
+    .select('id, tenant_id, property_id')
+    .eq('id', bookingId)
+    .single();
+
+  if (bookingErr || !booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+
+  // 1. Write settlement entry to payment_ledger
+  const { data: ledgerEntry, error: ledgerErr } = await supabase
+    .from('payment_ledger')
+    .insert({
+      reference_type: 'room_folio',
+      reference_id: bookingId,
+      event_type: 'settlement',
+      amount: amount.toFixed(2),
+      currency: 'USD',
+      status: 'completed',
+      tenant_id: booking.tenant_id,
+      property_id: booking.property_id,
+      metadata: {
+        staff_id: req.user!.userId,
+        method,
+        notes: notes || 'Room folio settlement',
+      },
+    })
+    .select()
+    .single();
+
+  if (ledgerErr) throw ledgerErr;
+
+  // 2. Insert row into payments table
+  await supabase
+    .from('payments')
+    .insert({
+      reference_type: 'room_folio',
+      reference_id: bookingId,
+      amount: amount.toFixed(2),
+      currency: 'USD',
+      method,
+      status: 'completed',
+      processed_by: req.user!.userId,
+      processed_at: new Date().toISOString(),
+      notes: notes || `Room folio settlement via ${method}`,
+      tenant_id: booking.tenant_id,
+      property_id: booking.property_id,
+    });
+
+  // Calculate updated balance
+  const { data: entries } = await supabase
+    .from('payment_ledger')
+    .select('event_type, amount')
+    .eq('reference_type', 'room_folio')
+    .eq('reference_id', bookingId)
+    .eq('status', 'completed');
+
+  const totalCharges = (entries || [])
+    .filter((e) => e.event_type === 'charge')
+    .reduce((acc, e) => acc + Number(e.amount), 0);
+  const totalSettlements = (entries || [])
+    .filter((e) => e.event_type === 'settlement')
+    .reduce((acc, e) => acc + Number(e.amount), 0);
+  const remainingBalance = Math.max(0, Number((totalCharges - totalSettlements).toFixed(2)));
+
+  res.status(201).json({
+    success: true,
+    data: {
+      ledgerEntry,
+      remainingBalance,
+    },
+  });
+});
+

@@ -1013,6 +1013,34 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
       case 'cancelled': engineAction = 'cancel'; break;
       default: throw new Error(`Invalid status: ${status}`);
     }
+
+    // Enforce Folio balance settlement before check-out
+    if (status === 'checked_out' || engineAction === 'check_out') {
+      const { data: ledgerEntries } = await supabase
+        .from('payment_ledger')
+        .select('event_type, amount')
+        .eq('reference_type', 'room_folio')
+        .eq('reference_id', bookingId)
+        .eq('status', 'completed');
+
+      const totalCharges = (ledgerEntries || [])
+        .filter((e) => e.event_type === 'charge')
+        .reduce((acc, e) => acc + Number(e.amount), 0);
+      const totalSettlements = (ledgerEntries || [])
+        .filter((e) => e.event_type === 'settlement')
+        .reduce((acc, e) => acc + Number(e.amount), 0);
+      const balance = Math.max(0, Number((totalCharges - totalSettlements).toFixed(2)));
+
+      if (balance > 0) {
+        return res.status(409).json({
+          success: false,
+          error: 'FOLIO_BALANCE_DUE',
+          message: 'Cannot check out guest with outstanding folio balance',
+          balance,
+          bookingId,
+        });
+      }
+    }
     
     // Execute state transition via engine
     const { data: moduleConfig } = await supabase
@@ -2451,6 +2479,107 @@ export async function freeServiceLocation(req: Request, res: Response) {
     res.status(500).json({ success: false, error: error.message || 'Failed to free table' });
   }
 }
+
+/**
+ * Get active checked-in rooms for POS room charging
+ */
+export async function getCheckedInRooms(req: Request, res: Response) {
+  try {
+    const { slug } = req.params;
+    const search = ((req.query.search as string) || '').toLowerCase().trim();
+    const supabase = getSupabase();
+
+    // Verify module
+    const { data: module } = await supabase
+      .from('modules')
+      .select('id, engine_type')
+      .eq('slug', slug)
+      .single();
+
+    if (!module) {
+      return res.status(400).json({ success: false, error: 'Module not found' });
+    }
+
+    // Get checked-in bookings for time_exclusive_reservation engine
+    const { data: bookings, error } = await supabase
+      .from('transactions')
+      .select('id, metadata, customer_id, created_at, users(full_name, email, phone)')
+      .eq('engine_type', 'time_exclusive_reservation')
+      .eq('status', 'checked_in')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Get units to enrich unit names/numbers
+    const { data: units } = await supabase
+      .from('accommodation_units')
+      .select('id, name, unit_number');
+
+    const unitMap = new Map((units || []).map((u) => [u.id, u]));
+
+    // Fetch ledger balances for all checked-in bookings
+    const bookingIds = (bookings || []).map((b) => b.id);
+    const ledgerMap = new Map<string, number>();
+
+    if (bookingIds.length > 0) {
+      const { data: ledgerRows } = await supabase
+        .from('payment_ledger')
+        .select('reference_id, event_type, amount')
+        .eq('reference_type', 'room_folio')
+        .in('reference_id', bookingIds)
+        .eq('status', 'completed');
+
+      (ledgerRows || []).forEach((row) => {
+        const current = ledgerMap.get(row.reference_id) || 0;
+        const delta = row.event_type === 'charge' ? Number(row.amount) : -Number(row.amount);
+        ledgerMap.set(row.reference_id, Math.max(0, current + delta));
+      });
+    }
+
+    // Map bookings into structured checked-in room options
+    let result = (bookings || []).map((b) => {
+      const meta = (b.metadata as Record<string, any>) || {};
+      const unitId = meta.unit_id || meta.chalet_id;
+      const unit = unitMap.get(unitId);
+
+      const unitName = unit?.name || meta.unit_name || meta.chalet_name || 'Room';
+      const unitNumber = unit?.unit_number || meta.unit_number || '';
+      const guestName = (b.users as any)?.full_name || meta.guest_name || meta.customer_name || 'Guest';
+      const guestPhone = (b.users as any)?.phone || meta.guest_phone || meta.customer_phone || '';
+      const balance = ledgerMap.get(b.id) || 0;
+
+      return {
+        id: b.id,
+        bookingNumber: meta.booking_number || b.id.slice(0, 8),
+        unitId,
+        unitName,
+        unitNumber,
+        guestName,
+        guestPhone,
+        checkInDate: meta.check_in_date || b.created_at,
+        checkOutDate: meta.check_out_date,
+        balance,
+      };
+    });
+
+    if (search) {
+      result = result.filter(
+        (r) =>
+          r.unitName.toLowerCase().includes(search) ||
+          r.unitNumber.toLowerCase().includes(search) ||
+          r.guestName.toLowerCase().includes(search) ||
+          r.guestPhone.toLowerCase().includes(search) ||
+          r.bookingNumber.toLowerCase().includes(search)
+      );
+    }
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    logger.error('Error fetching checked in rooms:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch checked-in rooms' });
+  }
+}
+
 
 
 
