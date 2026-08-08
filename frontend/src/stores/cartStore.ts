@@ -55,6 +55,16 @@ interface CartState {
   clearOrderDetails: () => void;
 }
 
+// Single source of truth for "sum of items" math on the client. Any screen that
+// needs a subtotal — full cart, a per-module slice of the cart, etc. — should call
+// this instead of writing its own reduce, so a fix here fixes every screen at once.
+export function calculateSubtotal(items: CartItem[]): number {
+  return items.reduce(
+    (sum, item) => sum + (item.price + (item.modifierTotal || 0)) * item.quantity,
+    0
+  );
+}
+
 function generateUniqueKey(itemId: string, modifiers?: SelectedModifier[]): string {
   if (!modifiers || modifiers.length === 0) return itemId;
   const modifierKey = modifiers
@@ -122,12 +132,7 @@ export const useCartStore = create<CartState>()(
 
       clearCart: () => set({ items: [] }),
 
-      getTotal: () => {
-        return get().items.reduce(
-          (sum, item) => sum + (item.price + (item.modifierTotal || 0)) * item.quantity,
-          0
-        );
-      },
+      getTotal: () => calculateSubtotal(get().items),
 
       getCount: () => {
         return get().items.reduce((sum, item) => sum + item.quantity, 0);
