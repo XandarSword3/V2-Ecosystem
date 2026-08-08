@@ -83,9 +83,15 @@
     "node-tar": ">=6.2.1",
     "minimatch": ">=9.0.5",
     "brace-expansion": ">=2.0.1",
-    "electron-builder>tar": ">=6.2.1",
-    "app-builder-lib>tar": ">=6.2.1",
-    "builder-util>tar": ">=6.2.1",
-    "http-proxy-agent": ">=7.0.0"
+    "http-proxy-agent": ">=7.0.0",
+    "electron-builder": {
+      "tar": ">=6.2.1"
+    },
+    "app-builder-lib": {
+      "tar": ">=6.2.1"
+    },
+    "builder-util": {
+      "tar": ">=6.2.1"
+    }
   }
 }
