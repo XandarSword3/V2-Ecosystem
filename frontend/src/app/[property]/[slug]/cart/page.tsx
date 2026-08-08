@@ -208,13 +208,15 @@ export default function ModuleCartPage() {
     orderType: 'dine_in' | 'takeaway' | 'delivery';
     paymentMethod: 'cash' | 'card';
     notes?: string;
-    items: Array<{ menuItemId: string; quantity: number; specialInstructions?: string; metadata?: { selectedModifiers: unknown[] } }>;
+    items: Array<{ catalog_item_id?: string; menuItemId: string; quantity: number; specialInstructions?: string; metadata?: { selectedModifiers: unknown[] } }>;
     moduleId?: string;
     // Discount integration fields
     couponCode?: string;
     giftCardRedemptions?: Array<{ code: string; amount: number }>;
     loyaltyPointsToRedeem?: number;
     loyaltyPointsDollarValue?: number;
+    // FIX 4: Preview total for server-side validation
+    previewTotal?: number;
   }
 
   interface MutationError {
@@ -327,6 +329,8 @@ export default function ModuleCartPage() {
         ? parseInt(loyaltyDiscount.details?.replace(/[^\d]/g, '') || '0')
         : undefined,
       loyaltyPointsDollarValue: loyaltyDiscount?.amount,
+      // FIX 4: Send previewTotal for server-side validation
+      previewTotal: total,
     });
   };
 

@@ -128,60 +128,72 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   // Cash drawer modal
   const [showCashModal, setShowCashModal] = useState(false);
   const [cashModalType, setCashModalType] = useState<'in' | 'out'>('in');
+  // Cash movement totals
+  const [cashTotals, setCashTotals] = useState<{ cashIn: number; cashOut: number; net: number }>({ cashIn: 0, cashOut: 0, net: 0 });
   // Item picker modal for adding to existing table order
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [menuItems, setMenuItems] = useState<any[]>([]);
 
   // Fetch data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [tablesRes, ordersRes, shiftRes] = await Promise.all([
-          api.get(`/staff/modules/${moduleSlug}/tables`),
-          api.get(`/staff/modules/${moduleSlug}/orders`, {
-            params: { status: 'pending,confirmed,preparing,ready,completed,delivered' }
-          }),
-          api.get('/staff/shifts/me/current'),
-        ]);
+  const fetchData = useCallback(async () => {
+    try {
+      const [tablesRes, ordersRes, shiftRes] = await Promise.all([
+        api.get(`/staff/modules/${moduleSlug}/tables`),
+        api.get(`/staff/modules/${moduleSlug}/orders`, {
+          params: { status: 'pending,confirmed,preparing,ready,completed,delivered' }
+        }),
+        api.get('/staff/shifts/me/current'),
+      ]);
 
-        // Normalize tables: backend returns { id, name, isOccupied, openTransactionId }
-        // but Table interface expects { id, number, capacity, status }
-        const rawTables = tablesRes.data.data || [];
-        setTables(rawTables.map((t: any) => ({
-          id: t.id,
-          number: t.number || t.name || 'Table',
-          capacity: t.capacity || t.seats || 4,
-          status: t.status || (t.isOccupied ? 'occupied' : 'available'),
-          currentOrder: t.currentOrder || null,
-          openTransactionId: t.openTransactionId || null,
-        })));
+      // Normalize tables: backend returns { id, name, isOccupied, openTransactionId }
+      // but Table interface expects { id, number, capacity, status }
+      const rawTables = tablesRes.data.data || [];
+      const mappedTables: Table[] = rawTables.map((t: any) => ({
+        id: t.id,
+        number: t.number || t.name || 'Table',
+        capacity: t.capacity || t.seats || 4,
+        status: t.status || (t.isOccupied ? 'occupied' : 'available'),
+        currentOrder: t.currentOrder || null,
+        openTransactionId: t.openTransactionId || null,
+      }));
 
-        setOrders(ordersRes.data.data || []);
-        setKitchenOrders((ordersRes.data.data || []).filter(
-          (o: Order) => ['confirmed', 'preparing'].includes(o.status)
-        ));
+      setTables(mappedTables);
+      setSelectedTable(prev => prev ? (mappedTables.find(t => t.id === prev.id) || prev) : null);
 
-        // Normalize shift: backend returns snake_case (opening_cash, start_time)
-        // but Shift interface expects camelCase (openingCash, startTime)
-        const shiftData = shiftRes.data.data;
-        if (shiftData) {
-          setCurrentShift({
-            id: shiftData.id,
-            startTime: shiftData.startTime || shiftData.start_time || shiftData.actual_start || shiftData.actualStart || '',
-            endTime: shiftData.endTime || shiftData.end_time || shiftData.actual_end || undefined,
-            openingCash: Number(shiftData.opening_cash ?? shiftData.openingCash ?? 0),
-            closingCash: shiftData.closing_cash != null ? Number(shiftData.closing_cash) : (shiftData.closingCash != null ? Number(shiftData.closingCash) : undefined),
-            status: shiftData.status || 'active',
-          });
+      setOrders(ordersRes.data.data || []);
+      setKitchenOrders((ordersRes.data.data || []).filter(
+        (o: Order) => ['confirmed', 'preparing'].includes(o.status)
+      ));
+
+      // Normalize shift: backend returns snake_case (opening_cash, start_time)
+      // but Shift interface expects camelCase (openingCash, startTime)
+      const shiftData = shiftRes.data.data;
+      if (shiftData) {
+        setCurrentShift({
+          id: shiftData.id,
+          startTime: shiftData.startTime || shiftData.start_time || shiftData.actual_start || shiftData.actualStart || '',
+          endTime: shiftData.endTime || shiftData.end_time || shiftData.actual_end || undefined,
+          openingCash: Number(shiftData.opening_cash ?? shiftData.openingCash ?? 0),
+          closingCash: shiftData.closing_cash != null ? Number(shiftData.closing_cash) : (shiftData.closingCash != null ? Number(shiftData.closingCash) : undefined),
+          status: shiftData.status || 'active',
+        });
+
+        // Fetch cash movements for this shift
+        const cashRes = await api.get(`/staff/shifts/${shiftData.id}/cash`);
+        if (cashRes.data.success) {
+          setCashTotals(cashRes.data.totals || { cashIn: 0, cashOut: 0, net: 0 });
         }
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setIsLoading(false);
       }
-    };
-    fetchData();
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, [moduleSlug]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Real-time updates
   useEffect(() => {
@@ -255,6 +267,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
     try {
       await api.post(`/staff/modules/${moduleSlug}/orders/${orderId}/items`, item);
       toast.success('Item added to order');
+      fetchData();
     } catch (error) {
       toast.error('Failed to add item');
     }
@@ -360,6 +373,13 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       await api.post(`/staff/shifts/${currentShift?.id}/cash`, { type, amount, note });
       toast.success(`Cash ${type === 'in' ? 'added to' : 'removed from'} drawer`);
       setShowCashModal(false);
+      // Refresh cash totals after recording movement
+      if (currentShift?.id) {
+        const cashRes = await api.get(`/staff/shifts/${currentShift.id}/cash`);
+        if (cashRes.data.success) {
+          setCashTotals(cashRes.data.totals || { cashIn: 0, cashOut: 0, net: 0 });
+        }
+      }
     } catch (error) {
       toast.error('Failed to record cash adjustment');
     }
@@ -369,6 +389,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   const createNewOrder = async (tableId: string) => {
     try {
       const res = await api.post(`/staff/modules/${moduleSlug}/orders`, {
+        serviceLocationId: tableId,
         tableId,
         orderType: 'dine_in',
         moduleId,
@@ -466,11 +487,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
               { mode: 'floor' as ViewMode, icon: LayoutGrid, label: 'Stations' },
               { mode: 'orders' as ViewMode, icon: UtensilsCrossed, label: 'Orders' },
               { mode: 'kitchen' as ViewMode, icon: ChefHat, label: 'Kitchen' },
+              { mode: 'dispatch' as ViewMode, icon: Truck, label: 'Dispatch' },
               { mode: 'cashier' as ViewMode, icon: CreditCard, label: 'Cashier' },
               ...(requireReservation !== false
                 ? [{ mode: 'floorplan' as ViewMode, icon: MapPin, label: 'Floor Map' }]
                 : []),
-              { mode: 'dispatch' as ViewMode, icon: Truck, label: 'Dispatch' },
             ].map(({ mode, icon: Icon, label }) => (
               <button
                 key={mode}
@@ -485,6 +506,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                 {mode === 'orders' && orders.filter(o => o.status === 'pending').length > 0 && (
                   <span className="bg-red-500 text-white text-xs rounded-full px-2">
                     {orders.filter(o => o.status === 'pending').length}
+                  </span>
+                )}
+                {mode === 'dispatch' && orders.filter(o => o.status === 'ready').length > 0 && (
+                  <span className="bg-emerald-500 text-white text-xs rounded-full px-2">
+                    {orders.filter(o => o.status === 'ready').length}
                   </span>
                 )}
               </button>
@@ -905,8 +931,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                     const cashSales = orders
                       .filter(o => (o.paymentStatus === 'paid' || o.status === 'completed') && (o.paymentMethod === 'cash' || o.paymentMethod === 'Cash'))
                       .reduce((sum, o) => sum + o.totalAmount, 0);
-                    const cashIn = cashSales; // TODO: add pay-in transactions when tracked
-                    const cashOut = 0; // TODO: add pay-out transactions when tracked
+                    const cashIn = cashSales + cashTotals.cashIn;
+                    const cashOut = cashTotals.cashOut;
                     const expectedCash = (currentShift.openingCash || 0) + cashIn - cashOut;
                     return (
                   <div className="space-y-2">
@@ -976,8 +1002,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
           <ReservationFloorMap slug={moduleSlug} />
         )}
 
+        {/* Dispatch View */}
         {viewMode === 'dispatch' && (
-          <DispatchBoard slug={moduleSlug} moduleName={moduleName} moduleId={moduleId} />
+          <div className="h-full overflow-y-auto">
+            <DispatchBoard slug={moduleSlug} moduleName={moduleName} moduleId={moduleId} />
+          </div>
         )}
       </main>
 

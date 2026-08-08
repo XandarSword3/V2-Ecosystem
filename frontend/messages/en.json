@@ -112,7 +112,9 @@
     "quantity": "Quantity",
     "confirmSelection": "Confirm Selection",
     "customizations": "Customizations",
-    "enterName": "Please enter your name"
+    "enterName": "Please enter your name",
+    "free": "Free",
+    "selectUpTo": "Select up to"
   },
   "errors": {
     "pageNotFound": "Page Not Found",
