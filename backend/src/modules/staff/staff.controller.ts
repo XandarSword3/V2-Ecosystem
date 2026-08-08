@@ -592,6 +592,53 @@ export const recordCashMovement = asyncHandler(async (req: Request, res: Respons
     res.status(201).json({ success: true, data: movement });
 });
 
+/**
+ * GET /api/staff/shifts/:id/cash
+ * Get all cash movements for a shift (pay-in/pay-out history)
+ */
+export const getShiftCashMovements = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
+    const supabase = getSupabase();
+
+    const { data: shift, error: fetchError } = await supabase
+      .from('staff_shifts')
+      .select('id, staff_id')
+      .eq('id', id)
+      .single();
+    if (fetchError || !shift) {
+      res.status(404).json({ success: false, error: 'Shift not found' });
+      return;
+    }
+    if (shift.staff_id !== userId) {
+      res.status(403).json({ success: false, error: 'Not authorized for this shift' });
+      return;
+    }
+
+    const { data: movements, error } = await supabase
+      .from('shift_cash_movements')
+      .select('*')
+      .eq('shift_id', id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Compute totals
+    const cashIn = (movements || []).filter(m => m.type === 'in').reduce((sum, m) => sum + Number(m.amount), 0);
+    const cashOut = (movements || []).filter(m => m.type === 'out').reduce((sum, m) => sum + Number(m.amount), 0);
+
+    res.json({
+      success: true,
+      data: movements || [],
+      totals: {
+        cashIn,
+        cashOut,
+        net: cashIn - cashOut,
+      },
+    });
+});
+
 // ============================================
 // Staff Assignments
 // ============================================

@@ -246,11 +246,12 @@ export async function getModuleTables(req: Request, res: Response) {
 
     const locationIds = (locations || []).map((l) => l.id);
     const occupiedByLocation = new Map<string, string>(); // location id -> open transaction id
+    const openTransactions = new Map<string, any>(); // transaction id -> full transaction data
 
     if (locationIds.length > 0) {
       const { data: openTx, error: openTxError } = await supabase
         .from('transactions')
-        .select('id, service_location_id')
+        .select('id, service_location_id, status, amount, metadata, created_at')
         .eq('engine_type', 'instant_transaction')
         .eq('module_id', module.id)
         .not('status', 'in', '(completed,cancelled)')
@@ -265,19 +266,77 @@ export async function getModuleTables(req: Request, res: Response) {
         // picking the latest.
         if (locId && !occupiedByLocation.has(locId)) {
           occupiedByLocation.set(locId, tx.id);
+          openTransactions.set(tx.id, tx);
         }
       }
     }
 
-    const tables = (locations || []).map((loc) => ({
-      id: loc.id,
-      name: loc.name,
-      qrCode: loc.qr_code,
-      isActive: loc.is_active,
-      sortOrder: loc.sort_order,
-      isOccupied: occupiedByLocation.has(loc.id),
-      openTransactionId: occupiedByLocation.get(loc.id) ?? null,
-    }));
+    // Fetch order items for all open transactions to build currentOrder objects
+    const transactionIds = Array.from(openTransactions.keys());
+    const itemsByTransaction = new Map<string, Array<{
+      id: string;
+      name: string;
+      quantity: number;
+      unitPrice: number;
+      subtotal: number;
+      specialInstructions: string | null;
+      status: string;
+    }>>();
+
+    if (transactionIds.length > 0) {
+      const { data: itemRows, error: itemsError } = await supabase
+        .from('order_items')
+        .select('id, transaction_id, catalog_item_id, quantity, unit_price, subtotal, special_instructions, status')
+        .in('transaction_id', transactionIds);
+
+      if (!itemsError && itemRows && itemRows.length > 0) {
+        const catalogIds = [...new Set(itemRows.map((r) => r.catalog_item_id).filter(Boolean))];
+        const { data: catalogRows } = catalogIds.length > 0
+          ? await supabase.from('catalog_items').select('id, name').in('id', catalogIds)
+          : { data: [] as Array<{ id: string; name: string }> };
+        const nameById = new Map((catalogRows || []).map((c) => [c.id, c.name]));
+
+        for (const row of itemRows) {
+          const list = itemsByTransaction.get(row.transaction_id) ?? [];
+          list.push({
+            id: row.id,
+            name: nameById.get(row.catalog_item_id) ?? 'Item',
+            quantity: row.quantity,
+            unitPrice: row.unit_price,
+            subtotal: row.subtotal,
+            specialInstructions: row.special_instructions,
+            status: row.status ?? 'pending',
+          });
+          itemsByTransaction.set(row.transaction_id, list);
+        }
+      }
+    }
+
+    const tables = (locations || []).map((loc) => {
+      const openTxId = occupiedByLocation.get(loc.id) ?? null;
+      const tx = openTxId ? openTransactions.get(openTxId) : null;
+      const meta = (tx?.metadata ?? {}) as Record<string, unknown>;
+
+      const currentOrder = openTxId && tx ? {
+        id: tx.id,
+        orderNumber: (meta.order_number as string | undefined) ?? null,
+        status: tx.status,
+        totalAmount: tx.amount,
+        items: itemsByTransaction.get(openTxId) ?? [],
+        createdAt: tx.created_at,
+      } : null;
+
+      return {
+        id: loc.id,
+        name: loc.name,
+        qrCode: loc.qr_code,
+        isActive: loc.is_active,
+        sortOrder: loc.sort_order,
+        isOccupied: occupiedByLocation.has(loc.id),
+        openTransactionId: openTxId,
+        currentOrder,
+      };
+    });
 
     res.json({ success: true, data: tables });
   } catch (error: any) {
@@ -1760,7 +1819,8 @@ export async function searchCustomers(req: Request, res: Response) {
 export async function createModuleOrder(req: Request, res: Response) {
   try {
     const { slug } = req.params;
-    const { serviceLocationId, tableNumber, customerName, customerId, items, notes } = req.body;
+    const { serviceLocationId: reqServiceLocId, tableId, tableNumber, customerName, customerId, items, notes } = req.body;
+    const serviceLocationId = reqServiceLocId || tableId;
     const userId = req.user?.userId;
     const tenantId = req.user?.tenantId;
     const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
