@@ -101,38 +101,75 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
   const resolvedTargetType = data.target_type || data.targetType || 'module';
   const resolvedTargetId = data.target_id || data.targetId || (resolvedTargetType === 'module' ? (moduleId !== 'general' ? moduleId : '00000000-0000-0000-0000-000000000000') : '00000000-0000-0000-0000-000000000000');
 
-  // Server-side target ownership validation
-  if (resolvedTargetType === 'staff') {
-    const { data: staffMember } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', resolvedTargetId)
-      .maybeSingle();
-    if (!staffMember) {
-      return res.status(400).json({ success: false, error: 'Invalid staff member target' });
-    }
-  } else if (resolvedTargetType === 'item' || resolvedTargetType === 'dish') {
-    const { data: catalogItem } = await supabase
-      .from('catalog_items')
-      .select('id')
-      .eq('id', resolvedTargetId)
-      .maybeSingle();
-    if (!catalogItem) {
-      return res.status(400).json({ success: false, error: 'Invalid menu item target' });
-    }
-  }
-
-  // Ensure reviewer has at least one order/transaction for this property
+  // Reviewer's transactions at this property. This is both the "verified
+  // transaction" gate and — for staff/item targets below — the relationship
+  // scope: it lets those checks confirm the target was actually part of one
+  // of THIS customer's orders here, not just that its id exists somewhere.
+  let customerTxIds: string[] = [];
   if (propertyId) {
     const { data: customerTx } = await supabase
       .from('transactions')
       .select('id')
       .eq('customer_id', userId)
-      .eq('property_id', propertyId)
-      .limit(1);
+      .eq('property_id', propertyId);
+    customerTxIds = (customerTx || []).map((t) => t.id);
 
-    if (!customerTx || customerTx.length === 0) {
+    if (customerTxIds.length === 0) {
       return res.status(403).json({ success: false, error: 'Only customers with verified transactions can review' });
+    }
+  }
+
+  // Server-side target ownership validation. Previously this only confirmed
+  // the target id existed in `profiles`/`catalog_items` — that passed for
+  // any staff UUID or menu item on the whole platform, not just this
+  // tenant/property or this customer's actual order. Now scoped to a
+  // transaction this reviewer had here that actually involved the target.
+  if (resolvedTargetType === 'staff') {
+    if (propertyId) {
+      const { data: servedTx } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('staff_id', resolvedTargetId)
+        .in('id', customerTxIds)
+        .limit(1)
+        .maybeSingle();
+      if (!servedTx) {
+        return res.status(403).json({ success: false, error: 'You can only review staff involved in one of your orders here' });
+      }
+    } else {
+      // No property context (e.g. test env) — fall back to existence-only.
+      const { data: staffMember } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', resolvedTargetId)
+        .maybeSingle();
+      if (!staffMember) {
+        return res.status(400).json({ success: false, error: 'Invalid staff member target' });
+      }
+    }
+  } else if (resolvedTargetType === 'item' || resolvedTargetType === 'dish') {
+    if (propertyId) {
+      const { data: orderedItem } = await supabase
+        .from('order_items')
+        .select('id')
+        .eq('catalog_item_id', resolvedTargetId)
+        .eq('property_id', propertyId)
+        .in('transaction_id', customerTxIds)
+        .limit(1)
+        .maybeSingle();
+      if (!orderedItem) {
+        return res.status(403).json({ success: false, error: 'You can only review dishes from one of your orders here' });
+      }
+    } else {
+      // No property context (e.g. test env) — fall back to existence-only.
+      const { data: catalogItem } = await supabase
+        .from('catalog_items')
+        .select('id')
+        .eq('id', resolvedTargetId)
+        .maybeSingle();
+      if (!catalogItem) {
+        return res.status(400).json({ success: false, error: 'Invalid menu item target' });
+      }
     }
   }
 
