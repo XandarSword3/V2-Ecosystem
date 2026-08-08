@@ -232,8 +232,7 @@ function ConfirmationContent() {
   // Live order status updates via WebSockets
   useEffect(() => {
     if (socket && itemId && confirmationType === 'order') {
-      socket.emit('join:order', itemId);
-      socket.emit('join:room', `order:${itemId}`);
+      socket.emit('order:join', { orderId: itemId });
 
       const handleOrderUpdate = (update: { orderId?: string; id?: string; status: string }) => {
         const targetId = update.orderId || update.id;
