@@ -28,6 +28,7 @@ router.get('/shifts/today', authorize(...managerRoles), staffController.getToday
 // Cash-drawer close and pay-in/pay-out (StaffPOSTemplate shift/drawer tab)
 router.post('/shifts/:id/close', authorize(...staffRoles), staffController.closeShift);
 router.post('/shifts/:id/cash', authorize(...staffRoles), staffController.recordCashMovement);
+router.get('/shifts/:id/cash', authorize(...staffRoles), staffController.getShiftCashMovements);
 
 // Get all shifts (managers/admins)
 router.get('/shifts', authorize(...managerRoles), staffController.getAllShifts);

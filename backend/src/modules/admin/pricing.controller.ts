@@ -9,7 +9,9 @@ import { logger } from '../../utils/logger';
 import { getCallerTenantId } from '../../security/tenant-scope.js';
 import { engineService } from '../../engines/engine-service.js';
 import { resolveTaxCategory, getModuleTaxCategory } from '../../services/tax.service.js';
-import type { PricingLineItem, PricingContext } from '../../engines/types.js';
+import { getEngineByTemplate } from '../../engines/registry.js';
+import { resolveAndPriceCatalogItems, type CatalogItemRequest } from '../../services/catalog-pricing.service.js';
+import type { PricingLineItem, PricingConfig, PricingContext } from '../../engines/types.js';
 
 const router = Router();
 
@@ -366,28 +368,46 @@ router.post(
     }
     console.log(`[PricingController] RequestID: ${requestId} - Module fetch: ${Date.now() - moduleFetchStart}ms`);
 
-    // Convert items to PricingLineItem format and resolve taxCategory server-side
-    const itemProcessingStart = Date.now();
-    const lineItems: PricingLineItem[] = items.map((item: any) => {
-      const lineItem = {
-        itemId: item.itemId,
-        name: item.name || 'Item',
-        unitPrice: item.unitPrice || 0,
-        quantity: item.quantity || 1,
-        unitAdjustment: item.unitAdjustment,
-        metadata: item.metadata || {}
-      };
-      return {
-        ...lineItem,
-        taxCategory: resolveTaxCategory(lineItem, moduleTaxCategory)
-      };
-    });
-    console.log(`[PricingController] RequestID: ${requestId} - Item processing: ${Date.now() - itemProcessingStart}ms`);
-
     // Note: applyTax/applyFees/supportsCoupons etc. are no longer taken from the
     // request body — they come from the engine's own `pricing` config (see
     // engines/registry.ts), same as at confirmation. A client can no longer
     // influence whether tax/fees apply just by omitting a flag.
+
+    // FIX 1: Use shared resolve-and-price function to get server-side prices
+    const itemProcessingStart = Date.now();
+    const catalogResult = await resolveAndPriceCatalogItems(
+      items as CatalogItemRequest[],
+      moduleId,
+      moduleTaxCategory
+    );
+    
+    if (catalogResult.validationErrors.length > 0) {
+      throw new AppError(`Invalid catalog items or modifiers: ${catalogResult.validationErrors.join(', ')}`, 400);
+    }
+    
+    const lineItems: PricingLineItem[] = catalogResult.resolvedItems.map((item) => ({
+      itemId: item.itemId,
+      name: item.name,
+      unitPrice: item.basePrice + item.modifierAdjustment,
+      quantity: item.quantity,
+      metadata: item.metadata,
+      taxCategory: item.taxCategory,
+    }));
+    
+    // Debug logging to track pricing consistency
+    console.log(`[PricingController] RequestID: ${requestId} - Preview line items from shared function`, {
+      moduleId,
+      itemCount: lineItems.length,
+      lineItems: lineItems.map(li => ({
+        itemId: li.itemId,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        lineTotal: li.unitPrice * li.quantity,
+      })),
+      subtotal: lineItems.reduce((sum, li) => sum + (li.unitPrice * li.quantity), 0),
+    });
+    
+    console.log(`[PricingController] RequestID: ${requestId} - Item processing: ${Date.now() - itemProcessingStart}ms`);
 
     // Build pricing context
     const pricingContext: PricingContext = {
@@ -397,8 +417,10 @@ router.post(
       couponCode,
       giftCardCodes,
       loyaltyPointsToRedeem,
-      // Use propertyId from request body if provided, otherwise fall back to middleware property
-      propertyId: propertyId || (req as any).property?.id || ((req as any).propertyId as string | undefined),
+      // FIX 3: Use consistent propertyId resolution order with order endpoint
+      // Order endpoint uses: mounted.property_id || req.propertyId || req.headers['x-property-id']
+      // Preview uses: req.property?.id (same middleware source as mounted.property_id) || body.propertyId || fallbacks
+      propertyId: (req as any).property?.id || propertyId || ((req as any).propertyId as string | undefined) || (req.headers?.['x-property-id'] as string | undefined),
       staffId: (req.user as any)?.userId
     };
 

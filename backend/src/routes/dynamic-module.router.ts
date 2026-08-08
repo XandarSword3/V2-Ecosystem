@@ -16,6 +16,7 @@ import { customizationService } from '../modules/customization/services/customiz
 import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reversal.js';
 import { actorForUser, resolveAction, changeInstantTransactionOrderStatus } from '../engines/order-status.service.js';
 import { emitToUnit } from '../socket/index.js';
+import { resolveAndPriceCatalogItems, type CatalogItemRequest } from '../services/catalog-pricing.service.js';
 import {
   createReservationHandler,
   getReservationsDayHandler,
@@ -821,90 +822,55 @@ function buildInstantTransactionRouter(router: Router): void {
       if (items.length === 0) {
         return res.status(400).json({ success: false, error: 'At least one item is required' });
       }
-      const itemIds = items
-        .map((item: unknown) => {
-          const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string };
-          return i.catalog_item_id || i.menuItemId || i.itemId;
-        })
-        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
-      const { data: catalogRows, error: catalogError } = await supabase
-        .from('catalog_items')
-        .select('id, name, price')
-        .eq('module_id', mounted.id)
-        .in('id', itemIds);
-      if (catalogError) throw catalogError;
-      // Human-readable name lookup — the pricing pipeline's own lineItems
-      // only carry an opaque `catalog_item:<uuid>` placeholder (it doesn't
-      // need real names to price correctly), so a separate map is built
-      // here purely for the receipt/ledger snapshot and the confirmation
-      // page's itemized breakdown.
-      const nameMap = new Map((catalogRows ?? []).map((row: any) => [row.id, row.name as string]));
+      
       // Fetch module's tax category for tax scoping
       const { data: module } = await supabase
         .from('modules')
         .select('tax_category')
         .eq('id', mounted.id)
         .maybeSingle();
-      const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
-      // Re-validate any submitted item customizations server-side before
-      // pricing — the client's `priceAdjustment` on each selected modifier
-      // is never trusted. `validate_customizations` re-derives the price
-      // from the DB (customization_options.price_adjustment) per item, so a
-      // tampered or stale client value can't affect the charge.
-      // Keyed by position in `items` since the same catalog_item_id can
-      // appear more than once in a cart with different selections.
-      const modifierAdjustmentByIndex = new Map<number, number>();
-      const modifierValidationErrors: string[] = [];
-      await Promise.all(items.map(async (item: unknown, index: number) => {
-        const currentItem = item as {
-          catalog_item_id?: string; menuItemId?: string; itemId?: string;
-          metadata?: Record<string, unknown>;
-        };
-        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
-        const rawSelections = Array.isArray(currentItem.metadata?.selectedModifiers)
-          ? currentItem.metadata!.selectedModifiers as Array<Record<string, unknown>>
-          : [];
-        const selections = rawSelections
-          .map((m) => ({
-            groupId: String(m.groupId ?? ''),
-            optionId: String(m.optionId ?? ''),
-            quantity: asNumber(m.quantity, 1),
-          }))
-          .filter((s) => s.optionId.length > 0);
-        if (selections.length === 0) return;
-        try {
-          const result = await customizationService.validateSelections('catalog_item', resolvedId, selections);
-          if (!result.isValid) {
-            modifierValidationErrors.push(...result.validationErrors.map((e) => `${resolvedId}: ${e}`));
-            return;
-          }
-          modifierAdjustmentByIndex.set(index, result.totalPriceAdjustment);
-        } catch (err) {
-          logger.error('[Dynamic Router] Failed to validate item customizations', {
-            itemId: resolvedId, error: err instanceof Error ? err.message : String(err),
-          });
-          modifierValidationErrors.push(`${resolvedId}: failed to validate customizations`);
-        }
-      }));
-      if (modifierValidationErrors.length > 0) {
-        return res.status(400).json({ success: false, error: 'Invalid item customizations', details: modifierValidationErrors });
+      
+      // FIX 1: Use shared resolve-and-price function to get server-side prices
+      const catalogResult = await resolveAndPriceCatalogItems(
+        items as CatalogItemRequest[],
+        mounted.id,
+        module?.tax_category ?? 'all'
+      );
+      
+      if (catalogResult.validationErrors.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Invalid catalog items or modifiers', 
+          details: catalogResult.validationErrors 
+        });
       }
-      const lineItems = items.map((item: unknown, index: number) => {
-        const currentItem = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number; metadata?: Record<string, unknown> };
-        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
-        const basePrice = priceMap.get(resolvedId) ?? 0;
-        const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
-        const lineItem = {
-          itemId: resolvedId,
-          name: `catalog_item:${resolvedId}`,
-          quantity: asNumber(currentItem.quantity, 1),
-          unitPrice: basePrice + modifierAdjustment,
-          metadata: currentItem.metadata || {},
-        };
-        return {
-          ...lineItem,
-          taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
-        };
+      
+      const nameMap = catalogResult.nameMap;
+      const modifierAdjustmentByIndex = new Map<number, number>();
+      catalogResult.resolvedItems.forEach((item, index) => {
+        modifierAdjustmentByIndex.set(index, item.modifierAdjustment);
+      });
+      
+      const lineItems = catalogResult.resolvedItems.map((item) => ({
+        itemId: item.itemId,
+        name: `catalog_item:${item.itemId}`,
+        quantity: item.quantity,
+        unitPrice: item.basePrice + item.modifierAdjustment,
+        metadata: item.metadata,
+        taxCategory: item.taxCategory,
+      }));
+      
+      // Debug logging to track pricing consistency
+      logger.info('[Dynamic Router] POST /orders - Line items from shared function', {
+        moduleId: mounted.id,
+        itemCount: lineItems.length,
+        lineItems: lineItems.map(li => ({
+          itemId: li.itemId,
+          quantity: li.quantity,
+          unitPrice: li.unitPrice,
+          lineTotal: li.unitPrice * li.quantity,
+        })),
+        subtotal: lineItems.reduce((sum, li) => sum + (li.unitPrice * li.quantity), 0),
       });
       // Receipt-friendly snapshot of what was actually ordered, with real
       // catalog names + any modifiers the cart attached. This is what gets
@@ -912,28 +878,21 @@ function buildInstantTransactionRouter(router: Router): void {
       // can show an itemized breakdown — previously this was computed for
       // pricing and then discarded, since PricingResult.lineItems only
       // carries the opaque `catalog_item:<uuid>` placeholder.
-      const receiptLineItems = items.map((item: unknown) => {
-        const currentItem = item as {
+      const receiptLineItems = catalogResult.resolvedItems.map((item, index) => {
+        const currentItem = items[index] as {
           catalog_item_id?: string; menuItemId?: string; itemId?: string;
           quantity?: number; metadata?: Record<string, unknown>;
         };
-        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
-        const quantity = asNumber(currentItem.quantity, 1);
-        const baseUnitPrice = priceMap.get(resolvedId) ?? 0;
         const selectedModifiers = Array.isArray(currentItem.metadata?.selectedModifiers)
           ? currentItem.metadata!.selectedModifiers
           : undefined;
-        // Sum modifier price adjustments to get final unit price
-        const modifierPriceAdjustment = selectedModifiers?.reduce((sum: number, mod: any) => {
-          return sum + (mod.priceAdjustment || mod.price_adjustment || 0);
-        }, 0) || 0;
-        const unitPrice = baseUnitPrice + modifierPriceAdjustment;
+        const unitPrice = item.basePrice + item.modifierAdjustment;
         return {
-          itemId: resolvedId,
-          name: nameMap.get(resolvedId) ?? 'Item',
-          quantity,
+          itemId: item.itemId,
+          name: item.name,
+          quantity: item.quantity,
           unitPrice,
-          lineTotal: unitPrice * quantity,
+          lineTotal: unitPrice * item.quantity,
           ...(selectedModifiers ? { selectedModifiers } : {}),
         };
       });
@@ -1080,25 +1039,22 @@ function buildInstantTransactionRouter(router: Router): void {
       // the ledger snapshot, a failure here means inventory won't deduct
       // and the kitchen won't see items, so it's logged at error, not warn.
       try {
-        const orderItemRows = items.map((item: unknown, index: number) => {
-          const currentItem = item as {
+        const orderItemRows = catalogResult.resolvedItems.map((item, index) => {
+          const currentItem = items[index] as {
             catalog_item_id?: string; menuItemId?: string; itemId?: string;
             quantity?: number; metadata?: Record<string, unknown>;
           };
           const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
-          const quantity = asNumber(currentItem.quantity, 1);
-          const basePrice = priceMap.get(resolvedId) ?? 0;
-          const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
-          const unitPrice = basePrice + modifierAdjustment;
           const specialInstructions = (currentItem.metadata?.specialInstructions
             ?? currentItem.metadata?.notes
             ?? null) as string | null;
+          const unitPrice = item.basePrice + item.modifierAdjustment;
           return {
             transaction_id: created.id,
             catalog_item_id: resolvedId || null,
-            quantity,
+            quantity: item.quantity,
             unit_price: unitPrice,
-            subtotal: unitPrice * quantity,
+            subtotal: unitPrice * item.quantity,
             special_instructions: specialInstructions,
             status: 'pending',
             tenant_id: tenantId,
@@ -1246,86 +1202,42 @@ function buildInstantTransactionRouter(router: Router): void {
       if (items.length === 0) {
         return res.status(400).json({ success: false, error: 'At least one item is required' });
       }
-      const itemIds = items
-        .map((item: unknown) => {
-          const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string };
-          return i.catalog_item_id || i.menuItemId || i.itemId;
-        })
-        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
-      const { data: catalogRows, error: catalogError } = await supabase
-        .from('catalog_items')
-        .select('id, name, price')
-        .eq('module_id', mounted.id)
-        .in('id', itemIds);
-      if (catalogError) throw catalogError;
-      const nameMap = new Map((catalogRows ?? []).map((row: any) => [row.id, row.name as string]));
-      const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, asNumber(row.price, 0)]));
+      
       const { data: moduleRow } = await supabase
         .from('modules')
         .select('tax_category')
         .eq('id', mounted.id)
         .maybeSingle();
-      // Re-validate customizations server-side, same as POST /orders —
-      // never trust a client-supplied priceAdjustment.
+      
+      // FIX 1: Use shared resolve-and-price function to get server-side prices
+      const catalogResult = await resolveAndPriceCatalogItems(
+        items as CatalogItemRequest[],
+        mounted.id,
+        moduleRow?.tax_category ?? 'all'
+      );
+      
+      if (catalogResult.validationErrors.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Invalid catalog items or modifiers', 
+          details: catalogResult.validationErrors 
+        });
+      }
+      
+      const nameMap = catalogResult.nameMap;
       const modifierAdjustmentByIndex = new Map<number, number>();
-      const modifierValidationErrors: string[] = [];
-      await Promise.all(items.map(async (item: unknown, index: number) => {
-        const currentItem = item as {
-          catalog_item_id?: string; menuItemId?: string; itemId?: string;
-          metadata?: Record<string, unknown>;
-        };
-        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
-        const rawSelections = Array.isArray(currentItem.metadata?.selectedModifiers)
-          ? currentItem.metadata!.selectedModifiers as Array<Record<string, unknown>>
-          : [];
-        const selections = rawSelections
-          .map((m) => ({
-            groupId: String(m.groupId ?? ''),
-            optionId: String(m.optionId ?? ''),
-            quantity: asNumber(m.quantity, 1),
-          }))
-          .filter((s) => s.optionId.length > 0);
-        if (selections.length === 0) return;
-        try {
-          const result = await customizationService.validateSelections('catalog_item', resolvedId, selections);
-          if (!result.isValid) {
-            modifierValidationErrors.push(...result.validationErrors.map((e) => `${resolvedId}: ${e}`));
-            return;
-          }
-          modifierAdjustmentByIndex.set(index, result.totalPriceAdjustment);
-        } catch (err) {
-          logger.error('[Dynamic Router] Failed to validate item customizations (add-items)', {
-            itemId: resolvedId, error: err instanceof Error ? err.message : String(err),
-          });
-          modifierValidationErrors.push(`${resolvedId}: failed to validate customizations`);
-        }
-      }));
-      if (modifierValidationErrors.length > 0) {
-        return res.status(400).json({ success: false, error: 'Invalid item customizations', details: modifierValidationErrors });
-      }
-      // Unknown/foreign catalog_item_id check — an id that resolved to
-      // nothing in catalogRows would silently price at 0 otherwise.
-      const unknownIds = itemIds.filter((id: string) => !priceMap.has(id));
-      if (unknownIds.length > 0) {
-        return res.status(400).json({ success: false, error: 'Unknown catalog item(s) for this module', details: unknownIds });
-      }
-      const lineItems = items.map((item: unknown, index: number) => {
-        const currentItem = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number; metadata?: Record<string, unknown> };
-        const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
-        const basePrice = priceMap.get(resolvedId) ?? 0;
-        const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
-        const lineItem = {
-          itemId: resolvedId,
-          name: `catalog_item:${resolvedId}`,
-          quantity: asNumber(currentItem.quantity, 1),
-          unitPrice: basePrice + modifierAdjustment,
-          metadata: currentItem.metadata || {},
-        };
-        return {
-          ...lineItem,
-          taxCategory: resolveTaxCategory(lineItem, moduleRow?.tax_category ?? 'all'),
-        };
+      catalogResult.resolvedItems.forEach((item, index) => {
+        modifierAdjustmentByIndex.set(index, item.modifierAdjustment);
       });
+      
+      const lineItems = catalogResult.resolvedItems.map((item) => ({
+        itemId: item.itemId,
+        name: `catalog_item:${item.itemId}`,
+        quantity: item.quantity,
+        unitPrice: item.basePrice + item.modifierAdjustment,
+        metadata: item.metadata,
+        taxCategory: item.taxCategory,
+      }));
       const resolvedPaymentMethod = (order.metadata as any)?.payment_method ?? 'cash';
       const resolvedOrderType = (order.metadata as any)?.order_type ?? 'dine_in';
       // No couponCode / giftCardCodes / loyaltyPointsToRedeem passed —
@@ -1341,8 +1253,9 @@ function buildInstantTransactionRouter(router: Router): void {
           quantity?: number; metadata?: Record<string, unknown>;
         };
         const resolvedId = currentItem.catalog_item_id || currentItem.menuItemId || currentItem.itemId || '';
-        const quantity = asNumber(currentItem.quantity, 1);
-        const basePrice = priceMap.get(resolvedId) ?? 0;
+        const resolvedItem = catalogResult.resolvedItems[index];
+        const quantity = resolvedItem?.quantity ?? asNumber(currentItem.quantity, 1);
+        const basePrice = resolvedItem?.basePrice ?? 0;
         const modifierAdjustment = modifierAdjustmentByIndex.get(index) ?? 0;
         const unitPrice = basePrice + modifierAdjustment;
         const specialInstructions = (currentItem.metadata?.specialInstructions
@@ -1395,11 +1308,11 @@ function buildInstantTransactionRouter(router: Router): void {
           paymentMethod: resolvedPaymentMethod,
           notes: 'Items added to existing order',
           metadata: {
-            addedLineItems: items.map((item: unknown) => {
-              const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number };
-              const resolvedId = i.catalog_item_id || i.menuItemId || i.itemId || '';
-              return { itemId: resolvedId, name: nameMap.get(resolvedId) ?? 'Item', quantity: asNumber(i.quantity, 1) };
-            }),
+            addedLineItems: catalogResult.resolvedItems.map((item) => ({
+              itemId: item.itemId,
+              name: item.name,
+              quantity: item.quantity,
+            })),
             taxBreakdown: pricing.taxBreakdown,
             feeBreakdown: pricing.feeBreakdown,
           },
@@ -1416,11 +1329,11 @@ function buildInstantTransactionRouter(router: Router): void {
       try {
         const kdsPayload = {
           id: order.id,
-          addedItems: items.map((item: unknown) => {
-            const i = item as { catalog_item_id?: string; menuItemId?: string; itemId?: string; quantity?: number };
-            const resolvedId = i.catalog_item_id || i.menuItemId || i.itemId || '';
-            return { id: resolvedId, name: nameMap.get(resolvedId) ?? 'Item', quantity: asNumber(i.quantity, 1) };
-          }),
+          addedItems: catalogResult.resolvedItems.map((item) => ({
+            id: item.itemId,
+            name: item.name,
+            quantity: item.quantity,
+          })),
         };
         emitToUnit(order.tenant_id, mounted.slug, 'order:items:added', kdsPayload);
         emitToUnit(order.tenant_id, mounted.id, 'order:items:added', kdsPayload);
