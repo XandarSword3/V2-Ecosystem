@@ -8,7 +8,7 @@ import { useMutation } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { useCartStore } from '@/stores/cartStore';
+import { useCartStore, calculateSubtotal } from '@/stores/cartStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useAuth } from '@/lib/auth-context';
@@ -109,7 +109,7 @@ export default function ModuleCartPage() {
   const [pricingBreakdown, setPricingBreakdown] = useState<any>(null);
   const [loadingPricing, setLoadingPricing] = useState(false);
 
-  const subtotal = moduleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = calculateSubtotal(moduleItems);
 
   // Fetch service locations for this module & auto-fill from URL query param
   useEffect(() => {

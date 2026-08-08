@@ -7,9 +7,9 @@ import { AppError } from '../../utils/AppError';
 import { seasonalPricingService } from '../../services/seasonal-pricing.service';
 import { logger } from '../../utils/logger';
 import { getCallerTenantId } from '../../security/tenant-scope.js';
-import { PricingPipeline } from '../../engines/pricing-pipeline.js';
-import { taxService, resolveTaxCategory, getModuleTaxCategory } from '../../services/tax.service.js';
-import type { PricingLineItem, PricingConfig, PricingContext } from '../../engines/types.js';
+import { engineService } from '../../engines/engine-service.js';
+import { resolveTaxCategory, getModuleTaxCategory } from '../../services/tax.service.js';
+import type { PricingLineItem, PricingContext } from '../../engines/types.js';
 
 const router = Router();
 
@@ -350,9 +350,20 @@ router.post(
 
     console.log(`[PricingController] RequestID: ${requestId} - Validation done: ${Date.now() - controllerStart}ms`);
 
-    // Fetch module's tax category for server-side resolution (cached)
+    // Fetch module's tax category for server-side resolution (cached), plus its
+    // template_type so this preview runs through the exact same engine pipeline
+    // (same discount resolvers, same engine.pricing config) that confirmation uses.
     const moduleFetchStart = Date.now();
     const moduleTaxCategory = await getModuleTaxCategory(moduleId);
+    const { data: moduleRow } = await supabase
+      .from('modules')
+      .select('template_type')
+      .eq('id', moduleId)
+      .maybeSingle();
+    const templateType = moduleRow?.template_type;
+    if (!templateType) {
+      throw new AppError('Unable to resolve engine type for moduleId', 400);
+    }
     console.log(`[PricingController] RequestID: ${requestId} - Module fetch: ${Date.now() - moduleFetchStart}ms`);
 
     // Convert items to PricingLineItem format and resolve taxCategory server-side
@@ -373,21 +384,10 @@ router.post(
     });
     console.log(`[PricingController] RequestID: ${requestId} - Item processing: ${Date.now() - itemProcessingStart}ms`);
 
-    // Build pricing config (default to applying tax and CMS fees unless specified).
-    // Fees (service charge, delivery fee, resort fee, custom) are entirely CMS-driven —
-    // configure them from Admin > Settings > Tax. There is no order-type gating here;
-    // scope a fee to specific order types via applies_to/payment_methods on that page.
-    const pricingConfig: PricingConfig = {
-      applyTax: req.body.applyTax !== false,
-      applyFees: req.body.applyFees !== false,
-      supportsCoupons: !!couponCode,
-      supportsGiftCards: !!giftCardCodes && giftCardCodes.length > 0,
-      supportsLoyaltyRedemption: !!loyaltyPointsToRedeem,
-      earnsLoyaltyPoints: false,
-      deductsInventory: false,
-      rounding: 'round',
-      decimalPlaces: 2
-    };
+    // Note: applyTax/applyFees/supportsCoupons etc. are no longer taken from the
+    // request body — they come from the engine's own `pricing` config (see
+    // engines/registry.ts), same as at confirmation. A client can no longer
+    // influence whether tax/fees apply just by omitting a flag.
 
     // Build pricing context
     const pricingContext: PricingContext = {
@@ -402,13 +402,11 @@ router.post(
       staffId: (req.user as any)?.userId
     };
 
-    // Use pricing pipeline to compute full breakdown
+    // Route through the same engine pipeline confirmation uses (engineService.calculatePricing),
+    // so preview and confirmation can never drift — same engine.pricing config, same
+    // coupon/gift-card/loyalty resolvers, same math.
     const pipelineStart = Date.now();
-    const pipeline = new PricingPipeline({
-      taxService
-    });
-
-    const result = await pipeline.calculate(lineItems, pricingConfig, pricingContext);
+    const result = await engineService.calculatePricing(templateType, lineItems, pricingContext);
     console.log(`[PricingController] RequestID: ${requestId} - Pipeline calculation: ${Date.now() - pipelineStart}ms`);
 
     const responseStart = Date.now();
