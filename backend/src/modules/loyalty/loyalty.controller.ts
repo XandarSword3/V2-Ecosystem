@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
+import { ensureLoyaltyMember } from './loyalty.service.js';
 
 /**
  * Loyalty Controller
@@ -97,50 +98,13 @@ export class LoyaltyController {
       }
 
       if (!account) {
-        // Create account if doesn't exist — scoped to property
-        const { data: settings } = await supabase
-          .from('loyalty_settings')
-          .select('*')
-          .eq('property_id', propertyId)
-          .limit(1)
-          .maybeSingle();
-
-        const { data: defaultTier } = await supabase
-          .from('loyalty_tiers')
-          .select('id')
-          .eq('property_id', propertyId)
-          .order('min_points', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-
-        const signupBonus = settings?.signup_bonus || 0;
-
-        const { data: newAccount, error: createError } = await supabase
-          .from('loyalty_members')
-          .insert({
-            user_id: userId,
-            tenant_id: req.user?.tenantId || null,
-            property_id: propertyId,
-            tier_id: defaultTier?.id || null,
-            available_points: signupBonus,
-            lifetime_points: signupBonus,
-            total_points: signupBonus,
-          })
-          .select(`*, tier:loyalty_tiers(*)`)
-          .single();
-
-        if (createError) throw createError;
-
-        // Log signup bonus if any
-        if (signupBonus > 0) {
-          await supabase.from('loyalty_transactions').insert({
-            member_id: newAccount.id,
-            type: 'bonus',
-            points: signupBonus,
-            balance_after: signupBonus,
-            description: 'Welcome bonus',
-          });
-        }
+        // Lazy-create: covers accounts that existed before registration-time
+        // enrollment, or a property granted after the user first signed up.
+        const newAccount = await ensureLoyaltyMember({
+          userId,
+          tenantId: req.user?.tenantId || null,
+          propertyId,
+        });
 
         return res.json({ success: true, data: newAccount });
       }
@@ -194,6 +158,8 @@ export class LoyaltyController {
       const { userId, points, description, referenceType, referenceId } = validation.data;
       const supabase = getSupabase();
 
+      const propertyId = getPropertyId(req);
+
       const { data: result, error: rpcError } = await supabase.rpc(
         'earn_loyalty_points_atomic',
         {
@@ -201,6 +167,8 @@ export class LoyaltyController {
           p_order_total: points,
           p_order_id: referenceId || '00000000-0000-0000-0000-000000000000',
           p_points_per_dollar: 1,
+          p_tenant_id: req.user?.tenantId || null,
+          p_property_id: propertyId,
         }
       );
 
