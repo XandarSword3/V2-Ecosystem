@@ -102,7 +102,7 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
       socket.emit('join:unit', slug);
 
       interface StatusUpdate {
-        orderId: string;
+        id: string;
         status: string;
       }
 
@@ -113,11 +113,14 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
       // currently in 'ready' — so just refetch on any status touch rather
       // than trying to patch state incrementally for a list that's this
       // small and this order-sensitive.
+      // FIX: real payload key from order-status.service.ts is `id`, not
+      // `orderId` — the cleanup branch below was filtering against
+      // `undefined` and silently never removing anything.
       const handleStatusUpdate = (update: StatusUpdate) => {
         if (update.status === 'ready') {
           loadOrders();
         } else {
-          setOrders((prev) => prev.filter((order) => order.id !== update.orderId));
+          setOrders((prev) => prev.filter((order) => order.id !== update.id));
         }
       };
 
@@ -309,6 +312,7 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
             items: paymentOrder.items.map(item => ({
               name: item.name,
               quantity: item.quantity,
+              unitPrice: item.unitPrice,
             })),
           }}
           onClose={() => setPaymentOrder(null)}

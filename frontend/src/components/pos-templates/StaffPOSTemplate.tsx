@@ -211,34 +211,49 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
         audio.play().catch(() => { });
       };
 
-      const handleStatusUpdate = (update: { orderId: string; status: string }) => {
+      // FIX: this listened for 'order:updated', but Accept/Start Prep/Mark
+      // Ready/Served/Cancel all go through the shared status-transition
+      // service (order-status.service.ts), which emits 'order:status' with
+      // payload { id, status, tableNumber } — not { orderId, status }.
+      // 'order:updated' is real but only fires on item-add and payment, so
+      // status changes (like Accept) never reached this handler at all.
+      const handleStatusUpdate = (update: { id: string; status: string }) => {
         setOrders(prev => prev.map(o =>
-          o.id === update.orderId ? { ...o, status: update.status } : o
+          o.id === update.id ? { ...o, status: update.status } : o
         ));
         setKitchenOrders(prev => {
           if (['confirmed', 'preparing'].includes(update.status)) {
-            const order = orders.find(o => o.id === update.orderId);
-            if (order && !prev.find(o => o.id === update.orderId)) {
+            const order = orders.find(o => o.id === update.id);
+            if (order && !prev.find(o => o.id === update.id)) {
               return [{ ...order, status: update.status }, ...prev];
             }
-            return prev.map(o => o.id === update.orderId ? { ...o, status: update.status } : o);
+            return prev.map(o => o.id === update.id ? { ...o, status: update.status } : o);
           }
-          return prev.filter(o => o.id !== update.orderId);
+          return prev.filter(o => o.id !== update.id);
         });
       };
 
-      const handleTableUpdate = (table: Table) => {
-        setTables(prev => prev.map(t => t.id === table.id ? table : t));
+      // FIX: 'table:update' is never emitted anywhere in the backend.
+      // 'table:freed' is real (emitted on transaction completion, currently
+      // only for reservation-linked orders — see dynamic-module.router.ts)
+      // and carries { serviceLocationId }, not a full Table object.
+      const handleTableFreed = (payload: { serviceLocationId?: string }) => {
+        if (!payload.serviceLocationId) return;
+        setTables(prev => prev.map(t =>
+          t.id === payload.serviceLocationId
+            ? { ...t, status: 'available', currentOrder: undefined, openTransactionId: null }
+            : t
+        ));
       };
 
       socket.on('order:new', handleNewOrder);
-      socket.on('order:updated', handleStatusUpdate);
-      socket.on('table:update', handleTableUpdate);
+      socket.on('order:status', handleStatusUpdate);
+      socket.on('table:freed', handleTableFreed);
 
       return () => {
         socket.off('order:new', handleNewOrder);
-        socket.off('order:updated', handleStatusUpdate);
-        socket.off('table:update', handleTableUpdate);
+        socket.off('order:status', handleStatusUpdate);
+        socket.off('table:freed', handleTableFreed);
       };
     }
   }, [socket, moduleId, orders]);

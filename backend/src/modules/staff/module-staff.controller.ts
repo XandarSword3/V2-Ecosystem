@@ -166,7 +166,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       );
       return {
         id: order.id,
-        orderNumber: (meta.order_number as string | undefined) ?? null,
+        orderNumber: (meta.order_number as string | undefined) ?? order.id.slice(0, 8),
         customerName: (meta.customer_name as string) || 'Guest',
         customerId: order.customer_id,
         staffId: (order as { staff_id?: string | null }).staff_id ?? null,
@@ -319,7 +319,7 @@ export async function getModuleTables(req: Request, res: Response) {
 
       const currentOrder = openTxId && tx ? {
         id: tx.id,
-        orderNumber: (meta.order_number as string | undefined) ?? null,
+        orderNumber: (meta.order_number as string | undefined) ?? tx.id.slice(0, 8),
         status: tx.status,
         totalAmount: tx.amount,
         items: itemsByTransaction.get(openTxId) ?? [],

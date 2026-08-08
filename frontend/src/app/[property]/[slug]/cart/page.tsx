@@ -88,7 +88,7 @@ export default function ModuleCartPage() {
   const setNotes = useCartStore((s) => s.setNotes);
 
   const [selectedLocationId, setSelectedLocationId] = useState('');
-  const [serviceLocations, setServiceLocations] = useState<Array<{ id: string; name: string; is_active: boolean }>>([]);
+  const [serviceLocations, setServiceLocations] = useState<Array<{ id: string; name: string; is_active: boolean; is_occupied?: boolean }>>([]);
   const [activeStep, setActiveStep] = useState(1);
 
   // Discount tracking state
@@ -124,10 +124,14 @@ export default function ModuleCartPage() {
           const urlLoc = urlParams.get('location') || urlParams.get('table') || urlParams.get('service_location_id');
           if (urlLoc) {
             const matched = activeLocs.find((l: any) => l.id === urlLoc || l.name.toLowerCase() === urlLoc.toLowerCase());
-            if (matched) {
+            // FIX: a table QR code or link shouldn't silently pre-select a
+            // table that already has an open order — that's exactly how
+            // one table ended up with two live orders. Fall back to
+            // manual selection instead so the customer sees it's occupied.
+            if (matched && !matched.is_occupied) {
               setSelectedLocationId(matched.id);
               setTableNumber(matched.name);
-            } else {
+            } else if (!matched) {
               setTableNumber(urlLoc);
             }
           }
@@ -710,7 +714,9 @@ export default function ModuleCartPage() {
                           >
                             <option value="">Select location / table</option>
                             {serviceLocations.map((loc) => (
-                              <option key={loc.id} value={loc.id}>{loc.name}</option>
+                              <option key={loc.id} value={loc.id} disabled={loc.is_occupied}>
+                                {loc.name}{loc.is_occupied ? ' (Occupied)' : ''}
+                              </option>
                             ))}
                           </select>
                         ) : (
