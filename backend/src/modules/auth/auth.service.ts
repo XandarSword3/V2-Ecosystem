@@ -11,6 +11,7 @@ import { validatePassword } from "../../services/password-policy.service.js";
 import { isAccountLocked, recordFailedAttempt, recordSuccessfulLogin } from "./lockout.service.js";
 import { blacklistToken } from "../../services/token-blacklist.service.js";
 import { scopeToRoles, scopeIsPlatformAdmin } from "../../security/permissions.js";
+import { ensureLoyaltyMember } from "../loyalty/loyalty.service.js";
 
 interface SessionMeta {
   ipAddress?: string;
@@ -113,6 +114,25 @@ export async function register(data: RegisterData) {
         logger.warn('Failed to grant property access during registration:', accessError.message);
         // Don't fail registration for this - user can be granted access later
       }
+
+      // Enroll in the loyalty program (grants signup bonus where configured)
+      // for every property just granted. Best-effort: a loyalty hiccup
+      // should never block account creation — the lazy-create fallback in
+      // getAccount will pick up any property that fails here.
+      await Promise.all(
+        properties.map((property) =>
+          ensureLoyaltyMember({
+            userId: user.id,
+            tenantId: data.tenantId || null,
+            propertyId: property.id,
+          }).catch((err) => {
+            logger.warn(
+              `Failed to enroll user ${user.id} in loyalty for property ${property.id} during registration:`,
+              err.message
+            );
+          })
+        )
+      );
     }
   }
   
