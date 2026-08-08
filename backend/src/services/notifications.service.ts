@@ -481,6 +481,47 @@ class NotificationService {
 
     return data.length;
   }
+
+  /**
+   * Create a single in-app notification for a specific user.
+   * Lighter-weight than broadcast() — no notification_broadcasts row.
+   */
+  async create(options: {
+    userId: string;
+    type: string;
+    title: string;
+    message: string;
+    priority?: string;
+    targetType?: string;
+    targetId?: string;
+    actions?: any[];
+  }): Promise<Notification | null> {
+    const supabase = getSupabase();
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: options.userId,
+        type: options.type,
+        title: options.title,
+        message: options.message,
+        channel: 'in_app',
+        priority: options.priority || 'normal',
+        target_type: options.targetType,
+        target_id: options.targetId,
+        actions: options.actions || [],
+        read: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('Error creating notification:', error);
+      return null;
+    }
+
+    return data;
+  }
 }
 
 export const notificationService = new NotificationService();

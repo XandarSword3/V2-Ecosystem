@@ -139,7 +139,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
           <p className="text-sm opacity-80">Available Points</p>
         </div>
         
-        {account.tier?.points_multiplier > 1 && (
+        {account.tier && account.tier.points_multiplier && account.tier.points_multiplier > 1 && (
           <div className="flex items-center justify-center gap-2 mt-2 text-sm">
             <TrendingUp className="w-4 h-4" />
             <span>{account.tier.points_multiplier}x points on all purchases</span>
