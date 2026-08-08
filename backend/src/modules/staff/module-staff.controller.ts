@@ -7,6 +7,7 @@ import { getEngineService } from '../../engines/engine-service.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
 import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
+import { getOrderNumber } from '../../utils/order-number.js';
 import dayjs from 'dayjs';
 
 /**
@@ -166,7 +167,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       );
       return {
         id: order.id,
-        orderNumber: (meta.order_number as string | undefined) ?? order.id.slice(0, 8),
+        orderNumber: getOrderNumber(order.id, meta),
         customerName: (meta.customer_name as string) || 'Guest',
         customerId: order.customer_id,
         staffId: (order as { staff_id?: string | null }).staff_id ?? null,
@@ -319,7 +320,7 @@ export async function getModuleTables(req: Request, res: Response) {
 
       const currentOrder = openTxId && tx ? {
         id: tx.id,
-        orderNumber: (meta.order_number as string | undefined) ?? tx.id.slice(0, 8),
+        orderNumber: getOrderNumber(tx.id, meta),
         status: tx.status,
         totalAmount: tx.amount,
         items: itemsByTransaction.get(openTxId) ?? [],
@@ -2173,7 +2174,7 @@ export async function printModuleOrderReceipt(req: Request, res: Response) {
       printType,
       moduleName: module.name,
       orderId: order.id,
-      orderNumber: meta.order_number || order.id.slice(0, 8),
+      orderNumber: getOrderNumber(order.id, meta),
       tableNumber: meta.table_number || null,
       customerName: meta.customer_name || 'Guest',
       createdAt: order.created_at,
