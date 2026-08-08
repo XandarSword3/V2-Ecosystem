@@ -198,7 +198,7 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+    <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
       <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">

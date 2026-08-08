@@ -94,6 +94,7 @@ export default function ModulesSlugPage() {
           moduleId={module.id}
           moduleSlug={slug}
           moduleName={module.name}
+          requireReservation={module.require_reservation}
         />
       );
 

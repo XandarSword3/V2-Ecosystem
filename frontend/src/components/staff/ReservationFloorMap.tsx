@@ -1,6 +1,17 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+/**
+ * Reservation floor map — host-stand view for seating, check-ins, and walk-ins.
+ * Extracted from the old standalone /floorMap route so it can be embedded as a
+ * tab inside StaffPOSTemplate (Engine A's single staff workspace) instead of
+ * living behind a separate nav link with no way back to Orders/Kitchen/Cashier.
+ *
+ * This is distinct from StaffPOSTemplate's "Stations" tab: this component is
+ * reservation/check-in focused (service_locations + reservations), while
+ * Stations is the quick table picker used when starting an order.
+ */
+
+import { useEffect, useState } from 'react';
 import { useSocket } from '@/lib/socket';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -29,14 +40,15 @@ interface Reservation {
   notes: string | null;
 }
 
-export default function FloorMapPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
+export interface ReservationFloorMapProps {
+  slug: string;
+}
+
+export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
   const [locations, setLocations] = useState<ServiceLocation[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
-  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showCheckInDialog, setShowCheckInDialog] = useState(false);
   const [showWalkInDialog, setShowWalkInDialog] = useState(false);
   const { socket } = useSocket();
 
@@ -66,7 +78,7 @@ export default function FloorMapPage({ params }: { params: Promise<{ slug: strin
         toast.info('Table assigned', { description: `Table ${data.serviceLocationId} assigned` });
       };
 
-      const handleOrderConfirmed = (data: { serviceLocationId: string }) => {
+      const handleOrderConfirmed = () => {
         loadFloorData();
       };
 
@@ -85,35 +97,8 @@ export default function FloorMapPage({ params }: { params: Promise<{ slug: strin
       await api.patch(`/${slug}/reservations/${reservationId}/check-in`);
       toast.success('Reservation checked in');
       loadFloorData();
-      setShowCheckInDialog(false);
     } catch (error) {
       toast.error('Failed to check in reservation');
-    }
-  };
-
-  const handleWalkIn = async (locationId: string, partySize: number, guestName: string) => {
-    try {
-      await api.post(`/${slug}/reservations`, {
-        serviceLocationId: locationId,
-        partySize,
-        guestName,
-        reservedFor: new Date().toISOString(),
-      });
-      toast.success('Walk-in seated');
-      loadFloorData();
-      setShowWalkInDialog(false);
-    } catch (error) {
-      toast.error('Failed to seat walk-in');
-    }
-  };
-
-  const handleReassignStaff = async (locationId: string, staffId: string | null) => {
-    try {
-      await api.patch(`/${slug}/service-locations/${locationId}/reassign`, { staffId });
-      toast.success('Staff reassigned');
-      loadFloorData();
-    } catch (error) {
-      toast.error('Failed to reassign staff');
     }
   };
 
@@ -139,14 +124,14 @@ export default function FloorMapPage({ params }: { params: Promise<{ slug: strin
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+      <header className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <MapPin className="h-8 w-8 text-primary" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+            <MapPin className="h-6 w-6 text-primary" />
             Floor Map
-          </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
             Manage seating, reservations, and staff assignments
           </p>
         </div>
@@ -184,8 +169,8 @@ export default function FloorMapPage({ params }: { params: Promise<{ slug: strin
         <div className="lg:col-span-1">
           {selectedLocation ? (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <h2 className="text-lg font-bold mb-4">{selectedLocation.name}</h2>
-              
+              <h3 className="text-lg font-bold mb-4">{selectedLocation.name}</h3>
+
               <div className="space-y-3 mb-6">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">Status</span>
