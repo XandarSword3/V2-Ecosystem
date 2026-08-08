@@ -974,6 +974,26 @@ function buildInstantTransactionRouter(router: Router): void {
         if (!locationRow) {
           return res.status(400).json({ success: false, error: 'service_location_id does not belong to this module' });
         }
+        // FIX: nothing previously stopped a second order landing on a table
+        // that already had an open one — the staff UI would then only show
+        // whichever order was created first, and the second was invisible.
+        // Same non-terminal-status check as fetchServiceLocationsWithOccupancy,
+        // scoped to this one location, done at insert time to close the race.
+        // .limit(1) + array check rather than .maybeSingle(): existing bad
+        // data (tables that already ended up with >1 open order, i.e. the
+        // exact bug this closes) would make maybeSingle() throw instead of
+        // correctly reporting "occupied".
+        const { data: existingOrders, error: occupancyError } = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('service_location_id', locationRow.id)
+          .eq('engine_type', 'instant_transaction')
+          .not('status', 'in', `(${INSTANT_TRANSACTION_TERMINAL_STATES.join(',')})`)
+          .limit(1);
+        if (occupancyError) throw occupancyError;
+        if (existingOrders && existingOrders.length > 0) {
+          return res.status(409).json({ success: false, error: 'This table already has an open order' });
+        }
         serviceLocationId = locationRow.id;
       }
       const isStaffUser = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
@@ -999,6 +1019,10 @@ function buildInstantTransactionRouter(router: Router): void {
           service_charge: pricing.serviceCharge ?? 0,
           service_location_id: serviceLocationId,
           metadata: {
+            // FIX: order_number was never written on this (customer-facing)
+            // creation path, unlike the staff "New Order" path — every
+            // customer-placed order showed a blank order number downstream.
+            order_number: `ORD-${Date.now().toString(36).toUpperCase().slice(-5)}`,
             notes: req.body?.notes ?? req.body?.metadata?.notes ?? null,
             payment_method: resolvedPaymentMethod,
             order_type: resolvedOrderType,

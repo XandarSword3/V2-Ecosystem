@@ -12,7 +12,7 @@ interface PaymentDialogProps {
     id: string;
     orderNumber: string;
     totalAmount: number;
-    items: Array<{ name: string; quantity: number; price?: number }>;
+    items: Array<{ name: string; quantity: number; unitPrice?: number }>;
   };
   onClose: () => void;
   onComplete: () => void;
@@ -48,7 +48,7 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
       // For itemized split, each item becomes a share
       return order.items.map((item, i) => ({
         id: `share-${i}`,
-        amount: (item.price || 0) * item.quantity,
+        amount: (item.unitPrice || 0) * item.quantity,
         paid: false,
       }));
     }
@@ -152,7 +152,7 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
               {order.items.map((item, i) => (
                 <div key={i} className="flex justify-between text-sm">
                   <span>{item.quantity}x {item.name}</span>
-                  <span>{formatCurrency((item.price || 0) * item.quantity)}</span>
+                  <span>{formatCurrency((item.unitPrice || 0) * item.quantity)}</span>
                 </div>
               ))}
             </div>
