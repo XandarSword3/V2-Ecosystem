@@ -68,6 +68,7 @@ interface Order {
   id: string;
   orderNumber: string;
   tableNumber?: string;
+  staffName?: string;
   status: string;
   items: OrderItem[];
   totalAmount: number;
@@ -832,8 +833,13 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                         <div className="flex justify-between items-start">
                           <div>
                             <CardTitle className="text-lg">#{order.orderNumber}</CardTitle>
-                            <p className="text-sm text-gray-500">
-                              {order.tableNumber ? `Table ${order.tableNumber}` : order.orderType}
+                            <p className="text-sm text-gray-500 flex items-center gap-1.5 flex-wrap">
+                              <span>{order.tableNumber ? `Table ${order.tableNumber}` : order.orderType}</span>
+                              {order.staffName && (
+                                <span className="text-[11px] bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium px-1.5 py-0.5 rounded">
+                                  Server: {order.staffName}
+                                </span>
+                              )}
                             </p>
                           </div>
                           <div className="text-right">

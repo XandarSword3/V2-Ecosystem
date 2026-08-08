@@ -26,6 +26,11 @@ const createReviewSchema = z.object({
   // Previously a fixed enum of legacy module types — now a free-form string so any
   // module slug (including dynamically created ones) can be used without code changes.
   service_type: z.string().max(100).optional().default('general'),
+  // Polymorphic review target — allows reviewing staff, menu items, etc.
+  target_type: z.string().max(50).optional(),
+  targetType: z.string().max(50).optional(),
+  target_id: z.string().uuid().optional(),
+  targetId: z.string().uuid().optional(),
 });
 
 /**
@@ -66,39 +71,13 @@ export const getApprovedReviews = asyncHandler(async (req: Request, res: Respons
     console.warn('[Reviews] Public query failed:', error.message);
     return res.json({
       success: true,
-      data: { reviews: [], stats: { totalReviews: 0, averageRating: 0 } },
+      data: [],
     });
   }
 
-  // Stats — scoped to same property
-  let statsQuery = supabase.from('reviews').select('rating').eq('status', 'approved');
-  if (propertyId) statsQuery = statsQuery.eq('property_id', propertyId);
-  const { data: allRatings } = await statsQuery;
-
-  const ratings = allRatings || [];
-  const averageRating = ratings.length > 0
-    ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
-    : 0;
-
-  const reviews = (data || []).map((r: any) => ({
-    ...r,
-    text: r.content,
-    service_type: r.module_id,
-    author: {
-      full_name: r.customer_name || 'Anonymous',
-      profile_image_url: null
-    },
-  }));
-
   res.json({
     success: true,
-    data: {
-      reviews,
-      stats: {
-        totalReviews: ratings.length,
-        averageRating: Math.round(averageRating * 10) / 10,
-      },
-    },
+    data: data || [],
   });
 });
 
@@ -119,6 +98,43 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
 
   const supabase = getSupabase();
   const moduleId = data.service_type || 'general';
+  const resolvedTargetType = data.target_type || data.targetType || 'module';
+  const resolvedTargetId = data.target_id || data.targetId || (resolvedTargetType === 'module' ? (moduleId !== 'general' ? moduleId : '00000000-0000-0000-0000-000000000000') : '00000000-0000-0000-0000-000000000000');
+
+  // Server-side target ownership validation
+  if (resolvedTargetType === 'staff') {
+    const { data: staffMember } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', resolvedTargetId)
+      .maybeSingle();
+    if (!staffMember) {
+      return res.status(400).json({ success: false, error: 'Invalid staff member target' });
+    }
+  } else if (resolvedTargetType === 'item' || resolvedTargetType === 'dish') {
+    const { data: catalogItem } = await supabase
+      .from('catalog_items')
+      .select('id')
+      .eq('id', resolvedTargetId)
+      .maybeSingle();
+    if (!catalogItem) {
+      return res.status(400).json({ success: false, error: 'Invalid menu item target' });
+    }
+  }
+
+  // Ensure reviewer has at least one order/transaction for this property
+  if (propertyId) {
+    const { data: customerTx } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('customer_id', userId)
+      .eq('property_id', propertyId)
+      .limit(1);
+
+    if (!customerTx || customerTx.length === 0) {
+      return res.status(403).json({ success: false, error: 'Only customers with verified transactions can review' });
+    }
+  }
 
   const { data: review, error } = await supabase
     .from('reviews')
@@ -129,8 +145,8 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
       content: data.text,
       module_id: moduleId,
       status: 'pending',
-      target_type: 'module',
-      target_id: '00000000-0000-0000-0000-000000000000',
+      target_type: resolvedTargetType,
+      target_id: resolvedTargetId,
     })
     .select()
     .single();
