@@ -470,12 +470,6 @@ export const modulesApi = {
 // Inventory API
 export const inventoryApi = {
   getItems: (params?: any) => api.get('/inventory/items', { params }),
-  getRecipe: (catalogItemId: string) => api.get(`/inventory/items/recipe/${catalogItemId}`),
-  updateRecipe: (catalogItemId: string, ingredients: any[]) =>
-    api.post(`/inventory/items/recipe/${catalogItemId}`, { ingredients }),
-  getSessionRecipe: (sessionId: string) => api.get(`/inventory/sessions/recipe/${sessionId}`),
-  updateSessionRecipe: (sessionId: string, ingredients: any[]) =>
-    api.post(`/inventory/sessions/recipe/${sessionId}`, { ingredients }),
 };
 
 // Payments API

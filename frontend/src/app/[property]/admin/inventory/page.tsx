@@ -228,8 +228,13 @@ export default function InventoryAdminPage() {
     setRecipeUsageItem(item);
     setRecipeUsage(null);
     try {
-      const res = await api.get(`/inventory/menu-cost-analysis/${item.id}`, { headers: propertyHeader });
-      setRecipeUsage(res.data?.data || res.data);
+      // Use the getItem endpoint which already includes linked menu items
+      const res = await api.get(`/inventory/items/${item.id}`, { headers: propertyHeader });
+      if (res.data.success && res.data.data.linkedMenuItems) {
+        setRecipeUsage({ usedIn: res.data.data.linkedMenuItems });
+      } else {
+        setRecipeUsage({ usedIn: [] });
+      }
     } catch { setRecipeUsage({ error: true }); }
   };
 
@@ -1300,12 +1305,12 @@ export default function InventoryAdminPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">{recipeUsageItem.name}</h3>
-                    <p className="text-sm text-slate-500">Recipe usage — where this item is consumed</p>
                   </div>
                   <button onClick={() => { setRecipeUsageItem(null); setRecipeUsage(null); }} className="text-slate-400 hover:text-slate-600">
                     <XCircle className="w-5 h-5" />
                   </button>
                 </div>
+                <p className="text-sm text-slate-500">Recipe usage — where this item is consumed</p>
                 <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1">
                   <p className="text-xs text-slate-500">Current stock</p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white">{recipeUsageItem.current_stock} <span className="text-base font-normal text-slate-400">{recipeUsageItem.unit}</span></p>
@@ -1325,7 +1330,7 @@ export default function InventoryAdminPage() {
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between">
                               <div>
-                                <p className="font-semibold text-slate-900 dark:text-white">{recipe.menu_item_name}</p>
+                                <p className="font-semibold text-slate-900 dark:text-white">{recipe.name}</p>
                                 <p className="text-xs text-slate-500 mt-0.5">Uses <span className="font-medium">{recipe.quantity_required} {recipeUsageItem.unit}</span> per serving</p>
                                 {recipeUsageItem.cost_per_unit && (
                                   <p className="text-xs text-slate-400">Ingredient cost: {formatCurrency(recipe.quantity_required * recipeUsageItem.cost_per_unit)}</p>
