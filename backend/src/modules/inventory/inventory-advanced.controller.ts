@@ -587,197 +587,26 @@ export class InventoryAdvancedController {
   }
 
   // ============================================
-  // BILL OF MATERIALS (BOM) / RECIPE SYSTEM
+  // DEDUCTION FOR ORDERS
   // ============================================
 
   /**
-   * Create a recipe (BOM) for a menu item
-   */
-  async createRecipe(req: Request, res: Response) {
-    try {
-      const { catalogItemId, name, ingredients, yields, prepTime, notes } = req.body;
-      const supabase = getSupabase();
-
-      // Validate ingredients
-      if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
-        return res.status(400).json({ success: false, error: 'At least one ingredient is required' });
-      }
-
-      // Create recipe
-      const { data: recipe, error: recipeError } = await supabase
-        .from('inventory_recipes')
-        .insert({
-          catalog_item_id: catalogItemId,
-          name,
-          yields: yields || 1,
-          prep_time_minutes: prepTime,
-          notes,
-          is_active: true,
-        })
-        .select()
-        .single();
-
-      if (recipeError) throw recipeError;
-
-      // Add ingredients
-      const ingredientRecords = ingredients.map((ing: any) => ({
-        recipe_id: recipe.id,
-        inventory_item_id: ing.itemId,
-        quantity: ing.quantity,
-        unit: ing.unit,
-        is_optional: ing.isOptional || false,
-        notes: ing.notes,
-      }));
-
-      const { error: ingredientError } = await supabase
-        .from('inventory_recipe_ingredients')
-        .insert(ingredientRecords);
-
-      if (ingredientError) throw ingredientError;
-
-      // Fetch complete recipe
-      const { data: completeRecipe } = await supabase
-        .from('inventory_recipes')
-        .select(`
-          *,
-          ingredients:inventory_recipe_ingredients(
-            *,
-            inventory_item:inventory_items(id, name, unit, current_stock, cost_per_unit)
-          )
-        `)
-        .eq('id', recipe.id)
-        .single();
-
-      res.status(201).json({ success: true, data: completeRecipe });
-    } catch (error: any) {
-      logger.error('Error creating recipe:', error);
-      res.status(500).json({ success: false, error: 'Failed to create recipe', message: error.message });
-    }
-  }
-
-  /**
-   * Get recipe for a menu item
-   */
-  async getRecipe(req: Request, res: Response) {
-    try {
-      const { catalogItemId } = req.params;
-      const supabase = getSupabase();
-
-      const { data: recipe, error } = await supabase
-        .from('inventory_recipes')
-        .select(`
-          *,
-          ingredients:inventory_recipe_ingredients(
-            *,
-            inventory_item:inventory_items(id, name, unit, current_stock, cost_per_unit)
-          )
-        `)
-        .eq('catalog_item_id', catalogItemId)
-        .eq('is_active', true)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      if (!recipe) {
-        return res.json({ success: true, data: null, message: 'No recipe found for this menu item' });
-      }
-
-      // Calculate total cost
-      const totalCost = (recipe.ingredients || []).reduce((sum: number, ing: any) => {
-        const unitCost = parseFloat(ing.inventory_item?.cost_per_unit) || 0;
-        return sum + (ing.quantity * unitCost);
-      }, 0);
-
-      // Check stock availability
-      const stockStatus = (recipe.ingredients || []).map((ing: any) => ({
-        itemId: ing.inventory_item_id,
-        itemName: ing.inventory_item?.name,
-        required: ing.quantity * recipe.yields,
-        available: parseFloat(ing.inventory_item?.current_stock) || 0,
-        sufficient: (parseFloat(ing.inventory_item?.current_stock) || 0) >= ing.quantity * recipe.yields,
-      }));
-
-      res.json({
-        success: true,
-        data: {
-          ...recipe,
-          totalCost,
-          stockStatus,
-          canProduce: stockStatus.every((s: any) => s.sufficient),
-        },
-      });
-    } catch (error: any) {
-      logger.error('Error fetching recipe:', error);
-      res.status(500).json({ success: false, error: 'Failed to fetch recipe', message: error.message });
-    }
-  }
-
-  /**
-   * Update recipe ingredients
-   */
-  async updateRecipe(req: Request, res: Response) {
-    try {
-      const { recipeId } = req.params;
-      const { ingredients, yields, prepTime, notes } = req.body;
-      const supabase = getSupabase();
-
-      // Update recipe metadata
-      const { error: updateError } = await supabase
-        .from('inventory_recipes')
-        .update({
-          yields: yields,
-          prep_time_minutes: prepTime,
-          notes,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', recipeId);
-
-      if (updateError) throw updateError;
-
-      // Replace ingredients if provided
-      if (ingredients && Array.isArray(ingredients)) {
-        // Delete existing ingredients
-        await supabase
-          .from('inventory_recipe_ingredients')
-          .delete()
-          .eq('recipe_id', recipeId);
-
-        // Insert new ingredients
-        const ingredientRecords = ingredients.map((ing: any) => ({
-          recipe_id: recipeId,
-          inventory_item_id: ing.itemId,
-          quantity: ing.quantity,
-          unit: ing.unit,
-          is_optional: ing.isOptional || false,
-          notes: ing.notes,
-        }));
-
-        await supabase.from('inventory_recipe_ingredients').insert(ingredientRecords);
-      }
-
-      // Fetch updated recipe
-      const { data: recipe } = await supabase
-        .from('inventory_recipes')
-        .select(`
-          *,
-          ingredients:inventory_recipe_ingredients(
-            *,
-            inventory_item:inventory_items(id, name, unit, current_stock)
-          )
-        `)
-        .eq('id', recipeId)
-        .single();
-
-      res.json({ success: true, data: recipe });
-    } catch (error: any) {
-      logger.error('Error updating recipe:', error);
-      res.status(500).json({ success: false, error: 'Failed to update recipe', message: error.message });
-    }
-  }
-
-  /**
    * Deduct inventory based on order completion
-   * Called when an order status changes to 'completed'
+   * 
+   * DORMANT ENDPOINT - NOT CALLED BY PRODUCTION CODE
+   * 
+   * This endpoint is not currently used in the production codebase. The actual automatic
+   * inventory deduction on order status changes is handled by:
+   * - engines/inventory-side-effects.ts (calls deduct_inventory_for_order RPC directly)
+   * - dynamic-module.router.ts (calls deduct_inventory_for_order_items at order creation)
+   * 
+   * This function is kept for potential manual testing or future use, but should not be
+   * considered the primary inventory deduction path. If modifying inventory deduction logic,
+   * ensure changes are also made to:
+   * 1. deduct_inventory_for_order RPC (database function)
+   * 2. deduct_inventory_for_order_items RPC (database function)
+   * 3. engines/inventory-side-effects.ts
+   * 4. dynamic-module.router.ts
    */
   async deductForOrder(req: Request, res: Response) {
     try {
@@ -788,7 +617,7 @@ export class InventoryAdvancedController {
       // Get order items
       const { data: orderItems, error: orderError } = await supabase
         .from('order_items')
-        .select('product_id, quantity')
+        .select('catalog_item_id, quantity')
         .eq('order_id', orderId);
 
       if (orderError) throw orderError;
@@ -796,28 +625,23 @@ export class InventoryAdvancedController {
       const deductionResults: any[] = [];
 
       for (const orderItem of orderItems || []) {
-        // Get recipe for this product
-        const { data: recipe } = await supabase
-          .from('inventory_recipes')
+        // Get ingredients for this catalog item from menu_item_ingredients
+        const { data: ingredients } = await supabase
+          .from('menu_item_ingredients')
           .select(`
-            *,
-            ingredients:inventory_recipe_ingredients(
-              inventory_item_id,
-              quantity,
-              is_optional
-            )
+            inventory_item_id,
+            quantity_required,
+            is_optional
           `)
-          .eq('catalog_item_id', orderItem.product_id)
-          .eq('is_active', true)
-          .single();
+          .eq('catalog_item_id', orderItem.catalog_item_id);
 
-        if (!recipe) continue; // No recipe = no deduction
+        if (!ingredients || ingredients.length === 0) continue; // No ingredients = no deduction
 
         // Deduct each required ingredient
-        for (const ingredient of recipe.ingredients || []) {
+        for (const ingredient of ingredients) {
           if (ingredient.is_optional) continue;
 
-          const deductQty = ingredient.quantity * orderItem.quantity;
+          const deductQty = ingredient.quantity_required * orderItem.quantity;
 
           // Get current stock
           const { data: item } = await supabase
@@ -895,36 +719,31 @@ export class InventoryAdvancedController {
    */
   async getMenuItemCostAnalysis(req: Request, res: Response) {
     try {
-      const { catalogItemId } = req.params;
+      const { menuItemId } = req.params;
       const supabase = getSupabase();
 
       // Get menu item
       const { data: menuItem, error: menuError } = await supabase
-        .from('products')
+        .from('catalog_items')
         .select('id, name, price')
-        .eq('id', catalogItemId)
-        .single();
+        .eq('id', menuItemId)
+        .maybeSingle();
 
       if (menuError || !menuItem) {
         return res.status(404).json({ success: false, error: 'Menu item not found' });
       }
 
-      // Get recipe
-      const { data: recipe } = await supabase
-        .from('inventory_recipes')
+      // Get recipe from menu_item_ingredients (the authoritative table for deductions)
+      const { data: ingredients } = await supabase
+        .from('menu_item_ingredients')
         .select(`
-          *,
-          ingredients:inventory_recipe_ingredients(
-            quantity,
-            unit,
-            inventory_item:inventory_items(id, name, cost_per_unit)
-          )
+          quantity_required,
+          unit,
+          inventory_item:inventory_items(id, name, cost_per_unit)
         `)
-        .eq('catalog_item_id', catalogItemId)
-        .eq('is_active', true)
-        .single();
+        .eq('catalog_item_id', menuItemId);
 
-      if (!recipe) {
+      if (!ingredients || ingredients.length === 0) {
         return res.json({
           success: true,
           data: {
@@ -936,12 +755,12 @@ export class InventoryAdvancedController {
       }
 
       // Calculate costs
-      const ingredientCosts = (recipe.ingredients || []).map((ing: any) => {
+      const ingredientCosts = ingredients.map((ing: any) => {
         const unitCost = parseFloat(ing.inventory_item?.cost_per_unit) || 0;
-        const totalCost = ing.quantity * unitCost;
+        const totalCost = ing.quantity_required * unitCost;
         return {
           name: ing.inventory_item?.name,
-          quantity: ing.quantity,
+          quantity: ing.quantity_required,
           unit: ing.unit,
           unitCost,
           totalCost,
@@ -958,10 +777,6 @@ export class InventoryAdvancedController {
         data: {
           menuItem,
           hasRecipe: true,
-          recipe: {
-            id: recipe.id,
-            yields: recipe.yields,
-          },
           costAnalysis: {
             ingredientCosts,
             totalCost: totalCost.toFixed(2),

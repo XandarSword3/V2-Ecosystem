@@ -1099,7 +1099,8 @@ function OptionDialog({
         isAvailable: true,
       });
     }
-  }, [option, open]);
+    setInventorySearch('');
+  }, [option, open, setInventorySearch]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1207,36 +1208,63 @@ function OptionDialog({
                 >✕</button>
               </div>
             )}
-            <Input
-              value={inventorySearch}
-              onChange={e => setInventorySearch(e.target.value)}
-              placeholder="Search inventory items…"
-              className="bg-card text-foreground border-border mb-1"
-            />
-            {inventorySearch.length > 0 && (
-              <div className="max-h-36 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
-                {inventoryItems
-                  .filter(i => i.name.toLowerCase().includes(inventorySearch.toLowerCase()))
-                  .slice(0, 10)
-                  .map(item => (
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 pointer-events-none">
+                <Search className="h-4 w-4" />
+              </div>
+              <Input
+                value={inventorySearch}
+                onChange={e => setInventorySearch(e.target.value)}
+                placeholder="Type to filter… click below to select from all items"
+                className="bg-card text-foreground border-border pl-9 mb-1"
+              />
+            </div>
+            <div className="max-h-36 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
+              {(() => {
+                const q = inventorySearch.trim().toLowerCase();
+                const filtered = q.length
+                  ? inventoryItems.filter(i =>
+                      i.name.toLowerCase().includes(q) ||
+                      (i as any).sku?.toLowerCase()?.includes(q)
+                    )
+                  : inventoryItems.slice();
+                if (filtered.length === 0) {
+                  return (
+                    <p className="px-3 py-2.5 text-xs text-slate-400 italic">No items found</p>
+                  );
+                }
+                return filtered.map(item => {
+                  const isSelected = formData.inventoryItemId === item.id;
+                  return (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => {
-                        setFormData({ ...formData, inventoryItemId: item.id });
+                        setFormData({
+                          ...formData,
+                          inventoryItemId: isSelected ? undefined : item.id,
+                        });
                         setInventorySearch('');
                       }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between"
+                      className={
+                        'w-full text-left px-2.5 py-1.5 text-xs flex items-center justify-between transition-colors ' +
+                        (isSelected
+                          ? 'bg-primary/10 text-primary dark:bg-primary/20'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200')
+                      }
                     >
-                      <span className="text-slate-800 dark:text-slate-200">{item.name}</span>
-                      <span className="text-xs text-slate-400">{item.current_stock} {item.unit}</span>
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        {isSelected && <CheckCircle2 className="h-3 w-3 shrink-0" />}
+                        <span className="truncate">{item.name}</span>
+                      </span>
+                      <span className="text-[11px] text-slate-400 shrink-0 ml-2 tabular-nums">
+                        {Number(item.current_stock).toLocaleString()} {item.unit}
+                      </span>
                     </button>
-                  ))}
-                {inventoryItems.filter(i => i.name.toLowerCase().includes(inventorySearch.toLowerCase())).length === 0 && (
-                  <p className="px-3 py-2 text-sm text-slate-400">No items found</p>
-                )}
-              </div>
-            )}
+                  );
+                });
+              })()}
+            </div>
           </div>
 
           <div className="flex items-center gap-6 pt-2">

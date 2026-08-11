@@ -167,7 +167,7 @@ export default function DynamicMenuPage() {
         is_spicy: item.metadata?.is_spicy || false,
         preparation_time: item.metadata?.preparation_time_minutes,
         allergens: item.metadata?.allergens,
-        recipe: item.metadata?.recipe,
+        recipe: item.metadata?.recipe, // Keep metadata.recipe for UI display, but menu_item_ingredients is authoritative
         customization_group_ids: item.metadata?.customization_group_ids,
       }));
       setItems(transformedItems);
@@ -276,13 +276,67 @@ export default function DynamicMenuPage() {
         customization_group_ids: selectedGroups.length > 0 ? selectedGroups : undefined,
       };
       
+      let savedItemId: string | undefined;
+      
       if (editingItem) {
         await api.put(`/${slug}/admin/items/${editingItem.id}`, payload);
+        savedItemId = editingItem.id;
         toast.success('Menu item updated successfully');
       } else {
-        await api.post(`/${slug}/admin/items`, payload);
+        const response = await api.post(`/${slug}/admin/items`, payload);
+        savedItemId = response.data?.data?.id;
         toast.success('Menu item created successfully');
       }
+
+      // Sync recipe items to menu_item_ingredients table for inventory deductions
+      // Always sync on edit (including empty recipes) to handle deletions
+      if (savedItemId && editingItem) {
+        try {
+          // Delete all existing links for this catalog item first (handles deletions)
+          await api.delete(`/inventory/items/${savedItemId}/menu-ingredients`, { headers: propertyHeader });
+          
+          // Insert current recipe items
+          if (recipeItems.length > 0) {
+            const insertPromises = recipeItems.map(recipeItem =>
+              api.post(`/inventory/items/${recipeItem.ingredient_id}/link-menu`, {
+                catalogItemId: savedItemId,
+                quantityRequired: recipeItem.quantity,
+                unit: recipeItem.unit,
+              }, { headers: propertyHeader })
+            );
+            
+            await Promise.all(insertPromises);
+          }
+          console.log(`Synced ${recipeItems.length} recipe items to inventory links`);
+        } catch (linkError) {
+          console.error('Failed to sync recipe to inventory links:', linkError);
+          // Rollback: delete all links to prevent partial state
+          try {
+            await api.delete(`/inventory/items/${savedItemId}/menu-ingredients`, { headers: propertyHeader });
+          } catch (rollbackError) {
+            console.error('Failed to rollback recipe sync:', rollbackError);
+          }
+          toast.warning('Menu item saved but recipe inventory links failed - inventory deductions may not work');
+        }
+      } else if (savedItemId && recipeItems.length > 0) {
+        // New item with recipe - just insert (no deletions needed)
+        try {
+          const insertPromises = recipeItems.map(recipeItem =>
+            api.post(`/inventory/items/${recipeItem.ingredient_id}/link-menu`, {
+              catalogItemId: savedItemId,
+              quantityRequired: recipeItem.quantity,
+              unit: recipeItem.unit,
+            }, { headers: propertyHeader })
+          );
+          
+          await Promise.all(insertPromises);
+          console.log(`Synced ${recipeItems.length} recipe items to inventory links`);
+        } catch (linkError) {
+          console.error('Failed to sync recipe to inventory links:', linkError);
+          toast.warning('Menu item saved but recipe inventory links failed - inventory deductions may not work');
+        }
+      }
+
       fetchData();
       setShowModal(false);
     } catch (error: unknown) {

@@ -1102,6 +1102,7 @@ function buildInstantTransactionRouter(router: Router): void {
       // record, so a hiccup here must not block order creation — but unlike
       // the ledger snapshot, a failure here means inventory won't deduct
       // and the kitchen won't see items, so it's logged at error, not warn.
+      let insertedOrderItems: any[] = [];
       try {
         const orderItemRows = catalogResult.resolvedItems.map((item, index) => {
           const currentItem = items[index] as {
@@ -1112,6 +1113,9 @@ function buildInstantTransactionRouter(router: Router): void {
           const specialInstructions = (currentItem.metadata?.specialInstructions
             ?? currentItem.metadata?.notes
             ?? null) as string | null;
+          const selectedModifiers = Array.isArray(currentItem.metadata?.selectedModifiers)
+            ? currentItem.metadata!.selectedModifiers
+            : undefined;
           const unitPrice = item.basePrice + item.modifierAdjustment;
           return {
             transaction_id: created.id,
@@ -1123,21 +1127,108 @@ function buildInstantTransactionRouter(router: Router): void {
             status: 'pending',
             tenant_id: tenantId,
             property_id: propertyId,
+            metadata: {
+              ...(selectedModifiers ? { selectedModifiers } : {}),
+            },
           };
         });
 
-        const { error: orderItemsError } = await supabase.from('order_items').insert(orderItemRows);
+        const { data: orderItemsData, error: orderItemsError } = await supabase
+          .from('order_items')
+          .insert(orderItemRows)
+          .select('id, catalog_item_id, metadata');
+        
         if (orderItemsError) {
           logger.error('[Dynamic Router] Failed to persist order_items — inventory deduction and KDS item display will be broken for this order', {
             orderId: created.id,
             error: orderItemsError.message,
           });
+        } else {
+          insertedOrderItems = orderItemsData || [];
         }
       } catch (orderItemsErr) {
         logger.error('[Dynamic Router] Unexpected error persisting order_items', {
           orderId: created.id,
           error: orderItemsErr instanceof Error ? orderItemsErr.message : String(orderItemsErr),
         });
+      }
+
+      // Process customization inventory for items with selectedModifiers
+      // This must happen after order_items insertion so we have order_item_id for snapshots
+      if (insertedOrderItems.length > 0) {
+        try {
+          for (const orderItem of insertedOrderItems) {
+            const selectedModifiers = orderItem.metadata?.selectedModifiers;
+            if (!selectedModifiers || !Array.isArray(selectedModifiers) || selectedModifiers.length === 0) {
+              continue;
+            }
+
+            // Transform selectedModifiers to the format expected by create_order_customization_snapshot
+            // Expected format: [{ groupId, optionId, quantity }]
+            const selections = selectedModifiers.map((mod: any) => ({
+              groupId: mod.groupId,
+              optionId: mod.optionId,
+              quantity: mod.quantity || 1,
+            }));
+
+            logger.info('[Dynamic Router] Processing customizations for order item:', {
+              orderItemId: orderItem.id,
+              catalogItemId: orderItem.catalog_item_id,
+              baseQuantity: orderItem.quantity,
+              selections: selections,
+            });
+
+            // Call create_order_customization_snapshot to validate, snapshot, and execute inventory
+            const { error: customizationError, data: customizationData } = await supabase.rpc('create_order_customization_snapshot', {
+              p_order_type: 'instant_transaction',
+              p_order_id: created.id,
+              p_order_item_id: orderItem.id,
+              p_entity_type: 'catalog_item',
+              p_entity_id: orderItem.catalog_item_id,
+              p_selections: selections,
+              p_base_quantity: orderItem.quantity,
+              p_execute_inventory: true,
+            });
+
+            if (customizationError) {
+              logger.error('[Dynamic Router] Customization inventory deduction failed, rolling back order:', {
+                error: customizationError,
+                message: customizationError.message,
+                details: customizationError.details,
+                hint: customizationError.hint,
+                code: customizationError.code,
+                selections: selections,
+                baseQuantity: orderItem.quantity,
+              });
+              
+              // Compensating transaction: delete order and reverse base inventory deduction
+              await supabase.from('order_items').delete().eq('transaction_id', created.id);
+              await supabase.from('transactions').delete().eq('id', created.id);
+              
+              // Note: base inventory deduction reversal would require a compensating RPC
+              // For now, we accept that base deduction may not be reversed on customization failure
+              // This is a known limitation that should be addressed in a future iteration
+              
+              return res.status(400).json({
+                success: false,
+                error: 'INSUFFICIENT_STOCK_CUSTOMIZATION',
+                message: 'One or more customizations in your order are out of stock',
+              });
+            }
+          }
+        } catch (customizationErr: any) {
+          logger.error('[Dynamic Router] Exception during customization inventory processing:', customizationErr);
+          
+          // Compensating transaction: delete order
+          await supabase.from('order_items').delete().eq('transaction_id', created.id);
+          await supabase.from('transactions').delete().eq('id', created.id);
+          
+          return res.status(400).json({
+            success: false,
+            error: 'INSUFFICIENT_STOCK_CUSTOMIZATION',
+            message: customizationErr?.message || 'Failed to process customizations',
+          });
+        }
       }
 
       // Persist the full pricing breakdown (subtotal, discount detail,
