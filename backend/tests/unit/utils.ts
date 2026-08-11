@@ -31,18 +31,35 @@ export function createMockReqRes(options: {
   params?: Record<string, string>; 
   query?: Record<string, any>; 
   body?: Record<string, any>;
-  user?: { id: string; role: string; userId: string };
+  user?: { id: string; role: string; userId: string; tenantId?: string; scope?: string };
   headers?: Record<string, string>;
+  propertyId?: string;
 } = {}) {
   const req = {
     params: options.params || {},
     query: options.query || {},
     body: options.body || {},
-    user: options.user || { id: 'admin-1', role: 'admin', userId: 'admin-1' },
+    // tenantId/scope: needed by security/tenant-scope.ts's getCallerTenantId
+    // and requireTenantScope, used for cross-tenant IDOR checks in
+    // roles/permissions controllers. Defaults model a normal tenant-scoped
+    // admin (tenant_admin maps to the 'admin' role, matching the default
+    // role below) — tests exercising a specific tenant mismatch or a
+    // genuinely-unscoped platform admin should override explicitly.
+    user: options.user || { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
     headers: options.headers || {},
     get: vi.fn((name: string) => (options.headers || {})[name?.toLowerCase()]),
     header: vi.fn((name: string) => (options.headers || {})[name?.toLowerCase()]),
     cookies: {},
+    // propertyId: set by validatePropertyAccess in the real request chain
+    // (see propertyAccess.middleware.ts). Admin controllers for gift cards,
+    // coupons, and reviews now require this via requirePropertyId. Left
+    // undefined by default — not every controller path is admin-only, and
+    // some (e.g. reviews.controller.ts's createReview) branch on whether a
+    // property context exists at all, so silently defaulting it here would
+    // change behavior for tests that aren't about property scoping. Pass
+    // `propertyId: 'property-1'` (or similar) explicitly in tests that
+    // exercise an admin endpoint.
+    propertyId: options.propertyId,
   } as unknown as Request;
 
   const res = {

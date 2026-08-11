@@ -256,7 +256,10 @@ describe('Coupon Controller', () => {
   describe('getAllCoupons (Admin)', () => {
     it('should return paginated coupons', async () => {
       mockRequest.query = { page: '1', limit: '10' };
-      mockRequest.user = { id: 'admin-123', role: 'admin' };
+      mockRequest.user = { id: 'admin-123', role: 'admin', tenantId: 'tenant-1', scope: 'tenant_admin' };
+      // getAllCoupons is now an admin endpoint gated by requirePropertyId —
+      // simulates what validatePropertyAccess sets on the real request chain.
+      (mockRequest as any).propertyId = 'property-1';
 
       const mockCoupons = [
         { id: 'coupon-1', code: 'SAVE10', discount_type: 'percentage', discount_value: 10, users: null },
@@ -286,7 +289,10 @@ describe('Coupon Controller', () => {
         discountValue: 15,
         appliesTo: 'all',
       };
-      mockRequest.user = { id: 'admin-123', role: 'admin' };
+      mockRequest.user = { id: 'admin-123', role: 'admin', tenantId: 'tenant-1', scope: 'tenant_admin' };
+      // createCoupon now requires tenant scope (requireTenantScope) and
+      // property scope (requirePropertyId) — see cross-tenant sweep fix.
+      (mockRequest as any).propertyId = 'property-1';
 
       const createdCoupon = {
         id: 'coupon-new',
