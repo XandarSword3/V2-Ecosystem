@@ -356,6 +356,7 @@ describe('Reviews Controller', () => {
 
       const { getAllReviews } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         query: {},
       });
 
@@ -395,6 +396,7 @@ describe('Reviews Controller', () => {
 
       const { getAllReviews } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         query: { status: 'pending' },
       });
 
@@ -416,6 +418,7 @@ describe('Reviews Controller', () => {
 
       const { getAllReviews } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         query: { status: 'approved' },
       });
 
@@ -433,6 +436,7 @@ describe('Reviews Controller', () => {
 
       const { getAllReviews } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         query: { service_type: 'accommodation_units' },
       });
 
@@ -450,7 +454,7 @@ describe('Reviews Controller', () => {
       } as any);
 
       const { getAllReviews } = await import('../../src/modules/reviews/reviews.controller.js');
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({ propertyId: 'property-1' });
 
       await getAllReviews(req, res, next);
 
@@ -477,6 +481,7 @@ describe('Reviews Controller', () => {
 
       const { updateReviewStatus } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         params: { id: 'review-1' },
         body: { status: 'approved' },
       });
@@ -505,6 +510,7 @@ describe('Reviews Controller', () => {
 
       const { updateReviewStatus } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         params: { id: 'review-1' },
         body: { status: 'rejected' },
       });
@@ -526,6 +532,7 @@ describe('Reviews Controller', () => {
 
       const { updateReviewStatus } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         params: { id: 'nonexistent-review' },
         body: { status: 'approved' },
       });
@@ -548,6 +555,7 @@ describe('Reviews Controller', () => {
 
       const { updateReviewStatus } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         params: { id: 'review-1' },
         body: { status: 'approved' },
       });
@@ -571,6 +579,7 @@ describe('Reviews Controller', () => {
 
       const { deleteReview } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         params: { id: 'review-1' },
       });
 
@@ -595,6 +604,7 @@ describe('Reviews Controller', () => {
 
       const { deleteReview } = await import('../../src/modules/reviews/reviews.controller.js');
       const { req, res, next } = createMockReqRes({
+        propertyId: 'property-1',
         params: { id: 'review-1' },
       });
 
