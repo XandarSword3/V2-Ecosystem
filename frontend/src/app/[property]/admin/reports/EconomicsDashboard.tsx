@@ -396,7 +396,7 @@ export default function EconomicsDashboard() {
                   <XAxis dataKey="time" tickFormatter={(v) => format(new Date(v), 'MMM d')} />
                   <YAxis />
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <Tooltip labelFormatter={(v) => format(new Date(v), 'MMM d, yyyy')} formatter={(value: any) => formatCurrency(Number(value))} />
+                  <Tooltip labelFormatter={(v) => format(new Date(v as string | number), 'MMM d, yyyy')} formatter={(value: any) => formatCurrency(Number(value))} />
                   <Legend />
                   {engines.map((engine, i) => (
                     <Area key={engine} type="monotone" dataKey={engine} stackId="1" stroke={colors[i % colors.length]} fill={`url(#color${engine})`} />
