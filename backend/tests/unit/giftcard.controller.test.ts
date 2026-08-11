@@ -92,7 +92,7 @@ describe('Gift Card Controller', () => {
     };
     
     mockRequest = {
-      user: { id: 'user-123', userId: 'user-123', email: 'user@example.com', roles: ['customer'] },
+      user: { id: 'user-123', userId: 'user-123', email: 'user@example.com', roles: ['customer'], tenantId: 'tenant-1', scope: 'customer' },
       params: {},
       query: {},
       body: {},
@@ -354,6 +354,9 @@ describe('Gift Card Controller', () => {
     it('should return paginated gift cards', async () => {
       mockRequest.query = { page: '1', limit: '10' };
       mockRequest.user = { id: 'admin-123', userId: 'admin-123', email: 'admin@example.com', roles: ['admin'] };
+      // getAllGiftCards is now an admin endpoint gated by requirePropertyId —
+      // simulates what validatePropertyAccess sets on the real request chain.
+      (mockRequest as any).propertyId = 'property-1';
 
       const mockGiftCards = [
         { id: 'gc-1', code: 'GIFT-1', current_balance: 50, status: 'active' },

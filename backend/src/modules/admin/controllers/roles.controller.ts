@@ -7,12 +7,21 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection';
 import { logActivity } from '../../../utils/activityLogger';
+import { getCallerTenantId, requireTenantScope } from '../../../security/tenant-scope.js';
 
 export const getRoles = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    const { data: rolesList, error } = await supabase
-      .from('roles')
-      .select('*');
+    // Cross-tenant IDOR fix: `roles` is a tenant-scoped table (tenant_id
+    // NOT NULL). This previously selected '*' with no tenant filter at all —
+    // any tenant_owner could read every tenant's custom role definitions.
+    // getCallerTenantId returns null only for a genuinely unscoped platform
+    // admin, in which case the query intentionally spans every tenant, same
+    // as validatePropertyAccess's super_admin bypass elsewhere. See
+    // CONTEXT.md cross-tenant sweep.
+    const tenantId = getCallerTenantId(req);
+    let rolesQuery = supabase.from('roles').select('*');
+    if (tenantId) rolesQuery = rolesQuery.eq('tenant_id', tenantId);
+    const { data: rolesList, error } = await rolesQuery;
 
     if (error) throw error;
 
@@ -65,6 +74,10 @@ export const getRoles = asyncHandler(async (req: Request, res: Response) => {
 
 export const createRole = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
+    // Insert must always be stamped with a concrete tenant_id (NOT NULL
+    // column) — requireTenantScope throws 403 rather than silently inserting
+    // under the wrong tenant if the caller has no concrete tenant context.
+    const tenantId = requireTenantScope(req);
     const { data: role, error } = await supabase
       .from('roles')
       .insert({
@@ -72,6 +85,7 @@ export const createRole = asyncHandler(async (req: Request, res: Response) => {
         display_name: req.body.displayName,
         description: req.body.description,
         business_unit: req.body.businessUnit,
+        tenant_id: tenantId,
       })
       .select()
       .single();
@@ -98,6 +112,20 @@ export const createRole = asyncHandler(async (req: Request, res: Response) => {
 
 export const updateRole = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
+    const tenantId = getCallerTenantId(req);
+
+    // Confirm the target role belongs to the caller's tenant before touching
+    // it. This is the actual fix for the cross-tenant IDOR: previously the
+    // update below ran with only .eq('id', req.params.id) — any tenant_owner
+    // could update any other tenant's role by UUID. 404 (not 403) so we don't
+    // reveal whether the id exists under a different tenant.
+    if (tenantId) {
+      const { data: owned } = await supabase.from('roles').select('id').eq('id', req.params.id).eq('tenant_id', tenantId).maybeSingle();
+      if (!owned) {
+        return res.status(404).json({ success: false, error: 'Role not found' });
+      }
+    }
+
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     };
@@ -137,6 +165,19 @@ export const updateRole = asyncHandler(async (req: Request, res: Response) => {
 export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params;
+    const tenantId = getCallerTenantId(req);
+
+    // Confirm the target role belongs to the caller's tenant before touching
+    // it — same fix as updateRole. Also grab the name here (previously a
+    // separate query below) since we need it for the app_role_permissions
+    // cleanup either way.
+    let roleQuery = supabase.from('roles').select('id, name').eq('id', id);
+    if (tenantId) roleQuery = roleQuery.eq('tenant_id', tenantId);
+    const { data: roleData } = await roleQuery.maybeSingle();
+
+    if (!roleData) {
+      return res.status(404).json({ success: false, error: 'Role not found' });
+    }
 
     // Check if role has assigned users
     const { count } = await supabase
@@ -151,18 +192,18 @@ export const deleteRole = asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    // Get role name to clean up app_role_permissions
-    const { data: roleData } = await supabase
-      .from('roles')
-      .select('name')
-      .eq('id', id)
-      .single();
-
-    if (roleData?.name) {
-      await supabase
-        .from('app_role_permissions')
-        .delete()
-        .eq('role_name', roleData.name);
+    if (roleData.name) {
+      // Scoped by tenant_id as well as role_name: app_role_permissions has no
+      // FK to a specific role, only (role_name, tenant_id, property_id), so
+      // deleting by name alone would wipe permission rows for any other
+      // tenant's role that happens to share this name. Scoping by tenant_id
+      // limits the blast radius to this tenant. Note this table's underlying
+      // caching layer (permission-cache.service.ts) still keys purely by
+      // role_name in memory — that's a separate, deeper design question
+      // flagged separately, not fixed by this change.
+      let cleanupQuery = supabase.from('app_role_permissions').delete().eq('role_name', roleData.name);
+      if (tenantId) cleanupQuery = cleanupQuery.eq('tenant_id', tenantId);
+      await cleanupQuery;
     }
 
     // Delete role permissions first
