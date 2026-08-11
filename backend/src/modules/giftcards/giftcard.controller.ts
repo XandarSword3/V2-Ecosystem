@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
+import { getScopedClient } from '../../security/scoped-client.js';
 import { z } from 'zod';
 import crypto from 'crypto';
 import { emailService } from '../../services/email.service.js';
@@ -619,9 +620,16 @@ export class GiftCardController {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
+      // Tenant context is built from the PROPERTY's owner, not the caller's
+      // JWT tenant — a super_admin can legitimately create a gift card for a
+      // property outside their own homed tenant (see validatePropertyAccess's
+      // bypass). getScopedClient's insert stamps tenant_id from ctx.tenantId,
+      // so passing the property-derived value here (rather than
+      // tenantContextFor(req), which would use the caller's own tenant) keeps
+      // this correct for that case too, not just the common one.
       const tenant_id = await getTenantIdForProperty(propertyId);
-      const { data: giftCard, error: insertError } = await supabase
-        .from('gift_cards')
+      const scoped = getScopedClient({ tenantId: tenant_id, actorId: req.user?.id });
+      const { data: giftCard, error: insertError } = await scoped.from('gift_cards')
         .insert({
           code,
           initial_value: finalAmount,
@@ -633,7 +641,6 @@ export class GiftCardController {
           personal_message: finalMessage,
           expires_at: expiresAt.toISOString(),
           property_id: propertyId,
-          tenant_id,
         })
         .select()
         .single();
