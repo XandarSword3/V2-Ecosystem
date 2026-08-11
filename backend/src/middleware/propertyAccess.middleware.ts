@@ -168,6 +168,29 @@ async function userHasAccessToProperty(userId: string, propertyId: string): Prom
   return (matchingProperty?.length ?? 0) > 0;
 }
 
+/**
+ * Enforces that a property context was actually established.
+ *
+ * validatePropertyAccess is deliberately permissive when no x-property-id
+ * header is sent at all — that's correct for endpoints where "no property
+ * scoping" is a valid state. It is NOT correct for admin CRUD endpoints on
+ * property-scoped resources (coupons, gift cards, reviews, etc.): several of
+ * those controllers used to apply their own property_id filter only when a
+ * value happened to be present, so simply omitting the header (or, worse,
+ * sending a different tenant's property UUID before this middleware existed
+ * in their route chain) returned or mutated rows across every tenant on the
+ * platform. Chain this immediately AFTER validatePropertyAccess — that call
+ * already verified ownership when a property_id was supplied; this one just
+ * makes supplying it mandatory instead of optional.
+ */
+export function requirePropertyId(req: Request, res: Response, next: NextFunction): void {
+  if (!(req as any).propertyId) {
+    res.status(400).json({ success: false, error: 'X-Property-Id header is required for this endpoint' });
+    return;
+  }
+  next();
+}
+
 export function requirePropertyAccess(propertyId: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!propertyId) {

@@ -108,7 +108,7 @@ describe('RolesController', () => {
           description: 'Management role',
           businessUnit: 'property'
         },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
       });
 
       await createRole(req, res, next);
@@ -131,7 +131,7 @@ describe('RolesController', () => {
 
       const { req, res, next } = createMockReqRes({
         body: { name: 'duplicate' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
       });
 
       await createRole(req, res, next);
@@ -148,6 +148,7 @@ describe('RolesController', () => {
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: { id: 'role-1' }, error: null })),
         single: vi.fn().mockImplementation(() => Promise.resolve({ data: mockRole, error: null }))
       };
 
@@ -156,7 +157,7 @@ describe('RolesController', () => {
       const { req, res, next } = createMockReqRes({
         params: { id: 'role-1' },
         body: { name: 'updated-role', displayName: 'Updated Role' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
       });
 
       await updateRole(req, res, next);
@@ -172,6 +173,7 @@ describe('RolesController', () => {
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: { id: 'role-1' }, error: null })),
         single: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: new Error('Update failed') }))
       };
 
@@ -180,7 +182,7 @@ describe('RolesController', () => {
       const { req, res, next } = createMockReqRes({
         params: { id: 'role-1' },
         body: { name: 'test' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
       });
 
       await updateRole(req, res, next);
@@ -210,7 +212,9 @@ describe('RolesController', () => {
         if (table === 'app_role_permissions') {
           return {
             delete: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ error: null })
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null })
+              })
             })
           };
         }
@@ -218,7 +222,10 @@ describe('RolesController', () => {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({ data: { name: 'admin' }, error: null })
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'role-1', name: 'admin' }, error: null })
+                }),
+                maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'role-1', name: 'admin' }, error: null })
               })
             }),
             delete: vi.fn().mockReturnValue({
@@ -235,7 +242,7 @@ describe('RolesController', () => {
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'role-1' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
       });
 
       await deleteRole(req, res, next);
@@ -256,7 +263,7 @@ describe('RolesController', () => {
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'role-1' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
       });
 
       await deleteRole(req, res, next);

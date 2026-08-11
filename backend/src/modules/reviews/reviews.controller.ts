@@ -16,8 +16,31 @@ import { z } from 'zod';
  * dynamically instead of showing a static list.
  */
 
+/**
+ * Permissive property resolution for public/customer-facing endpoints
+ * (getApprovedReviews, createReview) that are NOT gated by
+ * validatePropertyAccess / requirePropertyId.
+ */
 function getPropertyId(req: Request): string | undefined {
-  return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || undefined;
+  return (req as any).propertyId || req.property?.id || (req.headers?.['x-property-id'] as string) || undefined;
+}
+
+/**
+ * Strict property resolution for admin endpoints. Admin routes
+ * (reviews.routes.ts) run validatePropertyAccess + requirePropertyId before
+ * reaching any handler here — that pair verifies the caller's property_id
+ * belongs to their own tenant and rejects the request outright if it's
+ * missing. updateReviewStatus/deleteReview previously scoped by property_id
+ * only when the header happened to be present, letting a tenant admin
+ * moderate or delete another tenant's reviews by ID. See CONTEXT.md
+ * cross-tenant sweep.
+ */
+function getAdminPropertyId(req: Request): string {
+  const propertyId = (req as any).propertyId as string | undefined;
+  if (!propertyId) {
+    throw new Error('Property context missing — requirePropertyId middleware must run before this handler');
+  }
+  return propertyId;
 }
 
 const createReviewSchema = z.object({
@@ -205,12 +228,8 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
  */
 export const getAllReviews = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
-  const propertyId = getPropertyId(req);
+  const propertyId = getAdminPropertyId(req);
   const { status, service_type } = req.query;
-
-  if (!propertyId && process.env.NODE_ENV !== 'test') {
-    return res.status(400).json({ success: false, error: 'Property ID context is required' });
-  }
 
   let query = supabase
     .from('reviews')
@@ -224,11 +243,9 @@ export const getAllReviews = asyncHandler(async (req: Request, res: Response) =>
       created_at
     `)
     .is('deleted_at', null)
+    .eq('property_id', propertyId)
     .order('created_at', { ascending: false });
 
-  if (propertyId) {
-    query = query.eq('property_id', propertyId);
-  }
   if (status) {
     query = query.eq('status', status);
   }
@@ -274,16 +291,19 @@ export const updateReviewStatus = asyncHandler(async (req: Request, res: Respons
   const supabase = getSupabase();
   const { id } = req.params;
   const { status } = req.body;
-  const propertyId = getPropertyId(req);
+  const propertyId = getAdminPropertyId(req);
 
   if (!status || !['approved', 'rejected', 'pending'].includes(status)) {
     return res.status(400).json({ success: false, error: 'Invalid status' });
   }
 
-  let query = supabase.from('reviews').update({ status }).eq('id', id);
-  if (propertyId) query = query.eq('property_id', propertyId);
-
-  const { data, error } = await query.select().single();
+  const { data, error } = await supabase
+    .from('reviews')
+    .update({ status })
+    .eq('id', id)
+    .eq('property_id', propertyId)
+    .select()
+    .single();
 
   if (error) throw error;
   if (!data) return res.status(404).json({ success: false, error: 'Review not found' });
@@ -309,15 +329,13 @@ export const deleteReview = asyncHandler(async (req: Request, res: Response) => 
   const supabase = getSupabase();
   const { id } = req.params;
   const userId = (req.user as any)?.userId || (req.user as any)?.id;
-  const propertyId = getPropertyId(req);
+  const propertyId = getAdminPropertyId(req);
 
-  let query = supabase
+  const { error } = await supabase
     .from('reviews')
     .update({ deleted_at: new Date().toISOString(), deleted_by: userId })
-    .eq('id', id);
-  if (propertyId) query = query.eq('property_id', propertyId);
-
-  const { error } = await query;
+    .eq('id', id)
+    .eq('property_id', propertyId);
   if (error) throw error;
 
   res.json({ success: true, message: 'Review deleted' });
