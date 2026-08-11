@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
+import { getScopedClient } from '../../security/scoped-client.js';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
 import { requireTenantScope } from '../../security/tenant-scope.js';
@@ -42,6 +43,22 @@ function getAdminPropertyId(req: Request): string {
     throw new Error('Property context missing — requirePropertyId middleware must run before this handler');
   }
   return propertyId;
+}
+
+/**
+ * Resolve the tenant that owns propertyId directly from the DB, rather than
+ * trusting the caller's own JWT tenant. For a super_admin acting on a
+ * property outside their own homed tenant (see validatePropertyAccess's
+ * bypass), requireTenantScope(req) would return the WRONG tenant here —
+ * looking it up from the property itself is correct for every caller.
+ */
+async function getTenantIdForProperty(propertyId: string): Promise<string> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from('properties').select('tenant_id').eq('id', propertyId).maybeSingle();
+  if (error || !data?.tenant_id) {
+    throw new Error(`Could not resolve tenant for property ${propertyId}`);
+  }
+  return data.tenant_id;
 }
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
@@ -341,12 +358,17 @@ export class CouponController {
       const userId = req.user?.id;
       const propertyId = getAdminPropertyId(req);
 
-      let tenantId: string;
+      // Tenant is derived from the PROPERTY's owner, not the caller's JWT
+      // tenant — see getTenantIdForProperty's doc comment. requireTenantScope
+      // is still called first purely to reject a genuinely-unscoped
+      // super_admin early with a clear 403 (same UX as before); its return
+      // value is no longer what gets stamped onto the row.
       try {
-        tenantId = requireTenantScope(req);
+        requireTenantScope(req);
       } catch (scopeError: any) {
         return res.status(scopeError.statusCode || 403).json({ success: false, error: scopeError.message || 'Tenant scope required' });
       }
+      const tenantId = await getTenantIdForProperty(propertyId);
 
       const supabase = getSupabase();
 
@@ -363,8 +385,8 @@ export class CouponController {
         free_item: 'free_item',
       };
 
-      const { data: result, error } = await supabase
-        .from('coupons')
+      const scoped = getScopedClient({ tenantId, actorId: req.user?.id });
+      const { data: result, error } = await scoped.from('coupons')
         .insert({
           code: data.code,
           name: data.name,
@@ -382,7 +404,6 @@ export class CouponController {
           first_order_only: data.firstOrderOnly,
           created_by: userId,
           property_id: propertyId,
-          tenant_id: tenantId,
         })
         .select()
         .single();
