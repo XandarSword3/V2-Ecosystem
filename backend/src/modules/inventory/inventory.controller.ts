@@ -570,13 +570,13 @@ export class InventoryController {
       }));
 
       // Get linked menu items
-      const { data: linkedMenuItems } = await supabase
+      const { data: linkedMenuItems, error: linkError } = await supabase
         .from('menu_item_ingredients')
-        .select('catalog_item_id, quantity_needed')
+        .select('catalog_item_id, quantity_required')
         .eq('inventory_item_id', id);
 
       let menuItemsInfo: any[] = [];
-      if (linkedMenuItems && linkedMenuItems.length > 0) {
+      if (!linkError && linkedMenuItems && linkedMenuItems.length > 0) {
         const menuItemIds = linkedMenuItems.map(l => l.catalog_item_id);
         const { data: menuItems } = await supabase
           .from('catalog_items')
@@ -586,7 +586,7 @@ export class InventoryController {
         menuItemsInfo = (linkedMenuItems || []).map(link => ({
           id: link.catalog_item_id,
           name: menuItems?.find(m => m.id === link.catalog_item_id)?.name,
-          quantity_needed: link.quantity_needed,
+          quantity_required: link.quantity_required,
         }));
       }
 
@@ -1631,7 +1631,7 @@ export class InventoryController {
   async linkToMenuItem(req: Request, res: Response) {
     try {
       const { itemId } = req.params;
-      const { catalogItemId, quantityNeeded } = req.body;
+      const { catalogItemId, quantityRequired, unit } = req.body;
       const supabase = getSupabase();
       const propertyId = (req as any).propertyId as string | undefined;
 
@@ -1644,7 +1644,7 @@ export class InventoryController {
 
       let invItemQuery = supabase
         .from('inventory_items')
-        .select('id, tenant_id, module_id')
+        .select('id, tenant_id, module_id, unit')
         .eq('id', itemId);
       if (tenantId) invItemQuery = invItemQuery.eq('tenant_id', tenantId);
       const { data: invItem, error: invItemError } = await invItemQuery.maybeSingle();
@@ -1655,7 +1655,7 @@ export class InventoryController {
 
       let catalogItemQuery = supabase
         .from('catalog_items')
-        .select('id, tenant_id, module_id')
+        .select('id, tenant_id, module_id, property_id')
         .eq('id', catalogItemId);
       if (tenantId) catalogItemQuery = catalogItemQuery.eq('tenant_id', tenantId);
       const { data: catalogItem, error: catalogItemError } = await catalogItemQuery.maybeSingle();
@@ -1691,23 +1691,40 @@ export class InventoryController {
         .eq('inventory_item_id', itemId)
         .maybeSingle();
 
+      // Use unit from request body, fallback to inventory item's unit
+      const finalUnit = unit || invItem.unit;
+      const finalPropertyId = propertyId || catalogItem.property_id;
+
       if (existing) {
         // Update
-        await supabase
+        const { error: updateError } = await supabase
           .from('menu_item_ingredients')
           .update({
-            quantity_needed: quantityNeeded,
-            updated_at: new Date().toISOString(),
+            quantity_required: quantityRequired,
+            unit: finalUnit,
           })
           .eq('catalog_item_id', catalogItemId)
           .eq('inventory_item_id', itemId);
+        
+        if (updateError) {
+          console.error('Error updating menu_item_ingredients:', updateError);
+          return res.status(500).json({ success: false, error: 'Failed to update link', message: updateError.message });
+        }
       } else {
         // Insert
-        await supabase.from('menu_item_ingredients').insert({
+        const { error: insertError } = await supabase.from('menu_item_ingredients').insert({
           catalog_item_id: catalogItemId,
           inventory_item_id: itemId,
-          quantity_needed: quantityNeeded,
+          quantity_required: quantityRequired,
+          unit: finalUnit,
+          tenant_id: invItem.tenant_id,
+          property_id: finalPropertyId,
         });
+        
+        if (insertError) {
+          console.error('Error inserting menu_item_ingredients:', insertError);
+          return res.status(500).json({ success: false, error: 'Failed to create link', message: insertError.message });
+        }
       }
 
       res.json({
@@ -1722,6 +1739,55 @@ export class InventoryController {
       res.status(500).json({
         success: false,
         error: 'Failed to link items',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Delete all menu item ingredients for a catalog item
+   */
+  async deleteMenuItemIngredients(req: Request, res: Response) {
+    try {
+      const { itemId } = req.params; // itemId here is actually catalog_item_id
+      const supabase = getSupabase();
+      const tenantId = tenantScopeFor(req);
+
+      // Verify the catalog item exists and belongs to the tenant
+      let catalogItemQuery = supabase
+        .from('catalog_items')
+        .select('id, tenant_id')
+        .eq('id', itemId);
+      if (tenantId) catalogItemQuery = catalogItemQuery.eq('tenant_id', tenantId);
+      const { data: catalogItem, error: catalogItemError } = await catalogItemQuery.maybeSingle();
+      if (catalogItemError) throw catalogItemError;
+      if (!catalogItem) {
+        return res.status(404).json({ success: false, error: 'Catalog item not found' });
+      }
+
+      // Delete all menu_item_ingredients for this catalog item
+      const { error: deleteError } = await supabase
+        .from('menu_item_ingredients')
+        .delete()
+        .eq('catalog_item_id', itemId);
+
+      if (deleteError) {
+        console.error('Error deleting menu_item_ingredients:', deleteError);
+        return res.status(500).json({ success: false, error: 'Failed to delete links', message: deleteError.message });
+      }
+
+      res.json({
+        success: true,
+        message: 'Deleted all ingredient links',
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ success: false, error: error.message });
+      }
+      console.error('Error deleting menu item ingredients:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to delete ingredient links',
         message: error.message,
       });
     }

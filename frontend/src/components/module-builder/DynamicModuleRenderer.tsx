@@ -1140,7 +1140,7 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
       groupName: s.groupName,
       modifierType: mapCustomizationType(s.customizationType),
       priceAdjustment: s.priceAdjustment || s.totalPrice || 0,
-      quantity: s.quantity,
+      quantity: 1, // Always 1 per item - the loop below handles base quantity multiplication
     }));
 
     for (let i = 0; i < data.quantity; i++) {

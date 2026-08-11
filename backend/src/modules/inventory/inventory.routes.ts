@@ -9,13 +9,6 @@ const router = Router();
 const staffAuth: RequestHandler[] = [authenticate, authorize('staff', 'admin', 'super_admin')];
 const adminAuth: RequestHandler[] = [authenticate, authorize('admin', 'super_admin')];
 
-// Recipe / BOM routes (must be before /items/:id to avoid matching)
-router.get('/items/recipe/:menuItemId', ...staffAuth, inventoryAdvancedController.getRecipe.bind(inventoryAdvancedController));
-router.post('/items/recipe/:menuItemId', ...adminAuth, inventoryAdvancedController.createRecipe.bind(inventoryAdvancedController));
-router.put('/items/recipe/:menuItemId', ...adminAuth, inventoryAdvancedController.updateRecipe.bind(inventoryAdvancedController));
-router.get('/sessions/recipe/:sessionId', ...staffAuth, inventoryAdvancedController.getRecipe.bind(inventoryAdvancedController));
-router.post('/sessions/recipe/:sessionId', ...adminAuth, inventoryAdvancedController.createRecipe.bind(inventoryAdvancedController));
-
 // Categories
 router.get('/categories', ...staffAuth, inventoryController.getCategories.bind(inventoryController));
 router.post('/categories', ...adminAuth, inventoryController.createCategory.bind(inventoryController));
@@ -29,6 +22,7 @@ router.post('/items', ...adminAuth, inventoryController.createItem.bind(inventor
 router.put('/items/:id', ...adminAuth, inventoryController.updateItem.bind(inventoryController));
 router.delete('/items/:id', ...adminAuth, inventoryController.deleteItem.bind(inventoryController));
 router.post('/items/:itemId/link-menu', ...adminAuth, inventoryController.linkToMenuItem.bind(inventoryController));
+router.delete('/items/:itemId/menu-ingredients', ...adminAuth, inventoryController.deleteMenuItemIngredients.bind(inventoryController));
 
 // Transactions
 router.get('/transactions', ...staffAuth, inventoryController.getTransactions.bind(inventoryController));
