@@ -11,22 +11,81 @@ import { logger } from '../../utils/logger.js';
  * Issue 17: Added property_id scoping on all queries and inserts.
  * Template system (getTemplates, createTemplate, updateTemplate) removed per CONTEXT — templates
  * were a static-product layer that doesn't fit the white-label model. Routes were already cleaned.
+ *
+ * Admin routes (giftcard.routes.ts) now run validatePropertyAccess +
+ * requirePropertyId before reaching any handler below — that pair verifies
+ * the caller's property_id belongs to their own tenant and rejects the
+ * request outright if it's missing. getPropertyId() here just reads the
+ * already-validated value; it no longer needs to (and must not) fall back to
+ * "unscoped" the way the old local header-reading version did — that fallback
+ * was a cross-tenant data leak (see CONTEXT.md cross-tenant sweep).
  */
 
+/**
+ * Permissive property resolution for customer-facing endpoints (purchase,
+ * balance check, redeem, my-cards) that are NOT gated by validatePropertyAccess
+ * / requirePropertyId — a guest checking a balance may have no property
+ * context at all, and that's a legitimate state for these routes.
+ */
 function getPropertyId(req: Request): string | undefined {
-  return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || undefined;
+  return (req as any).propertyId || req.property?.id || (req.headers?.['x-property-id'] as string) || undefined;
 }
 
-async function getTenantIdFromReq(req: Request, propertyId?: string): Promise<string | null> {
-  const reqTenantId = (req as any).tenant?.id || req.user?.tenantId || (req.headers?.['x-tenant-id'] as string) || null;
-  if (reqTenantId) return reqTenantId;
-  const supabase = getSupabase();
-  if (propertyId) {
-    const { data } = await supabase.from('properties').select('tenant_id').eq('id', propertyId).maybeSingle();
-    if (data?.tenant_id) return data.tenant_id;
+/**
+ * Strict property resolution for admin endpoints. Admin routes
+ * (giftcard.routes.ts) run validatePropertyAccess + requirePropertyId before
+ * reaching any handler here — that pair verifies the caller's property_id
+ * belongs to their own tenant and rejects the request outright if it's
+ * missing. This just reads the already-validated value; it must NOT fall
+ * back to "unscoped" the way the old local header-reading version did — that
+ * fallback was a cross-tenant data leak (see CONTEXT.md cross-tenant sweep).
+ * Throwing here is a defense-in-depth backstop in case a route is ever wired
+ * up without that middleware — it fails closed instead of querying unscoped.
+ */
+function getAdminPropertyId(req: Request): string {
+  const propertyId = (req as any).propertyId as string | undefined;
+  if (!propertyId) {
+    throw new Error('Property context missing — requirePropertyId middleware must run before this handler');
   }
-  const { data } = await supabase.from('properties').select('tenant_id').limit(1).maybeSingle();
-  return data?.tenant_id || null;
+  return propertyId;
+}
+
+/**
+ * Resolve the tenant that owns propertyId directly from the DB, rather than
+ * trusting req.tenant. req.tenant is derived from a client-supplied header
+ * (X-Tenant-ID/X-Tenant-Slug) and, for a super_admin, may legitimately not
+ * match the tenant that owns the specific property being acted on (super
+ * admins can act on any property — see validatePropertyAccess). Looking the
+ * tenant up from the property itself is correct for every caller, not just
+ * the common case.
+ */
+async function getTenantIdForProperty(propertyId: string): Promise<string> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from('properties').select('tenant_id').eq('id', propertyId).maybeSingle();
+  if (error || !data?.tenant_id) {
+    throw new Error(`Could not resolve tenant for property ${propertyId}`);
+  }
+  return data.tenant_id;
+}
+
+/**
+ * Tenant resolution for customer-facing purchase flow, where propertyId may
+ * be absent. req.tenant is set globally by resolveTenant for every /api
+ * request (subdomain/slug/header resolution) — it is NOT client-spoofable
+ * in a way that matters here since a mis-scoped purchase only affects the
+ * purchasing tenant's own data, not a cross-tenant read/write. The previous
+ * version of this function fell back to `SELECT tenant_id FROM properties
+ * LIMIT 1` when nothing else resolved — silently assigning a purchase to an
+ * arbitrary, unrelated tenant. That fallback is removed; an unresolvable
+ * tenant now fails the purchase instead of mis-filing it.
+ */
+async function getTenantIdForPurchase(req: Request, propertyId?: string): Promise<string> {
+  const reqTenantId = req.tenant?.id || req.user?.tenantId;
+  if (reqTenantId) return reqTenantId;
+  if (propertyId) {
+    return getTenantIdForProperty(propertyId);
+  }
+  throw new Error('Unable to resolve tenant for this request — no tenant context and no property context');
 }
 
 // Validation schemas
@@ -133,7 +192,7 @@ export class GiftCardController {
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-      const tenant_id = await getTenantIdFromReq(req, propertyId);
+      const tenant_id = await getTenantIdForPurchase(req, propertyId);
       const { data: giftCard, error: insertError } = await supabase
         .from('gift_cards')
         .insert({
@@ -409,12 +468,15 @@ export class GiftCardController {
   async getGiftCard(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const supabase = getSupabase();
 
-      let cardQuery = supabase.from('gift_cards').select('*').eq('id', id);
-      if (propertyId) cardQuery = cardQuery.eq('property_id', propertyId);
-      const { data: giftCard, error: cardError } = await cardQuery.single();
+      const { data: giftCard, error: cardError } = await supabase
+        .from('gift_cards')
+        .select('*')
+        .eq('id', id)
+        .eq('property_id', propertyId)
+        .single();
 
       if (cardError || !giftCard) {
         return res.status(404).json({ success: false, error: 'Gift card not found' });
@@ -464,12 +526,11 @@ export class GiftCardController {
     try {
       const { page = '1', limit = '20', status, search } = req.query;
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const supabase = getSupabase();
 
-      let query = supabase.from('gift_cards').select('*', { count: 'exact' });
+      let query = supabase.from('gift_cards').select('*', { count: 'exact' }).eq('property_id', propertyId);
 
-      if (propertyId) query = query.eq('property_id', propertyId);
       if (status) query = query.eq('status', status as string);
       if (search) {
         query = query.or(`code.ilike.%${search}%,recipient_email.ilike.%${search}%,recipient_name.ilike.%${search}%`);
@@ -539,7 +600,7 @@ export class GiftCardController {
       const finalAmount = amount || initialValue!;
       const finalMessage = personalMessage || message;
       const userId = req.user?.id;
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const supabase = getSupabase();
 
       // Generate unique code
@@ -558,7 +619,7 @@ export class GiftCardController {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
-      const tenant_id = await getTenantIdFromReq(req, propertyId);
+      const tenant_id = await getTenantIdForProperty(propertyId);
       const { data: giftCard, error: insertError } = await supabase
         .from('gift_cards')
         .insert({
@@ -571,7 +632,7 @@ export class GiftCardController {
           recipient_name: recipientName,
           personal_message: finalMessage,
           expires_at: expiresAt.toISOString(),
-          property_id: propertyId || null,
+          property_id: propertyId,
           tenant_id,
         })
         .select()
@@ -634,16 +695,16 @@ export class GiftCardController {
     try {
       const { id } = req.params;
       const { reason } = req.body;
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const supabase = getSupabase();
 
-      let updateQuery = supabase
+      const { data: result, error: updateError } = await supabase
         .from('gift_cards')
         .update({ status: 'disabled', updated_at: new Date().toISOString() })
-        .eq('id', id);
-      if (propertyId) updateQuery = updateQuery.eq('property_id', propertyId);
-
-      const { data: result, error: updateError } = await updateQuery.select().single();
+        .eq('id', id)
+        .eq('property_id', propertyId)
+        .select()
+        .single();
 
       if (updateError || !result) {
         return res.status(404).json({ success: false, error: 'Gift card not found' });
@@ -678,15 +739,13 @@ export class GiftCardController {
    */
   async getStats(req: Request, res: Response) {
     try {
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const supabase = getSupabase();
 
-      let cardsQuery = supabase
+      const { data: allCards, error: cardsError } = await supabase
         .from('gift_cards')
-        .select('status, initial_value, current_balance, created_at');
-      if (propertyId) cardsQuery = cardsQuery.eq('property_id', propertyId);
-
-      const { data: allCards, error: cardsError } = await cardsQuery;
+        .select('status, initial_value, current_balance, created_at')
+        .eq('property_id', propertyId);
       if (cardsError) throw cardsError;
 
       const cards = allCards || [];

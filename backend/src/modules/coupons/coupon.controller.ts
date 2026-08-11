@@ -16,8 +16,32 @@ import { requireTenantScope } from '../../security/tenant-scope.js';
  *   accepts any slug as long as the coupon's applies_to matches or is 'all'.
  */
 
+/**
+ * Permissive property resolution for public endpoints (validateCoupon,
+ * getActiveCoupons) that are NOT gated by validatePropertyAccess /
+ * requirePropertyId — a guest browsing active coupons may have no property
+ * context, and that's a legitimate state for these routes.
+ */
 function getPropertyId(req: Request): string | undefined {
-  return (req as any).propertyId || (req.headers?.['x-property-id'] as string) || undefined;
+  return (req as any).propertyId || req.property?.id || (req.headers?.['x-property-id'] as string) || undefined;
+}
+
+/**
+ * Strict property resolution for admin endpoints. Admin routes
+ * (coupon.routes.ts) run validatePropertyAccess + requirePropertyId before
+ * reaching any handler here — that pair verifies the caller's property_id
+ * belongs to their own tenant and rejects the request outright if it's
+ * missing, so callers no longer need their own presence check, and — unlike
+ * the old local check — a supplied property_id is now actually verified to
+ * belong to the caller's tenant rather than merely being non-empty. See
+ * CONTEXT.md cross-tenant sweep.
+ */
+function getAdminPropertyId(req: Request): string {
+  const propertyId = (req as any).propertyId as string | undefined;
+  if (!propertyId) {
+    throw new Error('Property context missing — requirePropertyId middleware must run before this handler');
+  }
+  return propertyId;
 }
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
@@ -220,11 +244,7 @@ export class CouponController {
       const pageNum = parseInt(page as string);
       const limitNum = parseInt(limit as string);
       const offset = (pageNum - 1) * limitNum;
-      const propertyId = getPropertyId(req);
-
-      if (!propertyId && process.env.NODE_ENV !== 'test') {
-        return res.status(400).json({ success: false, error: 'Property ID context is required' });
-      }
+      const propertyId = getAdminPropertyId(req);
 
       const supabase = getSupabase();
       const now = new Date().toISOString();
@@ -233,7 +253,7 @@ export class CouponController {
         .from('coupons')
         .select('*, users!coupons_created_by_fkey(full_name)', { count: 'exact' });
 
-      if (propertyId) query = query.eq('property_id', propertyId);
+      query = query.eq('property_id', propertyId);
 
       if (status === 'active') {
         query = query.eq('is_active', true).or(`valid_until.is.null,valid_until.gt.${now}`);
@@ -271,11 +291,11 @@ export class CouponController {
   async getCoupon(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const supabase = getSupabase();
 
       let query = supabase.from('coupons').select('*, users!coupons_created_by_fkey(full_name)').eq('id', id);
-      if (propertyId) query = query.eq('property_id', propertyId);
+      query = query.eq('property_id', propertyId);
       const { data: coupon, error: couponError } = await query.single();
 
       if (couponError || !coupon) {
@@ -319,11 +339,7 @@ export class CouponController {
 
       const data = validation.data;
       const userId = req.user?.id;
-      const propertyId = getPropertyId(req);
-
-      if (!propertyId && process.env.NODE_ENV !== 'test') {
-        return res.status(400).json({ success: false, error: 'Property ID context is required' });
-      }
+      const propertyId = getAdminPropertyId(req);
 
       let tenantId: string;
       try {
@@ -392,7 +408,7 @@ export class CouponController {
       }
 
       const data = validation.data;
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const supabase = getSupabase();
 
       const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
@@ -418,7 +434,7 @@ export class CouponController {
       }
 
       let query = supabase.from('coupons').update(updateData).eq('id', id);
-      if (propertyId) query = query.eq('property_id', propertyId);
+      query = query.eq('property_id', propertyId);
       const { data: result, error } = await query.select().single();
 
       if (error) {
@@ -439,7 +455,7 @@ export class CouponController {
   async deleteCoupon(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const supabase = getSupabase();
 
       const { count: usageCount, error: countError } = await supabase
@@ -451,14 +467,14 @@ export class CouponController {
 
       if (usageCount && usageCount > 0) {
         let q = supabase.from('coupons').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', id);
-        if (propertyId) q = q.eq('property_id', propertyId);
+        q = q.eq('property_id', propertyId);
         const { error: updateError } = await q;
         if (updateError) throw updateError;
         return res.json({ success: true, message: 'Coupon deactivated (has usage history)' });
       }
 
       let q = supabase.from('coupons').delete().eq('id', id);
-      if (propertyId) q = q.eq('property_id', propertyId);
+      q = q.eq('property_id', propertyId);
       const { error: deleteError } = await q;
       if (deleteError) throw deleteError;
 
@@ -475,11 +491,11 @@ export class CouponController {
   async getStats(req: Request, res: Response) {
     try {
       const supabase = getSupabase();
-      const propertyId = getPropertyId(req);
+      const propertyId = getAdminPropertyId(req);
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       let couponsQuery = supabase.from('coupons').select('is_active, valid_until, usage_count');
-      if (propertyId) couponsQuery = couponsQuery.eq('property_id', propertyId);
+      couponsQuery = couponsQuery.eq('property_id', propertyId);
       const { data: allCoupons, error: couponsError } = await couponsQuery;
       if (couponsError) throw couponsError;
 
@@ -492,7 +508,7 @@ export class CouponController {
       const totalDiscount = usageData?.reduce((sum, u) => sum + (parseFloat(u.discount_applied) || 0), 0) || 0;
 
       let topQuery = supabase.from('coupons').select('code, name, usage_count, discount_type, discount_value').gt('usage_count', 0).order('usage_count', { ascending: false }).limit(10);
-      if (propertyId) topQuery = topQuery.eq('property_id', propertyId);
+      topQuery = topQuery.eq('property_id', propertyId);
       const { data: topCoupons, error: topError } = await topQuery;
       if (topError) throw topError;
 
