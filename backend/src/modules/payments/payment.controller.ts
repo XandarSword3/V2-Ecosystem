@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import Stripe from 'stripe';
 import { getSupabase } from "../../database/connection.js";
+import { getScopedClient, tenantContextFor, type TenantContext } from '../../security/scoped-client.js';
+import { getCallerTenantId } from '../../security/tenant-scope.js';
 import { config } from "../../config/index";
 import { logger } from "../../utils/logger.js";
 import { createPaymentIntentSchema, recordCashPaymentSchema, recordManualPaymentSchema, postRoomChargeSchema, settleRoomFolioSchema, validateBody } from "../../validation/schemas.js";
@@ -36,6 +38,25 @@ const getStripeWebhookSecret = async () => {
 
   return settings?.value?.stripeWebhookSecret || config.stripe.webhookSecret;
 };
+
+/**
+ * `transactions` isn't registered in TENANT_SCOPED_TABLES (see
+ * scoped-client.ts's note on why — it's the shared table underpinning all
+ * five engines and needs its own dedicated review), so ownership checks on
+ * it here are manual: fetch normally, then verify the record's tenant_id
+ * matches the caller's before proceeding. A genuinely unscoped super_admin
+ * (no tenantId on their own token) bypasses this, same pattern used
+ * everywhere else in this codebase (see validatePropertyAccess,
+ * getScopedClient). Used by postRoomCharge / getFolioBalance /
+ * settleFolioBalance, which previously fetched orders/bookings by id with no
+ * ownership check at all — any tenant's staff could post charges to,
+ * view the balance of, or settle another tenant's room folio.
+ */
+function assertOwnedByCallerTenant(req: Request, recordTenantId: string | null | undefined): boolean {
+  const callerTenantId = getCallerTenantId(req);
+  if (callerTenantId === null) return true;
+  return recordTenantId === callerTenantId;
+}
 
 function calculateRenewedEndDate(currentEndDate: string | null, billingCycle: string): string {
   const baseDate = currentEndDate ? new Date(currentEndDate) : new Date();
@@ -359,11 +380,44 @@ async function updateReferencePaymentStatus(
     .eq('id', referenceId);
 }
 
+/**
+ * Resolve tenant_id/property_id for a payments.reference_id from the
+ * underlying transactions row it points to (same source
+ * updateReferencePaymentStatus uses for reference_table). recordCashPayment
+ * and recordManualPayment insert into `payments`, whose tenant_id and
+ * property_id columns are NOT NULL — this was previously never set at all,
+ * meaning those inserts were very likely already failing against the DB
+ * constraint in production. Also used to verify the referenced transaction
+ * actually belongs to the caller's tenant before recording a payment against
+ * it.
+ */
+async function resolveReferenceTenantProperty(referenceId: string): Promise<{ tenantId: string; propertyId: string }> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('tenant_id, property_id')
+    .eq('id', referenceId)
+    .maybeSingle();
+  if (error || !data?.tenant_id || !data?.property_id) {
+    throw new Error(`Could not resolve tenant/property for reference ${referenceId}`);
+  }
+  return { tenantId: data.tenant_id, propertyId: data.property_id };
+}
+
 export const recordCashPayment = asyncHandler(async (req: Request, res: Response) => {
   const validatedData = validateBody(recordCashPaymentSchema, req.body);
   const { referenceType, referenceId, amount, notes } = validatedData;
 
   const supabase = getSupabase();
+
+  // Previously never resolved/checked at all — any tenant's staff could
+  // record a cash payment against another tenant's order, and the insert
+  // was very likely failing outright on the NOT NULL tenant_id/property_id
+  // columns regardless. See CONTEXT.md cross-tenant sweep.
+  const { tenantId, propertyId } = await resolveReferenceTenantProperty(referenceId);
+  if (!assertOwnedByCallerTenant(req, tenantId)) {
+    return res.status(404).json({ success: false, error: 'Reference not found' });
+  }
 
   const { data: existingPayment } = await supabase
     .from('payments')
@@ -385,8 +439,8 @@ export const recordCashPayment = asyncHandler(async (req: Request, res: Response
   const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
   const defaultCurrency = paymentSettings?.value?.currency?.toUpperCase() || 'USD';
 
-  const { data: payment, error } = await supabase
-    .from('payments')
+  const scoped = getScopedClient({ tenantId, actorId: req.user?.userId });
+  const { data: payment, error } = await scoped.from('payments')
     .insert({
       reference_type: referenceType,
       reference_id: referenceId,
@@ -397,6 +451,7 @@ export const recordCashPayment = asyncHandler(async (req: Request, res: Response
       processed_by: req.user!.userId,
       processed_at: new Date().toISOString(),
       notes,
+      property_id: propertyId,
     })
     .select()
     .single();
@@ -414,6 +469,12 @@ export const recordManualPayment = asyncHandler(async (req: Request, res: Respon
 
   const supabase = getSupabase();
 
+  // Same fix as recordCashPayment above.
+  const { tenantId, propertyId } = await resolveReferenceTenantProperty(referenceId);
+  if (!assertOwnedByCallerTenant(req, tenantId)) {
+    return res.status(404).json({ success: false, error: 'Reference not found' });
+  }
+
   const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
   const manualCurrency = paymentSettings?.value?.currency?.toUpperCase() || 'USD';
 
@@ -427,8 +488,8 @@ export const recordManualPayment = asyncHandler(async (req: Request, res: Respon
     ? `[Awaiting ${method.toUpperCase()} transfer verification]${notes ? ' ' + notes : ''}`
     : notes;
 
-  const { data: payment, error } = await supabase
-    .from('payments')
+  const scoped = getScopedClient({ tenantId, actorId: req.user?.userId });
+  const { data: payment, error } = await scoped.from('payments')
     .insert({
       reference_type: referenceType,
       reference_id: referenceId,
@@ -439,6 +500,7 @@ export const recordManualPayment = asyncHandler(async (req: Request, res: Respon
       processed_by: req.user!.userId,
       processed_at: new Date().toISOString(),
       notes: paymentNotes,
+      property_id: propertyId,
     })
     .select()
     .single();
@@ -460,21 +522,22 @@ export const recordManualPayment = asyncHandler(async (req: Request, res: Respon
 export const verifyManualPayment = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
   const { verificationNote } = req.body;
-  const supabase = getSupabase();
+  // Previously unscoped fetch+mutate — any tenant's staff could verify
+  // (mark completed) another tenant's pending Whish/OMT transfer. See
+  // CONTEXT.md cross-tenant sweep.
+  const scoped = getScopedClient(tenantContextFor(req));
 
-  const { data: payment, error: fetchError } = await supabase
-    .from('payments')
+  const { data: payment, error: fetchError } = await scoped.from('payments')
     .select('*')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   if (fetchError || !payment) return res.status(404).json({ success: false, error: 'Payment not found' });
   if (payment.status !== 'pending_verification') {
     return res.status(400).json({ success: false, error: `Payment is not pending verification (status: ${payment.status})` });
   }
 
-  const { error: updateError } = await supabase
-    .from('payments')
+  const { error: updateError } = await scoped.from('payments')
     .update({
       status: 'completed',
       notes: `${payment.notes || ''} [Verified by ${req.user!.userId}]${verificationNote ? ': ' + verificationNote : ''}`,
@@ -502,11 +565,13 @@ export const getPaymentMethods = asyncHandler(async (req: Request, res: Response
 });
 
 export const getTransactions = asyncHandler(async (req: Request, res: Response) => {
-  const supabase = getSupabase();
   const { limit = 50, offset = 0 } = req.query;
+  // Previously unscoped entirely — any tenant's admin/manager could list
+  // every tenant's payment records. `payments` is registered in
+  // TENANT_SCOPED_TABLES. See CONTEXT.md cross-tenant sweep.
+  const scoped = getScopedClient(tenantContextFor(req));
 
-  const { data: transactions, error } = await supabase
-    .from('payments')
+  const { data: transactions, error } = await scoped.from('payments')
     .select('*')
     .order('created_at', { ascending: false })
     .range(Number(offset), Number(offset) + Number(limit) - 1);
@@ -564,7 +629,16 @@ export const getPaymentReceipt = asyncHandler(async (req: Request, res: Response
 
   // FIX: ownership check now also checks reference_id against userId (since customer_id doesn't exist)
   const isOwner = payment.reference_id === userId;
-  if (!canViewAnyReceipt && !isOwner) {
+
+  // canViewAnyReceipt previously had no tenant check at all — any tenant's
+  // admin/manager could view any OTHER tenant's receipt. A genuinely
+  // unscoped super_admin (no tenantId on their own token) keeps the
+  // existing cross-tenant bypass, matching the pattern used everywhere else
+  // in this codebase; anyone else must match the payment's own tenant.
+  const callerTenantId = getCallerTenantId(req);
+  const tenantMismatch = canViewAnyReceipt && callerTenantId !== null && payment.tenant_id !== callerTenantId;
+
+  if ((!canViewAnyReceipt && !isOwner) || tenantMismatch) {
     return res.status(403).json({ success: false, error: 'Forbidden' });
   }
 
@@ -586,17 +660,16 @@ export const getPaymentReceipt = asyncHandler(async (req: Request, res: Response
 });
 
 export const getTransaction = asyncHandler(async (req: Request, res: Response) => {
-  const supabase = getSupabase();
-  const { data: payment, error } = await supabase
-    .from('payments')
+  // Previously unscoped — any tenant's admin could read any other tenant's
+  // full payment record. See CONTEXT.md cross-tenant sweep.
+  const scoped = getScopedClient(tenantContextFor(req));
+  const { data: payment, error } = await scoped.from('payments')
     .select('*')
     .eq('id', req.params.id)
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    if (error.code === 'PGRST116') return res.status(404).json({ success: false, error: 'Transaction not found' });
-    throw error;
-  }
+  if (error) throw error;
+  if (!payment) return res.status(404).json({ success: false, error: 'Transaction not found' });
 
   res.json({ success: true, data: payment });
 });
@@ -606,14 +679,25 @@ export async function processRefundById(
   amount: number | undefined,
   reason: string | undefined,
   processedByUserId: string,
+  // Optional: pass a TenantContext to scope the fetch+update to a specific
+  // tenant (used by the HTTP refundPayment handler below, where the caller's
+  // JWT gives us one). Left undefined for the manager-approvals workflow
+  // call site (approvals.controller.ts), which has no req/JWT of its own and
+  // is already gated by that workflow's own approval-record authorization —
+  // undefined here preserves that call path's exact prior behavior rather
+  // than guessing at a tenant context it doesn't have. Previously this
+  // function was ALWAYS unscoped for every caller, which is what let any
+  // tenant's admin refund any other tenant's Stripe charge via the HTTP
+  // route. See CONTEXT.md cross-tenant sweep.
+  tenantContext?: TenantContext,
 ): Promise<{ isPartial: boolean }> {
   const supabase = getSupabase();
+  const client = tenantContext ? getScopedClient(tenantContext) : supabase;
 
-  const { data: payment, error: fetchError } = await supabase
-    .from('payments')
+  const { data: payment, error: fetchError } = await client.from('payments')
     .select('*')
     .eq('id', paymentId)
-    .single();
+    .maybeSingle();
 
   if (fetchError || !payment) throw new Error('Payment record not found');
   if (payment.status === 'refunded') throw new Error('Payment is already refunded');
@@ -645,7 +729,7 @@ export async function processRefundById(
     }
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await client
     .from('payments')
     .update(refundDetails)
     .eq('id', paymentId);
@@ -728,7 +812,7 @@ export const refundPayment = asyncHandler(async (req: Request, res: Response) =>
   const { reason, amount } = req.body;
 
   try {
-    const { isPartial } = await processRefundById(id, amount, reason, req.user!.userId);
+    const { isPartial } = await processRefundById(id, amount, reason, req.user!.userId, tenantContextFor(req));
     res.json({
       success: true,
       message: isPartial ? 'Partial refund processed' : 'Payment refunded successfully',
@@ -756,6 +840,9 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
   if (orderErr || !order) {
     return res.status(404).json({ success: false, error: 'Order not found' });
   }
+  if (!assertOwnedByCallerTenant(req, order.tenant_id)) {
+    return res.status(404).json({ success: false, error: 'Order not found' });
+  }
 
   if (order.status === 'completed' || order.status === 'paid') {
     return res.status(400).json({ success: false, error: 'Order is already paid' });
@@ -769,6 +856,9 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
     .single();
 
   if (bookingErr || !booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+  if (!assertOwnedByCallerTenant(req, booking.tenant_id)) {
     return res.status(404).json({ success: false, error: 'Booking not found' });
   }
 
@@ -836,6 +926,22 @@ export const getFolioBalance = asyncHandler(async (req: Request, res: Response) 
   const { bookingId } = req.params;
   const supabase = getSupabase();
 
+  // Previously zero ownership check at all — any staff, any tenant, could
+  // read any other tenant's room folio balance just by knowing a bookingId.
+  // See CONTEXT.md cross-tenant sweep.
+  const { data: booking, error: bookingErr } = await supabase
+    .from('transactions')
+    .select('id, tenant_id')
+    .eq('id', bookingId)
+    .maybeSingle();
+
+  if (bookingErr || !booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+  if (!assertOwnedByCallerTenant(req, booking.tenant_id)) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+
   const { data: entries, error } = await supabase
     .from('payment_ledger')
     .select('*')
@@ -871,7 +977,9 @@ export const settleFolioBalance = asyncHandler(async (req: Request, res: Respons
 
   const supabase = getSupabase();
 
-  // Verify booking exists
+  // Verify booking exists and belongs to the caller's tenant. Previously
+  // only checked existence — any tenant's staff could settle a charge
+  // against another tenant's booking. See CONTEXT.md cross-tenant sweep.
   const { data: booking, error: bookingErr } = await supabase
     .from('transactions')
     .select('id, tenant_id, property_id')
@@ -879,6 +987,9 @@ export const settleFolioBalance = asyncHandler(async (req: Request, res: Respons
     .single();
 
   if (bookingErr || !booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found' });
+  }
+  if (!assertOwnedByCallerTenant(req, booking.tenant_id)) {
     return res.status(404).json({ success: false, error: 'Booking not found' });
   }
 

@@ -112,9 +112,12 @@ describe('Payment Controller', () => {
     });
 
     it('should return 404 when transaction not found', async () => {
+      // .maybeSingle() (used since the tenant-scoping fix) returns null data
+      // with NO error when nothing matches -- unlike .single()'s PGRST116
+      // error, which this test previously simulated.
       vi.mocked(getSupabase).mockReturnValue({
         from: vi.fn().mockReturnValue(
-          createChainableMock(null, { code: 'PGRST116', message: 'Not found' })
+          createChainableMock(null, null)
         ),
       } as any);
 
@@ -148,7 +151,7 @@ describe('Payment Controller', () => {
 
       req.params = { id: 'payment-123' };
       req.body = { reason: 'Customer request' };
-      req.user = { userId: 'staff-123', role: 'staff' };
+      req.user = { userId: 'staff-123', role: 'staff', tenantId: 'tenant-1', scope: 'tenant_admin' };
 
       await refundPayment(req as Request, res as Response, next as NextFunction);
 
@@ -167,7 +170,7 @@ describe('Payment Controller', () => {
 
       req.params = { id: 'nonexistent' };
       req.body = {};
-      req.user = { userId: 'staff-123', role: 'staff' };
+      req.user = { userId: 'staff-123', role: 'staff', tenantId: 'tenant-1', scope: 'tenant_admin' };
 
       await refundPayment(req as Request, res as Response, next as NextFunction);
 
@@ -190,7 +193,7 @@ describe('Payment Controller', () => {
 
       req.params = { id: 'payment-123' };
       req.body = {};
-      req.user = { userId: 'staff-123', role: 'staff' };
+      req.user = { userId: 'staff-123', role: 'staff', tenantId: 'tenant-1', scope: 'tenant_admin' };
 
       await refundPayment(req as Request, res as Response, next as NextFunction);
 
