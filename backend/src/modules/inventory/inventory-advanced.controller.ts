@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
+import { getCallerTenantId as tenantScopeFor, requireTenantScope } from '../../security/tenant-scope.js';
+import { getCallerPropertyId, requireCallerPropertyId } from '../../security/property-scope.js';
 
 // Validation schemas
 const recordWastageSchema = z.object({
@@ -53,14 +55,19 @@ export class InventoryAdvancedController {
 
       const data = validation.data;
       const userId = req.user?.userId;
+      const tenantId = tenantScopeFor(req);
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
-      // Get current item info
-      const { data: item, error: itemError } = await supabase
+      // Get current item info — scoped to caller's tenant/property so a
+      // wastage report can't be filed against another tenant's stock.
+      let itemQuery = supabase
         .from('inventory_items')
         .select('*, cost_per_unit')
-        .eq('id', data.itemId)
-        .single();
+        .eq('id', data.itemId);
+      if (tenantId) itemQuery = itemQuery.eq('tenant_id', tenantId);
+      itemQuery = itemQuery.eq('property_id', propertyId);
+      const { data: item, error: itemError } = await itemQuery.maybeSingle();
 
       if (itemError || !item) {
         return res.status(404).json({ success: false, error: 'Item not found' });
@@ -82,6 +89,8 @@ export class InventoryAdvancedController {
           cost_impact: costImpact,
           reported_by: userId,
           approval_status: data.quantity > 10 ? 'pending' : 'approved', // Auto-approve small amounts
+          tenant_id: requireTenantScope(req),
+          property_id: propertyId,
         })
         .select()
         .single();
@@ -112,13 +121,17 @@ export class InventoryAdvancedController {
     try {
       const { id } = req.params;
       const userId = req.user?.userId;
+      const tenantId = tenantScopeFor(req);
+      const propertyId = getCallerPropertyId(req);
       const supabase = getSupabase();
 
-      const { data: wastage, error: fetchError } = await supabase
+      let wastageQuery = supabase
         .from('inventory_wastage')
         .select('*')
-        .eq('id', id)
-        .single();
+        .eq('id', id);
+      if (tenantId) wastageQuery = wastageQuery.eq('tenant_id', tenantId);
+      if (propertyId) wastageQuery = wastageQuery.eq('property_id', propertyId);
+      const { data: wastage, error: fetchError } = await wastageQuery.maybeSingle();
 
       if (fetchError || !wastage) {
         return res.status(404).json({ success: false, error: 'Wastage record not found' });
@@ -128,11 +141,16 @@ export class InventoryAdvancedController {
         return res.status(400).json({ success: false, error: 'Wastage already processed' });
       }
 
-      // Approve and deduct stock
-      const { data: updated, error: updateError } = await supabase
+      // Approve and deduct stock. The tenant/property filter here is
+      // defense-in-depth — the fetch above already proved ownership — but
+      // keeps this update from ever being separated from that check.
+      let updateQuery = supabase
         .from('inventory_wastage')
         .update({ approval_status: 'approved', approved_by: userId })
-        .eq('id', id)
+        .eq('id', id);
+      if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+      if (propertyId) updateQuery = updateQuery.eq('property_id', propertyId);
+      const { data: updated, error: updateError } = await updateQuery
         .select()
         .single();
 
@@ -165,14 +183,19 @@ export class InventoryAdvancedController {
 
       const data = validation.data;
       const userId = req.user?.userId;
+      const tenantId = tenantScopeFor(req);
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
-      // Get current system quantity
-      const { data: item, error: itemError } = await supabase
+      // Get current system quantity — scoped so a count can't be filed
+      // against another tenant/property's item.
+      let itemQuery = supabase
         .from('inventory_items')
         .select('current_stock, cost_per_unit')
-        .eq('id', data.itemId)
-        .single();
+        .eq('id', data.itemId);
+      if (tenantId) itemQuery = itemQuery.eq('tenant_id', tenantId);
+      itemQuery = itemQuery.eq('property_id', propertyId);
+      const { data: item, error: itemError } = await itemQuery.maybeSingle();
 
       if (itemError || !item) {
         return res.status(404).json({ success: false, error: 'Item not found' });
@@ -197,6 +220,8 @@ export class InventoryAdvancedController {
           reason: data.notes,
           counted_by: userId,
           status: Math.abs(variancePercent) > 5 ? 'pending' : 'approved', // Auto-approve small variances
+          tenant_id: requireTenantScope(req),
+          property_id: propertyId,
         })
         .select()
         .single();
@@ -205,10 +230,13 @@ export class InventoryAdvancedController {
 
       // If approved, adjust stock
       if (varianceRecord.status === 'approved') {
-        await supabase
+        let stockUpdate = supabase
           .from('inventory_items')
           .update({ current_stock: data.actualQuantity, updated_at: new Date().toISOString() })
           .eq('id', data.itemId);
+        if (tenantId) stockUpdate = stockUpdate.eq('tenant_id', tenantId);
+        stockUpdate = stockUpdate.eq('property_id', propertyId);
+        await stockUpdate;
 
         // Record adjustment transaction
         await supabase.from('inventory_transactions').insert({
@@ -220,6 +248,8 @@ export class InventoryAdvancedController {
           reference_type: 'physical_count',
           notes: `Physical count adjustment: ${data.notes || 'No notes'}`,
           performed_by: userId,
+          tenant_id: requireTenantScope(req),
+          property_id: propertyId,
         });
       }
 
@@ -244,18 +274,24 @@ export class InventoryAdvancedController {
    */
   async getVarianceReport(req: Request, res: Response) {
     try {
-      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
+      const propertyId = getCallerPropertyId(req);
+      const tenantId = tenantScopeFor(req);
       const { startDate, endDate, status } = req.query;
       const supabase = getSupabase();
 
       // Property scoping: resolve item IDs that belong to this property.
-      // inventory_variance has no direct property_id — scope via item FK.
+      // inventory_variance also has a direct tenant_id/property_id column
+      // (added since this comment was written) — filtered directly below —
+      // but the item_id indirection stays too since it's what lets this
+      // report join in item name/sku/unit without a second round trip.
       let itemIdFilter: string[] | null = null;
       if (propertyId) {
-        const { data: propertyItems } = await supabase
+        let propertyItemsQuery = supabase
           .from('inventory_items')
           .select('id')
           .eq('property_id', propertyId);
+        if (tenantId) propertyItemsQuery = propertyItemsQuery.eq('tenant_id', tenantId);
+        const { data: propertyItems } = await propertyItemsQuery;
         itemIdFilter = (propertyItems || []).map((i: any) => i.id);
         if (itemIdFilter.length === 0) {
           return res.json({ success: true, data: [] });
@@ -277,6 +313,8 @@ export class InventoryAdvancedController {
         `)
         .order('count_date', { ascending: false });
 
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+      if (propertyId) query = query.eq('property_id', propertyId);
       if (itemIdFilter) query = query.in('item_id', itemIdFilter);
       if (startDate) query = query.gte('count_date', startDate as string);
       if (endDate) query = query.lte('count_date', endDate as string);
@@ -315,7 +353,11 @@ export class InventoryAdvancedController {
    */
   async getPurchaseOrders(req: Request, res: Response) {
     try {
-      const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string;
+      // propertyId was previously read here but never applied to the query
+      // below — every tenant's purchase orders were returned regardless of
+      // the caller's property. Now wired in alongside tenant_id.
+      const propertyId = getCallerPropertyId(req);
+      const tenantId = tenantScopeFor(req);
       const { status } = req.query;
       const supabase = getSupabase();
 
@@ -331,6 +373,8 @@ export class InventoryAdvancedController {
         `)
         .order('created_at', { ascending: false });
 
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+      if (propertyId) query = query.eq('property_id', propertyId);
       if (status) query = query.eq('status', status as string);
 
       const { data: orders, error } = await query.limit(100);
@@ -356,6 +400,8 @@ export class InventoryAdvancedController {
 
       const data = validation.data;
       const userId = req.user?.userId;
+      const tenantId = requireTenantScope(req);
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
       // Generate PO number
@@ -376,6 +422,8 @@ export class InventoryAdvancedController {
           expected_delivery: data.expectedDelivery,
           notes: data.notes,
           created_by: userId,
+          tenant_id: tenantId,
+          property_id: propertyId,
         })
         .select()
         .single();
@@ -389,6 +437,8 @@ export class InventoryAdvancedController {
         quantity_ordered: item.quantity,
         unit_cost: item.unitCost,
         total_cost: item.quantity * (item.unitCost || 0),
+        tenant_id: tenantId,
+        property_id: propertyId,
       }));
 
       await supabase.from('inventory_purchase_order_items').insert(poItems);
@@ -413,14 +463,22 @@ export class InventoryAdvancedController {
 
       const data = validation.data;
       const userId = req.user?.userId;
+      const tenantId = tenantScopeFor(req);
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
-      // Get PO
-      const { data: po, error: poError } = await supabase
+      // Get PO — scoped to caller's tenant/property. Previously unscoped:
+      // any tenant's staff/admin could receive (and mutate stock +
+      // cost_per_unit) on any other tenant's purchase order. maybeSingle()
+      // + 404 rather than 403 so a mismatch doesn't reveal that a PO with
+      // this id exists under a different tenant.
+      let poQuery = supabase
         .from('inventory_purchase_orders')
         .select('*, items:inventory_purchase_order_items(*)')
-        .eq('id', id)
-        .single();
+        .eq('id', id);
+      if (tenantId) poQuery = poQuery.eq('tenant_id', tenantId);
+      poQuery = poQuery.eq('property_id', propertyId);
+      const { data: po, error: poError } = await poQuery.maybeSingle();
 
       if (poError || !po) {
         return res.status(404).json({ success: false, error: 'Purchase order not found' });
@@ -443,6 +501,8 @@ export class InventoryAdvancedController {
           cost_per_unit: item.actualUnitCost,
           purchase_order_id: po.id,
           expiry_date: item.expiryDate,
+          tenant_id: tenantId,
+          property_id: propertyId,
         });
 
         // Update item stock
@@ -485,18 +545,24 @@ export class InventoryAdvancedController {
         });
 
         // Update PO item received quantity
-        await supabase
+        let poItemUpdate = supabase
           .from('inventory_purchase_order_items')
           .update({ quantity_received: item.quantityReceived })
           .eq('purchase_order_id', id)
           .eq('item_id', item.itemId);
+        if (tenantId) poItemUpdate = poItemUpdate.eq('tenant_id', tenantId);
+        poItemUpdate = poItemUpdate.eq('property_id', propertyId);
+        await poItemUpdate;
       }
 
       // Update PO status
-      const { data: updated } = await supabase
+      let poStatusUpdate = supabase
         .from('inventory_purchase_orders')
         .update({ status: 'received', received_date: new Date().toISOString().split('T')[0] })
-        .eq('id', id)
+        .eq('id', id);
+      if (tenantId) poStatusUpdate = poStatusUpdate.eq('tenant_id', tenantId);
+      poStatusUpdate = poStatusUpdate.eq('property_id', propertyId);
+      const { data: updated } = await poStatusUpdate
         .select()
         .single();
 
@@ -512,13 +578,18 @@ export class InventoryAdvancedController {
    */
   async getSuppliers(req: Request, res: Response) {
     try {
+      const tenantId = tenantScopeFor(req);
+      const propertyId = getCallerPropertyId(req);
       const supabase = getSupabase();
 
-      const { data: suppliers, error } = await supabase
+      let query = supabase
         .from('inventory_suppliers')
         .select('*')
         .eq('is_active', true)
         .order('name');
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+      if (propertyId) query = query.eq('property_id', propertyId);
+      const { data: suppliers, error } = await query;
 
       if (error) throw error;
 
@@ -535,6 +606,8 @@ export class InventoryAdvancedController {
   async createSupplier(req: Request, res: Response) {
     try {
       const { name, contactName, email, phone, address, paymentTerms, leadTimeDays, notes } = req.body;
+      const tenantId = requireTenantScope(req);
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
       const { data: supplier, error } = await supabase
@@ -548,6 +621,8 @@ export class InventoryAdvancedController {
           payment_terms: paymentTerms,
           lead_time_days: leadTimeDays,
           notes,
+          tenant_id: tenantId,
+          property_id: propertyId,
         })
         .select()
         .single();
@@ -567,15 +642,20 @@ export class InventoryAdvancedController {
   async getItemBatches(req: Request, res: Response) {
     try {
       const { itemId } = req.params;
+      const tenantId = tenantScopeFor(req);
+      const propertyId = getCallerPropertyId(req);
       const supabase = getSupabase();
 
-      const { data: batches, error } = await supabase
+      let query = supabase
         .from('inventory_batches')
         .select('*')
         .eq('item_id', itemId)
         .eq('status', 'active')
         .gt('remaining_quantity', 0)
         .order('received_date', { ascending: true });
+      if (tenantId) query = query.eq('tenant_id', tenantId);
+      if (propertyId) query = query.eq('property_id', propertyId);
+      const { data: batches, error } = await query;
 
       if (error) throw error;
 
@@ -612,6 +692,12 @@ export class InventoryAdvancedController {
     try {
       const { orderId } = req.params;
       const userId = req.user?.userId;
+      // Required (throwing) variants: this method inserts/upserts rows with
+      // NOT NULL tenant_id/property_id columns, so a missing scope should
+      // fail fast with a clear 400/403 rather than surface as an opaque
+      // 500 from a Postgres not-null violation.
+      const tenantId = requireTenantScope(req);
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
       // Get order items
@@ -643,12 +729,15 @@ export class InventoryAdvancedController {
 
           const deductQty = ingredient.quantity_required * orderItem.quantity;
 
-          // Get current stock
-          const { data: item } = await supabase
+          // Get current stock — scoped so an order can't deduct against
+          // another tenant/property's inventory item via a stray ingredient row.
+          let itemQuery = supabase
             .from('inventory_items')
             .select('current_stock, name')
-            .eq('id', ingredient.inventory_item_id)
-            .single();
+            .eq('id', ingredient.inventory_item_id);
+          if (tenantId) itemQuery = itemQuery.eq('tenant_id', tenantId);
+          if (propertyId) itemQuery = itemQuery.eq('property_id', propertyId);
+          const { data: item } = await itemQuery.maybeSingle();
 
           if (!item) continue;
 
@@ -656,10 +745,13 @@ export class InventoryAdvancedController {
           const newStock = Math.max(0, currentStock - deductQty);
 
           // Update stock
-          await supabase
+          let stockUpdate = supabase
             .from('inventory_items')
             .update({ current_stock: newStock })
             .eq('id', ingredient.inventory_item_id);
+          if (tenantId) stockUpdate = stockUpdate.eq('tenant_id', tenantId);
+          if (propertyId) stockUpdate = stockUpdate.eq('property_id', propertyId);
+          await stockUpdate;
 
           // Record transaction
           await supabase.from('inventory_transactions').insert({
@@ -672,6 +764,8 @@ export class InventoryAdvancedController {
             reference_id: orderId,
             notes: `Auto-deducted for order`,
             performed_by: userId,
+            tenant_id: tenantId,
+            property_id: propertyId,
           });
 
           deductionResults.push({
@@ -682,11 +776,13 @@ export class InventoryAdvancedController {
           });
 
           // Check for low stock alert
-          const { data: itemInfo } = await supabase
+          let itemInfoQuery = supabase
             .from('inventory_items')
             .select('min_stock_level')
-            .eq('id', ingredient.inventory_item_id)
-            .single();
+            .eq('id', ingredient.inventory_item_id);
+          if (tenantId) itemInfoQuery = itemInfoQuery.eq('tenant_id', tenantId);
+          if (propertyId) itemInfoQuery = itemInfoQuery.eq('property_id', propertyId);
+          const { data: itemInfo } = await itemInfoQuery.maybeSingle();
 
           if (itemInfo && newStock <= (parseFloat(itemInfo.min_stock_level) || 0)) {
             await supabase.from('inventory_alerts').upsert({
@@ -695,6 +791,8 @@ export class InventoryAdvancedController {
               message: `Low stock alert: ${item.name} is at ${newStock} units`,
               severity: newStock === 0 ? 'critical' : 'warning',
               is_resolved: false,
+              tenant_id: tenantId,
+              property_id: propertyId,
             }, { onConflict: 'item_id,alert_type' });
           }
         }

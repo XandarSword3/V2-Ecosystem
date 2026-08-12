@@ -2,12 +2,34 @@ import { Router, RequestHandler } from 'express';
 import { inventoryController } from './inventory.controller.js';
 import { inventoryAdvancedController } from './inventory-advanced.controller.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { validatePropertyAccess, requirePropertyId } from '../../middleware/propertyAccess.middleware.js';
 
 const router = Router();
 
-// All routes require staff/admin authentication
-const staffAuth: RequestHandler[] = [authenticate, authorize('staff', 'admin', 'super_admin')];
-const adminAuth: RequestHandler[] = [authenticate, authorize('admin', 'super_admin')];
+// All routes require staff/admin authentication, AND a validated property
+// context. validatePropertyAccess verifies any supplied x-property-id
+// belongs to the caller's own tenant (and, for property_staff/property_manager,
+// to a property they're actually granted access to) before requirePropertyId
+// makes supplying it mandatory. Without this pair, property_staff confined to
+// Property A could read/write Property B's inventory within the same tenant —
+// either by sending a different header value (never validated) or, on read
+// endpoints, by omitting the header entirely. Same pattern as
+// coupons/giftcards/reviews (see CONTEXT.md cross-tenant sweep).
+//
+// Applied uniformly to staff AND admin routes: the frontend has no
+// "view all properties" mode for tenant admins (checked — no such affordance
+// exists in the admin inventory page or property context), so there's no
+// legitimate no-property-selected state to preserve for adminAuth routes here.
+const staffAuth: RequestHandler[] = [authenticate, authorize('staff', 'admin', 'super_admin'), validatePropertyAccess, requirePropertyId];
+const adminAuth: RequestHandler[] = [authenticate, authorize('admin', 'super_admin'), validatePropertyAccess, requirePropertyId];
+
+// One deliberate carve-out: /check-expiring is a genuine cross-property scan
+// (its query has no property_id filter at all — it's meant to sweep every
+// property's expiring/expired items) invoked as a scheduled job with no
+// per-property caller context to supply a header from. Forcing
+// requirePropertyId here wouldn't close a real gap, it would just break the
+// cron call. Base auth only, no property gate.
+const adminAuthNoProperty: RequestHandler[] = [authenticate, authorize('admin', 'super_admin')];
 
 // Categories
 router.get('/categories', ...staffAuth, inventoryController.getCategories.bind(inventoryController));
@@ -38,7 +60,7 @@ router.get('/stats', ...adminAuth, inventoryController.getStats.bind(inventoryCo
 router.get('/report', ...adminAuth, inventoryController.generateReport.bind(inventoryController));
 
 // Cron endpoints
-router.post('/check-expiring', ...adminAuth, inventoryController.checkExpiringItems.bind(inventoryController));
+router.post('/check-expiring', ...adminAuthNoProperty, inventoryController.checkExpiringItems.bind(inventoryController));
 
 // ── Advanced: Wastage ──
 router.post('/wastage', ...staffAuth, inventoryAdvancedController.recordWastage.bind(inventoryAdvancedController));

@@ -381,6 +381,7 @@ class CustomizationController {
         return;
       }
 
+      const userId = req.user?.id;
       const result = await customizationService.createOrderSnapshot({
         orderType,
         orderId,
@@ -389,7 +390,8 @@ class CustomizationController {
         entityId,
         selections: selections || [],
         baseQuantity,
-        executeInventory
+        executeInventory,
+        performedBy: userId
       }, tenantScopeFor(req));
 
       if (!result.success) {

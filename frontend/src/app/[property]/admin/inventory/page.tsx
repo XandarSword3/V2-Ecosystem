@@ -108,9 +108,22 @@ interface Transaction {
   previous_stock: number;
   new_stock: number;
   reference_type: string;
+  reference_id?: string;
   notes?: string;
   performed_by_name?: string;
   created_at: string;
+}
+
+interface TransactionGroup {
+  reference_id: string | null;
+  reference_type: string;
+  reference_display: string;
+  created_at: string;
+  transactions: Transaction[];
+  summary: {
+    total_items: number;
+    total_quantity: number;
+  };
 }
 
 export default function InventoryAdminPage() {
@@ -121,6 +134,8 @@ export default function InventoryAdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionGroups, setTransactionGroups] = useState<TransactionGroup[]>([]);
+  const [groupTransactions, setGroupTransactions] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -195,7 +210,7 @@ export default function InventoryAdminPage() {
     } else if (activeTab === 'operations') {
       loadVarianceReport();
     }
-  }, [activeTab]);
+  }, [activeTab, groupTransactions]);
 
   const loadSuppliers = async () => {
     setAdvancedLoading(true);
@@ -335,8 +350,20 @@ export default function InventoryAdminPage() {
 
   const loadTransactions = async () => {
     try {
-      const res = await api.get('/inventory/transactions', { params: { limit: 100 }, headers: propertyHeader });
-      if (res.data.success) setTransactions(res.data.data);
+      const params: any = { limit: 100 };
+      if (groupTransactions) {
+        params.groupByReference = 'true';
+      }
+      const res = await api.get('/inventory/transactions', { params, headers: propertyHeader });
+      if (res.data.success) {
+        if (res.data.grouped) {
+          setTransactionGroups(res.data.data);
+          setTransactions([]);
+        } else {
+          setTransactions(res.data.data);
+          setTransactionGroups([]);
+        }
+      }
     } catch {
       toast.error('Failed to load transactions');
     }
@@ -884,56 +911,166 @@ export default function InventoryAdminPage() {
 
         {/* Transactions Tab */}
         <TabsContent value="transactions" className="space-y-4">
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b dark:border-slate-700">
-                      <th className="text-left p-4 font-medium text-slate-500">Date</th>
-                      <th className="text-left p-4 font-medium text-slate-500">Item</th>
-                      <th className="text-left p-4 font-medium text-slate-500">Type</th>
-                      <th className="text-center p-4 font-medium text-slate-500">Quantity</th>
-                      <th className="text-center p-4 font-medium text-slate-500">Stock Change</th>
-                      <th className="text-left p-4 font-medium text-slate-500">By</th>
-                      <th className="text-left p-4 font-medium text-slate-500">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((txn) => (
-                      <tr key={txn.id} className="border-b dark:border-slate-700">
-                        <td className="p-4 text-sm text-slate-500">
-                          {formatDate(txn.created_at)}
-                        </td>
-                        <td className="p-4">
-                          <div>
-                            <p className="font-medium">{txn.item_name}</p>
-                            <p className="text-xs text-slate-500">{txn.sku}</p>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          {getTransactionTypeBadge(txn.type)}
-                        </td>
-                        <td className="p-4 text-center font-bold">
-                          {txn.type === 'in' || txn.type === 'return' ? '+' : txn.type === 'adjustment' ? '=' : '-'}
-                          {txn.quantity}
-                        </td>
-                        <td className="p-4 text-center text-sm text-slate-500">
-                          {txn.previous_stock} → {txn.new_stock}
-                        </td>
-                        <td className="p-4 text-sm">
-                          {txn.performed_by_name || '-'}
-                        </td>
-                        <td className="p-4 text-sm text-slate-500 truncate max-w-xs">
-                          {txn.notes || '-'}
-                        </td>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-500">View:</span>
+              <Button
+                variant={groupTransactions ? "default" : "outline"}
+                size="sm"
+                onClick={() => setGroupTransactions(false)}
+              >
+                Individual
+              </Button>
+              <Button
+                variant={groupTransactions ? "outline" : "default"}
+                size="sm"
+                onClick={() => setGroupTransactions(true)}
+              >
+                Grouped by Order
+              </Button>
+            </div>
+            <Button onClick={loadTransactions} variant="outline" size="sm" className="gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </Button>
+          </div>
+
+          {groupTransactions ? (
+            <div className="space-y-4">
+              {transactionGroups.map((group) => (
+                <Card key={group.reference_id || 'manual'} className="overflow-hidden">
+                  <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b dark:border-slate-700">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                          <ShoppingBag className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">{group.reference_display}</CardTitle>
+                          <p className="text-sm text-slate-500">
+                            {formatDate(group.created_at)} • {group.summary.total_items} items
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm text-slate-500">Total Quantity</p>
+                          <p className="font-bold">{parseFloat(group.summary.total_quantity.toFixed(2))}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {group.transactions.length} transactions
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                            <th className="text-left p-3 font-medium text-slate-500 text-xs">Item</th>
+                            <th className="text-left p-3 font-medium text-slate-500 text-xs">Type</th>
+                            <th className="text-center p-3 font-medium text-slate-500 text-xs">Quantity</th>
+                            <th className="text-center p-3 font-medium text-slate-500 text-xs">Stock Change</th>
+                            <th className="text-left p-3 font-medium text-slate-500 text-xs">By</th>
+                            <th className="text-left p-3 font-medium text-slate-500 text-xs">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.transactions.map((txn) => (
+                            <tr key={txn.id} className="border-b dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                              <td className="p-3">
+                                <div>
+                                  <p className="font-medium text-sm">{txn.item_name}</p>
+                                  <p className="text-xs text-slate-500">{txn.sku}</p>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                {getTransactionTypeBadge(txn.type)}
+                              </td>
+                              <td className="p-3 text-center font-bold text-sm">
+                                {txn.type === 'in' || txn.type === 'return' ? '+' : txn.type === 'adjustment' ? '=' : '-'}
+                                {txn.quantity}
+                              </td>
+                              <td className="p-3 text-center text-sm text-slate-500">
+                                {txn.previous_stock} → {txn.new_stock}
+                              </td>
+                              <td className="p-3 text-sm">
+                                {txn.performed_by_name || '-'}
+                              </td>
+                              <td className="p-3 text-sm text-slate-500 truncate max-w-xs">
+                                {txn.notes || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {transactionGroups.length === 0 && (
+                <Card>
+                  <CardContent className="p-8 text-center text-slate-500">
+                    <ClipboardList className="w-12 h-12 mx-auto mb-4 opacity-40" />
+                    <p className="text-lg font-medium">No transactions found</p>
+                    <p className="text-sm">Start recording inventory transactions to see them here</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b dark:border-slate-700">
+                        <th className="text-left p-4 font-medium text-slate-500">Date</th>
+                        <th className="text-left p-4 font-medium text-slate-500">Item</th>
+                        <th className="text-left p-4 font-medium text-slate-500">Type</th>
+                        <th className="text-center p-4 font-medium text-slate-500">Quantity</th>
+                        <th className="text-center p-4 font-medium text-slate-500">Stock Change</th>
+                        <th className="text-left p-4 font-medium text-slate-500">By</th>
+                        <th className="text-left p-4 font-medium text-slate-500">Notes</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                    </thead>
+                    <tbody>
+                      {transactions.map((txn) => (
+                        <tr key={txn.id} className="border-b dark:border-slate-700">
+                          <td className="p-4 text-sm text-slate-500">
+                            {formatDate(txn.created_at)}
+                          </td>
+                          <td className="p-4">
+                            <div>
+                              <p className="font-medium">{txn.item_name}</p>
+                              <p className="text-xs text-slate-500">{txn.sku}</p>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            {getTransactionTypeBadge(txn.type)}
+                          </td>
+                          <td className="p-4 text-center font-bold">
+                            {txn.type === 'in' || txn.type === 'return' ? '+' : txn.type === 'adjustment' ? '=' : '-'}
+                            {txn.quantity}
+                          </td>
+                          <td className="p-4 text-center text-sm text-slate-500">
+                            {txn.previous_stock} → {txn.new_stock}
+                          </td>
+                          <td className="p-4 text-sm">
+                            {txn.performed_by_name || '-'}
+                          </td>
+                          <td className="p-4 text-sm text-slate-500 truncate max-w-xs">
+                            {txn.notes || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Alerts Tab */}

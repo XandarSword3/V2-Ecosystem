@@ -1188,6 +1188,7 @@ function buildInstantTransactionRouter(router: Router): void {
               p_selections: selections,
               p_base_quantity: orderItem.quantity,
               p_execute_inventory: true,
+              p_performed_by: req.user?.userId ?? null,
             });
 
             if (customizationError) {
