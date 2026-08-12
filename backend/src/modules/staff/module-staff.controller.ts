@@ -1956,6 +1956,15 @@ export async function createModuleOrder(req: Request, res: Response) {
 
     const createdItems: any[] = [];
     if (orderItemsInput.length > 0) {
+      // selectedModifiers isn't sent by any current staff UI (StaffPOSTemplate /
+      // AdminPOSTemplate have no customization selector today — only the
+      // customer-facing MenuService/DynamicModuleRenderer flow does), so this
+      // is defensive: if a caller ever does send it (future staff modifier UI,
+      // a customer-cart handoff, direct API use), it's captured and actually
+      // acted on below instead of silently discarded. Previously this field
+      // was dropped entirely — the item would be charged for and recorded,
+      // but its ingredients/add-ons were never deducted, which is a much
+      // harder bug to notice after the fact than a loud failure now.
       const itemInserts = orderItemsInput.map((i: any) => ({
         transaction_id: transaction.id,
         catalog_item_id: i.catalogItemId || i.itemId || i.id,
@@ -1964,6 +1973,11 @@ export async function createModuleOrder(req: Request, res: Response) {
         subtotal: Math.round(Number(i.quantity || i.qty || 1) * Number(i.unitPrice || i.price || 0) * 100) / 100,
         special_instructions: i.notes || i.instructions || null,
         status: 'pending',
+        metadata: {
+          ...(Array.isArray(i.selectedModifiers) && i.selectedModifiers.length > 0
+            ? { selectedModifiers: i.selectedModifiers }
+            : {}),
+        },
       }));
 
       const { data: insertedItems, error: itemsError } = await supabase
@@ -1975,6 +1989,70 @@ export async function createModuleOrder(req: Request, res: Response) {
         logger.warn('Failed inserting order items for staff order:', itemsError.message);
       } else {
         createdItems.push(...(insertedItems || []));
+      }
+
+      // Process customization inventory for items with selectedModifiers.
+      // Mirrors dynamic-module.router.ts's customer order path exactly —
+      // same RPC, same order_type, same compensating transaction on
+      // failure — so the two order-creation paths stay consistent instead
+      // of silently diverging in what they deduct.
+      //
+      // Known gap NOT addressed here: calculatedAmount above is qty*price
+      // only and doesn't include any totalPriceAdjustment from selections
+      // (the customer path's total comes from a separate PricingPipeline
+      // this staff endpoint doesn't call at all). Inventory deduction is
+      // correct after this change; the order total is not, if modifiers
+      // carry a price adjustment. That's a pricing-pipeline gap, not an
+      // inventory one — flagging rather than folding into this fix.
+      if (createdItems.length > 0) {
+        try {
+          for (const orderItem of createdItems) {
+            const selectedModifiers = orderItem.metadata?.selectedModifiers;
+            if (!selectedModifiers || !Array.isArray(selectedModifiers) || selectedModifiers.length === 0) {
+              continue;
+            }
+
+            const selections = selectedModifiers.map((mod: any) => ({
+              groupId: mod.groupId,
+              optionId: mod.optionId,
+              quantity: mod.quantity || 1,
+            }));
+
+            const { error: customizationError } = await supabase.rpc('create_order_customization_snapshot', {
+              p_order_type: 'instant_transaction',
+              p_order_id: transaction.id,
+              p_order_item_id: orderItem.id,
+              p_entity_type: 'catalog_item',
+              p_entity_id: orderItem.catalog_item_id,
+              p_selections: selections,
+              p_base_quantity: orderItem.quantity,
+              p_execute_inventory: true,
+            });
+
+            if (customizationError) {
+              logger.error('[Staff Order] Customization inventory deduction failed, rolling back order:', {
+                error: customizationError.message,
+                orderId: transaction.id,
+              });
+              await supabase.from('order_items').delete().eq('transaction_id', transaction.id);
+              await supabase.from('transactions').delete().eq('id', transaction.id);
+              return res.status(400).json({
+                success: false,
+                error: 'INSUFFICIENT_STOCK_CUSTOMIZATION',
+                message: 'One or more customizations in this order are out of stock',
+              });
+            }
+          }
+        } catch (customizationErr: any) {
+          logger.error('[Staff Order] Exception during customization inventory processing:', customizationErr);
+          await supabase.from('order_items').delete().eq('transaction_id', transaction.id);
+          await supabase.from('transactions').delete().eq('id', transaction.id);
+          return res.status(400).json({
+            success: false,
+            error: 'INSUFFICIENT_STOCK_CUSTOMIZATION',
+            message: customizationErr?.message || 'Failed to process customizations',
+          });
+        }
       }
     }
 
