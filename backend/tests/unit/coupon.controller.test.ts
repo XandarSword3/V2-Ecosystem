@@ -303,6 +303,8 @@ describe('Coupon Controller', () => {
         is_active: true,
       };
 
+      // Resolve tenant from property (getTenantIdForProperty)
+      mockBuilder.queueResponse({ tenant_id: 'tenant-1' }, null);
       // Check if code exists
       mockBuilder.queueResponse(null, null);
       // Insert coupon

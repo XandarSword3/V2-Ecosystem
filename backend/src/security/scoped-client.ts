@@ -36,7 +36,44 @@ const TENANT_SCOPED_TABLES = new Set([
   'customization_groups',
   'customization_options',
   'order_customizations',
+  // Added as part of the cross-tenant IDOR sweep (see CONTEXT.md):
+  'roles',
+  'gift_cards',
+  'coupons',
+  'reviews',
+  'payments',
+  'payment_ledger',
 ]);
+
+/**
+ * `transactions` is deliberately NOT registered here, even though several of
+ * the payments-module fixes above read/write it (postRoomCharge,
+ * settleFolioBalance, recordCashPayment/recordManualPayment's reference
+ * lookups). It's the unified table underpinning all five engines and has an
+ * enormous number of call sites across the codebase — auto-scoping it here
+ * would only affect sites explicitly migrated to getScopedClient, but
+ * verifying that's safe for `transactions` specifically means auditing far
+ * more of the codebase than the payments sweep covered. Those specific
+ * fetches are scoped manually instead (see payment.controller.ts) until
+ * `transactions` gets its own dedicated review.
+ */
+
+/**
+ * gift_cards / coupons / reviews are registered above so any call site NOT
+ * already covered gets tenant_id auto-scoping by default. But the admin
+ * controllers for these three (giftcard.controller.ts, coupon.controller.ts,
+ * reviews.controller.ts) deliberately do NOT route through getScopedClient()
+ * for their property-scoped admin endpoints — they scope by property_id via
+ * validatePropertyAccess + requirePropertyId instead. That's intentional:
+ * validatePropertyAccess has an explicit super_admin bypass allowing a
+ * platform admin to act on any property across ANY tenant. If those
+ * endpoints were switched to getScopedClient's automatic tenant_id filter,
+ * a super_admin homed to Tenant A would be silently blocked from a Tenant B
+ * property their role is supposed to reach — the two scoping mechanisms
+ * would fight each other. roles has no property_id dimension and no such
+ * bypass, so it's a clean fit and IS fully migrated (see
+ * roles.controller.ts / permissions.controller.ts).
+ */
 
 export interface TenantContext {
   /** null means super_admin — genuinely unscoped, not "forgot to set it." */

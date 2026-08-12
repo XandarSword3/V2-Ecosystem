@@ -3,7 +3,7 @@ import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
 import { logActivity } from "../../utils/activityLogger";
 import { permissionCache } from "../../security/permission-cache.service.js";
-import { getCallerTenantId } from '../../security/tenant-scope.js';
+import { getScopedClient, tenantContextFor } from '../../security/scoped-client.js';
 // import type { PermissionRow } from './types.js'; // Deprecated
 
 // -- Permissions --
@@ -27,15 +27,12 @@ export const getAllPermissions = asyncHandler(async (req: Request, res: Response
 export const getRolePermissions = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const { id } = req.params; // role_id
-    const tenantId = getCallerTenantId(req);
 
-    // 1. Resolve role name from ID, scoped to the caller's tenant. Previously
-    // unscoped — any tenant_owner could pass another tenant's role UUID and
-    // read that role's permission set. tenantId is null only for a
-    // genuinely-unscoped platform admin, same bypass as elsewhere.
-    let roleQuery = supabase.from('roles').select('name').eq('id', id);
-    if (tenantId) roleQuery = roleQuery.eq('tenant_id', tenantId);
-    const { data: roleData, error: roleError } = await roleQuery.maybeSingle();
+    // `roles` is registered in TENANT_SCOPED_TABLES — auto-scoped to the
+    // caller's tenant. Previously unscoped — any tenant_owner could pass
+    // another tenant's role UUID and read that role's permission set.
+    const scoped = getScopedClient(tenantContextFor(req));
+    const { data: roleData, error: roleError } = await scoped.from('roles').select('name').eq('id', id).maybeSingle();
 
     if (roleError || !roleData) {
         return res.status(404).json({ success: false, error: 'Role not found' });
@@ -44,9 +41,12 @@ export const getRolePermissions = asyncHandler(async (req: Request, res: Respons
     // NOTE: app_role_permissions is keyed by (role_name, tenant_id,
     // property_id) but this query still filters by role_name only. If two
     // tenants have a role with the same name, this can surface permission
-    // rows that don't belong to the caller's tenant. Not fixed here — see the
-    // note on updateRolePermissions below for why this needs a real design
-    // decision rather than a guessed patch.
+    // rows that don't belong to the caller's tenant. app_role_permissions is
+    // deliberately NOT registered in TENANT_SCOPED_TABLES — its NOT NULL
+    // property_id column has no equivalent on `roles`, so getScopedClient
+    // can't safely auto-stamp inserts for it. See the note on
+    // updateRolePermissions below for why this needs a real design decision
+    // rather than a guessed patch.
     const { data, error } = await supabase
       .from('app_role_permissions')
       .select('permission_slug')
@@ -63,13 +63,13 @@ export const updateRolePermissions = asyncHandler(async (req: Request, res: Resp
     const supabase = getSupabase();
     const { id } = req.params; // role_id
     const { permission_slugs } = req.body; // Array of strings (slugs)
-    const tenantId = getCallerTenantId(req);
+    const ctx = tenantContextFor(req);
+    const scoped = getScopedClient(ctx);
 
-    // 1. Resolve role name, scoped to the caller's tenant — same cross-tenant
-    // IDOR fix as getRolePermissions and roles.controller.ts.
-    let roleQuery = supabase.from('roles').select('name').eq('id', id);
-    if (tenantId) roleQuery = roleQuery.eq('tenant_id', tenantId);
-    const { data: roleData, error: roleError } = await roleQuery.maybeSingle();
+    // Resolve role name, auto-scoped to the caller's tenant via the scoped
+    // client — same cross-tenant IDOR fix as getRolePermissions and
+    // roles.controller.ts.
+    const { data: roleData, error: roleError } = await scoped.from('roles').select('name').eq('id', id).maybeSingle();
 
     if (roleError || !roleData) {
         return res.status(404).json({ success: false, error: 'Role not found' });
@@ -94,7 +94,7 @@ export const updateRolePermissions = asyncHandler(async (req: Request, res: Resp
     // what property_id should mean for a tenant-wide role), not something to
     // guess at in a security patch. Needs your call before it's touched.
     let delQuery = supabase.from('app_role_permissions').delete().eq('role_name', roleName);
-    if (tenantId) delQuery = delQuery.eq('tenant_id', tenantId);
+    if (ctx.tenantId) delQuery = delQuery.eq('tenant_id', ctx.tenantId);
     const { error: delError } = await delQuery;
     
     if (delError) throw delError;

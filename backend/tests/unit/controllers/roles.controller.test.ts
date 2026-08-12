@@ -148,8 +148,7 @@ describe('RolesController', () => {
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: { id: 'role-1' }, error: null })),
-        single: vi.fn().mockImplementation(() => Promise.resolve({ data: mockRole, error: null }))
+        maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: mockRole, error: null }))
       };
 
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
@@ -173,8 +172,7 @@ describe('RolesController', () => {
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: { id: 'role-1' }, error: null })),
-        single: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: new Error('Update failed') }))
+        maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: new Error('Update failed') }))
       };
 
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
@@ -229,7 +227,9 @@ describe('RolesController', () => {
               })
             }),
             delete: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ error: null })
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null })
+              })
             })
           };
         }
@@ -254,12 +254,36 @@ describe('RolesController', () => {
     });
 
     it('should handle delete errors', async () => {
-      const queryBuilder = {
-        delete: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: new Error('Delete failed') }))
-      };
+      const mockFrom = vi.fn().mockImplementation((table: string) => {
+        if (table === 'user_roles') {
+          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ count: 0 }) }) };
+        }
+        if (table === 'role_permissions') {
+          return { delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) };
+        }
+        if (table === 'app_role_permissions') {
+          return { delete: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) }) };
+        }
+        if (table === 'roles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'role-1', name: 'admin' }, error: null })
+                })
+              })
+            }),
+            delete: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: new Error('Delete failed') })
+              })
+            })
+          };
+        }
+        return {};
+      });
 
-      vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
+      vi.mocked(getSupabase).mockReturnValue({ from: mockFrom } as any);
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'role-1' },
