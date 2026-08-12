@@ -84,7 +84,7 @@ export function mockRequest(options: {
   params?: Record<string, string>;
   query?: Record<string, any>;
   body?: Record<string, any>;
-  user?: { userId: string; role: string };
+  user?: { userId: string; role: string; tenantId?: string; scope?: string };
   headers?: Record<string, string>;
   ip?: string;
 } = {}): Partial<Request> {
@@ -92,7 +92,12 @@ export function mockRequest(options: {
     params: options.params || {},
     query: options.query || {},
     body: options.body || {},
-    user: options.user,
+    // tenantId/scope default to a normal tenant-scoped staff/admin caller —
+    // needed by security/tenant-scope.ts's getCallerTenantId (used by
+    // getScopedClient) for the payments-module cross-tenant fixes. Tests
+    // exercising a specific tenant mismatch or an unauthenticated caller
+    // should still pass `user: undefined` or their own object explicitly.
+    user: 'user' in options ? options.user : { userId: 'staff-123', role: 'staff', tenantId: 'tenant-1', scope: 'tenant_admin' },
     headers: options.headers || {},
     ip: options.ip || '127.0.0.1',
     get: vi.fn((header: string) => (options.headers || {})[header.toLowerCase()]),
