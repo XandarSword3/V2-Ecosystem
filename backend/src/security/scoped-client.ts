@@ -41,7 +41,22 @@ const TENANT_SCOPED_TABLES = new Set([
   'gift_cards',
   'coupons',
   'reviews',
+  'payments',
+  'payment_ledger',
 ]);
+
+/**
+ * `transactions` is deliberately NOT registered here, even though several of
+ * the payments-module fixes above read/write it (postRoomCharge,
+ * settleFolioBalance, recordCashPayment/recordManualPayment's reference
+ * lookups). It's the unified table underpinning all five engines and has an
+ * enormous number of call sites across the codebase — auto-scoping it here
+ * would only affect sites explicitly migrated to getScopedClient, but
+ * verifying that's safe for `transactions` specifically means auditing far
+ * more of the codebase than the payments sweep covered. Those specific
+ * fetches are scoped manually instead (see payment.controller.ts) until
+ * `transactions` gets its own dedicated review.
+ */
 
 /**
  * gift_cards / coupons / reviews are registered above so any call site NOT
