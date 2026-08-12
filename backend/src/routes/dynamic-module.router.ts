@@ -3258,6 +3258,16 @@ async function commitImportForEngine(
         created: 0,
         failed: 0,
         errors: [] as string[],
+        // FIX: imported ingredients were parsed for preview but silently
+        // dropped on commit — no menu_item_ingredients rows were ever
+        // written for bulk/LLM/CSV-imported items, so deduct_inventory_for_order_items
+        // had nothing to deduct against for the entire imported catalog.
+        // Ingredients are now resolved by case-insensitive name match
+        // against this tenant/property's existing inventory_items and
+        // linked automatically; anything that can't be matched is reported
+        // here so it can be linked manually via the menu item's Recipe tab.
+        ingredientsLinked: 0,
+        unmatchedIngredients: [] as string[],
       };
       // First, get the module to find tenant_id
       const { data: module } = await supabase
@@ -3275,6 +3285,28 @@ async function commitImportForEngine(
           .maybeSingle();
         tenant_id = prop?.tenant_id ?? null;
       }
+
+      // Build a name -> inventory_item lookup for this tenant/property once,
+      // instead of querying per ingredient per item.
+      let inventoryByName = new Map<string, { id: string; unit: string | null }>();
+      {
+        let invQuery = supabase.from('inventory_items').select('id, name, unit').eq('tenant_id', tenant_id);
+        if (module?.property_id) invQuery = invQuery.eq('property_id', module.property_id);
+        const { data: invItems } = await invQuery;
+        for (const inv of invItems ?? []) {
+          inventoryByName.set(inv.name.trim().toLowerCase(), { id: inv.id, unit: inv.unit });
+        }
+      }
+
+      const pendingIngredientLinks: Array<{
+        catalog_item_id: string;
+        inventory_item_id: string;
+        quantity_required: number;
+        unit: string;
+        tenant_id: string | null;
+        property_id: string | null | undefined;
+      }> = [];
+
       for (const item of items as Array<{
         name: string;
         price: number;
@@ -3284,29 +3316,62 @@ async function commitImportForEngine(
         preparation_time?: number;
         calories?: number;
         allergens?: string[];
+        ingredients?: Array<{ name: string; estimatedQuantity: number; estimatedUnit: string }>;
       }>) {
-        const { error } = await supabase.from('catalog_items').insert({
-          name: item.name,
-          price: item.price,
-          description: item.description,
-          category: item.category ?? null,
-          is_available: item.is_available ?? true,
-          module_id: moduleId,
-          tenant_id,
-          property_id: module?.property_id,
-          metadata: {
-            preparation_time_minutes: item.preparation_time,
-            calories: item.calories,
-            allergens: item.allergens,
-          },
-        });
+        const { data: inserted, error } = await supabase
+          .from('catalog_items')
+          .insert({
+            name: item.name,
+            price: item.price,
+            description: item.description,
+            category: item.category ?? null,
+            is_available: item.is_available ?? true,
+            module_id: moduleId,
+            tenant_id,
+            property_id: module?.property_id,
+            metadata: {
+              preparation_time_minutes: item.preparation_time,
+              calories: item.calories,
+              allergens: item.allergens,
+            },
+          })
+          .select('id')
+          .single();
         if (error) {
           results.failed++;
           results.errors.push(`${item.name}: ${error.message}`);
-        } else {
-          results.created++;
+          continue;
+        }
+        results.created++;
+
+        for (const ingredient of item.ingredients ?? []) {
+          const match = inventoryByName.get(ingredient.name.trim().toLowerCase());
+          if (!match) {
+            results.unmatchedIngredients.push(`${item.name}: ${ingredient.name}`);
+            continue;
+          }
+          pendingIngredientLinks.push({
+            catalog_item_id: inserted.id,
+            inventory_item_id: match.id,
+            quantity_required: ingredient.estimatedQuantity || 1,
+            unit: ingredient.estimatedUnit || match.unit || 'unit',
+            tenant_id,
+            property_id: module?.property_id,
+          });
         }
       }
+
+      if (pendingIngredientLinks.length > 0) {
+        const { error: linkError, count } = await supabase
+          .from('menu_item_ingredients')
+          .insert(pendingIngredientLinks, { count: 'exact' });
+        if (linkError) {
+          results.errors.push(`Failed to link ${pendingIngredientLinks.length} ingredient(s): ${linkError.message}`);
+        } else {
+          results.ingredientsLinked = count ?? pendingIngredientLinks.length;
+        }
+      }
+
       return { success: true, data: results };
     }
     case 'shared_capacity_access': {
