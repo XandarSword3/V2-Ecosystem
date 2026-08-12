@@ -47,9 +47,11 @@ export const deductInventorySideEffect: SideEffectFn = async (
   try {
     const supabase = getSupabase();
     const targetOrderId = orderId || transactionId;
+    const userId = context.userId as string | undefined;
 
     const { data, error } = await supabase.rpc('deduct_inventory_for_order', {
       p_transaction_id: targetOrderId,
+      p_performed_by: userId,
     });
 
     // RETURNS TABLE(...) comes back through supabase-js as an array of rows.
@@ -170,9 +172,11 @@ export const restoreInventorySideEffect: SideEffectFn = async (
   try {
     const supabase = getSupabase();
     const targetOrderId = orderId || transactionId;
+    const userId = context.userId as string | undefined;
 
     const { data, error } = await supabase.rpc('restore_inventory_for_order', {
       p_transaction_id: targetOrderId,
+      p_performed_by: userId,
     });
 
     const result = Array.isArray(data) ? data[0] : data;

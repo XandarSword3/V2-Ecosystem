@@ -858,17 +858,19 @@ class CustomizationService {
     orderId: string,
     orderItemId: string | null,
     validatedSelections: ValidatedSelection[],
-    baseQuantity: number = 1
+    baseQuantity: number = 1,
+    performedBy?: string
   ): Promise<CustomizationInventoryResult> {
     const supabase = getSupabase();
     
     const { data, error } = await supabase
-      .rpc('process_customization_inventory', {
+      .rpc('process_customization_inventory_safe', {
         p_order_type: orderType,
         p_order_id: orderId,
         p_order_item_id: orderItemId,
         p_selections: validatedSelections,
-        p_base_quantity: baseQuantity
+        p_base_quantity: baseQuantity,
+        p_performed_by: performedBy || null
       });
 
     if (error) {
@@ -927,6 +929,7 @@ class CustomizationService {
     selections: Array<{ optionId: string; quantity: number }>;
     baseQuantity?: number;
     executeInventory?: boolean;
+    performedBy?: string;
   }, tenantId?: string | null): Promise<{
     success: boolean;
     snapshotId?: string;
@@ -965,7 +968,8 @@ class CustomizationService {
       p_entity_id: params.entityId,
       p_selections: params.selections,
       p_base_quantity: params.baseQuantity || 1,
-      p_execute_inventory: params.executeInventory ?? true
+      p_execute_inventory: params.executeInventory ?? true,
+      p_performed_by: params.performedBy || null
     });
 
     const latency = Date.now() - startTime;

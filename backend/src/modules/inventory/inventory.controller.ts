@@ -1087,7 +1087,7 @@ export class InventoryController {
    */
   async getTransactions(req: Request, res: Response) {
     try {
-      const { page = '1', limit = '50', itemId, type, startDate, endDate } = req.query;
+      const { page = '1', limit = '50', itemId, type, startDate, endDate, referenceId, groupByReference } = req.query;
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
       const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
@@ -1100,6 +1100,10 @@ export class InventoryController {
 
       if (itemId) {
         query = query.eq('item_id', itemId as string);
+      }
+
+      if (referenceId) {
+        query = query.eq('reference_id', referenceId as string);
       }
 
       if (type) {
@@ -1159,19 +1163,95 @@ export class InventoryController {
         previous_stock: t.stock_before,
         new_stock: t.stock_after,
         reference_type: t.reference_type,
+        reference_id: t.reference_id,
         notes: t.notes,
         performed_by_name: usersMap[t.performed_by]?.full_name,
         created_at: t.created_at,
       }));
 
-      res.json({
-        success: true,
-        data: enrichedTransactions,
-        pagination: {
-          page: parseInt(page as string),
-          limit: parseInt(limit as string),
-        },
-      });
+      // Group by reference if requested
+      if (groupByReference === 'true') {
+        const grouped = new Map<string, any[]>();
+        
+        for (const tx of enrichedTransactions) {
+          const key = tx.reference_id || 'manual';
+          if (!grouped.has(key)) {
+            grouped.set(key, []);
+          }
+          grouped.get(key)!.push(tx);
+        }
+
+        // Fetch reference display info for transaction references
+        const transactionIds = [...new Set(enrichedTransactions
+          .filter(t => (t.reference_type === 'transaction' || t.reference_type === 'instant_transaction_customization') && t.reference_id)
+          .map(t => t.reference_id))];
+        
+        const ordersMap: Record<string, any> = {};
+        if (transactionIds.length > 0) {
+          const { data: orders } = await supabase
+            .from('transactions')
+            .select('id, metadata, created_at')
+            .in('id', transactionIds);
+          
+          for (const order of orders || []) {
+            const meta = order.metadata as Record<string, any>;
+            ordersMap[order.id] = {
+              order_number: meta?.order_number || `#${order.id.substring(0, 8)}`,
+              customer_name: meta?.customer_name || 'Guest',
+            };
+          }
+        }
+
+        const groupedData = Array.from(grouped.entries()).map(([referenceId, txs]) => {
+          const firstTx = txs[0];
+          const isManual = firstTx.reference_id === null || firstTx.reference_type === 'manual';
+          
+          let referenceDisplay: string;
+          if (isManual) {
+            referenceDisplay = 'Manual Adjustment';
+          } else if (firstTx.reference_type === 'transaction' || firstTx.reference_type === 'instant_transaction_customization') {
+            const orderInfo = ordersMap[firstTx.reference_id];
+            referenceDisplay = orderInfo?.order_number || `Order #${firstTx.reference_id?.substring(0, 8)}`;
+          } else {
+            referenceDisplay = `${firstTx.reference_type} #${firstTx.reference_id?.substring(0, 8)}`;
+          }
+
+          const totalQuantity = txs.reduce((sum, tx) => sum + tx.quantity, 0);
+          const totalItems = txs.length;
+
+          return {
+            reference_id: firstTx.reference_id,
+            reference_type: firstTx.reference_type,
+            reference_display: referenceDisplay,
+            created_at: firstTx.created_at,
+            transactions: txs,
+            summary: {
+              total_items: totalItems,
+              total_quantity: totalQuantity,
+            },
+          };
+        }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        res.json({
+          success: true,
+          data: groupedData,
+          grouped: true,
+          pagination: {
+            page: parseInt(page as string),
+            limit: parseInt(limit as string),
+          },
+        });
+      } else {
+        res.json({
+          success: true,
+          data: enrichedTransactions,
+          grouped: false,
+          pagination: {
+            page: parseInt(page as string),
+            limit: parseInt(limit as string),
+          },
+        });
+      }
     } catch (error: any) {
       if (error instanceof AppError) {
         return res.status(error.statusCode).json({ success: false, error: error.message });
