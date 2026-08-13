@@ -488,6 +488,12 @@ export class InventoryAdvancedController {
         return res.status(400).json({ success: false, error: `PO already ${po.status}` });
       }
 
+      // tenantId is null for a super_admin's cross-tenant bypass — fall back
+      // to the PO's own (always non-null) tenant_id so the NOT NULL
+      // tenant_id columns below (inventory_batches, inventory_transactions
+      // via the RPC) never get a null write in that case.
+      const resolvedTenantId = tenantId || po.tenant_id;
+
       // Process each received item
       for (const item of data.items) {
         if (item.quantityReceived <= 0) continue;
@@ -501,48 +507,46 @@ export class InventoryAdvancedController {
           cost_per_unit: item.actualUnitCost,
           purchase_order_id: po.id,
           expiry_date: item.expiryDate,
-          tenant_id: tenantId,
+          tenant_id: resolvedTenantId,
           property_id: propertyId,
         });
 
-        // Update item stock
-        await supabase.rpc('deduct_stock_fifo', {
+        // Update item stock — atomic, row-locked increment via
+        // adjust_stock_atomic (replaces both the dead deduct_stock_fifo
+        // call and the unlocked SELECT-then-UPDATE that followed it).
+        //
+        // The dead code being replaced:
+        //   await supabase.rpc('deduct_stock_fifo', { p_quantity: -item.quantityReceived, ... })
+        // deduct_stock_fifo no-ops on p_quantity <= 0 (see its migration
+        // comment) — that call never did anything. The real increment was
+        // the manual `SELECT current_stock` -> compute -> `UPDATE
+        // current_stock = <value>` that followed, with no row lock —
+        // exactly the TOCTOU race adjust_stock_atomic's FOR UPDATE closes.
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('adjust_stock_atomic', {
           p_item_id: item.itemId,
-          p_quantity: -item.quantityReceived, // Negative to add
+          p_delta: item.quantityReceived,
+          p_tenant_id: resolvedTenantId,
+          p_property_id: propertyId,
           p_reason: 'purchase',
-          p_user_id: userId,
+          p_reference_type: 'purchase_order',
+          p_reference_id: po.id,
+          p_notes: `Received from PO ${po.po_number}`,
+          p_performed_by: userId,
         });
 
-        // Actually, let's use a simpler approach for adding stock
-        const { data: currentItem } = await supabase
-          .from('inventory_items')
-          .select('current_stock')
-          .eq('id', item.itemId)
-          .single();
+        if (rpcError || !rpcResult?.success) {
+          throw new Error(rpcError?.message || rpcResult?.error || 'Failed to update stock on receive');
+        }
 
-        const newStock = (parseFloat(currentItem?.current_stock) || 0) + item.quantityReceived;
-
-        await supabase
-          .from('inventory_items')
-          .update({ 
-            current_stock: newStock,
-            cost_per_unit: item.actualUnitCost || undefined,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', item.itemId);
-
-        // Record transaction
-        await supabase.from('inventory_transactions').insert({
-          item_id: item.itemId,
-          transaction_type: 'purchase',
-          quantity: item.quantityReceived,
-          stock_before: parseFloat(currentItem?.current_stock) || 0,
-          stock_after: newStock,
-          reference_type: 'purchase_order',
-          reference_id: po.id,
-          notes: `Received from PO ${po.po_number}`,
-          performed_by: userId,
-        });
+        // cost_per_unit isn't part of adjust_stock_atomic's contract (it
+        // only moves current_stock) — set separately when the PO supplied
+        // an actual unit cost.
+        if (item.actualUnitCost !== undefined && item.actualUnitCost !== null) {
+          await supabase
+            .from('inventory_items')
+            .update({ cost_per_unit: item.actualUnitCost })
+            .eq('id', item.itemId);
+        }
 
         // Update PO item received quantity
         let poItemUpdate = supabase
@@ -818,14 +822,19 @@ export class InventoryAdvancedController {
   async getMenuItemCostAnalysis(req: Request, res: Response) {
     try {
       const { menuItemId } = req.params;
+      const tenantId = tenantScopeFor(req);
+      const propertyId = getCallerPropertyId(req);
       const supabase = getSupabase();
 
-      // Get menu item
-      const { data: menuItem, error: menuError } = await supabase
+      // Get menu item — scoped so cost/price data for another tenant's
+      // catalog item can't be pulled by id alone.
+      let menuItemQuery = supabase
         .from('catalog_items')
         .select('id, name, price')
-        .eq('id', menuItemId)
-        .maybeSingle();
+        .eq('id', menuItemId);
+      if (tenantId) menuItemQuery = menuItemQuery.eq('tenant_id', tenantId);
+      if (propertyId) menuItemQuery = menuItemQuery.eq('property_id', propertyId);
+      const { data: menuItem, error: menuError } = await menuItemQuery.maybeSingle();
 
       if (menuError || !menuItem) {
         return res.status(404).json({ success: false, error: 'Menu item not found' });
@@ -895,40 +904,50 @@ export class InventoryAdvancedController {
    */
   async getDashboardStats(req: Request, res: Response) {
     try {
+      const tenantId = tenantScopeFor(req);
+      const propertyId = getCallerPropertyId(req);
       const supabase = getSupabase();
+
+      // Every count/aggregate below was previously unscoped — a tenant
+      // admin's dashboard was silently summing every tenant's inventory.
+      const scopeItems = (q: any) => {
+        if (tenantId) q = q.eq('tenant_id', tenantId);
+        if (propertyId) q = q.eq('property_id', propertyId);
+        return q;
+      };
 
       // Get counts
       const [itemsResult, alertsResult, lowStockResult, expiringResult] = await Promise.all([
-        supabase.from('inventory_items').select('id', { count: 'exact', head: true }),
-        supabase.from('inventory_alerts').select('id', { count: 'exact', head: true }).eq('is_resolved', false),
-        supabase.from('inventory_items').select('id', { count: 'exact', head: true }).lte('current_stock', 10), // Below 10 units
-        supabase.from('inventory_items').select('id', { count: 'exact', head: true })
+        scopeItems(supabase.from('inventory_items').select('id', { count: 'exact', head: true })),
+        scopeItems(supabase.from('inventory_alerts').select('id', { count: 'exact', head: true }).eq('is_resolved', false)),
+        scopeItems(supabase.from('inventory_items').select('id', { count: 'exact', head: true }).lte('current_stock', 10)), // Below 10 units
+        scopeItems(supabase.from('inventory_items').select('id', { count: 'exact', head: true })
           .not('expiry_date', 'is', null)
-          .lte('expiry_date', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+          .lte('expiry_date', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])),
       ]);
 
       // Get total inventory value
-      const { data: items } = await supabase
+      const { data: items } = await scopeItems(supabase
         .from('inventory_items')
-        .select('current_stock, cost_per_unit');
+        .select('current_stock, cost_per_unit'));
 
-      const totalValue = (items || []).reduce((sum, item) => {
+      const totalValue = (items || []).reduce((sum: number, item: any) => {
         return sum + ((parseFloat(item.current_stock) || 0) * (parseFloat(item.cost_per_unit) || 0));
       }, 0);
 
       // Get recent transactions count (last 24h)
-      const { count: recentTransactions } = await supabase
+      const { count: recentTransactions } = await scopeItems(supabase
         .from('inventory_transactions')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()));
 
       // Get wastage stats (last 30 days)
-      const { data: wastageData } = await supabase
+      const { data: wastageData } = await scopeItems(supabase
         .from('inventory_wastage')
         .select('cost_impact')
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()));
 
-      const wastageTotal = (wastageData || []).reduce((sum, w) => sum + (parseFloat(w.cost_impact) || 0), 0);
+      const wastageTotal = (wastageData || []).reduce((sum: number, w: any) => sum + (parseFloat(w.cost_impact) || 0), 0);
 
       res.json({
         success: true,

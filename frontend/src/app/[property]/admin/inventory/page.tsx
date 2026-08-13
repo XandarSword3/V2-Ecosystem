@@ -127,7 +127,7 @@ interface TransactionGroup {
 }
 
 export default function InventoryAdminPage() {
-  const { activePropertyId } = useProperty();
+  const { activePropertyId, loading: propertyContextLoading } = useProperty();
   const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : undefined;
   const [activeTab, setActiveTab] = useState('items');
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -194,9 +194,14 @@ export default function InventoryAdminPage() {
   });
 
   useEffect(() => {
+    // Don't fire until PropertyContext has actually resolved a property.
+    // On mount, activePropertyId starts null while fetchProperties() is
+    // still in flight — firing here would send requests with no
+    // x-property-id header, which now 400s under requirePropertyId.
+    if (propertyContextLoading || !activePropertyId) return;
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePropertyId]);
+  }, [activePropertyId, propertyContextLoading]);
 
   useEffect(() => {
     if (activeTab === 'transactions') {
@@ -570,6 +575,14 @@ export default function InventoryAdminPage() {
       </Badge>
     );
   };
+
+  if (propertyContextLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
 
   if (!activePropertyId) {
     return (

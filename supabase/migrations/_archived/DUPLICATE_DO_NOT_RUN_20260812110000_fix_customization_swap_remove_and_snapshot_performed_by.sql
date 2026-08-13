@@ -1,3 +1,28 @@
+-- DUPLICATE_DO_NOT_RUN: archived 2026-08-13.
+--
+-- This file never applied (confirmed via `supabase migration list` — blank
+-- Remote column for 20260812110000) and `supabase db push` failed on it
+-- with "unterminated dollar-quoted string": the file is truncated mid-body,
+-- cut off at line 271 right after the 'swap' branch, with no 'remove'
+-- branch, no END CASE/END LOOP, no RETURN QUERY, no closing END;/$$;, and
+-- no second CREATE FUNCTION for create_order_customization_snapshot.
+--
+-- It's also redundant even if completed: 20260812100000_fix_inventory_
+-- transaction_fields.sql (committed in the same wip commit, 003b9a56) was
+-- already applied to remote and already contains the full, working fix for
+-- all three items this file's header describes — the swap branch's
+-- inventory_transactions insert, the remove branch's insert, and
+-- create_order_customization_snapshot accepting + forwarding p_performed_by
+-- to process_customization_inventory_safe. Diffed line-by-line against
+-- 20260812100000 for everything up to the truncation point; identical.
+--
+-- Moved here instead of hand-completing it, per the repo's existing
+-- DUPLICATE_DO_NOT_RUN convention (see the 2026-02-24 pool-ticket/chalet
+-- duplicates in this same folder) — finishing it would only recreate a
+-- function that's already live, with no functional difference.
+--
+-- Original header follows unmodified:
+-- ------------------------------------------------------------------
 -- Fix swap/remove branches in process_customization_inventory_safe missing
 -- inventory_transactions records, and add p_performed_by to
 -- create_order_customization_snapshot (the function actually invoked by the

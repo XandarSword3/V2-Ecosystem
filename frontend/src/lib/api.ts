@@ -320,7 +320,16 @@ api.interceptors.request.use(
         (/\/(?:admin|staff)(\/?$|\/)/.test(window.location.pathname) ||
           window.location.pathname.startsWith('/platform-admin'));
 
-      if (isAdminOrStaffRoute) {
+      // Only fall back to localStorage when the caller hasn't already set
+      // x-property-id explicitly. This interceptor runs asynchronously
+      // (after the CSRF/refresh awaits below), so if we unconditionally
+      // overwrote here, a property switch that lands mid-flight on a
+      // pending request would silently redirect that request to the new
+      // property — even though the UI captured the old one at click time.
+      // Respecting an already-set per-call header preserves click-time
+      // semantics for every page that builds its own propertyHeader; this
+      // is purely a default for call sites that don't.
+      if (isAdminOrStaffRoute && !config.headers['x-property-id']) {
         const activePropertyId = getStoredPropertyId();
         if (activePropertyId) {
           config.headers['x-property-id'] = activePropertyId;
