@@ -848,6 +848,7 @@ export class InventoryController {
       const data = validation.data;
       const userId = req.user?.id;
       const tenantId = tenantScopeFor(req);
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
       // Get current stock
@@ -856,6 +857,7 @@ export class InventoryController {
         .select('*')
         .eq('id', data.itemId);
       if (tenantId) itemQuery = itemQuery.eq('tenant_id', tenantId);
+      itemQuery = itemQuery.eq('property_id', propertyId);
       const { data: item, error: itemError } = await itemQuery.maybeSingle();
 
       if (itemError || !item) {
@@ -863,65 +865,95 @@ export class InventoryController {
       }
 
       const currentStock = parseFloat(item.current_stock);
-      let newStock = currentStock;
 
-      // Calculate new stock based on transaction type
-      switch (data.type) {
-        case 'in':
-        case 'return':
-          newStock = currentStock + data.quantity;
-          break;
-        case 'out':
-        case 'waste':
-          if (currentStock < data.quantity) {
-            return res.status(400).json({
-              success: false,
-              error: `Insufficient stock. Available: ${currentStock}`,
-            });
-          }
-          newStock = currentStock - data.quantity;
-          break;
-        case 'adjustment':
-          newStock = data.quantity; // Direct set
-          break;
-      }
-
-      // Record transaction
       // Map API types to DB transaction_type: in→purchase, out→sale
       const dbTransactionType = data.type === 'in' ? 'purchase' : data.type === 'out' ? 'sale' : data.type;
-      
-      const { data: transaction, error: txError } = await supabase
-        .from('inventory_transactions')
-        .insert({
-          item_id: data.itemId,
-          transaction_type: dbTransactionType,
-          quantity: data.quantity,
-          stock_before: currentStock,
-          stock_after: newStock,
-          reference_type: data.referenceType,
-          reference_id: data.referenceId,
-          notes: data.notes || data.reason,
-          performed_by: userId,
-          tenant_id: item.tenant_id,
-        })
-        .select()
-        .single();
 
-      if (txError) throw txError;
+      let transaction: any;
+      let newStock: number;
 
-      // Update item stock
-      const updateData: Record<string, any> = {
-        current_stock: newStock,
-        updated_at: new Date().toISOString(),
-      };
-      if (data.type === 'in') {
-        updateData.last_restocked_at = new Date().toISOString();
+      if (data.type === 'adjustment') {
+        // Absolute set (manual recount override) — "last write wins" by
+        // design, not a relative change, so it doesn't need the same lock
+        // as in/out/waste/return below.
+        newStock = data.quantity;
+
+        const { data: tx, error: txError } = await supabase
+          .from('inventory_transactions')
+          .insert({
+            item_id: data.itemId,
+            transaction_type: dbTransactionType,
+            quantity: data.quantity,
+            stock_before: currentStock,
+            stock_after: newStock,
+            reference_type: data.referenceType,
+            reference_id: data.referenceId,
+            notes: data.notes || data.reason,
+            performed_by: userId,
+            tenant_id: item.tenant_id,
+            property_id: item.property_id,
+          })
+          .select()
+          .single();
+        if (txError) throw txError;
+        transaction = tx;
+
+        await supabase
+          .from('inventory_items')
+          .update({ current_stock: newStock, updated_at: new Date().toISOString() })
+          .eq('id', data.itemId);
+      } else {
+        // in/out/waste/return: relative change. Previously a plain
+        // SELECT-then-UPDATE with no row lock — two concurrent transactions
+        // on the same item could both read the same stock and one write
+        // would silently clobber the other. adjust_stock_atomic locks the
+        // row (FOR UPDATE) for the read-check-write, same serialization
+        // point deduct_stock_fifo already uses for order deductions.
+        const delta = (data.type === 'in' || data.type === 'return') ? data.quantity : -data.quantity;
+
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('adjust_stock_atomic', {
+          p_item_id: data.itemId,
+          p_delta: delta,
+          p_tenant_id: item.tenant_id,
+          p_property_id: item.property_id,
+          p_reason: dbTransactionType,
+          p_reference_type: data.referenceType ?? null,
+          p_reference_id: data.referenceId ?? null,
+          p_notes: data.notes || data.reason || null,
+          p_performed_by: userId ?? null,
+        });
+        if (rpcError) throw rpcError;
+
+        if (!rpcResult?.success) {
+          const status = rpcResult?.error === 'Insufficient stock' ? 400 : 404;
+          return res.status(status).json({
+            success: false,
+            error: rpcResult?.error === 'Insufficient stock'
+              ? `Insufficient stock. Available: ${rpcResult.available}`
+              : (rpcResult?.error || 'Failed to adjust stock'),
+          });
+        }
+
+        newStock = rpcResult.stock_after;
+        // The RPC returns the exact row it inserted — fetch by that id
+        // rather than re-querying "most recent transaction for this item",
+        // which would itself be racy under the same concurrency this fix
+        // exists to close.
+        const { data: tx } = await supabase
+          .from('inventory_transactions')
+          .select('*')
+          .eq('id', rpcResult.transaction_id)
+          .maybeSingle();
+        transaction = tx;
       }
 
-      await supabase
-        .from('inventory_items')
-        .update(updateData)
-        .eq('id', data.itemId);
+      // Update last_restocked_at separately (adjust_stock_atomic doesn't touch it)
+      if (data.type === 'in') {
+        await supabase
+          .from('inventory_items')
+          .update({ last_restocked_at: new Date().toISOString() })
+          .eq('id', data.itemId);
+      }
 
       // Check for alerts
       const reorderPoint = parseFloat(item.reorder_point);
@@ -965,18 +997,22 @@ export class InventoryController {
       const { transactions } = validation.data;
       const userId = req.user?.id;
       const tenantId = tenantScopeFor(req);
+      const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 
       // --- Step 1: One batch SELECT for all unique items (replaces n individual SELECTs) ---
-      // Tenant-scoped: items outside the caller's tenant simply won't come back here,
-      // so they fall through to the existing "Item not found" branch below instead of
-      // letting a caller manipulate another tenant's stock via a crafted itemId list.
+      // Tenant/property-scoped: items outside the caller's tenant or property
+      // simply won't come back here, so they fall through to the existing
+      // "Item not found" branch below instead of letting a caller manipulate
+      // another tenant's (or another property's, within the same tenant)
+      // stock via a crafted itemId list.
       const uniqueItemIds = [...new Set(transactions.map(t => t.itemId))];
       let fetchQuery = supabase
         .from('inventory_items')
         .select('*')
         .in('id', uniqueItemIds);
       if (tenantId) fetchQuery = fetchQuery.eq('tenant_id', tenantId);
+      fetchQuery = fetchQuery.eq('property_id', propertyId);
       const { data: fetchedItems, error: fetchError } = await fetchQuery;
 
       if (fetchError) throw fetchError;
@@ -986,12 +1022,19 @@ export class InventoryController {
         {} as Record<string, any>,
       );
 
-      // --- Step 2: Compute new stocks, build transaction insert rows ---
-      // newStockById tracks running stock so multiple txns on the same item are correct.
-      const newStockById: Record<string, number> = {};
+      // --- Step 2: Process each line ---
+      // adjustment (absolute set) stays a direct batch insert+update — "last
+      // write wins" by design within the batch, same as before, just no
+      // longer entangled with the delta-type tracking below.
+      // in/out/waste/return now each call adjust_stock_atomic directly
+      // instead of computing through the old in-memory newStockById running
+      // total. The RPC's own row lock (FOR UPDATE) handles same-item
+      // sequencing within this batch AND against fully external concurrent
+      // requests — something the in-memory tracking never could.
       const results: { itemId: string; newStock: number }[] = [];
       const errors: { itemId: string; error: string }[] = [];
-      const txInserts: Record<string, any>[] = [];
+      const adjustmentNewStockById: Record<string, number> = {};
+      const adjustmentInserts: Record<string, any>[] = [];
 
       for (const txn of transactions) {
         const item = itemsById[txn.itemId];
@@ -1000,59 +1043,73 @@ export class InventoryController {
           continue;
         }
 
-        // Use accumulated stock if this item already appeared earlier in the batch
-        const currentStock = newStockById[txn.itemId] !== undefined
-          ? newStockById[txn.itemId]
-          : parseFloat(item.current_stock);
+        if (txn.type === 'adjustment') {
+          const currentStock = adjustmentNewStockById[txn.itemId] !== undefined
+            ? adjustmentNewStockById[txn.itemId]
+            : parseFloat(item.current_stock);
+          const newStock = txn.quantity;
+          adjustmentNewStockById[txn.itemId] = newStock;
 
-        let newStock = currentStock;
+          adjustmentInserts.push({
+            item_id: txn.itemId,
+            transaction_type: 'adjustment',
+            quantity: txn.quantity,
+            stock_before: currentStock,
+            stock_after: newStock,
+            reference_type: txn.referenceType,
+            notes: txn.notes,
+            performed_by: userId,
+            tenant_id: item.tenant_id,
+            property_id: item.property_id,
+          });
 
-        switch (txn.type) {
-          case 'in':
-          case 'return':
-            newStock = currentStock + txn.quantity;
-            break;
-          case 'out':
-          case 'waste':
-            if (currentStock < txn.quantity) {
-              errors.push({ itemId: txn.itemId, error: `Insufficient stock: ${currentStock}` });
-              continue;
-            }
-            newStock = currentStock - txn.quantity;
-            break;
-          case 'adjustment':
-            newStock = txn.quantity;
-            break;
+          results.push({ itemId: txn.itemId, newStock });
+          continue;
         }
 
-        newStockById[txn.itemId] = newStock;
+        const delta = (txn.type === 'in' || txn.type === 'return') ? txn.quantity : -txn.quantity;
+        const dbTransactionType = txn.type === 'in' ? 'purchase' : txn.type === 'out' ? 'sale' : txn.type;
 
-        txInserts.push({
-          item_id: txn.itemId,
-          transaction_type: txn.type === 'in' ? 'purchase' : txn.type === 'out' ? 'sale' : txn.type,
-          quantity: txn.quantity,
-          stock_before: currentStock,
-          stock_after: newStock,
-          reference_type: txn.referenceType,
-          notes: txn.notes,
-          performed_by: userId,
-          tenant_id: item.tenant_id,
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('adjust_stock_atomic', {
+          p_item_id: txn.itemId,
+          p_delta: delta,
+          p_tenant_id: item.tenant_id,
+          p_property_id: item.property_id,
+          p_reason: dbTransactionType,
+          p_reference_type: txn.referenceType ?? null,
+          p_reference_id: null,
+          p_notes: txn.notes ?? null,
+          p_performed_by: userId ?? null,
         });
 
-        results.push({ itemId: txn.itemId, newStock });
+        if (rpcError) {
+          errors.push({ itemId: txn.itemId, error: rpcError.message });
+          continue;
+        }
+        if (!rpcResult?.success) {
+          errors.push({
+            itemId: txn.itemId,
+            error: rpcResult?.error === 'Insufficient stock'
+              ? `Insufficient stock: ${rpcResult.available}`
+              : (rpcResult?.error || 'Failed to adjust stock'),
+          });
+          continue;
+        }
+
+        results.push({ itemId: txn.itemId, newStock: rpcResult.stock_after });
       }
 
-      // --- Step 3: One batch INSERT for all transaction rows (replaces n individual INSERTs) ---
-      if (txInserts.length > 0) {
+      // --- Step 3: One batch INSERT for adjustment-type transaction rows ---
+      if (adjustmentInserts.length > 0) {
         const { error: insertError } = await supabase
           .from('inventory_transactions')
-          .insert(txInserts);
+          .insert(adjustmentInserts);
         if (insertError) throw insertError;
       }
 
-      // --- Step 4: Parallel UPDATEs, one per unique item (replaces n sequential UPDATEs) ---
+      // --- Step 4: Parallel UPDATEs, one per unique adjustment-type item ---
       await Promise.all(
-        Object.entries(newStockById).map(([itemId, newStock]) =>
+        Object.entries(adjustmentNewStockById).map(([itemId, newStock]) =>
           supabase
             .from('inventory_items')
             .update({ current_stock: newStock, updated_at: new Date().toISOString() })
