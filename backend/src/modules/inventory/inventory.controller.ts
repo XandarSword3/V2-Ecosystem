@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger.js';
 import { AppError } from '../../utils/AppError.js';
 import { z } from 'zod';
 import { getCallerTenantId as tenantScopeFor } from '../../security/tenant-scope.js';
-import { requireCallerPropertyId } from '../../security/property-scope.js';
+import { requireCallerPropertyId, getCallerPropertyId } from '../../security/property-scope.js';
 
 // Validation schemas
 const dateOrDatetimeSchema = z.string().transform((val) => {
@@ -118,52 +118,46 @@ export class InventoryController {
   async getCategories(req: Request, res: Response) {
     try {
       const { moduleId } = req.query;
-      const propertyId = (req as any).propertyId as string | undefined;
+      const propertyId = getCallerPropertyId(req);
       const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
-      // Resolve property-scoped module list before building the query.
-      const { moduleIds, denied } = await this.resolvePropertyScope(
-        propertyId, moduleId as string | undefined
-      );
-      if (denied) {
-        return res.status(403).json({ success: false, error: denied });
-      }
-      // Empty moduleIds means the property has no accessible modules.
-      if (moduleIds !== null && moduleIds.length === 0) {
-        return res.json({ success: true, data: [] });
+      // Property boundary is enforced directly via property_id below (the
+      // same column every insert already sets). module_id is only applied
+      // when the caller explicitly asks to filter to one module — it must
+      // never gate visibility, since shared (module_id IS NULL) items and
+      // categories have to remain visible regardless of module.
+      let scopedModuleId: string | undefined;
+      if (moduleId) {
+        const { denied } = await this.resolvePropertyScope(propertyId, moduleId as string);
+        if (denied) {
+          return res.status(403).json({ success: false, error: denied });
+        }
+        scopedModuleId = moduleId as string;
       }
 
-      // Scope to module when provided
+      // Scope to tenant/property, and to module only when explicitly requested
       let catQuery = supabase
         .from('inventory_categories')
         .select('*')
         .order('name', { ascending: true });
 
       if (tenantId) catQuery = catQuery.eq('tenant_id', tenantId);
-      if (moduleIds !== null) {
-        // Property-scoped: filter to allowed modules
-        catQuery = catQuery.in('module_id', moduleIds);
-      } else if (moduleId) {
-        // No property header but caller supplied moduleId — respect it
-        catQuery = catQuery.eq('module_id', moduleId as string);
-      }
+      if (propertyId) catQuery = catQuery.eq('property_id', propertyId);
+      if (scopedModuleId) catQuery = catQuery.eq('module_id', scopedModuleId);
 
       const { data: categories, error } = await catQuery;
 
       if (error) throw error;
 
-      // Get item counts for each category, scoped to same module/property
+      // Get item counts for each category, scoped to same tenant/property/module
       let itemsCountQuery = supabase
         .from('inventory_items')
         .select('category_id, current_stock')
         .eq('is_active', true);
       if (tenantId) itemsCountQuery = itemsCountQuery.eq('tenant_id', tenantId);
-      if (moduleIds !== null) {
-        itemsCountQuery = itemsCountQuery.in('module_id', moduleIds);
-      } else if (moduleId) {
-        itemsCountQuery = itemsCountQuery.eq('module_id', moduleId as string);
-      }
+      if (propertyId) itemsCountQuery = itemsCountQuery.eq('property_id', propertyId);
+      if (scopedModuleId) itemsCountQuery = itemsCountQuery.eq('module_id', scopedModuleId);
       const { data: items } = await itemsCountQuery;
 
       const categoryStats = (categories || []).map(cat => {
@@ -381,23 +375,23 @@ export class InventoryController {
         sortOrder = 'asc',
       } = req.query;
 
-      const propertyId = (req as any).propertyId as string | undefined;
+      const propertyId = getCallerPropertyId(req);
       const tenantId = tenantScopeFor(req);
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
       const supabase = getSupabase();
 
-      // Resolve property-scoped module list before building the query.
-      const { moduleIds, denied } = await this.resolvePropertyScope(
-        propertyId, moduleId as string | undefined
-      );
-      if (denied) {
-        return res.status(403).json({ success: false, error: denied });
-      }
-      if (moduleIds !== null && moduleIds.length === 0) {
-        return res.json({
-          success: true, data: [],
-          pagination: { page: parseInt(page as string), limit: parseInt(limit as string), total: 0, totalPages: 0 },
-        });
+      // Property boundary is enforced directly via property_id below (the
+      // same column every insert already sets). module_id is only applied
+      // when the caller explicitly asks to filter to one module — it must
+      // never gate visibility, since shared (module_id IS NULL) items have
+      // to remain visible regardless of module.
+      let scopedModuleId: string | undefined;
+      if (moduleId) {
+        const { denied } = await this.resolvePropertyScope(propertyId, moduleId as string);
+        if (denied) {
+          return res.status(403).json({ success: false, error: denied });
+        }
+        scopedModuleId = moduleId as string;
       }
 
       let query = supabase
@@ -406,15 +400,8 @@ export class InventoryController {
         .eq('is_active', true);
 
       if (tenantId) query = query.eq('tenant_id', tenantId);
-
-      // module_id was added to inventory_items in 20260625000002 — this filter
-      // was previously a no-op because the column didn't exist yet when this
-      // comment was written; it does now, so actually apply the scope.
-      if (moduleIds !== null) {
-        query = query.in('module_id', moduleIds);
-      } else if (moduleId) {
-        query = query.eq('module_id', moduleId as string);
-      }
+      if (propertyId) query = query.eq('property_id', propertyId);
+      if (scopedModuleId) query = query.eq('module_id', scopedModuleId);
 
       if (categoryId) {
         query = query.eq('category_id', categoryId as string);
@@ -1432,19 +1419,25 @@ export class InventoryController {
   async getStats(req: Request, res: Response) {
     try {
       const { moduleId } = req.query;
-      const propertyId = (req as any).propertyId as string | undefined;
+      const propertyId = getCallerPropertyId(req);
       const tenantId = tenantScopeFor(req);
       const supabase = getSupabase();
 
-      // Resolve property-scoped module list.
-      const { moduleIds, denied } = await this.resolvePropertyScope(
-        propertyId, moduleId as string | undefined
-      );
-      if (denied) {
-        return res.status(403).json({ success: false, error: denied });
-      }
-      if (moduleIds !== null && moduleIds.length === 0) {
-        return res.json({ success: true, data: { summary: { total_items: 0, out_of_stock: 0, low_stock: 0, overstock: 0, total_value: 0, unresolvedAlerts: 0 }, categoryBreakdown: [], recentActivity: [], expiringItems: [] } });
+      // Property boundary is enforced directly via property_id below (the
+      // same column every insert already sets). module_id is only applied
+      // when the caller explicitly asks to filter to one module — it must
+      // never gate visibility, since shared (module_id IS NULL) items have
+      // to remain visible regardless of module. Mirrors getItems/getCategories;
+      // this used to expand to "all module IDs for the property" and filter
+      // with .in('module_id', moduleIds), which silently dropped every
+      // shared item from the stats because SQL IN never matches NULL.
+      let scopedModuleId: string | undefined;
+      if (moduleId) {
+        const { denied } = await this.resolvePropertyScope(propertyId, moduleId as string);
+        if (denied) {
+          return res.status(403).json({ success: false, error: denied });
+        }
+        scopedModuleId = moduleId as string;
       }
 
       // Get all items, scoped to tenant/property/module
@@ -1453,11 +1446,8 @@ export class InventoryController {
         .select('*')
         .eq('is_active', true);
       if (tenantId) itemsQuery = itemsQuery.eq('tenant_id', tenantId);
-      if (moduleIds !== null) {
-        itemsQuery = itemsQuery.in('module_id', moduleIds);
-      } else if (moduleId) {
-        itemsQuery = itemsQuery.eq('module_id', moduleId as string);
-      }
+      if (propertyId) itemsQuery = itemsQuery.eq('property_id', propertyId);
+      if (scopedModuleId) itemsQuery = itemsQuery.eq('module_id', scopedModuleId);
       const { data: items, error: itemsError } = await itemsQuery;
 
       if (itemsError) throw itemsError;
@@ -1481,11 +1471,8 @@ export class InventoryController {
       // Get categories, scoped to same tenant/property/module
       let categoriesQuery = supabase.from('inventory_categories').select('*');
       if (tenantId) categoriesQuery = categoriesQuery.eq('tenant_id', tenantId);
-      if (moduleIds !== null) {
-        categoriesQuery = categoriesQuery.in('module_id', moduleIds);
-      } else if (moduleId) {
-        categoriesQuery = categoriesQuery.eq('module_id', moduleId as string);
-      }
+      if (propertyId) categoriesQuery = categoriesQuery.eq('property_id', propertyId);
+      if (scopedModuleId) categoriesQuery = categoriesQuery.eq('module_id', scopedModuleId);
       const { data: categories } = await categoriesQuery;
 
       const categoryBreakdown = (categories || []).map(cat => {

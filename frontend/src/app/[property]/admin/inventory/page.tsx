@@ -151,6 +151,7 @@ export default function InventoryAdminPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+  const [showAdvancedItemFields, setShowAdvancedItemFields] = useState(false);
 
   // Advanced inventory state
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -454,7 +455,7 @@ export default function InventoryAdminPage() {
       name: item.name,
       sku: item.sku || '',
       description: item.description || '',
-      categoryId: item.category_id,
+      categoryId: item.category_id || '',
       unit: item.unit,
       currentStock: item.current_stock.toString(),
       minStockLevel: item.min_stock_level.toString(),
@@ -465,6 +466,9 @@ export default function InventoryAdminPage() {
       location: item.location || '',
       expiryDate: item.expiry_date?.split('T')[0] || '',
     });
+    // Editing an existing item: show everything, since fields like SKU,
+    // supplier, or location may already be set and shouldn't be hidden.
+    setShowAdvancedItemFields(true);
     setShowCreateModal(true);
   };
 
@@ -625,7 +629,7 @@ export default function InventoryAdminPage() {
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>
-          <Button onClick={() => { resetItemForm(); setEditingItem(null); setShowCreateModal(true); }} className="gap-2">
+          <Button onClick={() => { resetItemForm(); setEditingItem(null); setShowAdvancedItemFields(false); setShowCreateModal(true); }} className="gap-2">
             <Plus className="w-4 h-4" />
             Add Item
           </Button>
@@ -1545,16 +1549,7 @@ export default function InventoryAdminPage() {
                     onChange={(e) => setItemForm(f => ({ ...f, name: e.target.value }))}
                   />
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">SKU</label>
-                  <Input
-                    placeholder="Auto-generated if empty"
-                    value={itemForm.sku}
-                    onChange={(e) => setItemForm(f => ({ ...f, sku: e.target.value }))}
-                  />
-                </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Category *</label>
                   <select
@@ -1597,27 +1592,7 @@ export default function InventoryAdminPage() {
                     onChange={(e) => setItemForm(f => ({ ...f, currentStock: e.target.value }))}
                   />
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Min Stock Level</label>
-                  <Input
-                    type="number"
-                    placeholder="10"
-                    value={itemForm.minStockLevel}
-                    onChange={(e) => setItemForm(f => ({ ...f, minStockLevel: e.target.value }))}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Reorder Point</label>
-                  <Input
-                    type="number"
-                    placeholder="5"
-                    value={itemForm.reorderPoint}
-                    onChange={(e) => setItemForm(f => ({ ...f, reorderPoint: e.target.value }))}
-                  />
-                </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-2">Cost per Unit ($)</label>
                   <Input
@@ -1628,34 +1603,86 @@ export default function InventoryAdminPage() {
                     onChange={(e) => setItemForm(f => ({ ...f, costPerUnit: e.target.value }))}
                   />
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Supplier</label>
-                  <Input
-                    placeholder="Supplier name"
-                    value={itemForm.supplier}
-                    onChange={(e) => setItemForm(f => ({ ...f, supplier: e.target.value }))}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Location</label>
-                  <Input
-                    placeholder="Storage location"
-                    value={itemForm.location}
-                    onChange={(e) => setItemForm(f => ({ ...f, location: e.target.value }))}
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Expiry Date</label>
-                  <Input
-                    type="date"
-                    value={itemForm.expiryDate}
-                    onChange={(e) => setItemForm(f => ({ ...f, expiryDate: e.target.value }))}
-                  />
-                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAdvancedItemFields(v => !v)}
+                className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 mt-4 hover:underline"
+              >
+                {showAdvancedItemFields ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {showAdvancedItemFields ? 'Hide more options' : 'Show more options'}
+                <span className="text-slate-400 font-normal">(SKU, min stock, reorder point, supplier, location, expiry)</span>
+              </button>
+
+              <AnimatePresence>
+                {showAdvancedItemFields && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">SKU</label>
+                        <Input
+                          placeholder="Auto-generated if empty"
+                          value={itemForm.sku}
+                          onChange={(e) => setItemForm(f => ({ ...f, sku: e.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Min Stock Level</label>
+                        <Input
+                          type="number"
+                          placeholder="10"
+                          value={itemForm.minStockLevel}
+                          onChange={(e) => setItemForm(f => ({ ...f, minStockLevel: e.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Reorder Point</label>
+                        <Input
+                          type="number"
+                          placeholder="5"
+                          value={itemForm.reorderPoint}
+                          onChange={(e) => setItemForm(f => ({ ...f, reorderPoint: e.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Supplier</label>
+                        <Input
+                          placeholder="Supplier name"
+                          value={itemForm.supplier}
+                          onChange={(e) => setItemForm(f => ({ ...f, supplier: e.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Location</label>
+                        <Input
+                          placeholder="Storage location"
+                          value={itemForm.location}
+                          onChange={(e) => setItemForm(f => ({ ...f, location: e.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Expiry Date</label>
+                        <Input
+                          type="date"
+                          value={itemForm.expiryDate}
+                          onChange={(e) => setItemForm(f => ({ ...f, expiryDate: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               
               <div className="flex justify-end gap-3 mt-6">
                 <Button variant="outline" onClick={() => { setShowCreateModal(false); setEditingItem(null); }}>

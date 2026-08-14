@@ -82,10 +82,11 @@ describe('Inventory Controller', () => {
     };
     
     mockRequest = {
-      user: { id: 'staff-123', role: 'staff' },
+      user: { id: 'staff-123', role: 'staff', tenantId: 'tenant-123' },
       params: {},
       query: {},
       body: {},
+      headers: { 'x-property-id': 'property-123' },
     };
     
     mockBuilder = createChainableMock();

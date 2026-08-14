@@ -37,6 +37,7 @@ function mockReq(overrides: Record<string, any> = {}): Request {
     params: {},
     query: {},
     body: {},
+    headers: {},
     // tenantScopeFor() throws AppError(403) for any non-super_admin caller
     // with no tenantId — every default-path test needs one to reach its
     // assertions instead of dying at the tenant-scope check.
