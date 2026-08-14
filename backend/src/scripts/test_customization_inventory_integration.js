@@ -14,6 +14,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 // Test configuration
 const TEST_TENANT_ID = process.env.TEST_TENANT_ID || 'test-tenant-id';
 const TEST_PROPERTY_ID = process.env.TEST_PROPERTY_ID || 'test-property-id';
+const TEST_PERFORMED_BY = process.env.TEST_PERFORMED_BY || null;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
@@ -151,6 +152,7 @@ async function testCreationTimePath() {
         ],
         p_base_quantity: 2,
         p_execute_inventory: true,
+        p_performed_by: TEST_PERFORMED_BY,
       }
     );
     
@@ -158,6 +160,9 @@ async function testCreationTimePath() {
     
     const result = Array.isArray(snapshotResult) ? snapshotResult[0] : snapshotResult;
     console.log(`Snapshot result:`, result);
+    if (!result?.success) {
+      throw new Error(`Snapshot RPC did not succeed: ${result?.validation_errors?.join(', ') || 'unknown error'}`);
+    }
     
     // Verify inventory was deducted
     const { data: updatedItem } = await supabase
