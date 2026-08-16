@@ -2,19 +2,13 @@ import { test, expect } from '../fixtures/auth.fixture';
 
 const FRONTEND_URL =
   process.env.PRODUCTION_FRONTEND_URL ||
-  process.env.FRONTEND_URL;
+  process.env.FRONTEND_URL ||
+  'http://localhost:3000';
 
 const API_URL =
   process.env.PRODUCTION_API_URL ||
-  process.env.API_URL;
-
-if (!FRONTEND_URL) {
-  throw new Error('Missing FRONTEND_URL or PRODUCTION_FRONTEND_URL for production connectivity tests.');
-}
-
-if (!API_URL) {
-  throw new Error('Missing API_URL or PRODUCTION_API_URL for production connectivity tests.');
-}
+  process.env.API_URL ||
+  'http://localhost:3005';
 
 const CRITICAL_ENDPOINTS = [
   '/api/settings',

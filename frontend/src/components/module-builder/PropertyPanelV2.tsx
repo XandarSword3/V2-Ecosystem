@@ -1,7 +1,8 @@
-'use client';
-
 import { useState, useCallback, useEffect } from 'react';
 import { useModuleBuilderStore } from '@/stores/module-builder-store';
+import { useSiteSettings } from '@/lib/settings-context';
+import { MediaLibraryModal } from './MediaLibraryModal';
+import { ChevronsUp, ChevronsDown, ChevronUp, ChevronDown, Sparkles, Image as ImageIcon } from 'lucide-react';
 import type {
   UIBlock,
   UIBlockStyle,
@@ -59,11 +60,29 @@ const SECTION_LAYOUTS: { label: string; value: SectionLayout }[] = [
 
 const HEIGHT_MODES: HeightMode[] = ['auto', 'fixed', 'min-height', 'full-screen', 'viewport'];
 
-const SWATCH_COLORS = [
+const DEFAULT_SWATCH_COLORS = [
   '#0f172a', '#1e293b', '#475569', '#94a3b8',
   '#ef4444', '#f97316', '#eab308', '#22c55e',
   '#06b6d4', '#4f46e5', '#a855f7', '#ec4899',
 ];
+
+const SECTION_WRAPPER_BLOCKS = new Set([
+  'hero', 'hero_v2', 'container', 'card_grid', 'features', 'stats',
+  'testimonials', 'testimonials_carousel', 'pricing_table', 'cta', 'section',
+]);
+
+function getBrandSwatches(themeColors?: { primary?: string; secondary?: string; accent?: string; background?: string }): string[] {
+  if (!themeColors?.primary) return DEFAULT_SWATCH_COLORS;
+  const p = themeColors.primary;
+  const s = themeColors.secondary || '#06b6d4';
+  const a = themeColors.accent || '#f97316';
+  const bg = themeColors.background || '#0f172a';
+  return [
+    p, s, a, bg,
+    '#ffffff', '#f8fafc', '#cbd5e1', '#64748b',
+    '#ef4444', '#22c55e', '#eab308', '#a855f7',
+  ];
+}
 
 const GRID_TYPES = new Set(['card_grid', 'features', 'stats', 'grid']);
 
@@ -195,7 +214,17 @@ function Slider({
 
 // ─── Tab: Style ───────────────────────────────────────────────────────────────
 
-function StyleTab({ block, updateBlock }: { block: UIBlock; updateBlock: (patch: Partial<UIBlock>) => void }) {
+function StyleTab({
+  block,
+  updateBlock,
+  onOpenMedia,
+  swatches,
+}: {
+  block: UIBlock;
+  updateBlock: (patch: Partial<UIBlock>) => void;
+  onOpenMedia: (accept: 'image' | 'video' | 'all', cb: (url: string) => void) => void;
+  swatches: string[];
+}) {
   const bg = block.background ?? {} as Partial<SectionBackground>;
   const style = block.style ?? {};
 
@@ -209,6 +238,7 @@ function StyleTab({ block, updateBlock }: { block: UIBlock; updateBlock: (patch:
   // opacity: 0-1 in CSS, display as 0-100
   const opacityPct = Math.round((style.opacity ?? 1) * 100);
   const boxShadow = style.boxShadow ?? 'none';
+  const isSectionWrapperBlock = SECTION_WRAPPER_BLOCKS.has(block.type);
 
   return (
     <div>
@@ -280,13 +310,26 @@ function StyleTab({ block, updateBlock }: { block: UIBlock; updateBlock: (patch:
       {(bgType === 'image' || bgType === 'video') && (
         <>
           <Row label="URL">
-            <Input
-              value={bgType === 'image' ? (bg.image?.url ?? '') : (bg.video?.url ?? '')}
-              onChange={v => {
-                if (bgType === 'image') patchBg({ image: { ...(bg.image ?? {}), url: v } });
-                else patchBg({ video: { ...(bg.video ?? { muted: true, loop: true, autoplay: true }), url: v } });
-              }}
-            />
+            <div className="flex items-center gap-1.5 w-full">
+              <Input
+                value={bgType === 'image' ? (bg.image?.url ?? '') : (bg.video?.url ?? '')}
+                onChange={v => {
+                  if (bgType === 'image') patchBg({ image: { ...(bg.image ?? {}), url: v } });
+                  else patchBg({ video: { ...(bg.video ?? { muted: true, loop: true, autoplay: true }), url: v } });
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => onOpenMedia(bgType === 'image' ? 'image' : 'video', (url) => {
+                  if (bgType === 'image') patchBg({ image: { ...(bg.image ?? {}), url } });
+                  else patchBg({ video: { ...(bg.video ?? { muted: true, loop: true, autoplay: true }), url } });
+                })}
+                className="flex items-center gap-1 px-2.5 h-7 rounded border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 whitespace-nowrap shrink-0 transition-colors"
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Browse</span>
+              </button>
+            </div>
           </Row>
           {bgType === 'image' && (
             <Row label="Position">
@@ -316,19 +359,23 @@ function StyleTab({ block, updateBlock }: { block: UIBlock; updateBlock: (patch:
         </>
       )}
 
-      {/* Background color on style (used by many blocks alongside the SectionBackground) */}
-      <Divider label="Fill" />
-      <Row label="Bg Color">
-        <div className="flex items-center gap-2">
-          <input
-            type="color"
-            value={style.backgroundColor ?? '#ffffff'}
-            onChange={e => patchStyle({ backgroundColor: e.target.value })}
-            className="w-7 h-7 rounded border border-slate-200 p-0.5 cursor-pointer bg-slate-50"
-          />
-          <Input value={style.backgroundColor ?? ''} onChange={v => patchStyle({ backgroundColor: v })} />
-        </div>
-      </Row>
+      {/* Background color on style — suppressed for SectionWrapper blocks to fix Bug 1.4 */}
+      {!isSectionWrapperBlock && (
+        <>
+          <Divider label="Fill" />
+          <Row label="Bg Color">
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={style.backgroundColor ?? '#ffffff'}
+                onChange={e => patchStyle({ backgroundColor: e.target.value })}
+                className="w-7 h-7 rounded border border-slate-200 p-0.5 cursor-pointer bg-slate-50"
+              />
+              <Input value={style.backgroundColor ?? ''} onChange={v => patchStyle({ backgroundColor: v })} />
+            </div>
+          </Row>
+        </>
+      )}
 
       {/* Border */}
       <Divider label="Border" />
@@ -415,13 +462,40 @@ function StyleTab({ block, updateBlock }: { block: UIBlock; updateBlock: (patch:
           />
         </Row>
       )}
+
+      {/* Animation (Tier 2) */}
+      <Divider label="Animation" />
+      <Row label="Entry">
+        <Select
+          value={block.animation?.entry?.type ?? 'none'}
+          onChange={v => updateBlock({ animation: { ...(block.animation ?? {}), entry: { ...(block.animation?.entry ?? {}), type: v as any } } })}
+          options={['none', 'fade', 'slide-up', 'slide-down', 'zoom', 'bounce', 'flip'].map(a => ({ label: a.charAt(0).toUpperCase() + a.slice(1), value: a }))}
+        />
+      </Row>
+      <Row label="Hover">
+        <Select
+          value={block.animation?.hover?.type ?? 'none'}
+          onChange={v => updateBlock({ animation: { ...(block.animation ?? {}), hover: { ...(block.animation?.hover ?? {}), type: v as any } } })}
+          options={['none', 'lift', 'scale', 'glow', 'pulse'].map(a => ({ label: a.charAt(0).toUpperCase() + a.slice(1), value: a }))}
+        />
+      </Row>
     </div>
   );
 }
 
 // ─── Tab: Typography ──────────────────────────────────────────────────────────
 
-function TypographyTab({ block, updateBlock }: { block: UIBlock; updateBlock: (patch: Partial<UIBlock>) => void }) {
+function TypographyTab({
+  block,
+  updateBlock,
+  swatches,
+  brandFontPair,
+}: {
+  block: UIBlock;
+  updateBlock: (patch: Partial<UIBlock>) => void;
+  swatches: string[];
+  brandFontPair?: { heading: string; body: string };
+}) {
   const [loadedFonts, setLoadedFonts] = useState<Set<string>>(new Set());
   const style = block.style ?? {};
 
@@ -447,6 +521,10 @@ function TypographyTab({ block, updateBlock }: { block: UIBlock; updateBlock: (p
         setLoadedFonts(s => new Set([...s, pair.heading, pair.body]));
       }
     });
+    if (brandFontPair) {
+      loadGoogleFont(brandFontPair.heading);
+      loadGoogleFont(brandFontPair.body);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -463,6 +541,26 @@ function TypographyTab({ block, updateBlock }: { block: UIBlock; updateBlock: (p
   return (
     <div>
       <Divider label="Font Pair" />
+      {brandFontPair && (
+        <div className="mb-2">
+          <button
+            onClick={() => handleFontPair(brandFontPair.heading, brandFontPair.body)}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-all ${
+              style.fontFamily?.includes(brandFontPair.heading)
+                ? 'bg-indigo-50 border-indigo-400 text-indigo-900 shadow-sm'
+                : 'bg-white border-indigo-200 hover:border-indigo-300 text-slate-800'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span className="text-xs font-semibold">{brandFontPair.heading} / {brandFontPair.body}</span>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-100 dark:bg-indigo-950 px-1.5 py-0.5 rounded">
+              Brand
+            </span>
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-1 max-h-52 overflow-y-auto pr-1 mb-2">
         {FONT_PAIRS.map(pair => {
           const isActive = style.fontFamily?.includes(pair.heading) ?? false;
@@ -558,7 +656,7 @@ function TypographyTab({ block, updateBlock }: { block: UIBlock; updateBlock: (p
       <Row label="Color">
         <div className="space-y-1.5">
           <div className="flex flex-wrap gap-1">
-            {SWATCH_COLORS.map(c => (
+            {swatches.map(c => (
               <button
                 key={c} title={c}
                 onClick={() => patchStyle({ color: c })}
@@ -683,6 +781,7 @@ function LayoutTab({ block, updateBlock }: { block: UIBlock; updateBlock: (patch
 type QuickPreset = 'top-left' | 'top-center' | 'top-right' | 'center-left' | 'center' | 'center-right';
 
 function PositionTab({ block, updateBlock }: { block: UIBlock; updateBlock: (patch: Partial<UIBlock>) => void }) {
+  const { bringToFront, sendToBack, bringForward, sendBackward } = useModuleBuilderStore();
   const pos = block.position ?? {};
 
   const patchPos = (patch: Partial<BlockPosition>) =>
@@ -745,12 +844,36 @@ function PositionTab({ block, updateBlock }: { block: UIBlock; updateBlock: (pat
         ))}
       </div>
 
-      <Divider label="Layer Order" />
-      <div className="flex items-start gap-2 px-2 py-2 rounded bg-slate-50 border border-slate-200 mb-2">
-        <span className="text-base leading-none mt-0.5 shrink-0">☰</span>
-        <p className="text-xs text-slate-500 leading-relaxed">
-          Z-order is set by <strong className="text-slate-700">row position</strong> in the Layers Panel — drag rows to reorder depth.
-        </p>
+      <Divider label={`Layer Order (Z-Index: ${pos.z ?? 1})`} />
+      <div className="grid grid-cols-2 gap-1.5 mb-2">
+        <button
+          onClick={() => bringToFront(block.id)}
+          className="flex items-center justify-center gap-1.5 h-8 text-xs font-medium rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 transition-colors"
+        >
+          <ChevronsUp className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Bring to Front</span>
+        </button>
+        <button
+          onClick={() => bringForward(block.id)}
+          className="flex items-center justify-center gap-1.5 h-8 text-xs font-medium rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 transition-colors"
+        >
+          <ChevronUp className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Bring Forward</span>
+        </button>
+        <button
+          onClick={() => sendBackward(block.id)}
+          className="flex items-center justify-center gap-1.5 h-8 text-xs font-medium rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 transition-colors"
+        >
+          <ChevronDown className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Send Backward</span>
+        </button>
+        <button
+          onClick={() => sendToBack(block.id)}
+          className="flex items-center justify-center gap-1.5 h-8 text-xs font-medium rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 text-slate-700 transition-colors"
+        >
+          <ChevronsDown className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Send to Back</span>
+        </button>
       </div>
 
       <Divider label="Transform" />
@@ -788,12 +911,12 @@ function EmptyState() {
 function MultiSelectState({ count }: { count: number }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
-      <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
-        <span className="text-base font-bold text-indigo-600">{count}</span>
+      <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center mb-3 text-indigo-600 font-semibold text-sm">
+        {count}
       </div>
       <p className="text-sm font-medium text-slate-700">{count} blocks selected</p>
-      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-        Use the alignment bar above the canvas to align or distribute.
+      <p className="text-xs text-slate-400 mt-1 max-w-[200px]">
+        Use alignment or distribution controls in the floating bar to format selection.
       </p>
     </div>
   );
@@ -812,6 +935,21 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function PropertyPanelV2() {
   const [activeTab, setActiveTab] = useState<Tab>('style');
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [mediaModalAccept, setMediaModalAccept] = useState<'image' | 'video' | 'all'>('image');
+  const [mediaModalCallback, setMediaModalCallback] = useState<(url: string) => void>(() => () => {});
+
+  const { settings: siteSettings } = useSiteSettings();
+  const swatches = getBrandSwatches(siteSettings?.themeColors);
+  const brandFontPair = siteSettings?.fontHeading && siteSettings?.fontBody
+    ? { heading: siteSettings.fontHeading, body: siteSettings.fontBody }
+    : undefined;
+
+  const handleOpenMedia = useCallback((accept: 'image' | 'video' | 'all', cb: (url: string) => void) => {
+    setMediaModalAccept(accept);
+    setMediaModalCallback(() => cb);
+    setMediaModalOpen(true);
+  }, []);
 
   const layout = useModuleBuilderStore(s => s.layout);
   const selectedBlockId = useModuleBuilderStore(s => s.selectedBlockId);
@@ -840,8 +978,15 @@ export function PropertyPanelV2() {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex items-center px-4 h-11 border-b border-slate-200 shrink-0">
+      <div className="flex items-center justify-between px-4 h-11 border-b border-slate-200 shrink-0">
         <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Properties</span>
+        {siteSettings?.themeColors?.primary && (
+          <span
+            className="w-2.5 h-2.5 rounded-full ring-2 ring-indigo-500/20"
+            style={{ backgroundColor: siteSettings.themeColors.primary }}
+            title="Brand primary color"
+          />
+        )}
       </div>
 
       {multiCount > 1 ? (
@@ -883,13 +1028,38 @@ export function PropertyPanelV2() {
 
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto px-4 pb-6">
-            {activeTab === 'style' && <StyleTab block={block} updateBlock={update} />}
-            {activeTab === 'typography' && <TypographyTab block={block} updateBlock={update} />}
+            {activeTab === 'style' && (
+              <StyleTab
+                block={block}
+                updateBlock={update}
+                onOpenMedia={handleOpenMedia}
+                swatches={swatches}
+              />
+            )}
+            {activeTab === 'typography' && (
+              <TypographyTab
+                block={block}
+                updateBlock={update}
+                swatches={swatches}
+                brandFontPair={brandFontPair}
+              />
+            )}
             {activeTab === 'layout' && <LayoutTab block={block} updateBlock={update} />}
             {activeTab === 'position' && <PositionTab block={block} updateBlock={update} />}
           </div>
         </>
       )}
+
+      {/* Media Library Modal */}
+      <MediaLibraryModal
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        onSelect={(url) => {
+          mediaModalCallback(url);
+          setMediaModalOpen(false);
+        }}
+        accept={mediaModalAccept}
+      />
     </div>
   );
 }

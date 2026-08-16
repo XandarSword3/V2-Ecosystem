@@ -152,6 +152,8 @@ export function ComponentToolbarV2() {
 
   const [dragging, setDragging] = useState<Entry | null>(null);
   const [ghostPos, setGhostPos] = useState({ x: 0, y: 0 });
+  const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<Category | 'all'>('all');
 
   const handleDragStart = (entry: Entry) => {
     setDragging(entry);
@@ -165,33 +167,71 @@ export function ComponentToolbarV2() {
     setGhostPos({ x, y });
   };
 
-  // Click fallback — adds block at default stagger position (same as old toolbar)
+  // Click fallback — adds block at default stagger position
   const handleClick = (entry: Entry) => {
     addBlock(entry.type);
   };
 
   const categories = Object.keys(CATEGORY_LABELS) as Category[];
 
+  const filteredComponents = COMPONENTS.filter(c => {
+    const matchesSearch = c.label.toLowerCase().includes(search.toLowerCase()) ||
+                          c.type.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = activeCategory === 'all' || c.category === activeCategory;
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <>
       {/* Custom drag ghost */}
       {dragging && <DragGhost entry={dragging} x={ghostPos.x} y={ghostPos.y} />}
 
-      <div className="flex h-full items-center gap-4 overflow-x-auto py-2">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap mr-1 flex-shrink-0">
-          Add
-        </span>
+      <div className="flex h-full items-center gap-3 overflow-x-auto py-2">
+        {/* Search input */}
+        <div className="relative flex-shrink-0 w-36">
+          <input
+            type="text"
+            placeholder="Search blocks..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-8 pl-7 pr-2 text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+          />
+          <span className="absolute left-2 top-2 text-slate-400 text-xs">🔍</span>
+        </div>
 
-        {categories.map((cat, ci) => (
-          <div key={cat} className="flex items-center gap-1.5 flex-shrink-0">
-            <span className="text-[9px] font-bold uppercase text-slate-400 tracking-widest whitespace-nowrap writing-mode-vertical hidden xl:block mr-0.5">
+        {/* Category Pills */}
+        <div className="flex items-center gap-1 flex-shrink-0 border-r border-slate-200 dark:border-slate-700 pr-2">
+          <button
+            onClick={() => setActiveCategory('all')}
+            className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
+              activeCategory === 'all'
+                ? 'bg-indigo-600 text-white'
+                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            All
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                activeCategory === cat
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
               {CATEGORY_LABELS[cat]}
-            </span>
-            <span className="text-[9px] font-bold uppercase text-slate-400 tracking-widest whitespace-nowrap xl:hidden">
-              {CATEGORY_LABELS[cat]}
-            </span>
+            </button>
+          ))}
+        </div>
 
-            {COMPONENTS.filter(c => c.category === cat).map(entry => (
+        {/* Component Buttons */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {filteredComponents.length === 0 ? (
+            <span className="text-xs text-slate-400 italic px-2">No blocks match "{search}"</span>
+          ) : (
+            filteredComponents.map(entry => (
               <ComponentButton
                 key={entry.type}
                 entry={entry}
@@ -200,13 +240,9 @@ export function ComponentToolbarV2() {
                 onMouseMove={handleMouseMove}
                 onClick={handleClick}
               />
-            ))}
-
-            {ci < categories.length - 1 && (
-              <div className="w-px h-10 bg-slate-200 dark:bg-slate-600 ml-1.5 flex-shrink-0" />
-            )}
-          </div>
-        ))}
+            ))
+          )}
+        </div>
       </div>
     </>
   );

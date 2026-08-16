@@ -13,7 +13,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Clock, Users, ShoppingCart, Plus, Minus, Calendar, Star, Check, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -125,26 +125,41 @@ function parseProps(props: Record<string, unknown>): BlockProps {
   return parsed;
 }
 
-// Hook to compute responsive scale factor for the 1920x1080 canvas
-function useCanvasScale() {
+// Helper to parse dimension string (e.g. '400px', '100%') into pixel number
+const parsePx = (val: string | number | undefined, fallback = 200): number => {
+  if (val == null) return fallback;
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string' && val.includes('%')) return fallback;
+  const n = parseFloat(val);
+  return isNaN(n) ? fallback : n;
+};
+
+// Hook to compute responsive scale factor relative to container width (1440px standard canvas width)
+function useContainerWidthScale(ref: React.RefObject<HTMLDivElement | null>) {
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
     const update = () => {
-      const vw = window.innerWidth;
-      // Scale the 1920px canvas to fit the viewport width
-      setScale(Math.min(vw / 1920, 1));
+      const w = el.clientWidth || 1440;
+      setScale(w / 1440);
     };
+
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [ref]);
 
   return scale;
 }
 
 export function DynamicModuleRenderer({ layout, module, propertySlug }: RendererProps & { propertySlug?: string }) {
-  const scale = useCanvasScale();
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const scale = useContainerWidthScale(containerRef);
 
   // Validate schema version
   const result = z.array(SafeBlockSchema).safeParse(layout);
@@ -178,12 +193,6 @@ export function DynamicModuleRenderer({ layout, module, propertySlug }: Renderer
   }
 
   // Only switch to freeform canvas mode when EVERY block has explicit position data.
-  // Using `some` caused a split-state bug: the moment the builder saved position to
-  // one block (e.g. pricing_table after a drag), all blocks flipped to freeform mode.
-  // Blocks without saved positions defaulted to top:0 / left:0 and overlapped each
-  // other, making them appear to disappear in the builder preview while the live page
-  // (still stack-mode in the DB) rendered correctly. `every` means freeform mode only
-  // engages when all blocks have been explicitly placed by the builder.
   const hasPositionData = safeLayout.length > 0 && safeLayout.every(
     (b) => b.position?.x !== undefined && b.position?.y !== undefined
   );
@@ -199,13 +208,22 @@ export function DynamicModuleRenderer({ layout, module, propertySlug }: Renderer
     );
   }
 
-  // Freeform canvas mode - blocks positioned absolutely like PowerPoint
-  // Scales down responsively on smaller viewports
+  // Canvas height calculation
+  const canvasHeight = Math.max(
+    800,
+    ...safeLayout.map((b) => (b.position?.y ?? 0) + parsePx(b.position?.height, 200) + 100)
+  );
+
+  // Freeform canvas mode — 1440px canvas scaled to fit container width (Desktop 100%, Mobile 375px frame)
   return (
-    <div className="relative w-full bg-slate-50 dark:bg-slate-900 overflow-hidden" style={{ minHeight: `${1080 * scale}px` }}>
+    <div
+      ref={containerRef}
+      className="relative w-full bg-slate-50 dark:bg-slate-900 overflow-hidden"
+      style={{ height: `${canvasHeight * scale}px` }}
+    >
       <div style={{
-        width: '1920px',
-        height: '1080px',
+        width: '1440px',
+        height: `${canvasHeight}px`,
         transform: `scale(${scale})`,
         transformOrigin: 'top left',
         position: 'relative',
@@ -215,6 +233,12 @@ export function DynamicModuleRenderer({ layout, module, propertySlug }: Renderer
           const transforms: string[] = [];
           if (pos?.rotation) transforms.push(`rotate(${pos.rotation}deg)`);
           if (pos?.scale && pos.scale !== 1) transforms.push(`scale(${pos.scale})`);
+
+          // If block width is 1440px or 100%, let it span full canvas width
+          const blockWidth = pos?.width === '1440px' || pos?.width === '100%'
+            ? '1440px'
+            : (pos?.width || '100%');
+
           return (
             <div
               key={block.id}
@@ -223,7 +247,7 @@ export function DynamicModuleRenderer({ layout, module, propertySlug }: Renderer
                 left: pos?.x !== undefined ? `${pos.x}px` : '0px',
                 top: pos?.y !== undefined ? `${pos.y}px` : '0px',
                 zIndex: pos?.z || 1,
-                width: pos?.width || '100%',
+                width: blockWidth,
                 height: pos?.height || 'auto',
                 transform: transforms.length > 0 ? transforms.join(' ') : undefined,
                 transformOrigin: 'center center',
@@ -334,8 +358,8 @@ function SectionWrapper({ block, children }: SectionWrapperProps) {
   const hasBackground = !!background;
   const hasOverlay = background?.overlay && background.overlay.opacity > 0;
 
-  // If no background or height control, just render children
-  if (!hasBackground && !sectionHeight) {
+  // If no background, height control, or section layout, just render children
+  if (!hasBackground && !sectionHeight && !sectionLayout) {
     return <>{children}</>;
   }
 
@@ -418,6 +442,23 @@ function SectionWrapper({ block, children }: SectionWrapperProps) {
                 >
                   {layer.content?.text || 'Button'}
                 </button>
+              )}
+              {layer.type === 'shape' && (
+                <div
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: layer.content?.color || '#4f46e5',
+                    borderRadius: layer.content?.borderRadius || '0px',
+                    opacity: layer.style?.opacity,
+                    border: layer.style?.borderWidth ? `${layer.style.borderWidth} ${layer.style.borderStyle || 'solid'} ${layer.style.borderColor || '#000'}` : undefined,
+                  }}
+                />
+              )}
+              {layer.type === 'icon' && (
+                <div className="flex items-center justify-center w-full h-full" style={layer.style as React.CSSProperties}>
+                  <span className="text-2xl">{layer.content?.icon || '★'}</span>
+                </div>
               )}
             </div>
           ))}
@@ -1965,7 +2006,7 @@ function ClassScheduleComponent({ module, props }: { module: Module; props: Bloc
           onClick={() => window.location.href = `/${propertySlug}/${module.slug}`}
           className="text-amber-500 hover:text-amber-400 text-sm font-medium flex items-center gap-1"
         >
-          {t('viewFullSchedule') || 'View Full Schedule'} →
+          View Full Schedule →
         </button>
       </div>
 

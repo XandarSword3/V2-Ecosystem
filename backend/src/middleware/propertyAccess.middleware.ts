@@ -238,7 +238,7 @@ export function requireModulePropertyAccess(moduleSlug: string) {
     const supabase = getSupabase();
     const { data: moduleRecord, error } = await supabase
       .from('modules')
-      .select('property_id')
+      .select('id, property_id, tenant_id')
       .eq('slug', moduleSlug)
       .maybeSingle();
 
@@ -248,24 +248,72 @@ export function requireModulePropertyAccess(moduleSlug: string) {
       return;
     }
 
-    const propertyId = moduleRecord?.property_id as string | undefined;
-    if (!propertyId) {
-      // Backward compatibility for modules without property scoping yet.
-      next();
+    if (!moduleRecord) {
+      res.status(404).json({ success: false, error: 'Module not found' });
       return;
     }
 
-    const allowed = await userHasAccessToProperty(req.user.userId, propertyId);
-    if (!allowed) {
-      logger.warn('Property access denied by requireModulePropertyAccess', {
+    // ── Tenant ownership guard ──────────────────────────────────────────────
+    // Verify that the module's tenant_id matches the authenticated user's tenantId.
+    // Cross-tenant staff access is unconditionally rejected.
+    const userTenantId = req.user.tenantId;
+    if (moduleRecord.tenant_id && userTenantId && moduleRecord.tenant_id !== userTenantId) {
+      logger.warn('Cross-tenant module access denied', {
         userId: req.user.userId,
         moduleSlug,
-        propertyId,
+        moduleTenantId: moduleRecord.tenant_id,
+        userTenantId,
       });
-      res.status(403).json({ success: false, error: 'Access denied for this property' });
+      res.status(403).json({ success: false, error: 'Access denied: cross-tenant module access prohibited' });
       return;
     }
 
-    next();
+    const propertyId = moduleRecord?.property_id as string | undefined;
+
+    // Tenant owners and tenant admins have implicit access to all modules/properties within their tenant
+    const userScope = req.user?.scope;
+    const isTenantAdmin =
+      userScope === 'tenant_owner' ||
+      userScope === 'tenant_admin' ||
+      req.user?.roles?.includes('tenant_admin');
+
+    if (propertyId) {
+      (req as any).propertyId = propertyId;
+
+      if (isTenantAdmin) {
+        return next();
+      }
+
+      const allowed = await userHasAccessToProperty(req.user.userId, propertyId);
+      if (!allowed) {
+        logger.warn('Property access denied by requireModulePropertyAccess', {
+          userId: req.user.userId,
+          moduleSlug,
+          propertyId,
+        });
+        res.status(403).json({ success: false, error: 'Access denied for this property' });
+        return;
+      }
+
+      return next();
+    }
+
+    // Fallback for modules lacking property_id:
+    // Only allow if user's tenant matches the module's tenant (or user is tenant admin)
+    if (moduleRecord.tenant_id && userTenantId && moduleRecord.tenant_id === userTenantId) {
+      return next();
+    }
+
+    if (isTenantAdmin && !moduleRecord.tenant_id) {
+      return next();
+    }
+
+    logger.warn('Unscoped module access denied without matching tenant', {
+      userId: req.user.userId,
+      moduleSlug,
+    });
+    res.status(403).json({ success: false, error: 'Access denied: module lacks valid tenant or property scoping' });
+    return;
   };
 }
+

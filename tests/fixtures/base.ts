@@ -22,9 +22,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import path from 'path';
+import dotenv from 'dotenv';
 import { test as base, expect } from '@playwright/test';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './test-credentials';
+
+dotenv.config({ path: path.resolve(__dirname, '../.env.test') });
+dotenv.config({ path: path.resolve(__dirname, '../../backend/.env') });
 
 type V2Fixtures = {
   /** Service-role Supabase client — bypasses RLS. For assertions only, not auth. */

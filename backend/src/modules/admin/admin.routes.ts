@@ -22,6 +22,7 @@ import * as onboardingController from "./controllers/onboarding.controller.js";
 import * as importController from "./controllers/import.controller.js";
 import * as moduleTemplatesController from "./controllers/module-templates.controller.js";
 import * as plansController from "./controllers/plans.controller.js";
+import * as aiController from "./controllers/ai.controller.js";
 import { asyncHandler } from "../../middleware/async-handler.js";
 import { getSupabase } from "../../database/connection.js";
 
@@ -222,6 +223,8 @@ router.get('/onboarding/manual', authorize('admin'), onboardingController.getOpe
 // CSV Bulk Imports
 router.post('/import/catalog-items', authorizeManager, importController.importCatalogItems);
 router.post('/import/units', authorizeManager, importController.importUnits);
-router.post('/import/inventory', authorizeManager, importController.importInventory);
+// AI Provider Endpoints (Tier 4)
+router.post('/ai/generate-layout', authorizeManager, aiController.generateLayout);
+router.post('/ai/generate-alt-text', authorizeManager, aiController.generateAltText);
 
 export default router;

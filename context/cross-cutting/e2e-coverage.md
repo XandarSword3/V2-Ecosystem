@@ -2,19 +2,22 @@
 
 ## Source of truth
 
-- `playwright.config.ts` / `playwright.all.config.ts` (repo root)
-- `e2e/` — test specs; `e2e/.env.test` — E2E-specific env
-- CI: GitHub Actions runs Playwright E2E, frontend Vitest, backend
-  integration tests (`.github/workflows/ci.yml`)
+- `playwright.config.ts` / `playwright.all.config.ts` (repo root — `testDir: './tests'`)
+- `tests/` — top-level Playwright specs, fixtures (`tests/fixtures/`), helpers (`tests/helpers/`), and environment (`tests/.env.test`)
+- CI: GitHub Actions runs Playwright E2E, frontend Vitest, backend integration tests (`.github/workflows/ci.yml`)
 
-## Status
+## Test Suite Health Baseline (Re-verified 2026-08-16)
 
-- [ ] Not yet audited per-engine — first session to touch this
-      should populate an actual engine → spec-file coverage table
-      here instead of this placeholder.
-- Note: backend unit suite currently has 23/153 test files failing
-  (205/3585 tests) and frontend has 84/110 files failing (294/536
-  tests) on `main` as of 2026-07-25 — pre-existing, not introduced
-  by the 2026-07-25 contract-freeze merge (verified by running both
-  suites before and after). Worth knowing before trusting a green
-  CI run on unrelated work; a failing job may already be expected.
+- **Backend Unit & Integration Suite**: 36 failed | 119 passed (155 test files total). 269 failed | 3302 passed | 8 skipped (3579 individual tests).
+- **Frontend Vitest Suite**: 14 failed | 100 passed (114 test files total). 25 failed | 509 passed (534 individual tests).
+
+## Per-Engine Automated Coverage Matrix
+
+| Engine | Engine Type | Automated Coverage / Spec Files | Status |
+|---|---|---|---|
+| **Engine A** | `instant_transaction` | `tests/e2e/engine-a-customer-checkout.spec.ts`<br>`tests/e2e/engine-a-staff-settlement.spec.ts`<br>`backend/tests/unit/modules/staff/module-staff-payment.test.ts`<br>`frontend/tests/high-impact/staff-pos-template.behavior.test.tsx` | **Covered** (Customer menu/cart/checkout + Staff POS payment & loyalty + Unit tests) |
+| **Engine B** | `time_exclusive_reservation` | `tests/features/reservations.spec.ts`<br>`tests/workflows/booking-flow.spec.ts`<br>`backend/tests/unit/reservations/` | **Partial** (Booking workflows covered; multi-day checkout pending audit) |
+| **Engine C** | `shared_capacity_access` | `tests/features/session-access.spec.ts`<br>`backend/tests/unit/modules/` | **Partial** (Session access & QR validation) |
+| **Engine D** | `ongoing_entitlement` | `backend/tests/unit/modules/promotions/` | **Pending** (Membership & tier entitlements) |
+| **Engine E** | `platform_entitlement` | `tests/e2e/engine-e-signup.spec.ts`<br>`backend/tests/integration/stripe-provisioning-webhook.test.ts`<br>`tests/e2e/02-tenant-isolation/modules-cross-tenant.spec.ts` | **Covered** (Public signup CTA + HMAC-signed SaaS webhook provisioning + Tenant isolation) |
+

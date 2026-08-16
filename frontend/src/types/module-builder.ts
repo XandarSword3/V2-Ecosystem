@@ -205,7 +205,38 @@ export type AlignmentDirection =
   | 'bottom';
 
 // ============================================
-// EXTENDED UIBLOCK — 5 layers + Phase 1 fields
+// ANIMATIONS & INTERACTIONS (Tier 2)
+// ============================================
+export interface AnimationConfig {
+  entry?: {
+    type: 'fade' | 'slide-up' | 'slide-down' | 'zoom' | 'bounce' | 'flip' | 'none';
+    duration?: number; // ms, e.g. 400
+    delay?: number;    // ms, e.g. 100
+    easing?: string;   // e.g. 'ease-out'
+  };
+  hover?: {
+    type: 'lift' | 'scale' | 'glow' | 'tilt' | 'pulse' | 'none';
+    scale?: number;     // e.g. 1.05
+    elevation?: string; // e.g. '0 10px 25px rgba(0,0,0,0.15)'
+  };
+  trigger?: 'scroll' | 'hover' | 'load' | 'click';
+}
+
+export interface BlockInteraction {
+  id: string;
+  event: 'click' | 'hover' | 'scroll-into-view';
+  action: 'navigate' | 'open_modal' | 'scroll_to' | 'toggle_class' | 'trigger_animation' | 'webhook';
+  payload?: {
+    targetUrl?: string;
+    targetElementId?: string;
+    modalId?: string;
+    className?: string;
+    webhookUrl?: string;
+  };
+}
+
+// ============================================
+// EXTENDED UIBLOCK — 5 layers + Phase 1 & 2 fields
 // ============================================
 export interface UIBlock {
   id: string;
@@ -232,6 +263,18 @@ export interface UIBlock {
 
   // Phase 1: LayersPanel controls
   locked?: boolean;            // prevents canvas selection/drag when true
+
+  // Tier 2: Animations & Interactions
+  animation?: AnimationConfig;
+  interactions?: BlockInteraction[];
+
+  // Tier 2: Reusable Symbols
+  isSymbol?: boolean;
+  symbolId?: string;
+  symbolScope?: 'property' | 'platform';
+
+  // Tier 2: Grouping Primitives
+  groupId?: string;
 }
 
 export interface ModuleTemplate {

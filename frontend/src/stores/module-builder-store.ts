@@ -36,6 +36,17 @@ const parsePx = (val: string | number | undefined, fallback = 200): number => {
   return isNaN(n) ? fallback : n;
 };
 
+/** Ensure position.z matches array index (1..n) for all root blocks so z-order and array order remain synchronized */
+const syncZIndex = (layout: UIBlock[]): UIBlock[] => {
+  return layout.map((block, idx) => ({
+    ...block,
+    position: {
+      ...block.position,
+      z: idx + 1,
+    },
+  }));
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ModuleBuilderStore {
@@ -91,6 +102,25 @@ interface ModuleBuilderStore {
   alignBlocks: (ids: string[], alignment: AlignmentDirection) => void;
   /** Distribute selected blocks evenly. Requires ≥3 selected blocks. */
   distributeBlocks: (ids: string[], direction: 'horizontal' | 'vertical') => void;
+  /** Stacking order controls (Phase 1.1) */
+  bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
+  bringForward: (id: string) => void;
+  sendBackward: (id: string) => void;
+
+  // ── Phase 5: Element Layer actions ──────────────────────────────────────
+  addElementLayer: (blockId: string, layer: Omit<import('@/types/module-builder').ElementLayer, 'id'>) => void;
+  updateElementLayer: (blockId: string, layerId: string, patch: Partial<import('@/types/module-builder').ElementLayer>) => void;
+  removeElementLayer: (blockId: string, layerId: string) => void;
+
+  // ── Phase 7: Reusable Symbols actions ──────────────────────────────────
+  symbols: Array<{ id: string; name: string; scope: 'property' | 'platform'; block: UIBlock }>;
+  saveAsSymbol: (blockId: string, scope: 'property' | 'platform', name?: string) => void;
+  addSymbolToCanvas: (symbolId: string) => void;
+
+  // ── Phase 9: Grouping actions ─────────────────────────────────────────
+  groupBlocks: (ids: string[]) => void;
+  ungroupBlock: (groupIdOrBlockId: string) => void;
 }
 
 // ─── Default props per block type ────────────────────────────────────────────
@@ -204,9 +234,10 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
 
   setLayout: (layout, skipHistory = false) =>
     set((state) => {
-      if (skipHistory) return { layout };
+      const syncedLayout = syncZIndex(layout);
+      if (skipHistory) return { layout: syncedLayout };
       const newHistory = [...state.history, [...state.layout]].slice(-50);
-      return { layout, history: newHistory, _futureStates: [] };
+      return { layout: syncedLayout, history: newHistory, _futureStates: [] };
     }),
 
   selectBlock: (id) =>
@@ -242,7 +273,7 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
       const newFuture = [...state._futureStates];
       const nextLayout = newFuture.pop()!;
       const newHistory = [...state.history, [...state.layout]];
-      return { layout: [...nextLayout], history: newHistory, _futureStates: newFuture };
+      return { layout: [...nextLayout], history: newHistory, _futureStates: newHistory };
     }),
 
   canUndo: () => get().history.length > 0,
@@ -294,13 +325,13 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
             return node;
           });
         };
-        const newLayout = addRecursive(state.layout);
+        const newLayout = syncZIndex(addRecursive(state.layout));
         const newHistory = [...state.history, [...state.layout]].slice(-50);
         return { layout: newLayout, history: newHistory, _futureStates: [] };
       }
 
       // Default: add to root layout
-      const newLayout = [...state.layout, newBlock];
+      const newLayout = syncZIndex([...state.layout, newBlock]);
       const newHistory = [...state.history, [...state.layout]].slice(-50);
       return { layout: newLayout, history: newHistory, _futureStates: [] };
     }),
@@ -584,4 +615,138 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
       const newHistory = [...state.history, [...state.layout]].slice(-50);
       return { layout: newLayout, history: newHistory, _futureStates: [] };
     }),
+
+  bringToFront: (id) =>
+    set((state) => {
+      const idx = state.layout.findIndex((b) => b.id === id);
+      if (idx === -1 || idx === state.layout.length - 1) return state;
+      const newLayout = [...state.layout];
+      const [moved] = newLayout.splice(idx, 1);
+      newLayout.push(moved);
+      const synced = syncZIndex(newLayout);
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: synced, history: newHistory, _futureStates: [] };
+    }),
+
+  sendToBack: (id) =>
+    set((state) => {
+      const idx = state.layout.findIndex((b) => b.id === id);
+      if (idx === -1 || idx === 0) return state;
+      const newLayout = [...state.layout];
+      const [moved] = newLayout.splice(idx, 1);
+      newLayout.unshift(moved);
+      const synced = syncZIndex(newLayout);
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: synced, history: newHistory, _futureStates: [] };
+    }),
+
+  bringForward: (id) =>
+    set((state) => {
+      const idx = state.layout.findIndex((b) => b.id === id);
+      if (idx === -1 || idx === state.layout.length - 1) return state;
+      const newLayout = [...state.layout];
+      const [moved] = newLayout.splice(idx, 1);
+      newLayout.splice(idx + 1, 0, moved);
+      const synced = syncZIndex(newLayout);
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: synced, history: newHistory, _futureStates: [] };
+    }),
+
+  sendBackward: (id) =>
+    set((state) => {
+      const idx = state.layout.findIndex((b) => b.id === id);
+      if (idx === -1 || idx === 0) return state;
+      const newLayout = [...state.layout];
+      const [moved] = newLayout.splice(idx, 1);
+      newLayout.splice(idx - 1, 0, moved);
+      const synced = syncZIndex(newLayout);
+      const newHistory = [...state.history, [...state.layout]].slice(-50);
+      return { layout: synced, history: newHistory, _futureStates: [] };
+    }),
+
+  // ── Phase 5: Element Layer actions ────────────────────────────────────────
+
+  addElementLayer: (blockId, layer) => {
+    const state = get();
+    const target = findNode(state.layout, blockId);
+    if (!target) return;
+    const newLayer = {
+      ...layer,
+      id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    };
+    const currentLayers = target.layers ?? [];
+    state.updateBlock(blockId, { layers: [...currentLayers, newLayer] });
+  },
+
+  updateElementLayer: (blockId, layerId, patch) => {
+    const state = get();
+    const target = findNode(state.layout, blockId);
+    if (!target || !target.layers) return;
+    const nextLayers = target.layers.map((l) => (l.id === layerId ? { ...l, ...patch } : l));
+    state.updateBlock(blockId, { layers: nextLayers });
+  },
+
+  removeElementLayer: (blockId, layerId) => {
+    const state = get();
+    const target = findNode(state.layout, blockId);
+    if (!target || !target.layers) return;
+    const nextLayers = target.layers.filter((l) => l.id !== layerId);
+    state.updateBlock(blockId, { layers: nextLayers });
+  },
+
+  // ── Phase 7: Reusable Symbols ─────────────────────────────────────────────
+
+  symbols: [],
+
+  saveAsSymbol: (blockId, scope, name) => {
+    const state = get();
+    const block = findNode(state.layout, blockId);
+    if (!block) return;
+    const symbolId = `sym_${Date.now()}`;
+    const symbolName = name || block.label || `${block.type} Symbol`;
+    const symbolBlock: UIBlock = JSON.parse(JSON.stringify(block));
+    symbolBlock.isSymbol = true;
+    symbolBlock.symbolId = symbolId;
+    symbolBlock.symbolScope = scope;
+
+    state.updateBlock(blockId, { isSymbol: true, symbolId, symbolScope: scope });
+
+    set((s) => ({
+      symbols: [...s.symbols, { id: symbolId, name: symbolName, scope, block: symbolBlock }],
+    }));
+  },
+
+  addSymbolToCanvas: (symbolId) => {
+    const state = get();
+    const sym = state.symbols.find((s) => s.id === symbolId);
+    if (!sym) return;
+    const newBlock: UIBlock = JSON.parse(JSON.stringify(sym.block));
+    newBlock.id = `block_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    newBlock.position = {
+      ...(newBlock.position ?? {}),
+      x: 40 + state.layout.length * 20,
+      y: 40 + state.layout.length * 20,
+      z: state.layout.length + 1,
+    };
+    const nextLayout = [...state.layout, newBlock];
+    state.setLayout(syncZIndex(nextLayout));
+  },
+
+  // ── Phase 9: Grouping Primitives ──────────────────────────────────────────
+
+  groupBlocks: (ids) => {
+    if (ids.length < 2) return;
+    const groupId = `grp_${Date.now()}`;
+    const state = get();
+    const nextLayout = state.layout.map((b) => (ids.includes(b.id) ? { ...b, groupId } : b));
+    state.setLayout(nextLayout);
+  },
+
+  ungroupBlock: (groupIdOrBlockId) => {
+    const state = get();
+    const target = findNode(state.layout, groupIdOrBlockId);
+    const targetGroupId = target?.groupId || groupIdOrBlockId;
+    const nextLayout = state.layout.map((b) => (b.groupId === targetGroupId ? { ...b, groupId: undefined } : b));
+    state.setLayout(nextLayout);
+  },
 }));

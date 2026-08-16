@@ -72,12 +72,16 @@ export async function getModules(req: Request, res: Response, next: NextFunction
 
 export const getModule = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    const { id } = req.params;
+    const identifier = req.params.id || req.params.slug || (req.params as any)[0];
+
+    if (!identifier) {
+      return res.status(400).json({ success: false, error: 'Module identifier is required' });
+    }
 
     const propertyId = req.property?.id ?? ((req as any).propertyId as string | undefined);
     const tenantId = req.user ? getCallerTenantId(req) : (req.tenant?.id ?? null);
 
-    logger.info(`[ModulesController] getModule identifier="${id}" propertyId="${propertyId ?? 'none'}" tenantId="${tenantId ?? 'none'}"`);
+    logger.info(`[ModulesController] getModule identifier="${identifier}" propertyId="${propertyId ?? 'none'}" tenantId="${tenantId ?? 'none'}"`);
 
     const applyScope = (q: any) => {
       let scoped = q;
@@ -86,29 +90,29 @@ export const getModule = asyncHandler(async (req: Request, res: Response) => {
       return scoped;
     };
 
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
     let data: any = null;
 
     if (isUuid) {
       const { data: byId, error: idError } = await applyScope(
-        supabase.from('modules').select('*').eq('id', id)
+        supabase.from('modules').select('*').eq('id', identifier)
       ).maybeSingle();
       if (idError) throw idError;
       data = byId;
     }
 
-    if (!data && id) {
+    if (!data && identifier) {
       const { data: bySlug, error: slugErr } = await applyScope(
-        supabase.from('modules').select('*').eq('slug', id)
+        supabase.from('modules').select('*').eq('slug', identifier)
       ).maybeSingle();
 
       if (slugErr) throw slugErr;
-      if (!bySlug) {
-        logger.warn(`[ModulesController] Module not found for identifier="${id}" propertyId="${propertyId ?? 'none'}" tenantId="${tenantId ?? 'none'}"`);
-        return res.status(404).json({ success: false, error: 'Module not found' });
-      }
-
       data = bySlug;
+    }
+
+    if (!data) {
+      logger.warn(`[ModulesController] Module not found for identifier="${identifier}" propertyId="${propertyId ?? 'none'}" tenantId="${tenantId ?? 'none'}"`);
+      return res.status(404).json({ success: false, error: 'Module not found' });
     }
 
     logger.info(`[ModulesController] Found module "${data.name}" (${data.id}, slug="${data.slug}")`);
