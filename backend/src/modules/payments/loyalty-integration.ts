@@ -34,10 +34,23 @@ export async function awardLoyaltyPointsForPayment(
 
     const pointsPerDollar = settings.points_per_dollar || 1;
 
+    // Idempotency guard: prevent duplicate point awards for the same transaction
+    const { data: existingTx } = await supabase
+      .from('loyalty_transactions')
+      .select('id')
+      .eq('reference_id', referenceId)
+      .eq('transaction_type', 'earn')
+      .maybeSingle();
+
+    if (existingTx) {
+      logger.info(`Loyalty points already awarded for ${referenceType}:${referenceId}, skipping duplicate award`);
+      return;
+    }
+
     // Find all necessary details from the unified transactions table
     const { data: tx } = await supabase
       .from('transactions')
-      .select('customer_id, amount, engine_type, module_id, property_id')
+      .select('customer_id, amount, engine_type, module_id, property_id, tenant_id')
       .eq('id', referenceId)
       .single();
 
@@ -65,6 +78,8 @@ export async function awardLoyaltyPointsForPayment(
         p_order_total: transactionAmount,
         p_order_id: referenceId,
         p_points_per_dollar: pointsPerDollar,
+        p_tenant_id: tx?.tenant_id || null,
+        p_property_id: tx?.property_id || null,
       }
     );
 

@@ -67,6 +67,9 @@ const EXEMPT_PATHS = [
   '/api/v1/auth/2fa/verify', // Called during login before Bearer token is issued
   // Stripe webhooks have their own HMAC signature — CSRF does not apply
   '/api/v1/payments/webhook',
+  // Platform checkout — public landing-page CTA, anonymous like /auth/register
+  '/api/platform/checkout',
+  '/api/v1/platform/checkout',
   // Kiosk: device-authenticated with hardware token, not browser cookies
   '/api/v1/kiosk',
   // Health probes — no state change

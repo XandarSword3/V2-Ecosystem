@@ -294,14 +294,52 @@ describe('Property Access Middleware', () => {
       expect(next).not.toHaveBeenCalled();
     });
 
-    it('should bypass if module has no property scoping', async () => {
-      const middleware = requireModulePropertyAccess('menu_service');
+    it('should return 404 if module is not found', async () => {
+      const middleware = requireModulePropertyAccess('non_existent_module');
       const { req, res, next } = createMockReqRes({
-        user: { id: 'user-1', role: 'staff', userId: 'user-1' }
+        user: { id: 'user-1', role: 'staff', userId: 'user-1', tenantId: 'tenant-1' }
       });
 
       const fromMock = vi.fn().mockImplementation(() => {
-        return createChainableMock({ property_id: null });
+        return createChainableMock(null, null);
+      });
+      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+      await middleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should reject cross-tenant staff access with 403', async () => {
+      const middleware = requireModulePropertyAccess('menu_service');
+      const { req, res, next } = createMockReqRes({
+        user: { id: 'user-1', role: 'staff', userId: 'user-1', tenantId: 'tenant-a' }
+      });
+
+      const fromMock = vi.fn().mockImplementation(() => {
+        return createChainableMock({ id: 'mod-1', property_id: 'prop-1', tenant_id: 'tenant-b' });
+      });
+      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+      await middleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: expect.stringContaining('cross-tenant')
+      }));
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should allow if module has no property scoping but user belongs to same tenant', async () => {
+      const middleware = requireModulePropertyAccess('menu_service');
+      const { req, res, next } = createMockReqRes({
+        user: { id: 'user-1', role: 'staff', userId: 'user-1', tenantId: 'tenant-1' }
+      });
+
+      const fromMock = vi.fn().mockImplementation(() => {
+        return createChainableMock({ id: 'mod-1', property_id: null, tenant_id: 'tenant-1' });
       });
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
@@ -310,16 +348,33 @@ describe('Property Access Middleware', () => {
       expect(next).toHaveBeenCalled();
     });
 
+    it('should reject if module has no property scoping and user is from different tenant', async () => {
+      const middleware = requireModulePropertyAccess('menu_service');
+      const { req, res, next } = createMockReqRes({
+        user: { id: 'user-1', role: 'staff', userId: 'user-1', tenantId: 'tenant-other' }
+      });
+
+      const fromMock = vi.fn().mockImplementation(() => {
+        return createChainableMock({ id: 'mod-1', property_id: null, tenant_id: 'tenant-1' });
+      });
+      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+      await middleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).not.toHaveBeenCalled();
+    });
+
     it('should allow if user has access to module property', async () => {
       const propertyId = '12345678-1234-4567-a123-1234567890ab';
       const middleware = requireModulePropertyAccess('menu_service');
       const { req, res, next } = createMockReqRes({
-        user: { id: 'user-1', role: 'staff', userId: 'user-1' }
+        user: { id: 'user-1', role: 'staff', userId: 'user-1', tenantId: 'tenant-1' }
       });
 
       const fromMock = vi.fn().mockImplementation((table: string) => {
         if (table === 'modules') {
-          return createChainableMock({ property_id: propertyId });
+          return createChainableMock({ id: 'mod-1', property_id: propertyId, tenant_id: 'tenant-1' });
         }
         if (table === 'user_property_access') {
           return createChainableMock([{ id: 'access-1' }], null, 1); // Direct access row => allows
@@ -331,6 +386,35 @@ describe('Property Access Middleware', () => {
       await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
+      expect((req as any).propertyId).toBe(propertyId);
+    });
+
+    it('should reject with 403 if user lacks access to module property', async () => {
+      const propertyId = '12345678-1234-4567-a123-1234567890ab';
+      const middleware = requireModulePropertyAccess('menu_service');
+      const { req, res, next } = createMockReqRes({
+        user: { id: 'user-1', role: 'staff', userId: 'user-1', tenantId: 'tenant-1' }
+      });
+
+      const fromMock = vi.fn().mockImplementation((table: string) => {
+        if (table === 'modules') {
+          return createChainableMock({ id: 'mod-1', property_id: propertyId, tenant_id: 'tenant-1' });
+        }
+        if (table === 'user_property_access') {
+          return createChainableMock([], null, 0); // No access row
+        }
+        if (table === 'user_group_access') {
+          return createChainableMock([], null, 0);
+        }
+        return createChainableMock([]);
+      });
+      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+      await middleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).not.toHaveBeenCalled();
     });
   });
 });
+

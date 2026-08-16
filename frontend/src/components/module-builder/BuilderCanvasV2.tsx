@@ -6,7 +6,7 @@ import { useModuleBuilderStore } from '@/stores/module-builder-store';
 import { UIBlock, AlignmentDirection } from '@/types/module-builder';
 import { Module } from '@/lib/settings-context';
 import { BlockRenderer } from './DynamicModuleRenderer';
-import { Copy, Trash2, Lock, AlignLeft, AlignCenter, AlignRight, MoveHorizontal, MoveVertical } from 'lucide-react';
+import { Copy, Trash2, Lock, AlignLeft, AlignCenter, AlignRight, MoveHorizontal, MoveVertical, ChevronsUp, ChevronsDown, ChevronUp, ChevronDown, Bookmark, Group, Ungroup } from 'lucide-react';
 import { DRAG_TYPE_KEY } from './ComponentToolbarV2';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -129,14 +129,20 @@ const DistributeVIcon = () => (
   </svg>
 );
 
-interface AlignBarProps {
+function MultiSelectBar({
+  selectedIds,
+  onAlign,
+  onDistribute,
+  onGroup,
+  onUngroup,
+}: {
   selectedIds: string[];
-  onAlign: (d: AlignmentDirection) => void;
+  onAlign: (a: AlignmentDirection) => void;
   onDistribute: (d: 'horizontal' | 'vertical') => void;
-}
-
-function AlignmentBar({ selectedIds, onAlign, onDistribute }: AlignBarProps) {
-  const btn = 'p-1.5 rounded hover:bg-slate-100 text-slate-600 hover:text-indigo-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center';
+  onGroup: () => void;
+  onUngroup: () => void;
+}) {
+  const btn = 'p-1 rounded hover:bg-slate-100 text-slate-600 disabled:opacity-30 disabled:hover:bg-transparent';
   const can3 = selectedIds.length >= 3;
 
   return (
@@ -157,6 +163,10 @@ function AlignmentBar({ selectedIds, onAlign, onDistribute }: AlignBarProps) {
       {/* Distribute */}
       <button className={btn} title="Distribute Horizontally" disabled={!can3} onClick={() => onDistribute('horizontal')}><DistributeHIcon /></button>
       <button className={btn} title="Distribute Vertically"   disabled={!can3} onClick={() => onDistribute('vertical')}><DistributeVIcon /></button>
+      <div className="w-px h-4 bg-slate-200 mx-1" />
+      {/* Group / Ungroup */}
+      <button className={btn} title="Group Selection" onClick={onGroup}><Group className="h-3.5 w-3.5" /></button>
+      <button className={btn} title="Ungroup Selection" onClick={onUngroup}><Ungroup className="h-3.5 w-3.5" /></button>
     </div>
   );
 }
@@ -176,6 +186,8 @@ export function BuilderCanvasV2({ module }: BuilderCanvasV2Props) {
     setInlineEditing, inlineEditingBlockId,
     alignBlocks, distributeBlocks,
     addBlock,
+    bringToFront, sendToBack, bringForward, sendBackward,
+    saveAsSymbol, groupBlocks, ungroupBlock,
   } = useModuleBuilderStore();
 
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -323,57 +335,60 @@ export function BuilderCanvasV2({ module }: BuilderCanvasV2Props) {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="relative h-full w-full overflow-auto bg-slate-200 dark:bg-slate-900 p-8">
+    <div className="relative h-full w-full overflow-auto bg-slate-200 dark:bg-slate-900">
+      <div className="inline-flex min-w-full justify-center p-8 min-h-full">
 
-      {/* Alignment bar — sticky at top of scroll area when multi-selected */}
-      {multiSelected && (
-        <AlignmentBar
-          selectedIds={selectedBlockIds}
-          onAlign={dir => alignBlocks(selectedBlockIds, dir)}
-          onDistribute={dir => distributeBlocks(selectedBlockIds, dir)}
-        />
-      )}
+        {/* Alignment & Grouping bar — sticky at top of scroll area when multi-selected */}
+        {multiSelected && (
+          <MultiSelectBar
+            selectedIds={selectedBlockIds}
+            onAlign={dir => alignBlocks(selectedBlockIds, dir)}
+            onDistribute={dir => distributeBlocks(selectedBlockIds, dir)}
+            onGroup={() => groupBlocks(selectedBlockIds)}
+            onUngroup={() => ungroupBlock(selectedBlockIds[0])}
+          />
+        )}
 
-      {/* ── Canvas ── */}
-      <div
-        ref={canvasRef}
-        onMouseDown={handleCanvasMouseDown}
-        onMouseMove={handleCanvasMouseMove}
-        onMouseUp={handleCanvasMouseUp}
-        onMouseLeave={handleCanvasMouseUp}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault();
-          const raw = e.dataTransfer.getData(DRAG_TYPE_KEY);
-          if (!raw) return;
-          try {
-            const { type, defaultWidth } = JSON.parse(raw);
-            const el = canvasRef.current;
-            if (!el) return;
-            const rect = el.getBoundingClientRect();
-            const scale = zoom / 100;
-            // Canvas-relative position, snapped to 8px grid
-            const rawX = (e.clientX - rect.left) / scale;
-            const rawY = (e.clientY - rect.top)  / scale;
-            const x = Math.round(rawX / GRID) * GRID;
-            const y = Math.round(rawY / GRID) * GRID;
-            addBlock(type, { x, y, width: `${defaultWidth ?? 400}px` });
-          } catch {}
-        }}
-        style={{
-          width: CANVAS_WIDTH,
-          minHeight: canvasHeight,
-          position: 'relative',
-          backgroundColor: '#ffffff',
-          backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
-          backgroundSize: `${GRID}px ${GRID}px`,
-          boxShadow: '0 4px 24px -4px rgba(0,0,0,0.12)',
-          transform: `scale(${zoom / 100})`,
-          transformOrigin: 'top center',
-          margin: '0 auto',
-          userSelect: rubberBand ? 'none' : 'auto',
-        }}
-      >
+        {/* ── Canvas ── */}
+        <div
+          ref={canvasRef}
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseUp={handleCanvasMouseUp}
+          onMouseLeave={handleCanvasMouseUp}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const raw = e.dataTransfer.getData(DRAG_TYPE_KEY);
+            if (!raw) return;
+            try {
+              const { type, defaultWidth } = JSON.parse(raw);
+              const el = canvasRef.current;
+              if (!el) return;
+              const rect = el.getBoundingClientRect();
+              const scale = zoom / 100;
+              // Canvas-relative position, snapped to 8px grid
+              const rawX = (e.clientX - rect.left) / scale;
+              const rawY = (e.clientY - rect.top)  / scale;
+              const x = Math.round(rawX / GRID) * GRID;
+              const y = Math.round(rawY / GRID) * GRID;
+              addBlock(type, { x, y, width: `${defaultWidth ?? 400}px` });
+            } catch {}
+          }}
+          style={{
+            width: CANVAS_WIDTH,
+            minHeight: canvasHeight,
+            position: 'relative',
+            backgroundColor: '#ffffff',
+            backgroundImage: 'radial-gradient(circle, #cbd5e1 1px, transparent 1px)',
+            backgroundSize: `${GRID}px ${GRID}px`,
+            boxShadow: '0 4px 24px -4px rgba(0,0,0,0.12)',
+            transform: `scale(${zoom / 100})`,
+            transformOrigin: 'top center',
+            flexShrink: 0,
+            userSelect: rubberBand ? 'none' : 'auto',
+          }}
+        >
         {/* 12-column overlay (G key) */}
         {showColumns && (
           <div className="absolute inset-0 pointer-events-none z-50 flex px-6">
@@ -436,6 +451,35 @@ export function BuilderCanvasV2({ module }: BuilderCanvasV2Props) {
                 {singleBlock.type.replace(/_/g, ' ')}
               </span>
               <button
+                onClick={() => bringToFront(singleBlock.id)}
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700"
+                title="Bring to Front"
+              >
+                <ChevronsUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => bringForward(singleBlock.id)}
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700"
+                title="Bring Forward"
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => sendBackward(singleBlock.id)}
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700"
+                title="Send Backward"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => sendToBack(singleBlock.id)}
+                className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700"
+                title="Send to Back"
+              >
+                <ChevronsDown className="h-3.5 w-3.5" />
+              </button>
+              <div className="w-px h-3 bg-slate-200 mx-0.5" />
+              <button
                 onClick={() => duplicateBlock(singleBlock.id)}
                 className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700"
                 title="Duplicate"
@@ -448,6 +492,13 @@ export function BuilderCanvasV2({ module }: BuilderCanvasV2Props) {
                 title="Delete"
               >
                 <Trash2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => saveAsSymbol(singleBlock.id, 'property')}
+                className="p-1 rounded hover:bg-amber-50 text-slate-500 hover:text-amber-600"
+                title="Save as Symbol"
+              >
+                <Bookmark className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => toggleLock(singleBlock.id)}
@@ -465,6 +516,7 @@ export function BuilderCanvasV2({ module }: BuilderCanvasV2Props) {
           const isLocked   = lockedBlockIds.includes(block.id);
           const isSelected = selectedBlockId === block.id || selectedBlockIds.includes(block.id);
           const isSingle   = isSelected && selectedBlockIds.length <= 1;
+          const hasRotation = !!block.position?.rotation && block.position.rotation !== 0;
 
           return (
             <Rnd
@@ -476,9 +528,9 @@ export function BuilderCanvasV2({ module }: BuilderCanvasV2Props) {
               bounds="parent"
               dragHandleClassName="drag-handle"
               disableDragging={isLocked}
-              enableResizing={!isLocked}
+              enableResizing={!isLocked && !hasRotation}
               style={{ zIndex: isSelected ? 10 + (block.position?.z ?? 1) : (block.position?.z ?? 1) }}
-              resizeHandleStyles={buildHandleStyles(isSingle)}
+              resizeHandleStyles={buildHandleStyles(isSingle && !hasRotation)}
               onDragStart={() => setDraggingId(block.id)}
               onDrag={(_e, d) => handleDrag(block, d.x, d.y)}
               onDragStop={(_e, d) => handleDragStop(block, d.x, d.y)}
@@ -497,6 +549,15 @@ export function BuilderCanvasV2({ module }: BuilderCanvasV2Props) {
                   isLocked ? 'opacity-60' : '',
                   block.style?.visibility === 'hidden' ? 'opacity-30' : '',
                 ].join(' ')}
+                style={{
+                  transform: (() => {
+                    const t: string[] = [];
+                    if (block.position?.rotation) t.push(`rotate(${block.position.rotation}deg)`);
+                    if (block.position?.scale && block.position.scale !== 1) t.push(`scale(${block.position.scale})`);
+                    return t.length > 0 ? t.join(' ') : undefined;
+                  })(),
+                  transformOrigin: 'center center',
+                }}
               >
                 {/* Drag handle strip */}
                 <div className={[
@@ -533,6 +594,7 @@ export function BuilderCanvasV2({ module }: BuilderCanvasV2Props) {
             </Rnd>
           );
         })}
+      </div>
       </div>
 
       {/* Column overlay hint */}

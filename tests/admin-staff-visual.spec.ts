@@ -459,7 +459,7 @@ test.describe('Purchase Flow Tests', () => {
           // Create booking
           const bookingRes = await request.post(`${API_URL}/api/v1/units/bookings`, {
             data: {
-              unitId: accommodation unit.id,
+              unitId: accommodationUnit.id,
               checkIn: checkIn.toISOString().split('T')[0],
               checkOut: checkOut.toISOString().split('T')[0],
               guestCount: 2,

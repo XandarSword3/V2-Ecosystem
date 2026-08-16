@@ -7,7 +7,7 @@ import {
   Layout, Type, Image as ImageIcon, Grid, List, Calendar,
   Clock, Box, MousePointer2, FormInput, Sparkles, Star,
   BarChart3, Dumbbell, ArrowRight, Divide, Minus, CreditCard,
-  Users, ChevronDown, ChevronRight, Pencil, Check, X,
+  Users, ChevronDown, ChevronRight, ChevronsUp, ChevronsDown, Pencil, Check, X,
 } from 'lucide-react';
 import { useState, useRef, useCallback } from 'react';
 
@@ -59,6 +59,7 @@ function LayerRow({ block, depth = 0, isDragOver, onDragStart, onDragOver, onDro
     selectedBlockId, selectedBlockIds,
     selectBlock, addToSelection, removeFromSelection,
     updateBlock, toggleLock, lockedBlockIds,
+    bringToFront, sendToBack,
   } = useModuleBuilderStore();
 
   const isSelected = selectedBlockIds.includes(block.id) || selectedBlockId === block.id;
@@ -174,6 +175,22 @@ function LayerRow({ block, depth = 0, isDragOver, onDragStart, onDragOver, onDro
 
         {/* Action buttons — only visible on hover or selected */}
         <div className={`flex items-center gap-0.5 flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+          {/* Bring to Front */}
+          <button
+            onClick={(e) => { e.stopPropagation(); bringToFront(block.id); }}
+            title="Bring to Front"
+            className="rounded p-0.5 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+          >
+            <ChevronsUp className="h-3 w-3" />
+          </button>
+          {/* Send to Back */}
+          <button
+            onClick={(e) => { e.stopPropagation(); sendToBack(block.id); }}
+            title="Send to Back"
+            className="rounded p-0.5 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+          >
+            <ChevronsDown className="h-3 w-3" />
+          </button>
           {/* Visibility */}
           <button
             onClick={handleToggleVisibility}

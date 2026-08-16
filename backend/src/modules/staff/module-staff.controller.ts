@@ -9,6 +9,7 @@ import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
 import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
 import { getOrderNumber } from '../../utils/order-number.js';
+import { awardLoyaltyPointsForPayment } from '../payments/loyalty-integration.js';
 import dayjs from 'dayjs';
 
 /**
@@ -2227,6 +2228,13 @@ export async function payModuleOrder(req: Request, res: Response) {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // Award loyalty points for cash/staff-settled orders (idempotent, safe no-op if loyalty disabled or customer missing)
+    try {
+      await awardLoyaltyPointsForPayment('order', order.id, paidAmount);
+    } catch (lErr: any) {
+      logger.warn('Failed awarding loyalty points for staff paid order:', lErr?.message || lErr);
+    }
 
     try {
       emitToUnit(req.user?.tenantId || 'default', slug, 'order:updated', {
