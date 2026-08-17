@@ -208,40 +208,16 @@ export class ProvisioningService {
       };
     }
 
-    // ---- Step 2: Create property group ----
-    const groupName = `${operatorName}'s Group`;
-    const { data: group, error: groupErr } = await supabase
-      .from('property_groups')
-      .insert({
-        name: groupName,
-        description: `Default property group for ${subdomain}`,
-      })
-      .select('id')
-      .single();
-
-    if (groupErr || !group) {
-      throw new Error(`[PROVISIONING] Failed to create property_group: ${groupErr?.message}`);
-    }
-
-    // ---- Step 3: Create tenant row ----
-    // Resolve plan_id + feature_limits from the LIVE plans table (the
-    // admin-editable source of truth) rather than a hardcoded duplicate.
-    // Non-fatal if the lookup fails or no row matches: falls back to the
-    // hardcoded FALLBACK_FEATURE_LIMITS so provisioning never breaks if the
-    // plans table is empty, mid-migration, or a tier has no matching plan
-    // row yet. plan_id stays null in that case — tenantAccess.middleware.ts
-    // already falls back to the tenants.feature_limits snapshot when plan_id
-    // is null, so this degrades safely either way.
+    // ---- Step 2: Create tenant row first (property_groups foreign key references tenants.id) ----
+    const tenantId = crypto.randomUUID();
     const { plan_id: resolvedPlanId, feature_limits: resolvedFeatureLimits, code: resolvedTierCode } = await resolvePlanForTier(tier);
 
-    const tenantId = crypto.randomUUID();
     const { error: tenantErr } = await supabase
       .from('tenants')
       .insert({
         id: tenantId,
         subdomain,
-        property_group_id: group.id,
-        subscription_tier: resolvedTierCode || tier, // Use the resolved tier code from database
+        subscription_tier: resolvedTierCode || tier,
         plan_id: resolvedPlanId,
         billing_status: billingStatus,
         stripe_customer_id: stripeCustomerId,
@@ -253,6 +229,28 @@ export class ProvisioningService {
     if (tenantErr) {
       throw new Error(`[PROVISIONING] Failed to create tenant: ${tenantErr.message}`);
     }
+
+    // ---- Step 3: Create property group ----
+    const groupName = `${operatorName}'s Group`;
+    const { data: group, error: groupErr } = await supabase
+      .from('property_groups')
+      .insert({
+        name: groupName,
+        description: `Default property group for ${subdomain}`,
+        tenant_id: tenantId,
+      })
+      .select('id')
+      .single();
+
+    if (groupErr || !group) {
+      throw new Error(`[PROVISIONING] Failed to create property_group: ${groupErr?.message}`);
+    }
+
+    // Link tenant to property group
+    await supabase
+      .from('tenants')
+      .update({ property_group_id: group.id })
+      .eq('id', tenantId);
 
     // ---- Step 4: Create default property ----
     const propertyName = `${operatorName}'s Property`;
