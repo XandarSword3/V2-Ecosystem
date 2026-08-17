@@ -455,6 +455,9 @@ DECLARE
     v_deduction RECORD;
     v_restore_count INTEGER := 0;
     v_current_stock DECIMAL;
+    v_tenant_id UUID;
+    v_property_id UUID;
+    v_affected_items UUID[] := '{}';
 BEGIN
     -- Idempotency guard: if this transaction has already been restored,
     -- do nothing rather than double-crediting stock.
@@ -478,28 +481,53 @@ BEGIN
     LOOP
         -- Lock the inventory_items row before touching it, same as
         -- deduct_stock_fifo's serialization point.
-        SELECT current_stock INTO v_current_stock
+        SELECT current_stock, tenant_id, property_id
+          INTO v_current_stock, v_tenant_id, v_property_id
         FROM inventory_items
         WHERE id = v_deduction.item_id
         FOR UPDATE;
 
-        UPDATE inventory_items
-        SET current_stock = current_stock + ABS(v_deduction.quantity),
-            updated_at = NOW()
-        WHERE id = v_deduction.item_id;
+        IF v_current_stock IS NOT NULL THEN
+            UPDATE inventory_items
+            SET current_stock = current_stock + ABS(v_deduction.quantity),
+                updated_at = NOW()
+            WHERE id = v_deduction.item_id;
 
-        INSERT INTO inventory_transactions(
-            item_id, transaction_type, quantity, stock_before, stock_after,
-            reference_type, reference_id, notes, performed_by
-        ) VALUES (
-            v_deduction.item_id, 'restoration', ABS(v_deduction.quantity),
-            v_current_stock, v_current_stock + ABS(v_deduction.quantity),
-            'transaction', p_transaction_id, 'Restored due to order cancellation',
-            p_performed_by
-        );
+            INSERT INTO inventory_transactions(
+                item_id, transaction_type, quantity, stock_before, stock_after,
+                reference_type, reference_id, notes, performed_by, tenant_id, property_id
+            ) VALUES (
+                v_deduction.item_id, 'restoration', ABS(v_deduction.quantity),
+                v_current_stock, v_current_stock + ABS(v_deduction.quantity),
+                'transaction', p_transaction_id, 'Restored due to order cancellation',
+                p_performed_by, v_tenant_id, v_property_id
+            );
 
-        v_restore_count := v_restore_count + 1;
+            v_restore_count := v_restore_count + 1;
+            v_affected_items := array_append(v_affected_items, v_deduction.item_id);
+        END IF;
     END LOOP;
+
+    -- Auto-86 Flip-Back: Flip is_available = true for catalog items whose
+    -- non-optional recipe ingredients now ALL have sufficient stock again
+    IF array_length(v_affected_items, 1) > 0 THEN
+      UPDATE catalog_items ci
+         SET is_available = true
+       WHERE ci.is_available = false
+         AND ci.id IN (
+           SELECT DISTINCT mii.catalog_item_id
+             FROM menu_item_ingredients mii
+            WHERE mii.inventory_item_id = ANY(v_affected_items)
+              AND NOT EXISTS (
+                SELECT 1
+                  FROM menu_item_ingredients mii2
+                  JOIN inventory_items ii2 ON ii2.id = mii2.inventory_item_id
+                 WHERE mii2.catalog_item_id = mii.catalog_item_id
+                   AND COALESCE(mii2.is_optional, false) = false
+                   AND ii2.current_stock < mii2.quantity_required
+              )
+         );
+    END IF;
 
     RETURN QUERY SELECT true, v_restore_count, NULL::TEXT;
 END;

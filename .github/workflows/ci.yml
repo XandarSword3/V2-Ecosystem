@@ -62,6 +62,10 @@ jobs:
         working-directory: backend
         run: npm run check:tenant-writes
 
+      - name: Check no-mock integration tests
+        working-directory: backend
+        run: npm run check:no-mock-integration
+
       - name: Check legacy module terminology
         run: node tools/legacy-audit.js --ci
 

@@ -56,6 +56,13 @@ export const instantTransactionStateMachine: StateMachineDefinition<InstantTrans
       guardDescription: 'All items in the order are prepared',
     },
     {
+      from: 'confirmed',
+      to: 'ready',
+      action: 'mark_ready',
+      allowedActors: ['staff'],
+      guardDescription: 'All items in the order are prepared (direct from confirmed)',
+    },
+    {
       from: 'ready',
       to: 'delivered',
       action: 'deliver',

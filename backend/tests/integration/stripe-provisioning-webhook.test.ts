@@ -1,253 +1,218 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+/**
+ * SaaS Tenant Provisioning & Stripe Integration Test
+ *
+ * Real database integration test — no mocking of Supabase, connection.js, or DB.
+ * Exercises ProvisioningService.provision() and updateBillingStatus() against
+ * the live Postgres test database, and exercises HTTP endpoint signature validation.
+ */
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import request from 'supertest';
 import crypto from 'crypto';
-import { handleSaasStripeWebhook } from '../../src/modules/platform/saas-webhook.controller.js';
-import { getSaasBillingService } from '../../src/services/saas-billing.service.js';
-import { getProvisioningService } from '../../src/modules/platform/provisioning.service.js';
-import { emailService } from '../../src/services/email.service.js';
+import app from '../../src/app.js';
 import { getSupabase } from '../../src/database/connection.js';
+import { getProvisioningService } from '../../src/modules/platform/provisioning.service.js';
 
-// Mock dependencies
-vi.mock('../../src/database/connection.js', () => ({
-  getSupabase: vi.fn(),
-}));
+describe('SaaS Tenant Provisioning Integration (Real Database)', () => {
+  const supabase = getSupabase();
+  const provisioning = getProvisioningService();
 
-vi.mock('../../src/services/email.service.js', () => ({
-  emailService: {
-    sendEmail: vi.fn().mockResolvedValue(true),
-  },
-}));
+  const testRunId = crypto.randomBytes(4).toString('hex');
+  const testSubdomain = `test-tenant-${testRunId}`;
+  const testEmail = `operator-${testRunId}@example.com`;
+  const testOperatorName = `Test Operator ${testRunId}`;
+  const stripeSubId = `sub_test_${testRunId}`;
+  const stripeCustId = `cus_test_${testRunId}`;
 
-vi.mock('../../src/services/saas-billing.service.js', () => {
-  const mockBilling = {
-    constructWebhookEvent: vi.fn(),
-    resolveSubscription: vi.fn().mockResolvedValue({
-      id: 'sub_test_123',
-      customer: 'cus_test_123',
-      status: 'active',
-      trial_end: null,
-    }),
-  };
-  return {
-    getSaasBillingService: () => mockBilling,
-    SaasBillingService: {
-      mapStripeToBillingStatus: (status: string) => (status === 'active' ? 'active' : 'trialing'),
-    },
-  };
-});
+  let createdTenantId: string | null = null;
+  let createdGroupId: string | null = null;
+  let createdPropertyId: string | null = null;
+  let createdUserId: string | null = null;
 
-describe('SaaS Provisioning & Stripe Webhook Integration', () => {
-  const WEBHOOK_SECRET = 'whsec_test_secret_for_tests';
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
+  afterAll(async () => {
+    // Clean up all seeded resources in reverse FK dependency order
+    if (createdTenantId) {
+      try {
+        if (createdUserId) {
+          await supabase.from('user_roles').delete().eq('user_id', createdUserId);
+          await supabase.from('users').delete().eq('id', createdUserId);
+        }
+        await supabase.from('roles').delete().eq('tenant_id', createdTenantId);
+        if (createdPropertyId) {
+          await supabase.from('properties').delete().eq('id', createdPropertyId);
+        }
+        // Unlink property_group_id from tenant to avoid circular FK
+        await supabase.from('tenants').update({ property_group_id: null }).eq('id', createdTenantId);
+        if (createdGroupId) {
+          await supabase.from('property_groups').delete().eq('id', createdGroupId);
+        }
+        await supabase.from('billing_history').delete().eq('tenant_id', createdTenantId);
+        await supabase.from('tenants').delete().eq('id', createdTenantId);
+      } catch (cleanupErr) {
+        console.warn('[Provisioning Integration Cleanup] Non-fatal error:', cleanupErr);
+      }
+    }
   });
 
-  function createSignedWebhookRequest(payload: object) {
-    const payloadString = JSON.stringify(payload);
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = crypto
-      .createHmac('sha256', WEBHOOK_SECRET)
-      .update(`${timestamp}.${payloadString}`)
-      .digest('hex');
-
-    const headers: Record<string, string> = {
-      'stripe-signature': `t=${timestamp},v1=${signature}`,
-      'content-type': 'application/json',
-    };
-
-    const req: any = {
-      headers,
-      body: Buffer.from(payloadString),
-    };
-
-    const res: any = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-    };
-
-    return { req, res, payloadString, timestamp, signature };
-  }
-
-  it('should accept signed checkout.session.completed event and provision tenant, role, and welcome email', async () => {
-    const tenantId = '00000000-0000-0000-0000-000000000001';
-    const ownerUserId = '11111111-1111-1111-1111-111111111111';
-    const propertyGroupId = '22222222-2222-2222-2222-222222222222';
-    const propertyId = '33333333-3333-3333-3333-333333333333';
-    const roleId = '44444444-4444-4444-4444-444444444444';
-
-    const eventPayload = {
-      id: 'evt_test_checkout_123',
-      object: 'event',
-      type: 'checkout.session.completed',
-      data: {
-        object: {
-          id: 'cs_test_session_123',
-          mode: 'subscription',
-          subscription: 'sub_test_123',
-          customer: 'cus_test_123',
-          customer_details: {
-            email: 'alicesmith@example.com',
-            name: 'Alice Smith',
-          },
-          metadata: {
-            tenantId,
-            subdomain: 'alicesresort',
-            tier: 'growth',
-          },
-          amount_total: 9900,
-          currency: 'usd',
-        },
-      },
-    };
-
-    // Configure billing service constructWebhookEvent to return the event object
-    const billing = getSaasBillingService();
-    (billing.constructWebhookEvent as any).mockReturnValue(eventPayload);
-
-    // Mock Supabase calls for provisioning steps
-    const mockTenantsTable = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }), // Fresh provision
-      insert: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: {
-          id: tenantId,
-          subdomain: 'alicesresort',
-          subscription_tier: 'growth',
-          billing_status: 'active',
-          stripe_subscription_id: 'sub_test_123',
-        },
-        error: null,
-      }),
-      update: vi.fn().mockReturnThis(),
-    };
-
-    const mockPropertyGroupsTable = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      insert: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: { id: propertyGroupId, name: 'Alice\'s Resort', tenant_id: tenantId },
-        error: null,
-      }),
-    };
-
-    const mockPropertiesTable = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      insert: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: { id: propertyId, name: 'Main Property', tenant_id: tenantId, group_id: propertyGroupId },
-        error: null,
-      }),
-    };
-
-    const mockRolesTable = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: { id: roleId, name: 'tenant_owner' }, error: null }),
-      insert: vi.fn().mockResolvedValue({ data: [{ id: roleId, name: 'tenant_owner' }], error: null }),
-    };
-
-    const mockUsersTable = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      insert: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: {
-          id: ownerUserId,
-          email: 'alicesmith@example.com',
-          name: 'Alice Smith',
-          tenant_id: tenantId,
-          scope: 'tenant_owner',
-        },
-        error: null,
-      }),
-    };
-
-    const mockUserRolesTable = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockResolvedValue({ data: [], error: null }),
-    };
-
-    const mockBillingHistoryTable = {
-      insert: vi.fn().mockResolvedValue({ data: [], error: null }),
-    };
-
-    const fromMock = vi.fn().mockImplementation((table: string) => {
-      switch (table) {
-        case 'tenants': return mockTenantsTable;
-        case 'property_groups': return mockPropertyGroupsTable;
-        case 'properties': return mockPropertiesTable;
-        case 'roles': return mockRolesTable;
-        case 'users': return mockUsersTable;
-        case 'user_roles': return mockUserRolesTable;
-        case 'saas_billing_history': return mockBillingHistoryTable;
-        default:
-          return {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-            insert: vi.fn().mockReturnThis(),
-            single: vi.fn().mockResolvedValue({ data: {}, error: null }),
-          };
-      }
-    });
-
-    vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
-
-    const { req, res } = createSignedWebhookRequest(eventPayload);
-
-    await handleSaasStripeWebhook(req, res);
-
-    // 1. Assert immediate 200 acknowledgment to Stripe
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ received: true });
-
-    // 2. Direct provision call to assert service logic
-    const provisioning = getProvisioningService();
+  it('1. provisions a full tenant hierarchy into the real database', async () => {
     const result = await provisioning.provision({
-      stripeSubscriptionId: 'sub_test_123',
-      stripeCustomerId: 'cus_test_123',
+      stripeSubscriptionId: stripeSubId,
+      stripeCustomerId: stripeCustId,
       tier: 'growth',
       billingStatus: 'active',
-      operatorEmail: 'alicesmith@example.com',
-      operatorName: 'Alice Smith',
-      subdomain: 'alicesresort',
+      operatorEmail: testEmail,
+      operatorName: testOperatorName,
+      subdomain: testSubdomain,
       trialEndsAt: null,
     });
 
-    // 3. Assert provision outputs
     expect(result).toBeDefined();
-    expect(result.tenantId).toBe(tenantId);
-    expect(result.ownerUserId).toBe(ownerUserId);
+    expect(result.created).toBe(true);
+    expect(result.tenantId).toBeTruthy();
+    expect(result.propertyGroupId).toBeTruthy();
+    expect(result.propertyId).toBeTruthy();
+    expect(result.ownerUserId).toBeTruthy();
 
-    // 4. Assert welcome email was dispatched
-    expect(emailService.sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'alicesmith@example.com',
-        subject: expect.stringContaining('ready'),
-      })
-    );
+    createdTenantId = result.tenantId;
+    createdGroupId = result.propertyGroupId;
+    createdPropertyId = result.propertyId;
+    createdUserId = result.ownerUserId;
+
+    // Direct database assertions: tenants row
+    const { data: tenant, error: tErr } = await supabase
+      .from('tenants')
+      .select('id, subdomain, subscription_tier, billing_status, stripe_subscription_id, property_group_id')
+      .eq('id', createdTenantId)
+      .single();
+
+    expect(tErr).toBeNull();
+    expect(tenant).toBeDefined();
+    expect(tenant?.subdomain).toBe(testSubdomain);
+    expect(tenant?.billing_status).toBe('active');
+    expect(tenant?.stripe_subscription_id).toBe(stripeSubId);
+    expect(tenant?.property_group_id).toBe(createdGroupId);
+
+    // Direct database assertions: property_groups row
+    const { data: group, error: gErr } = await supabase
+      .from('property_groups')
+      .select('id, name, tenant_id')
+      .eq('id', createdGroupId)
+      .single();
+
+    expect(gErr).toBeNull();
+    expect(group?.tenant_id).toBe(createdTenantId);
+
+    // Direct database assertions: properties row
+    const { data: prop, error: pErr } = await supabase
+      .from('properties')
+      .select('id, name, tenant_id, group_id, public_slug, is_active')
+      .eq('id', createdPropertyId)
+      .single();
+
+    expect(pErr).toBeNull();
+    expect(prop?.tenant_id).toBe(createdTenantId);
+    expect(prop?.group_id).toBe(createdGroupId);
+    expect(prop?.public_slug).toBeTruthy();
+    expect(prop?.is_active).toBe(true);
+
+    // Direct database assertions: roles seeded
+    const { data: roles, error: rErr } = await supabase
+      .from('roles')
+      .select('id, name, tenant_id')
+      .eq('tenant_id', createdTenantId);
+
+    expect(rErr).toBeNull();
+    expect(roles).toBeDefined();
+    const roleNames = (roles || []).map((r) => r.name);
+    expect(roleNames).toContain('tenant_owner');
+    expect(roleNames).toContain('admin');
+    expect(roleNames).toContain('staff');
+    expect(roleNames).toContain('customer');
+
+    // Direct database assertions: owner user row
+    const { data: user, error: uErr } = await supabase
+      .from('users')
+      .select('id, email, full_name, tenant_id, scope, email_verified, must_change_password')
+      .eq('id', createdUserId)
+      .single();
+
+    expect(uErr).toBeNull();
+    expect(user?.email).toBe(testEmail);
+    expect(user?.tenant_id).toBe(createdTenantId);
+    expect(user?.scope).toBe('tenant_owner');
+    expect(user?.email_verified).toBe(true);
+    expect(user?.must_change_password).toBe(true);
+
+    // Direct database assertions: user_roles assignment
+    const ownerRole = roles?.find((r) => r.name === 'tenant_owner');
+    expect(ownerRole).toBeDefined();
+
+    const { data: userRole, error: urErr } = await supabase
+      .from('user_roles')
+      .select('id, user_id, role_id')
+      .eq('user_id', createdUserId)
+      .eq('role_id', ownerRole!.id)
+      .maybeSingle();
+
+    expect(urErr).toBeNull();
+    expect(userRole).toBeDefined();
+    expect(userRole?.user_id).toBe(createdUserId);
   });
 
-  it('should reject webhook request if stripe signature is invalid', async () => {
-    const billing = getSaasBillingService();
-    (billing.constructWebhookEvent as any).mockImplementation(() => {
-      throw new Error('Signature verification failed');
+  it('2. is strictly idempotent — second provision call does not duplicate rows', async () => {
+    const result2 = await provisioning.provision({
+      stripeSubscriptionId: stripeSubId,
+      stripeCustomerId: stripeCustId,
+      tier: 'growth',
+      billingStatus: 'active',
+      operatorEmail: testEmail,
+      operatorName: testOperatorName,
+      subdomain: testSubdomain,
+      trialEndsAt: null,
     });
 
-    const { req, res } = createSignedWebhookRequest({ type: 'customer.subscription.updated' });
+    expect(result2.created).toBe(false);
+    expect(result2.tenantId).toBe(createdTenantId);
+    expect(result2.ownerUserId).toBe(createdUserId);
 
-    await handleSaasStripeWebhook(req, res);
+    // Verify tenant count has not multiplied
+    const { data: tenants } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('stripe_subscription_id', stripeSubId);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Webhook signature verification failed' });
+    expect(tenants?.length).toBe(1);
+  });
+
+  it('3. updateBillingStatus updates real database tenant state', async () => {
+    await provisioning.updateBillingStatus(stripeSubId, 'past_due');
+
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('billing_status')
+      .eq('id', createdTenantId!)
+      .single();
+
+    expect(tenant?.billing_status).toBe('past_due');
+  });
+
+  it('4. rejects webhook HTTP request when stripe-signature header is missing', async () => {
+    const res = await request(app)
+      .post('/api/webhooks/stripe/saas')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ type: 'customer.subscription.updated' }));
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Missing stripe-signature header' });
+  });
+
+  it('5. rejects webhook HTTP request when stripe-signature is invalid', async () => {
+    const res = await request(app)
+      .post('/api/webhooks/stripe/saas')
+      .set('stripe-signature', 't=123456789,v1=invalid_fake_signature_hash')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ type: 'customer.subscription.updated' }));
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'Webhook signature verification failed' });
   });
 });

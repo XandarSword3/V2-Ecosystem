@@ -96,15 +96,10 @@ test.describe('Engine A: Customer Cart & Checkout Flow', () => {
       },
     });
 
-    const status = res.status();
+    expect(res.status()).toBe(201);
     const body = await res.json();
-
-    if (status === 201 || status === 200) {
-      expect(body.success).toBe(true);
-      expect(body.data).toBeDefined();
-      expect(body.data.status).toBe('pending');
-    } else {
-      expect([400, 404]).toContain(status);
-    }
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+    expect(body.data.status).toBe('pending');
   });
 });
