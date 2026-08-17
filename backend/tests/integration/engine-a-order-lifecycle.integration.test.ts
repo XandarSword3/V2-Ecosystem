@@ -43,6 +43,8 @@ import { randomUUID } from 'crypto';
 import app from '../../src/app';
 import { getSupabase } from '../../src/database/supabase';
 
+import { loadDynamicModules } from '../../src/routes/dynamic-modules.loader';
+
 const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
 const describeIntegration = runIntegration ? describe : describe.skip;
 
@@ -86,7 +88,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
 
     const { data: property, error: propErr } = await supabase
       .from('properties')
-      .insert({ name: `${namePrefix} Property` })
+      .insert({ name: `${namePrefix} Property`, tenant_id: tenant.id })
       .select('id')
       .single();
     if (propErr || !property) throw new Error(`Fixture setup failed (property): ${propErr?.message}`);
@@ -98,6 +100,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
         name: `${namePrefix} Kitchen`,
         slug,
         engine_type: 'instant_transaction',
+        tenant_id: tenant.id,
         property_id: property.id,
         is_active: true,
       })
@@ -129,11 +132,12 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
 
     const { error: accessErr } = await supabase
       .from('user_property_access')
-      .insert({ user_id: user.id, property_id: property });
+      .insert({ user_id: user.id, property_id: property, tenant_id: tenant, access_level: 'staff' });
     if (accessErr) throw new Error(`Fixture setup failed (user_property_access): ${accessErr?.message}`);
 
     const loginRes = await request(app)
       .post('/api/v1/auth/login')
+      .set('X-Tenant-ID', tenant)
       .send({ email, password: staffPassword });
     if (loginRes.status !== 200 || !loginRes.body?.success) {
       throw new Error(`Fixture setup failed (login): ${loginRes.status} ${JSON.stringify(loginRes.body)}`);
@@ -172,12 +176,26 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
         name: 'Integration Test Beef Patty',
         unit: 'piece',
         current_stock: STARTING_STOCK,
+        tenant_id: tenantId,
+        property_id: propertyId,
+        module_id: moduleId,
         is_active: true,
       })
       .select('id')
       .single();
     if (invErr || !invItem) throw new Error(`Fixture setup failed (inventory_item): ${invErr?.message}`);
     inventoryItemId = invItem.id;
+
+    const { error: batchErr } = await supabase.from('inventory_batches').insert({
+      item_id: inventoryItemId,
+      batch_number: 'BATCH-001',
+      quantity: STARTING_STOCK,
+      remaining_quantity: STARTING_STOCK,
+      status: 'active',
+      tenant_id: tenantId,
+      property_id: propertyId,
+    });
+    if (batchErr) throw new Error(`Fixture setup failed (inventory_batches): ${batchErr.message}`);
 
     const { error: recipeErr } = await supabase.from('menu_item_ingredients').insert({
       catalog_item_id: catalogItemId,
@@ -203,6 +221,9 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const otherStaff = await createStaffUser(other.tenantId, other.propertyId, `staff-other-${randomUUID().slice(0, 8)}@integration.test`);
     otherStaffUserId = otherStaff.userId;
     otherStaffToken = otherStaff.token;
+
+    // Refresh dynamic module router so the new modules are routable in Express
+    await loadDynamicModules();
   }, 60000);
 
   afterAll(async () => {
@@ -216,6 +237,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
       if (secondOrderId) {
         await supabase.from('inventory_transactions').delete().eq('reference_id', secondOrderId);
       }
+      await supabase.from('inventory_batches').delete().eq('item_id', inventoryItemId);
       await supabase.from('inventory_items').delete().eq('id', inventoryItemId);
       await supabase.from('catalog_items').delete().eq('id', catalogItemId);
       await supabase.from('user_property_access').delete().in('user_id', [staffUserId, otherStaffUserId]);
@@ -236,6 +258,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const res = await request(app)
       .post(`/api/v1/${moduleSlug}/orders`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({
         items: [{ catalog_item_id: catalogItemId, quantity: ORDER_QTY }],
         table_number: 'T-1',
@@ -263,6 +286,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const res = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${createdOrderId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({ status: 'confirmed' });
 
     expect(res.status).toBe(200);
@@ -294,6 +318,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const res = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${createdOrderId}/items/${itemId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({ status: 'ready' }); // skipping 'preparing'
 
     expect(res.status).toBe(400);
@@ -306,12 +331,14 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const toPreparing = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${createdOrderId}/items/${itemId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({ status: 'preparing' });
     expect(toPreparing.status).toBe(200);
 
     const toReady = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${createdOrderId}/items/${itemId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({ status: 'ready' });
     expect(toReady.status).toBe(200);
 
@@ -329,6 +356,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const res = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${createdOrderId}/items/${itemId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({ status: 'served' });
     expect(res.status).toBe(200);
 
@@ -346,6 +374,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const createRes = await request(app)
       .post(`/api/v1/${moduleSlug}/orders`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({ items: [{ catalog_item_id: catalogItemId, quantity: ORDER_QTY }], table_number: 'T-2' });
     expect(createRes.status).toBe(201);
     secondOrderId = createRes.body.data.id;
@@ -353,6 +382,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const confirmRes = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${secondOrderId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({ status: 'confirmed' });
     expect(confirmRes.status).toBe(200);
 
@@ -366,6 +396,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const cancelRes = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${secondOrderId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
       .send({ status: 'cancelled' });
     expect(cancelRes.status).toBe(200);
 
@@ -394,6 +425,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const attempt = await request(app)
       .patch(`/api/v1/staff/modules/${otherModuleSlug}/orders/${createdOrderId}/status`)
       .set('Authorization', `Bearer ${otherStaffToken}`)
+      .set('X-Tenant-ID', otherTenantId)
       .send({ status: 'confirmed' });
 
     expect(attempt.status).toBe(404);

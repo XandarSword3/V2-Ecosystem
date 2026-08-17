@@ -176,7 +176,7 @@ export const restoreInventorySideEffect: SideEffectFn = async (
 
     const { data, error } = await supabase.rpc('restore_inventory_for_order', {
       p_transaction_id: targetOrderId,
-      p_performed_by: userId,
+      p_performed_by: userId ?? null,
     });
 
     const result = Array.isArray(data) ? data[0] : data;
