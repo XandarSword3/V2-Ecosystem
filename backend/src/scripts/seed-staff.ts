@@ -46,7 +46,7 @@ async function seedStaff() {
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   // Hash the password once
-  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 12);
   console.log(`🔐 Password for all staff: ${DEFAULT_PASSWORD}\n`);
 
   // Get all roles for lookup

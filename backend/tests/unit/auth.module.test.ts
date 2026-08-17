@@ -81,12 +81,29 @@ describe('Auth Service', () => {
         })
       };
       
-      // Override for sequence: check returns empty array, insert returns user
-      mockSupabase.from = vi.fn()
-        .mockReturnValueOnce(createChainableMock([])) // Check existing
-        .mockReturnValueOnce(createChainableMock(mockUser)) // Insert user
-        .mockReturnValueOnce(createChainableMock(mockRole)) // Get role
-        .mockReturnValueOnce(createChainableMock(null)); // Insert user_role
+      let checkExisting = true;
+      mockSupabase.from = vi.fn((table) => {
+        if (table === 'users') {
+          if (checkExisting) {
+            checkExisting = false;
+            return createChainableMock([]);
+          }
+          return createChainableMock(mockUser);
+        }
+        if (table === 'password_history') {
+          return createChainableMock(null);
+        }
+        if (table === 'roles') {
+          return createChainableMock(mockRole);
+        }
+        if (table === 'user_roles') {
+          return createChainableMock(null);
+        }
+        if (table === 'properties') {
+          return createChainableMock([]);
+        }
+        return createChainableMock([]);
+      });
 
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
 

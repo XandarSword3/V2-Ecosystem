@@ -8,14 +8,15 @@ import { emailService } from "../../services/email.service.js";
 import { buildTenantUrl } from "../../utils/tenant-url.js";
 import { AppError } from "../../utils/errors.js";
 import { validatePassword } from "../../services/password-policy.service.js";
-import { isAccountLocked, recordFailedAttempt, recordSuccessfulLogin } from "./lockout.service.js";
+import { isAccountLocked, recordFailedAttempt, recordSuccessfulLogin, isCaptchaRequired, verifyCaptchaToken, applyProgressiveDelay } from "./lockout.service.js";
 import { blacklistToken } from "../../services/token-blacklist.service.js";
 import { scopeToRoles, scopeIsPlatformAdmin } from "../../security/permissions.js";
 import { ensureLoyaltyMember } from "../loyalty/loyalty.service.js";
 
-interface SessionMeta {
+export interface SessionMeta {
   ipAddress?: string;
   userAgent?: string;
+  captchaToken?: string;
 }
 
 export interface RegisterData {
@@ -53,7 +54,10 @@ export async function register(data: RegisterData) {
   }
 
   // Enforce password policy at registration
-  const policyResult = await validatePassword(data.password);
+  const policyResult = await validatePassword(data.password, {
+    email: data.email,
+    firstName: data.fullName,
+  });
   if (!policyResult.valid) {
     throw new Error(`Password does not meet policy: ${policyResult.errors.join(', ')}`);
   }
@@ -87,6 +91,9 @@ export async function register(data: RegisterData) {
     logger.error('Error creating user:', userError.message);
     throw userError;
   }
+
+  // Save initial password hash to password_history
+  await recordPasswordHistory(user.id, passwordHash, data.tenantId);
 
   // scope is set to 'customer' by DEFAULT in the database schema
   
@@ -146,7 +153,12 @@ export async function register(data: RegisterData) {
   return { user };
 }
 
-export async function login(email: string, password: string, meta: SessionMeta, tenantId?: string) {
+export async function login(
+  email: string,
+  password: string,
+  meta: SessionMeta = {},
+  tenantId?: string
+) {
   const supabase = getSupabase();
 
   // Find user — scoped to the resolved tenant (req.tenant?.id, set by
@@ -169,17 +181,29 @@ export async function login(email: string, password: string, meta: SessionMeta, 
     throw new AppError('Account is disabled', 403, 'ACCOUNT_DISABLED');
   }
 
-  // FIX: Check account lockout before verifying password
+  // Check account lockout before verifying password
   const lockStatus = await isAccountLocked(email.toLowerCase());
   if (lockStatus.locked) {
     throw new AppError(lockStatus.message || 'Account is temporarily locked', 429, 'ACCOUNT_LOCKED');
   }
 
+  // Check if CAPTCHA verification is required for this account
+  const captchaRequired = await isCaptchaRequired(email.toLowerCase());
+  if (captchaRequired) {
+    const isCaptchaValid = await verifyCaptchaToken(meta.captchaToken, meta.ipAddress);
+    if (!isCaptchaValid) {
+      throw new AppError('CAPTCHA verification required', 400, 'CAPTCHA_REQUIRED');
+    }
+  }
+
+  // Apply progressive login delay based on previous failed attempts
+  await applyProgressiveDelay(email.toLowerCase());
+
   // Verify password
   const isValid = await bcrypt.compare(password, user.password_hash);
 
   if (!isValid) {
-    // FIX: Record failed attempt for lockout tracking
+    // Record failed attempt for lockout tracking
     await recordFailedAttempt(
       email.toLowerCase(),
       email,
@@ -189,7 +213,7 @@ export async function login(email: string, password: string, meta: SessionMeta, 
     throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
   }
 
-  // FIX: Clear lockout on successful login
+  // Clear lockout on successful login
   await recordSuccessfulLogin(email.toLowerCase());
 
   // FIX: Issue 5 — Enforce email verification before allowing login
@@ -574,10 +598,10 @@ export async function getUserById(userId: string) {
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
   const supabase = getSupabase();
 
-  // Get user with password hash
+  // Get user with password hash and profile info
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, password_hash')
+    .select('id, email, full_name, password_hash, tenant_id')
     .eq('id', userId)
     .single();
 
@@ -591,14 +615,27 @@ export async function changePassword(userId: string, currentPassword: string, ne
     throw new AppError('Current password is incorrect', 400, 'INVALID_CREDENTIALS');
   }
 
-  // FIX: Iteration 20 - Enforce password policy on password change
-  const policyResult = await validatePassword(newPassword);
+  // Fetch previous password hashes to prevent password reuse
+  const previousHashes = await getPreviousPasswordHashes(userId);
+  if (user.password_hash && !previousHashes.includes(user.password_hash)) {
+    previousHashes.unshift(user.password_hash);
+  }
+
+  // Enforce password policy on password change
+  const policyResult = await validatePassword(
+    newPassword,
+    { email: user.email, firstName: user.full_name },
+    previousHashes
+  );
   if (!policyResult.valid) {
     throw new AppError(`Password does not meet policy: ${policyResult.errors.join(', ')}`, 400, 'PASSWORD_POLICY_VIOLATION');
   }
 
   // Hash new password
   const newPasswordHash = await bcrypt.hash(newPassword, 12);
+
+  // Record outgoing current password hash in password_history
+  await recordPasswordHistory(userId, user.password_hash, user.tenant_id);
 
   // Update password
   const { error: updateError } = await supabase
@@ -745,14 +782,35 @@ export async function resetPassword(token: string, newPassword: string) {
     throw new AppError('Reset token has expired', 400, 'TOKEN_EXPIRED');
   }
 
-  // FIX: Iteration 20 - Enforce password policy on password reset
-  const policyResult = await validatePassword(newPassword);
+  // Fetch user for userInfo and current hash
+  const { data: user } = await supabase
+    .from('users')
+    .select('id, email, full_name, password_hash, tenant_id')
+    .eq('id', session.user_id)
+    .single();
+
+  const previousHashes = await getPreviousPasswordHashes(session.user_id);
+  if (user?.password_hash && !previousHashes.includes(user.password_hash)) {
+    previousHashes.unshift(user.password_hash);
+  }
+
+  // Enforce password policy on password reset with reuse check
+  const policyResult = await validatePassword(
+    newPassword,
+    user ? { email: user.email, firstName: user.full_name } : undefined,
+    previousHashes
+  );
   if (!policyResult.valid) {
     throw new AppError(`Password does not meet policy: ${policyResult.errors.join(', ')}`, 400, 'PASSWORD_POLICY_VIOLATION');
   }
 
   // Hash new password
   const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+  // Record outgoing current password hash in password_history
+  if (user?.password_hash) {
+    await recordPasswordHistory(session.user_id, user.password_hash, user.tenant_id);
+  }
 
   // Update user password
   const { error: updateError } = await supabase
@@ -899,4 +957,65 @@ export async function verifyEmail(token: string) {
 
   logger.info(`Email verified for user ${session.user_id}`);
   return { user_id: session.user_id };
+}
+
+/**
+ * Record a password hash into password_history and prune older rows beyond maxHistory
+ */
+export async function recordPasswordHistory(
+  userId: string,
+  passwordHash: string,
+  tenantId?: string | null,
+  maxHistory: number = 5
+): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    await supabase.from('password_history').insert({
+      user_id: userId,
+      password_hash: passwordHash,
+      tenant_id: tenantId || null,
+    });
+
+    // Prune older history rows beyond maxHistory
+    const { data: rows } = await supabase
+      .from('password_history')
+      .select('id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (rows && rows.length > maxHistory) {
+      const idsToDelete = rows.slice(maxHistory).map(r => r.id);
+      await supabase.from('password_history').delete().in('id', idsToDelete);
+    }
+  } catch (error) {
+    logger.warn('Failed to record password history', { userId, error });
+  }
+}
+
+/**
+ * Fetch previous password hashes for a user from password_history
+ */
+export async function getPreviousPasswordHashes(
+  userId: string,
+  limit: number = 5
+): Promise<string[]> {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('password_history')
+      .select('password_hash')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      logger.warn('Failed to fetch password history', { userId, error: error.message });
+      return [];
+    }
+
+    return (data || []).map(row => row.password_hash).filter(Boolean);
+  } catch (error) {
+    logger.warn('Failed to fetch password history', { userId, error });
+    return [];
+  }
 }

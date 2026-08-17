@@ -33,18 +33,18 @@ export const systemSettings = pgTable('system_settings', {
 // ============================================
 export const securityAuditLog = pgTable('security_audit_log', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id),
   eventType: varchar('event_type', { length: 100 }).notNull(),
-  severity: varchar('severity', { length: 20 }).default('low'),
-  action: varchar('action', { length: 255 }).notNull(),
-  resource: varchar('resource', { length: 255 }),
-  resourceId: uuid('resource_id'),
-  ipAddress: text('ip_address'),
+  severity: varchar('severity', { length: 20 }).default('INFO').notNull(),
+  userId: uuid('user_id').references(() => users.id),
+  targetUserId: uuid('target_user_id').references(() => users.id),
+  ipAddress: varchar('ip_address', { length: 45 }),
   userAgent: text('user_agent'),
-  metadata: jsonb('metadata').default('{}'),
+  description: text('description').notNull(),
+  metadata: jsonb('metadata'),
   success: boolean('success').default(true),
-  errorMessage: text('error_message'),
   createdAt: timestamp('created_at').defaultNow(),
+  tenantId: uuid('tenant_id'),
+  propertyId: uuid('property_id'),
 });
 
 // ============================================
