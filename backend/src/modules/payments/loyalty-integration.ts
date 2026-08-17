@@ -27,12 +27,13 @@ export async function awardLoyaltyPointsForPayment(
       .limit(1)
       .single();
 
-    if (!settings?.is_enabled) {
+    // If loyalty settings explicitly disabled or no points per dollar
+    if (settings && (settings.is_enabled === false || settings.points_per_dollar === 0)) {
       logger.info('Loyalty system is disabled, skipping points award');
       return;
     }
 
-    const pointsPerDollar = settings.points_per_dollar || 1;
+    const pointsPerDollar = settings?.points_per_dollar || 1;
 
     // Idempotency guard: prevent duplicate point awards for the same transaction
     const { data: existingTx } = await supabase
