@@ -20,6 +20,7 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
+  captchaToken: z.string().optional(),
 });
 
 export const changePasswordSchema = z.object({

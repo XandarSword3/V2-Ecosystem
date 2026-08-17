@@ -23,6 +23,7 @@ import {
 } from './types.js';
 import { assertStaffUserLimit } from '../../services/feature-limits.service.js';
 import { getCallerTenantId } from '../../security/tenant-scope.js';
+import { validatePassword } from '../../services/password-policy.service.js';
 
 // Interface for user with roles from Supabase query
 interface UserWithRolesQuery extends UserRow {
@@ -429,10 +430,22 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'Email already exists' });
     }
 
-    // Hash password
+    // Enforce password policy on admin-created user
+    const policyResult = await validatePassword(password, {
+      email,
+      firstName: fullName,
+    });
+    if (!policyResult.valid) {
+      return res.status(400).json({
+        success: false,
+        error: `Password does not meet policy: ${policyResult.errors.join(', ')}`,
+      });
+    }
+
+    // Hash password with standard bcrypt cost 12
     const bcryptModule = await import('bcryptjs');
     const bcrypt = bcryptModule.default || bcryptModule;
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
     // Inherit tenant_id from the resolved tenant on the request (set by tenantGate).
     // Falls back to undefined in legacy single-tenant mode.
@@ -455,6 +468,13 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       .single();
 
     if (userError) throw userError;
+
+    // Record initial password in password_history
+    await supabase.from('password_history').insert({
+      user_id: user.id,
+      password_hash: passwordHash,
+      tenant_id: tenantId ?? null,
+    });
 
     // Link user to current property access
     if (propertyId && process.env.NODE_ENV !== 'test') {

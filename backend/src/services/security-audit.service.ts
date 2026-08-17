@@ -75,6 +75,8 @@ interface SecurityEventData {
   description: string;
   metadata?: Record<string, unknown>;
   success?: boolean;
+  tenantId?: string;
+  propertyId?: string;
 }
 
 interface SecurityAuditLogEntry {
@@ -89,6 +91,8 @@ interface SecurityAuditLogEntry {
   metadata: any;
   success: boolean;
   createdAt: Date;
+  tenantId: string | null;
+  propertyId: string | null;
 }
 
 /**
@@ -100,8 +104,6 @@ export async function logSecurityEvent(data: SecurityEventData): Promise<void> {
     const { error } = await supabase
       .from('security_audit_log')
       .insert({
-        action: 'SECURITY_EVENT',
-        resource: 'SECURITY',
         event_type: data.eventType,
         severity: data.severity,
         user_id: data.userId || null,
@@ -111,6 +113,8 @@ export async function logSecurityEvent(data: SecurityEventData): Promise<void> {
         description: data.description,
         metadata: data.metadata ? JSON.stringify(data.metadata) : undefined,
         success: data.success ?? true,
+        tenant_id: data.tenantId || null,
+        property_id: data.propertyId || null,
       });
     if (error) throw error;
 
@@ -124,7 +128,9 @@ export async function logSecurityEvent(data: SecurityEventData): Promise<void> {
       targetUserId: data.targetUserId,
       ipAddress: data.ipAddress,
       success: data.success,
-      metadata: data.metadata
+      metadata: data.metadata,
+      tenantId: data.tenantId,
+      propertyId: data.propertyId,
     });
 
   } catch (error) {
@@ -143,7 +149,9 @@ export async function logLoginSuccess(
   userId: string,
   ipAddress?: string,
   userAgent?: string,
-  method: 'password' | '2fa' | 'oauth' = 'password'
+  method: 'password' | '2fa' | 'oauth' = 'password',
+  tenantId?: string,
+  propertyId?: string
 ): Promise<void> {
   await logSecurityEvent({
     eventType: SecurityEventType.LOGIN_SUCCESS,
@@ -153,7 +161,9 @@ export async function logLoginSuccess(
     userAgent,
     description: `User logged in successfully via ${method}`,
     metadata: { method },
-    success: true
+    success: true,
+    tenantId,
+    propertyId,
   });
 }
 
@@ -164,7 +174,9 @@ export async function logLoginFailure(
   email: string,
   ipAddress?: string,
   userAgent?: string,
-  reason: string = 'Invalid credentials'
+  reason: string = 'Invalid credentials',
+  tenantId?: string,
+  propertyId?: string
 ): Promise<void> {
   await logSecurityEvent({
     eventType: SecurityEventType.LOGIN_FAILURE,
@@ -173,7 +185,9 @@ export async function logLoginFailure(
     userAgent,
     description: `Login attempt failed for ${email}: ${reason}`,
     metadata: { email, reason },
-    success: false
+    success: false,
+    tenantId,
+    propertyId,
   });
 }
 
@@ -183,7 +197,9 @@ export async function logLoginFailure(
 export async function logAccountLocked(
   email: string,
   ipAddress?: string,
-  attemptCount: number = 0
+  attemptCount: number = 0,
+  tenantId?: string,
+  propertyId?: string
 ): Promise<void> {
   await logSecurityEvent({
     eventType: SecurityEventType.ACCOUNT_LOCKED,
@@ -191,7 +207,9 @@ export async function logAccountLocked(
     ipAddress,
     description: `Account locked after ${attemptCount} failed attempts: ${email}`,
     metadata: { email, attemptCount },
-    success: true
+    success: true,
+    tenantId,
+    propertyId,
   });
 }
 
@@ -201,7 +219,9 @@ export async function logAccountLocked(
 export async function logPasswordChange(
   userId: string,
   ipAddress?: string,
-  forced: boolean = false
+  forced: boolean = false,
+  tenantId?: string,
+  propertyId?: string
 ): Promise<void> {
   await logSecurityEvent({
     eventType: SecurityEventType.PASSWORD_CHANGE,
@@ -210,7 +230,9 @@ export async function logPasswordChange(
     ipAddress,
     description: forced ? 'Password changed (forced reset)' : 'Password changed',
     metadata: { forced },
-    success: true
+    success: true,
+    tenantId,
+    propertyId,
   });
 }
 
@@ -220,7 +242,9 @@ export async function logPasswordChange(
 export async function logTwoFactorEvent(
   userId: string,
   event: 'enabled' | 'disabled' | 'verified' | 'failed',
-  ipAddress?: string
+  ipAddress?: string,
+  tenantId?: string,
+  propertyId?: string
 ): Promise<void> {
   const eventTypeMap = {
     enabled: SecurityEventType.TWO_FA_ENABLED,
@@ -242,7 +266,9 @@ export async function logTwoFactorEvent(
     userId,
     ipAddress,
     description: `Two-factor authentication ${event}`,
-    success: event !== 'failed'
+    success: event !== 'failed',
+    tenantId,
+    propertyId,
   });
 }
 
@@ -254,7 +280,9 @@ export async function logPermissionChange(
   targetUserId: string,
   action: 'grant' | 'revoke',
   permission: string,
-  ipAddress?: string
+  ipAddress?: string,
+  tenantId?: string,
+  propertyId?: string
 ): Promise<void> {
   await logSecurityEvent({
     eventType: action === 'grant' 
@@ -266,7 +294,9 @@ export async function logPermissionChange(
     ipAddress,
     description: `Permission ${action}ed: ${permission}`,
     metadata: { permission, action },
-    success: true
+    success: true,
+    tenantId,
+    propertyId,
   });
 }
 
@@ -277,7 +307,9 @@ export async function logSuspiciousActivity(
   description: string,
   ipAddress?: string,
   userId?: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  tenantId?: string,
+  propertyId?: string
 ): Promise<void> {
   await logSecurityEvent({
     eventType: SecurityEventType.SUSPICIOUS_ACTIVITY,
@@ -286,7 +318,9 @@ export async function logSuspiciousActivity(
     ipAddress,
     description,
     metadata,
-    success: false
+    success: false,
+    tenantId,
+    propertyId,
   });
 }
 
@@ -298,7 +332,9 @@ export async function logAdminSettingsChange(
   settingKey: string,
   oldValue: string,
   newValue: string,
-  ipAddress?: string
+  ipAddress?: string,
+  tenantId?: string,
+  propertyId?: string
 ): Promise<void> {
   await logSecurityEvent({
     eventType: SecurityEventType.ADMIN_SETTINGS_CHANGE,
@@ -311,7 +347,9 @@ export async function logAdminSettingsChange(
       oldValue: oldValue.length > 20 ? '[redacted]' : oldValue,
       newValue: newValue.length > 20 ? '[redacted]' : newValue
     },
-    success: true
+    success: true,
+    tenantId,
+    propertyId,
   });
 }
 

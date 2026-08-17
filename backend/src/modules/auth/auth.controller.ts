@@ -139,10 +139,17 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     // tenantAccess middleware from the subdomain/X-Tenant-Slug header.
     // Required now that email is scoped per-tenant, not platform-wide
     // (20260704010000_scope_users_email_uniqueness_per_tenant.sql).
-    const result = await authService.login(data.email, data.password, {
+    const meta: authService.SessionMeta = {
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
-    }, req.tenant?.id);
+    };
+    if (data.captchaToken) {
+      meta.captchaToken = data.captchaToken;
+    }
+
+    const result = req.tenant?.id
+      ? await authService.login(data.email, data.password, meta, req.tenant.id)
+      : await authService.login(data.email, data.password, meta);
 
     // Check if 2FA is required (existing enrolled 2FA)
     if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
@@ -336,7 +343,11 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
 export async function forgotPassword(req: Request, res: Response, next: NextFunction) {
   try {
     const { email } = req.body;
-    await authService.sendPasswordResetEmail(email, req.tenant?.id);
+    if (req.tenant?.id) {
+      await authService.sendPasswordResetEmail(email, req.tenant.id);
+    } else {
+      await authService.sendPasswordResetEmail(email);
+    }
     res.json({ success: true, message: 'If the email exists, a reset link has been sent' });
   } catch (error) {
     // Don't reveal if email exists

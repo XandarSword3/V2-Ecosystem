@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import { randomInt } from 'crypto'; // FIX: Iteration 20 - CSPRNG for password generation
+import bcrypt from 'bcryptjs';
 import { getSupabase } from '../database/connection.js';
 import { logger } from '../utils/logger.js';
 
@@ -195,6 +196,25 @@ export async function validatePassword(
   // Sequential/repeated character check
   if (/(.)\1{2,}/.test(password)) {
     score -= 10;
+  }
+
+  // Password reuse check against previous hashes
+  if (previousPasswordHashes && previousPasswordHashes.length > 0) {
+    const hashesToCheck = previousPasswordHashes.slice(0, policy.passwordHistoryCount);
+    for (const oldHash of hashesToCheck) {
+      if (oldHash) {
+        try {
+          const matches = await bcrypt.compare(password, oldHash);
+          if (matches) {
+            errors.push('Cannot reuse recent passwords. Please choose a new password.');
+            score -= 30;
+            break;
+          }
+        } catch {
+          // Skip invalid hash formats
+        }
+      }
+    }
   }
 
   // Length bonus

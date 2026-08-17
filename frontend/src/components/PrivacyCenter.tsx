@@ -16,7 +16,7 @@ import {
   Share2,
   Lock
 } from 'lucide-react';
-import api from '@/lib/api';
+import api, { API_BASE_URL } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface Consent {
@@ -469,7 +469,7 @@ export default function PrivacyCenter() {
                     </div>
                     {request.status === 'completed' && (
                       <a
-                        href={`/api/gdpr/export/download/${request.id}`}
+                        href={`${API_BASE_URL}/gdpr/export/download/${request.id}`}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg font-semibold hover:underline"
                       >
                         <Download className="w-3.5 h-3.5" />

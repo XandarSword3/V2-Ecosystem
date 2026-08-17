@@ -190,6 +190,12 @@ export const config = {
     // Deep linking scheme
     deepLinkScheme: process.env.DEEP_LINK_SCHEME || 'v2ecosystem',
   },
+
+  // CAPTCHA / Bot Protection Configuration (Cloudflare Turnstile)
+  turnstile: {
+    secretKey: process.env.TURNSTILE_SECRET_KEY || process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY || '',
+    verifyUrl: 'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+  },
 } as const;
 
 export type Config = typeof config;

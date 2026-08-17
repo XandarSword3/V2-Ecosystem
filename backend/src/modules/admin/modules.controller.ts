@@ -347,7 +347,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
 
         // 3. Create Default Staff User (one per module, idempotent via email)
         const staffEmail = `staff.${finalSlug}@v2ecosystem.com`;
-        const staffPassword = await bcrypt.hash(`Staff${finalSlug.charAt(0).toUpperCase() + finalSlug.slice(1)}123!`, 10);
+        const staffPassword = await bcrypt.hash(`Staff${finalSlug.charAt(0).toUpperCase() + finalSlug.slice(1)}123!`, 12);
 
         const { data: userData, error: userError } = await supabase
           .from('users')

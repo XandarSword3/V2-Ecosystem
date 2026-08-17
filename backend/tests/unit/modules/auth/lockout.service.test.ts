@@ -87,6 +87,23 @@ describe('LockoutService', () => {
     it('should export applyProgressiveDelay function', () => {
       expect(typeof lockoutService.applyProgressiveDelay).toBe('function');
     });
+
+    it('should export verifyCaptchaToken function', () => {
+      expect(typeof lockoutService.verifyCaptchaToken).toBe('function');
+    });
+  });
+
+  describe('verifyCaptchaToken', () => {
+    it('should reject empty or missing token', async () => {
+      expect(await lockoutService.verifyCaptchaToken()).toBe(false);
+      expect(await lockoutService.verifyCaptchaToken('')).toBe(false);
+      expect(await lockoutService.verifyCaptchaToken('   ')).toBe(false);
+    });
+
+    it('should accept valid tokens in test/development environment', async () => {
+      expect(await lockoutService.verifyCaptchaToken('valid-test-token-12345')).toBe(true);
+      expect(await lockoutService.verifyCaptchaToken('XXXX.DUMMY.TOKEN.XXXX')).toBe(true);
+    });
   });
 
   describe('lockout thresholds', () => {

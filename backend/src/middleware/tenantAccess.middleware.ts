@@ -45,7 +45,7 @@ import { cache } from '../utils/cache.js';
 // ============================================
 
 export type BillingStatus = 'trialing' | 'active' | 'past_due' | 'suspended' | 'cancelled';
-export type SubscriptionTier = 'starter' | 'growth' | 'enterprise';
+export type SubscriptionTier = 'starter' | 'growth' | 'enterprise' | (string & {});
 
 export interface TenantRecord {
   id: string;

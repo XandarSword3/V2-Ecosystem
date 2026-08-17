@@ -339,12 +339,26 @@ export async function changeTier(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
     const { tier } = req.body as { tier: SubscriptionTier };
 
-    if (!tier || !['starter', 'growth', 'enterprise'].includes(tier)) {
-      res.status(400).json({ success: false, error: 'Invalid tier. Must be starter, growth, or enterprise.' });
+    if (!tier || typeof tier !== 'string' || tier.trim() === '') {
+      res.status(400).json({ success: false, error: 'Tier is required' });
       return;
     }
 
     const supabase = getSupabase();
+
+    // Dynamically validate tier against active plans in the database
+    const { data: targetPlan } = await supabase
+      .from('plans')
+      .select('id, code, is_active')
+      .eq('code', tier)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!targetPlan) {
+      res.status(400).json({ success: false, error: `Invalid tier: '${tier}'. Plan does not exist or is not active.` });
+      return;
+    }
+
     const { data: tenant } = await supabase
       .from('tenants')
       .select('stripe_subscription_id, subscription_tier, subdomain')
@@ -367,16 +381,9 @@ export async function changeTier(req: Request, res: Response): Promise<void> {
     // to the new plan immediately (same fix as the webhook path in
     // provisioning.service.ts's updateBillingStatus; this is the manual
     // admin-initiated equivalent of that same tier-change event).
-    const { data: newPlan } = await supabase
-      .from('plans')
-      .select('id')
-      .eq('code', tier)
-      .eq('is_active', true)
-      .maybeSingle();
-
     await supabase
       .from('tenants')
-      .update({ subscription_tier: tier, plan_id: newPlan?.id ?? null, updated_at: new Date().toISOString() })
+      .update({ subscription_tier: tier, plan_id: targetPlan.id, updated_at: new Date().toISOString() })
       .eq('id', id);
 
     invalidateTenantCache(id, tenant.subdomain);

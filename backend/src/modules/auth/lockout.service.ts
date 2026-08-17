@@ -8,6 +8,7 @@
 import { cache } from '../../utils/cache';
 import { logger } from '../../utils/logger';
 import { emailService } from '../../services/email.service';
+import { config } from '../../config/index.js';
 
 interface LockoutInfo {
   failedAttempts: number;
@@ -312,6 +313,66 @@ export async function applyProgressiveDelay(identifier: string): Promise<void> {
   }
 }
 
+/**
+ * Verify Turnstile / CAPTCHA token with Cloudflare Turnstile API
+ */
+export async function verifyCaptchaToken(token?: string, ipAddress?: string): Promise<boolean> {
+  if (!token || typeof token !== 'string' || token.trim() === '') {
+    return false;
+  }
+
+  const secretKey = config.turnstile?.secretKey;
+
+  // Development/Test mock / bypass:
+  if (!secretKey) {
+    if (config.env === 'test' || config.env === 'development') {
+      return token.length > 5;
+    }
+    logger.warn('Turnstile secret key is not configured in production');
+    return false;
+  }
+
+  // Cloudflare standard test dummy pass tokens
+  if (token === 'XXXX.DUMMY.TOKEN.XXXX' || token === '1x0000000000000000000000000000000AA') {
+    if (config.env !== 'production') {
+      return true;
+    }
+  }
+
+  try {
+    const formData = new URLSearchParams();
+    formData.append('secret', secretKey);
+    formData.append('response', token);
+    if (ipAddress) {
+      formData.append('remoteip', ipAddress);
+    }
+
+    const response = await fetch(config.turnstile.verifyUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    if (!response.ok) {
+      logger.error('Turnstile verification HTTP error', { status: response.status });
+      return false;
+    }
+
+    const data = await response.json() as { success: boolean; 'error-codes'?: string[] };
+    if (!data.success) {
+      logger.warn('Turnstile verification failed', { errorCodes: data['error-codes'] });
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Failed to verify Turnstile token', { error });
+    return false;
+  }
+}
+
 export default {
   isAccountLocked,
   isCaptchaRequired,
@@ -320,5 +381,6 @@ export default {
   recordSuccessfulLogin,
   unlockAccount,
   getLockoutStatus,
-  applyProgressiveDelay
+  applyProgressiveDelay,
+  verifyCaptchaToken,
 };

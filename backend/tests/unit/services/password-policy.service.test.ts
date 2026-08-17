@@ -101,6 +101,44 @@ describe('PasswordPolicyService', () => {
 
       expect(strongResult.score).toBeGreaterThan(weakResult.score);
     });
+
+    it('should reject passwords matching previous password hashes', async () => {
+      const bcrypt = (await import('bcryptjs')).default;
+      const oldHash = await bcrypt.hash('PreviousPass123!', 10);
+
+      const result = await validatePassword(
+        'PreviousPass123!',
+        undefined,
+        [oldHash]
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('reuse'))).toBe(true);
+    });
+
+    it('should allow new passwords not matching previous hashes', async () => {
+      const bcrypt = (await import('bcryptjs')).default;
+      const oldHash = await bcrypt.hash('OldPassword123!', 10);
+
+      const result = await validatePassword(
+        'NewStrongPassword123!',
+        undefined,
+        [oldHash]
+      );
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should reject passwords containing user info', async () => {
+      const result = await validatePassword('JohnSmith123!@#', {
+        firstName: 'John',
+        lastName: 'Smith',
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.includes('personal information'))).toBe(true);
+    });
   });
 
   describe('generateSecurePassword', () => {
