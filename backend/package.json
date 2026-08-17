@@ -37,7 +37,7 @@
     "@opentelemetry/sdk-trace-base": "^2.5.0",
     "@opentelemetry/sdk-trace-node": "^2.5.0",
     "@opentelemetry/semantic-conventions": "^1.39.0",
-    "@sentry/node": "^10.63.0",
+    "@sentry/node": "^10.70.0",
     "@simplewebauthn/server": "^13.3.1",
     "@socket.io/redis-adapter": "^8.3.0",
     "@supabase/supabase-js": "^2.89.0",
