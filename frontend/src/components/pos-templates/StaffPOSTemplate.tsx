@@ -103,6 +103,24 @@ interface Shift {
   status: 'active' | 'closed';
 }
 
+interface QuickModifier {
+  groupId: string;
+  optionId: string;
+  quantity: number;
+  name: string;
+  groupName: string;
+  priceAdjustment: number;
+}
+
+interface QuickCartItem {
+  lineId: string;
+  id: string; // catalog item id
+  name: string;
+  price: number; // base unit price
+  quantity: number;
+  selectedModifiers?: QuickModifier[];
+}
+
 interface StaffPOSTemplateProps {
   moduleId: string;
   moduleSlug: string;
@@ -233,7 +251,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   const [quickMenuCategories, setQuickMenuCategories] = useState<any[]>([]);
   const [quickMenuItems, setQuickMenuItems] = useState<any[]>([]);
   const [quickCustomerName, setQuickCustomerName] = useState('');
-  const [quickCart, setQuickCart] = useState<{ id: string; name: string; price: number; quantity: number }[]>([]);
+  const [quickCart, setQuickCart] = useState<QuickCartItem[]>([]);
+  // Modifier picker state: the menu item being configured and the per-group
+  // option selections (groupId → optionId → quantity).
+  const [modifierItem, setModifierItem] = useState<any | null>(null);
+  const [modifierSelections, setModifierSelections] = useState<Record<string, Record<string, number>>>({});
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -462,46 +484,173 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   };
 
   // Quick Order cart actions
-  const addToQuickCart = (item: any) => {
+  const quickCartLineUnitPrice = (c: QuickCartItem) =>
+    c.price + (c.selectedModifiers?.reduce((s, m) => s + m.priceAdjustment * m.quantity, 0) ?? 0);
+
+  const addPlainToCart = (item: any, selectedModifiers?: QuickModifier[]) => {
+    const hasModifiers = !!selectedModifiers?.length;
+    const lineId = hasModifiers ? `${item.id}:${Date.now()}` : item.id;
     setQuickCart(prev => {
-      const existing = prev.find(c => c.id === item.id);
-      if (existing) {
-        return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+      if (!hasModifiers) {
+        const existing = prev.find(c => c.id === item.id && !c.selectedModifiers?.length);
+        if (existing) {
+          return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+        }
       }
-      return [...prev, { id: item.id, name: item.name, price: Number(item.price ?? item.unitPrice ?? 0), quantity: 1 }];
+      return [...prev, {
+        lineId,
+        id: item.id,
+        name: item.name,
+        price: Number(item.price ?? item.unitPrice ?? 0),
+        quantity: 1,
+        ...(hasModifiers ? { selectedModifiers } : {}),
+      }];
     });
   };
 
-  const decrementQuickCartItem = (id: string) => {
+  const addToQuickCart = (item: any) => {
+    const groups = Array.isArray(item.customizations) ? item.customizations : [];
+    if (groups.length > 0) {
+      setModifierItem(item);
+      setModifierSelections({});
+    } else {
+      addPlainToCart(item);
+    }
+  };
+
+  const incrementQuickCartLine = (lineId: string) => {
+    setQuickCart(prev => prev.map(c => c.lineId === lineId ? { ...c, quantity: c.quantity + 1 } : c));
+  };
+
+  const decrementQuickCartItem = (lineId: string) => {
     setQuickCart(prev => prev
-      .map(c => c.id === id ? { ...c, quantity: c.quantity - 1 } : c)
+      .map(c => c.lineId === lineId ? { ...c, quantity: c.quantity - 1 } : c)
       .filter(c => c.quantity > 0)
     );
   };
 
-  const removeQuickCartItem = (id: string) => {
-    setQuickCart(prev => prev.filter(c => c.id !== id));
+  const removeQuickCartItem = (lineId: string) => {
+    setQuickCart(prev => prev.filter(c => c.lineId !== lineId));
   };
 
-  const quickCartTotal = quickCart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+  const toggleModifierOption = (group: any, option: any) => {
+    const groupId = group.groupId;
+    setModifierSelections(prev => {
+      const current = { ...(prev[groupId] ?? {}) };
+      if (group.selectionMode === 'single') {
+        return { ...prev, [groupId]: { [option.id]: 1 } };
+      }
+      if (group.selectionMode === 'quantity') {
+        current[option.id] = (current[option.id] ?? 0) + 1;
+        return { ...prev, [groupId]: current };
+      }
+      if (current[option.id]) delete current[option.id];
+      else current[option.id] = 1;
+      return { ...prev, [groupId]: current };
+    });
+  };
 
-  const placeQuickOrder = async () => {
+  const decrementModifierOption = (group: any, option: any) => {
+    const groupId = group.groupId;
+    setModifierSelections(prev => {
+      const current = { ...(prev[groupId] ?? {}) };
+      const next = (current[option.id] ?? 0) - 1;
+      if (next <= 0) delete current[option.id];
+      else current[option.id] = next;
+      return { ...prev, [groupId]: current };
+    });
+  };
+
+  const modifierSelectionsValid = (() => {
+    if (!modifierItem) return true;
+    const groups = Array.isArray(modifierItem.customizations) ? modifierItem.customizations : [];
+    for (const group of groups) {
+      const selected = modifierSelections[group.groupId] ?? {};
+      const count = Object.values(selected).reduce((s, q) => s + q, 0);
+      if (group.isRequired && count === 0) return false;
+      if (typeof group.minSelections === 'number' && count < group.minSelections) return false;
+      if (typeof group.maxSelections === 'number' && count > group.maxSelections) return false;
+    }
+    return true;
+  })();
+
+  const confirmModifiers = () => {
+    if (!modifierItem) return;
+    const groups = Array.isArray(modifierItem.customizations) ? modifierItem.customizations : [];
+    const selectedModifiers: QuickModifier[] = [];
+    for (const group of groups) {
+      const selected = modifierSelections[group.groupId] ?? {};
+      for (const option of group.options ?? []) {
+        const qty = selected[option.id] ?? 0;
+        if (qty > 0) {
+          selectedModifiers.push({
+            groupId: group.groupId,
+            optionId: option.id,
+            quantity: qty,
+            name: option.name,
+            groupName: group.displayName || group.groupName,
+            priceAdjustment: Number(option.priceAdjustment ?? 0),
+          });
+        }
+      }
+    }
+    addPlainToCart(modifierItem, selectedModifiers);
+    setModifierItem(null);
+    setModifierSelections({});
+  };
+
+  const quickCartTotal = quickCart.reduce((sum, c) => sum + quickCartLineUnitPrice(c) * c.quantity, 0);
+
+  // Quick Order checkout — creates the order, then immediately routes it into
+  // the Cashier payment modal. createModuleOrder (POST .../orders) only persists
+  // an unpaid order; there is no path that leaves a quick order un-settled.
+  // payModuleOrder (POST .../orders/:id/pay) settles it when the cashier picks
+  // a method in the modal.
+  const checkoutQuickOrder = async () => {
     if (quickCart.length === 0) {
       toast.error('Add at least one item');
       return;
     }
     try {
-      await api.post(`/staff/modules/${moduleSlug}/orders`, {
-        items: quickCart.map(c => ({ catalogItemId: c.id, quantity: c.quantity, unitPrice: c.price })),
+      const res = await api.post(`/staff/modules/${moduleSlug}/orders`, {
+        items: quickCart.map(c => ({
+          catalogItemId: c.id,
+          quantity: c.quantity,
+          unitPrice: c.price,
+          ...(c.selectedModifiers?.length
+            ? { selectedModifiers: c.selectedModifiers.map(m => ({ groupId: m.groupId, optionId: m.optionId, quantity: m.quantity })) }
+            : {}),
+        })),
         customerName: quickCustomerName.trim() || 'Walk-in',
         orderType: 'counter',
       });
+      const created = res.data.data;
+      const newOrder: Order = {
+        id: created.id,
+        orderNumber: created.orderNumber,
+        tableNumber: created.tableNumber || undefined,
+        status: created.status || 'confirmed',
+        items: quickCart.map(c => ({
+          id: c.id,
+          name: c.name,
+          quantity: c.quantity,
+          unitPrice: quickCartLineUnitPrice(c),
+          status: 'pending',
+        })),
+        totalAmount: created.totalAmount ?? quickCartTotal,
+        createdAt: created.createdAt || new Date().toISOString(),
+        customerName: created.customerName || quickCustomerName.trim() || 'Walk-in',
+        orderType: 'counter',
+        paymentStatus: 'unpaid',
+      };
+      setOrders(prev => [newOrder, ...prev]);
+      setKitchenOrders(prev => ['confirmed', 'preparing'].includes(newOrder.status) ? [newOrder, ...prev] : prev);
+      setSelectedOrder(newOrder);
+      setShowPaymentModal(true);
       setQuickCart([]);
       setQuickCustomerName('');
-      toast.success('Order placed');
-      fetchData();
     } catch (error) {
-      toast.error('Failed to place order');
+      toast.error('Failed to start order');
     }
   };
 
@@ -1063,7 +1212,10 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                               className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                             >
                               <div className="text-left">
-                                <p className="font-medium">{item.name}</p>
+                                <p className="font-medium">
+                                  {item.name}
+                                  {item.customizations?.length ? <span className="ml-2 text-xs text-purple-600 dark:text-purple-400 font-normal">Customise</span> : null}
+                                </p>
                                 {item.description && <p className="text-xs text-gray-500">{item.description}</p>}
                               </div>
                               <span className="text-primary font-semibold">{formatCurrency(item.price ?? item.unitPrice ?? 0)}</span>
@@ -1110,35 +1262,47 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
               ) : (
                 <div className="flex-1 space-y-2">
                   {quickCart.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-2 border rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{item.name}</p>
-                        <p className="text-sm text-gray-500">{formatCurrency(item.price)} each</p>
+                    <div key={item.lineId} className="p-2 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.name}</p>
+                          <p className="text-sm text-gray-500">{formatCurrency(quickCartLineUnitPrice(item))} each</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => decrementQuickCartItem(item.lineId)}
+                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span className="w-6 text-center font-bold">{item.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => incrementQuickCartLine(item.lineId)}
+                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeQuickCartItem(item.lineId)}
+                            className="p-1 rounded hover:bg-red-50 text-red-500"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => decrementQuickCartItem(item.id)}
-                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-6 text-center font-bold">{item.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => addToQuickCart(item)}
-                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeQuickCartItem(item.id)}
-                          className="p-1 rounded hover:bg-red-50 text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {item.selectedModifiers.map((m, i) => (
+                            <p key={i} className="text-xs text-gray-500 dark:text-gray-400">
+                              {m.groupName}: {m.name}{m.quantity > 1 ? ` ×${m.quantity}` : ''}
+                              {m.priceAdjustment ? ` (+${formatCurrency(m.priceAdjustment * m.quantity)})` : ''}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1148,8 +1312,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                   <span>Total</span>
                   <span>{formatCurrency(quickCartTotal)}</span>
                 </div>
-                <Button className="w-full" onClick={placeQuickOrder} disabled={quickCart.length === 0}>
-                  <ShoppingCart className="h-4 w-4 mr-2" /> Place Order
+                <Button className="w-full" onClick={checkoutQuickOrder} disabled={quickCart.length === 0}>
+                  <CreditCard className="h-4 w-4 mr-2" /> Checkout & Pay
                 </Button>
               </div>
             </div>
@@ -1410,6 +1574,77 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
               >
                 Cancel
               </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modifier / Customisation Picker (Quick Order) */}
+      {modifierItem && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Customise item"
+          onKeyDown={(e) => { if (e.key === 'Escape') { setModifierItem(null); setModifierSelections({}); } }}
+        >
+          <Card className="max-w-lg w-full max-h-[80vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>{modifierItem.name}</span>
+                <button type="button" onClick={() => { setModifierItem(null); setModifierSelections({}); }} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <X className="h-5 w-5" />
+                </button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {(Array.isArray(modifierItem.customizations) ? modifierItem.customizations : []).map((group: any) => (
+                <div key={group.groupId}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-sm">{group.displayName || group.groupName}</h4>
+                    <span className="text-xs text-gray-500">
+                      {group.selectionMode === 'single' ? 'Choose one' : group.selectionMode === 'quantity' ? 'Select quantity' : 'Choose any'}
+                      {group.isRequired && <span className="text-red-500 ml-1">*</span>}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {(group.options ?? []).map((option: any) => {
+                      const qty = modifierSelections[group.groupId]?.[option.id] ?? 0;
+                      const selected = qty > 0;
+                      const showStepper = group.selectionMode === 'quantity';
+                      return (
+                        <div
+                          key={option.id}
+                          className={`flex items-center justify-between p-2 rounded-lg border ${selected ? 'border-primary bg-primary/5' : 'border-slate-200 dark:border-slate-700'}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleModifierOption(group, option)}
+                            className="flex-1 flex items-center gap-2 text-left"
+                          >
+                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selected ? 'bg-primary border-primary text-white' : 'border-slate-300 dark:border-slate-600'}`}>
+                              {selected && <Check className="w-3 h-3" />}
+                            </span>
+                            <span className="text-sm">{option.name}</span>
+                          </button>
+                          <span className="text-sm text-gray-500">{option.priceAdjustment ? `+${formatCurrency(option.priceAdjustment)}` : ''}</span>
+                          {showStepper && selected && (
+                            <div className="flex items-center gap-1 ml-2">
+                              <button type="button" onClick={() => decrementModifierOption(group, option)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"><Minus className="h-3.5 w-3.5" /></button>
+                              <span className="w-5 text-center text-sm font-bold">{qty}</span>
+                              <button type="button" onClick={() => toggleModifierOption(group, option)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"><Plus className="h-3.5 w-3.5" /></button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={() => { setModifierItem(null); setModifierSelections({}); }}>Cancel</Button>
+                <Button onClick={confirmModifiers} disabled={!modifierSelectionsValid}>Add to Order</Button>
+              </div>
             </CardContent>
           </Card>
         </div>

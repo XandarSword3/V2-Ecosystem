@@ -195,6 +195,32 @@ export const createShift = asyncHandler(async (req: Request, res: Response) => {
       return;
     }
 
+    // One open shift at a time: if the staff member is still clocked in to a
+    // prior shift (active with no actual_end — an overnight shift or a
+    // forgotten clock-out), block the new ad-hoc start instead of creating an
+    // overlap. The same-day check above only reuses today's shift, so an open
+    // shift from an earlier date would otherwise slip through.
+    if (isAdHocStart) {
+      const { data: openShift } = await supabase
+        .from('staff_shifts')
+        .select('id, shift_date')
+        .eq('staff_id', targetStaffId)
+        .eq('status', 'active')
+        .is('actual_end', null)
+        .order('shift_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (openShift) {
+        res.status(409).json({
+          success: false,
+          error: `Still clocked in to a shift from ${openShift.shift_date}. Clock out before starting a new shift.`,
+          activeShiftId: openShift.id,
+        });
+        return;
+      }
+    }
+
     const { data: shift, error } = await supabase
       .from('staff_shifts')
       .insert({
@@ -289,6 +315,7 @@ export const deleteShift = asyncHandler(async (req: Request, res: Response) => {
  */
 export const clockIn = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
+    const { lateReason } = (req.body ?? {}) as { lateReason?: string };
     const userId = req.user?.userId;
     if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
@@ -315,26 +342,53 @@ export const clockIn = asyncHandler(async (req: Request, res: Response) => {
       return;
     }
 
+    // One open shift at a time: block clocking in while another shift is still
+    // active (actual_start set, actual_end null). An overnight shift or a
+    // forgotten clock-out would otherwise silently create overlapping shifts.
+    const { data: openShift } = await supabase
+      .from('staff_shifts')
+      .select('id, shift_date')
+      .eq('staff_id', userId)
+      .eq('status', 'active')
+      .is('actual_end', null)
+      .neq('id', id)
+      .limit(1)
+      .maybeSingle();
+
+    if (openShift) {
+      res.status(409).json({
+        success: false,
+        error: `Already clocked in to a shift on ${openShift.shift_date}. Clock out first.`,
+      });
+      return;
+    }
+
     const now = new Date().toISOString();
+
+    // Check if late
+    const scheduledStart = new Date(`${shift.shift_date}T${shift.start_time}`);
+    const actualStart = new Date(now);
+    const lateMinutes = Math.floor((actualStart.getTime() - scheduledStart.getTime()) / 60000);
+    const isLate = lateMinutes > 0;
+
     const { data: updated, error } = await supabase
       .from('staff_shifts')
-      .update({ actual_start: now, status: 'active' })
+      .update({
+        actual_start: now,
+        status: 'active',
+        ...(isLate ? { late_reason: lateReason?.trim() || null } : {}),
+      })
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
 
-    // Check if late
-    const scheduledStart = new Date(`${shift.shift_date}T${shift.start_time}`);
-    const actualStart = new Date(now);
-    const lateMinutes = Math.floor((actualStart.getTime() - scheduledStart.getTime()) / 60000);
-
     res.json({
       success: true,
       data: updated,
-      lateMinutes: lateMinutes > 0 ? lateMinutes : 0,
-      message: lateMinutes > 0 ? `Clocked in ${lateMinutes} minutes late` : 'Clocked in on time',
+      lateMinutes: isLate ? lateMinutes : 0,
+      message: isLate ? `Clocked in ${lateMinutes} minutes late` : 'Clocked in on time',
     });
 });
 
@@ -344,7 +398,7 @@ export const clockIn = asyncHandler(async (req: Request, res: Response) => {
  */
 export const clockOut = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { breakMinutes } = req.body;
+    const { breakMinutes, earlyLeaveReason } = (req.body ?? {}) as { breakMinutes?: number; earlyLeaveReason?: string };
     const userId = req.user?.userId;
     if (!userId) throw new Error('Authentication required');
     const supabase = getSupabase();
@@ -376,12 +430,20 @@ export const clockOut = asyncHandler(async (req: Request, res: Response) => {
     }
 
     const now = new Date().toISOString();
+
+    // Detect early leave: clocking out before the scheduled end (overnight-safe).
+    const scheduledStartMs = new Date(`${shift.shift_date}T${shift.start_time}`).getTime();
+    let scheduledEndMs = new Date(`${shift.shift_date}T${shift.end_time}`).getTime();
+    if (scheduledEndMs <= scheduledStartMs) scheduledEndMs += 24 * 60 * 60 * 1000;
+    const isEarlyLeave = new Date(now).getTime() < scheduledEndMs;
+
     const { data: updated, error } = await supabase
       .from('staff_shifts')
       .update({
         actual_end: now,
         actual_break_minutes: breakMinutes || shift.break_minutes,
         status: 'completed',
+        ...(isEarlyLeave ? { early_leave_reason: earlyLeaveReason?.trim() || null } : {}),
       })
       .eq('id', id)
       .select()
@@ -399,8 +461,60 @@ export const clockOut = asyncHandler(async (req: Request, res: Response) => {
       success: true,
       data: updated,
       workedHours,
-      message: `Clocked out. Total worked: ${workedHours} hours`,
+      earlyLeave: isEarlyLeave,
+      message: isEarlyLeave
+        ? `Clocked out early. Total worked: ${workedHours} hours`
+        : `Clocked out. Total worked: ${workedHours} hours`,
     });
+});
+
+/**
+ * PATCH /api/staff/shifts/:id/reasons
+ * Record a late or early-leave reason after clock-in/out. clockIn/clockOut
+ * can't prompt for the reason inline because lateness is only known once the
+ * backend compares actual vs scheduled time, so the frontend submits the
+ * optional reason here as a follow-up.
+ */
+export const updateShiftReasons = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { lateReason, earlyLeaveReason } = (req.body ?? {}) as { lateReason?: string; earlyLeaveReason?: string };
+    const userId = req.user?.userId;
+    if (!userId) throw new Error('Authentication required');
+    const supabase = getSupabase();
+
+    const { data: shift, error: fetchError } = await supabase
+      .from('staff_shifts')
+      .select('id, staff_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !shift) {
+      res.status(404).json({ success: false, error: 'Shift not found' });
+      return;
+    }
+    if (shift.staff_id !== userId) {
+      res.status(403).json({ success: false, error: 'Not authorized for this shift' });
+      return;
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (lateReason !== undefined) updateData.late_reason = lateReason?.trim() || null;
+    if (earlyLeaveReason !== undefined) updateData.early_leave_reason = earlyLeaveReason?.trim() || null;
+
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ success: false, error: 'lateReason or earlyLeaveReason is required' });
+      return;
+    }
+
+    const { data: updated, error } = await supabase
+      .from('staff_shifts')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, data: updated });
 });
 
 /**
