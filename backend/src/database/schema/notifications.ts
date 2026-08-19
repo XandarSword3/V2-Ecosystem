@@ -21,7 +21,9 @@ export const notificationPriorityEnum = pgEnum('notification_priority', [
 // ============================================
 export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id).notNull(),
+  userId: uuid('user_id').references(() => users.id),
+  tenantId: uuid('tenant_id').notNull(),
+  propertyId: uuid('property_id').notNull(),
   type: varchar('type', { length: 50 }).default('info'),
   title: varchar('title', { length: 255 }).notNull(),
   message: text('message').notNull(),
@@ -52,6 +54,8 @@ export const notificationBroadcasts = pgTable('notification_broadcasts', {
   sentAt: timestamp('sent_at'),
   sentCount: text('sent_count').default('0'),
   createdBy: uuid('created_by').references(() => users.id),
+  tenantId: uuid('tenant_id').notNull(),
+  propertyId: uuid('property_id').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -67,6 +71,8 @@ export const notificationTemplates = pgTable('notification_templates', {
   bodyTemplate: text('body_template').notNull(),
   variables: jsonb('variables').default('[]'),
   isActive: boolean('is_active').default(true),
+  tenantId: uuid('tenant_id').notNull(),
+  propertyId: uuid('property_id').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -77,6 +83,8 @@ export const notificationTemplates = pgTable('notification_templates', {
 export const deviceTokens = pgTable('device_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
+  tenantId: uuid('tenant_id').notNull(),
+  propertyId: uuid('property_id').notNull(),
   token: text('token').notNull(),
   platform: varchar('platform', { length: 20 }).notNull(),
   deviceId: varchar('device_id', { length: 255 }),

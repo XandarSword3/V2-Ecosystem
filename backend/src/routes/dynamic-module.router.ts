@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import dayjs from 'dayjs';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import { authenticate, authorize, optionalAuth } from '../middleware/auth.middleware.js';
 import { requireModule, getModuleStatus } from '../middleware/moduleGuard.middleware.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { getSupabase } from '../database/connection.js';
@@ -1570,7 +1570,7 @@ function buildInstantTransactionRouter(router: Router): void {
         // POST /orders below) but were previously never selected here, so
         // the confirmation page had no way to show a subtotal/discount/tax
         // breakdown even though the data existed on the row.
-        .select('id, customer_id, status, amount, tax_amount, discount_amount, created_at, metadata')
+        .select('id, customer_id, staff_id, status, amount, tax_amount, discount_amount, created_at, metadata')
         .eq('engine_type', 'instant_transaction')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -1583,6 +1583,18 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(403).json({ success: false, error: 'Access denied' });
       }
       const meta = (data?.metadata ?? {}) as Record<string, unknown>;
+      // Expose the serving staff member so the customer can leave a staff
+      // review (POST /orders/:id/staff-review). staff_id on a transaction is
+      // the serving staff's users.id, so resolve the display name from users.
+      let staffName: string | null = null;
+      if (data?.staff_id) {
+        const { data: staffRow } = await supabase
+          .from('users')
+          .select('id, full_name, email')
+          .eq('id', data.staff_id)
+          .maybeSingle();
+        staffName = staffRow?.full_name || staffRow?.email || null;
+      }
       // QR code was never wired up for orders — qr-security.ts has a working,
       // HMAC-signed generator that nothing was calling. Generated fresh on
       // each fetch; validity is verified by signature/expiry, not storage.
@@ -1634,6 +1646,8 @@ function buildInstantTransactionRouter(router: Router): void {
           order_type: meta.order_type ?? 'dine_in',
           customer_name: meta.customer_name ?? null,
           customer_phone: meta.customer_phone ?? null,
+          staff_id: data?.staff_id ?? null,
+          staff_name: staffName,
           notes: meta.notes ?? ledgerBreakdown?.notes ?? null,
           table_id: meta.table_number ?? null,
           payment_method: meta.payment_method ?? ledgerBreakdown?.payment_method ?? null,
@@ -1698,7 +1712,7 @@ function buildInstantTransactionRouter(router: Router): void {
   });
 
   // Review endpoints (Phase 4.1 & 4.2)
-  router.post('/orders/:id/items/:itemId/review', async (req: Request, res: Response) => {
+  router.post('/orders/:id/items/:itemId/review', optionalAuth, async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {
@@ -1758,7 +1772,7 @@ function buildInstantTransactionRouter(router: Router): void {
     }
   });
 
-  router.post('/orders/:id/staff-review', async (req: Request, res: Response) => {
+  router.post('/orders/:id/staff-review', optionalAuth, async (req: Request, res: Response) => {
     try {
       const mounted = getMountedModule(req);
       if (!mounted) {

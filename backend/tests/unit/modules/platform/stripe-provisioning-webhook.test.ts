@@ -21,12 +21,13 @@ vi.mock('../../../../src/services/email.service.js', () => ({
 vi.mock('../../../../src/services/saas-billing.service.js', () => {
   const mockBilling = {
     constructWebhookEvent: vi.fn(),
-    resolveSubscription: vi.fn().mockResolvedValue({
+    getSubscription: vi.fn().mockResolvedValue({
       id: 'sub_test_123',
       customer: 'cus_test_123',
       status: 'active',
       trial_end: null,
     }),
+    cancelSubscription: vi.fn().mockResolvedValue(undefined),
   };
   return {
     getSaasBillingService: () => mockBilling,
@@ -252,5 +253,165 @@ describe('SaaS Provisioning & Stripe Webhook Handler', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ error: 'Webhook signature verification failed' });
+  });
+
+  it('should skip processing if event was already processed (idempotency)', async () => {
+    const existingTenantId = '00000000-0000-0000-0000-000000000099';
+    const mockBillingHistoryTable = createChainableMock({
+      id: 'bh-123',
+      tenant_id: existingTenantId,
+      stripe_event_id: 'evt_already_processed',
+    });
+    mockBillingHistoryTable.select = vi.fn().mockReturnThis();
+    mockBillingHistoryTable.eq = vi.fn().mockReturnThis();
+    mockBillingHistoryTable.maybeSingle = vi.fn().mockResolvedValue({
+      data: { id: 'bh-123' },
+      error: null,
+    });
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'billing_history') return mockBillingHistoryTable;
+      return createChainableMock({});
+    });
+
+    vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+    const eventPayload = {
+      id: 'evt_already_processed',
+      object: 'event',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_test_123',
+          customer: 'cus_test_123',
+          status: 'active',
+          metadata: { tier: 'growth' },
+        },
+      },
+    };
+
+    const billing = getSaasBillingService();
+    (billing.constructWebhookEvent as any).mockReturnValue(eventPayload);
+
+    const { req, res } = createSignedWebhookRequest(eventPayload);
+
+    await handleSaasStripeWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    
+    // Verify that the billing history check was called with the correct event ID
+    expect(mockBillingHistoryTable.select).toHaveBeenCalledWith('id');
+    expect(mockBillingHistoryTable.eq).toHaveBeenCalledWith('stripe_event_id', 'evt_already_processed');
+    expect(mockBillingHistoryTable.maybeSingle).toHaveBeenCalled();
+  });
+
+  it('should return 500 and cancel the subscription when checkout provisioning fails', async () => {
+    const eventPayload = {
+      id: 'evt_checkout_fail_123',
+      object: 'event',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_fail_123',
+          mode: 'subscription',
+          subscription: 'sub_test_123',
+          customer: 'cus_test_123',
+          customer_details: {
+            email: 'alicesmith@example.com',
+            name: 'Alice Smith',
+          },
+          metadata: {
+            tenantId: '00000000-0000-0000-0000-000000000001',
+            subdomain: 'alicesresort',
+            tier: 'growth',
+          },
+          amount_total: 9900,
+          currency: 'usd',
+        },
+      },
+    };
+
+    const billing = getSaasBillingService() as any;
+    billing.constructWebhookEvent.mockReturnValue(eventPayload);
+    billing.getSubscription.mockResolvedValue({
+      id: 'sub_test_123',
+      customer: 'cus_test_123',
+      status: 'active',
+      trial_end: null,
+    });
+
+    // The tenants insert resolving to an error makes provisioning.provision()
+    // throw, which should trigger the compensating cancel + a 500 response.
+    const failingTenantsTable = createChainableMock(null, { message: 'boom' });
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'tenants') return failingTenantsTable;
+      if (table === 'billing_history') return createChainableMock();
+      return createChainableMock({});
+    });
+    vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+    const { req, res } = createSignedWebhookRequest(eventPayload);
+
+    await handleSaasStripeWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Webhook processing failed' });
+    expect(billing.cancelSubscription).toHaveBeenCalledWith('sub_test_123', { atPeriodEnd: false });
+  });
+
+  it('should skip provisioning and ack 200 when the subscription is already cancelled', async () => {
+    const eventPayload = {
+      id: 'evt_checkout_cancelled_123',
+      object: 'event',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_cancelled_123',
+          mode: 'subscription',
+          subscription: 'sub_test_123',
+          customer: 'cus_test_123',
+          customer_details: {
+            email: 'alicesmith@example.com',
+            name: 'Alice Smith',
+          },
+          metadata: {
+            tenantId: '00000000-0000-0000-0000-000000000001',
+            subdomain: 'alicesresort',
+            tier: 'growth',
+          },
+          amount_total: 9900,
+          currency: 'usd',
+        },
+      },
+    };
+
+    const billing = getSaasBillingService() as any;
+    billing.constructWebhookEvent.mockReturnValue(eventPayload);
+    billing.getSubscription.mockResolvedValue({
+      id: 'sub_test_123',
+      customer: 'cus_test_123',
+      status: 'canceled',
+      trial_end: null,
+    });
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'billing_history') return createChainableMock();
+      return createChainableMock({});
+    });
+    vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+    const provisioning = getProvisioningService();
+    const provisionSpy = vi.spyOn(provisioning, 'provision');
+
+    const { req, res } = createSignedWebhookRequest(eventPayload);
+
+    await handleSaasStripeWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+    expect(provisionSpy).not.toHaveBeenCalled();
+
+    provisionSpy.mockRestore();
   });
 });

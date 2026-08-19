@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticate } from '../../middleware/auth.middleware.js';
-import { requirePermission } from '../../middleware/permission.middleware.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { economicsService, DateRangeParams } from './economics.service.js';
 
@@ -24,7 +23,7 @@ const parseParams = (req: Request): DateRangeParams => {
 };
 
 router.use(authenticate);
-router.use(requirePermission('economics:read'));
+router.use(authorize('admin', 'manager'));
 
 router.get('/revenue', asyncHandler(async (req: Request, res: Response) => {
   const params = parseParams(req);

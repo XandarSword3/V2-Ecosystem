@@ -38,6 +38,7 @@ import {
   Truck,
   Banknote,
   MessageSquare,
+  Star,
 } from 'lucide-react';
 
 // ============================
@@ -91,6 +92,8 @@ interface OrderConfirmation {
   order_number: string;
   customer_name?: string;
   customer_phone?: string;
+  staff_id?: string | null;
+  staff_name?: string | null;
   notes?: string;
   status: string;
   order_type: string;
@@ -208,6 +211,14 @@ function ConfirmationContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Staff review (POST /orders/:id/staff-review) — only rendered when this
+  // order has a serving staff member and has reached a servable state.
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
   const confirmationType = searchParams.get('type') || 'session'; // 'session' | 'order' | 'booking'
   const itemId = searchParams.get('id');
   const slug = Array.isArray(params?.slug) ? params.slug[0] : params?.slug || '';
@@ -270,6 +281,27 @@ function ConfirmationContent() {
       setError('Failed to load confirmation details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const submitStaffReview = async () => {
+    if (reviewRating < 1 || reviewRating > 5) {
+      toast.error('Please select a star rating');
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewError(null);
+    try {
+      await api.post(`/${slug}/orders/${itemId}/staff-review`, {
+        rating: reviewRating,
+        text: reviewText.trim() ? reviewText.trim() : undefined,
+      });
+      setReviewSubmitted(true);
+      toast.success('Thanks for rating your server!');
+    } catch (err) {
+      setReviewError('Could not submit your rating. Please try again.');
+    } finally {
+      setReviewSubmitting(false);
     }
   };
 
@@ -660,6 +692,57 @@ function ConfirmationContent() {
             </Card>
           );
         })()}
+
+        {/* ========== RATE YOUR SERVER (menu_service) ========== */}
+        {order && order.staff_id && ['ready', 'delivered', 'completed'].includes(order.status) && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-amber-500" />
+                Rate your server
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {reviewSubmitted ? (
+                <p className="text-sm text-muted-foreground">
+                  Thanks — your feedback helps {order.staff_name || 'your server'} improve.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    How was your experience with {order.staff_name || 'your server'}?
+                  </p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setReviewRating(n)}
+                        aria-label={`${n} star${n === 1 ? '' : 's'}`}
+                        className="p-1"
+                      >
+                        <Star
+                          className={`w-7 h-7 transition ${n <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'}`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    placeholder="Optional: share a few words…"
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  />
+                  {reviewError && <p className="text-sm text-destructive">{reviewError}</p>}
+                  <Button onClick={submitStaffReview} disabled={reviewSubmitting}>
+                    {reviewSubmitting ? 'Submitting…' : 'Submit Rating'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* ========== BOOKING CONFIRMATION (multi_day_booking) ========== */}
         {booking && (

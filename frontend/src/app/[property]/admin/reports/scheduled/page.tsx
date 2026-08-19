@@ -1,5 +1,6 @@
-import { useParams } from 'next/navigation';
 'use client';
+
+import { useParams } from 'next/navigation';
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';

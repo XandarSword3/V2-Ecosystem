@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Shield,
   Search,
+  Star,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -91,6 +92,21 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
       name: 'Customer Lookup',
       href: `/${propertySlug}/staff/customers`,
       icon: Search,
+      roles: ['super_admin', 'admin', 'manager', 'staff']
+    },
+    // My Schedule - personal shift lookup, same class as Customer Lookup
+    // (a self-service info route, not a POS tab inside StaffPOSTemplate).
+    {
+      name: 'My Schedule',
+      href: `/${propertySlug}/staff/schedule`,
+      icon: Calendar,
+      roles: ['super_admin', 'admin', 'manager', 'staff']
+    },
+    // My Ratings - personal review lookup, same class as Customer Lookup.
+    {
+      name: 'My Ratings',
+      href: `/${propertySlug}/staff/ratings`,
+      icon: Star,
       roles: ['super_admin', 'admin', 'manager', 'staff']
     },
     // Dynamic modules - roles based on module slug pattern

@@ -1046,11 +1046,24 @@ export class AlertService {
 
   ): Promise<void> {
 
+    const { data: property } = await this.supabase
+      .from('properties')
+      .select('tenant_id')
+      .eq('id', definition.propertyId)
+      .single();
+    if (!property?.tenant_id) {
+      throw new Error(`Cannot create alert notification without tenant scope for property ${definition.propertyId}`);
+    }
+
     await this.supabase.from('notifications').insert({
 
       id: uuidv4(),
 
       user_id: userId,
+
+      property_id: definition.propertyId,
+
+      tenant_id: property.tenant_id,
 
       type: 'alert',
 

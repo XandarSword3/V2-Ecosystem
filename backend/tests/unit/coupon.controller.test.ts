@@ -280,6 +280,35 @@ describe('Coupon Controller', () => {
     });
   });
 
+  describe('getStats (Admin)', () => {
+    it('scopes discount totals and recent usage to the active property', async () => {
+      mockRequest.user = { id: 'admin-123', role: 'admin', tenantId: 'tenant-1', scope: 'tenant_admin' };
+      (mockRequest as any).propertyId = 'property-1';
+
+      mockBuilder.queueResponse([
+        { is_active: true, valid_until: null, usage_count: 0 },
+      ], null);
+      mockBuilder.queueResponse([
+        { discount_applied: 300 },
+      ], null);
+      mockBuilder.queueResponse([], null);
+      mockBuilder.queueResponse([], null);
+
+      await controller.getStats(
+        mockRequest as Request,
+        mockResponse as Response,
+      );
+
+      expect(responseJson.success).toBe(true);
+      expect(responseJson.data.summary.totalDiscountGiven).toBe(300);
+
+      const propertyFilters = mockBuilder.builder.eq.mock.calls
+        .filter(([field]) => field === 'property_id');
+      expect(propertyFilters).toHaveLength(4);
+      expect(propertyFilters.every(([, value]) => value === 'property-1')).toBe(true);
+    });
+  });
+
   describe('createCoupon', () => {
     it('should create a new coupon', async () => {
       mockRequest.body = {

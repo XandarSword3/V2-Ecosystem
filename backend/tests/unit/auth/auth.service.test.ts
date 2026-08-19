@@ -38,6 +38,9 @@ const mockRecordFailedAttempt = vi.fn().mockResolvedValue(undefined);
 const mockRecordSuccessfulLogin = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../../src/modules/auth/lockout.service.js', () => ({
   isAccountLocked: (...args: unknown[]) => mockIsAccountLocked(...args),
+  isCaptchaRequired: vi.fn().mockResolvedValue(false),
+  verifyCaptchaToken: vi.fn().mockResolvedValue(false),
+  applyProgressiveDelay: vi.fn().mockResolvedValue(undefined),
   recordFailedAttempt: (...args: unknown[]) => mockRecordFailedAttempt(...args),
   recordSuccessfulLogin: (...args: unknown[]) => mockRecordSuccessfulLogin(...args),
 }));
