@@ -10,8 +10,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { StripePlatformService, getStripePlatformService, PaymentPlatform } from '../../services/stripe-platform.service.js';
-import { authenticate as requireAuth } from '../../middleware/auth.middleware.js';
-import { requirePermission } from '../../middleware/permission.middleware.js';
+import { authenticate as requireAuth, authorize } from '../../middleware/auth.middleware.js';
 import { logger } from '../../utils/logger.js';
 import { userRateLimit as rateLimiter } from '../../middleware/userRateLimit.middleware.js';
 import { getEngineService } from '../../engines/engine-service.js';
@@ -299,7 +298,7 @@ router.post(
 router.post(
   '/refunds',
   requireAuth,
-  requirePermission('payment:refund' as any),
+  authorize('admin', 'super_admin'),
   async (req: Request, res: Response) => {
     try {
       const validation = refundSchema.safeParse(req.body);

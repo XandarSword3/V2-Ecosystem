@@ -9,8 +9,20 @@ import { asyncHandler } from '../../../middleware/async-handler.js';
 import { getSupabase } from '../../../database/connection.js';
 import { getContainer } from '../../../lib/container/index.js';
 
+function getNotificationScope(req: Request): { propertyId: string; tenantId: string } {
+  const propertyId = (req as any).propertyId || req.property?.id || (req.headers['x-property-id'] as string);
+  const tenantId = req.tenant?.id || (req.user as any)?.tenantId;
+  if (!propertyId || !tenantId) {
+    const error = new Error('Notification property and tenant scope are required') as Error & { statusCode?: number };
+    error.statusCode = 400;
+    throw error;
+  }
+  return { propertyId, tenantId };
+}
+
 export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
   const supabase = getSupabase();
+  const { propertyId } = getNotificationScope(req);
 
   // Fetch orders (instant_transaction)
   const ordersResult = await supabase
@@ -18,6 +30,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
     .select('id, metadata, status, created_at')
     .eq('engine_type', 'instant_transaction')
     .eq('status', 'pending')
+    .eq('property_id', propertyId)
     .order('created_at', { ascending: false })
     .limit(10);
   const orders: any[] = ordersResult?.data ?? [];
@@ -28,6 +41,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
     .select('id, status, created_at')
     .eq('engine_type', 'time_exclusive_reservation')
     .eq('status', 'pending')
+    .eq('property_id', propertyId)
     .order('created_at', { ascending: false })
     .limit(10);
   const bookings: any[] = bookingsResult?.data ?? [];
@@ -37,6 +51,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
     .from('reviews')
     .select('id, rating, created_at')
     .eq('status', 'pending')
+    .eq('property_id', propertyId)
     .order('created_at', { ascending: false })
     .limit(10);
   const reviews: any[] = reviewsResult?.data ?? [];
@@ -49,7 +64,7 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
       unreadOnly: req.query.unreadOnly === 'true',
       type: req.query.type as any,
       limit: parseInt(req.query.limit as string) || 20,
-      propertyId: (req as any).propertyId || (req.headers['x-property-id'] as string),
+      propertyId,
     }
   );
 
@@ -97,13 +112,15 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
 
 export const markNotificationRead = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  const notification = await svc.markAsRead(req.params.id);
+  const { propertyId } = getNotificationScope(req);
+  const notification = await svc.markAsRead(req.params.id, req.user?.userId || '', propertyId);
   res.json({ success: true, data: notification });
 });
 
 export const markAllNotificationsRead = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  const count = await svc.markAllAsRead(req.user?.userId || '');
+  const { propertyId } = getNotificationScope(req);
+  const count = await svc.markAllAsRead(req.user?.userId || '', propertyId);
   res.json({ success: true, message: `${count} notifications marked as read` });
 });
 
@@ -113,20 +130,22 @@ export const broadcastNotification = asyncHandler(async (req: Request, res: Resp
     return res.status(400).json({ success: false, error: 'Title and message are required' });
   }
   const svc = getContainer().notificationService();
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  const { propertyId, tenantId } = getNotificationScope(req);
   const broadcast = await svc.broadcast({
     title, message, type, targetType: target_type, priority,
     targetUserIds: target_user_ids, actions,
     scheduledFor: scheduled_for,
     createdBy: req.user?.userId || '',
     propertyId,
+    tenantId,
   });
   res.status(201).json({ success: true, data: broadcast });
 });
 
 export const deleteNotification = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  await svc.delete(req.params.id);
+  const { propertyId } = getNotificationScope(req);
+  await svc.delete(req.params.id, req.user?.userId || '', propertyId);
   res.json({ success: true, message: 'Notification deleted' });
 });
 
@@ -136,20 +155,22 @@ export const deleteMultipleNotifications = asyncHandler(async (req: Request, res
     return res.status(400).json({ success: false, error: 'Array of notification IDs required' });
   }
   const svc = getContainer().notificationService();
-  const count = await svc.deleteMultiple(ids);
+  const { propertyId } = getNotificationScope(req);
+  const count = await svc.deleteMultiple(ids, req.user?.userId || '', propertyId);
   res.json({ success: true, message: `${count} notifications deleted` });
 });
 
 export const getTemplates = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  const { propertyId } = getNotificationScope(req);
   const templates = await svc.getTemplates(req.query.activeOnly !== 'false', propertyId);
   res.json({ success: true, data: templates });
 });
 
 export const getTemplateById = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  const template = await svc.getTemplateById(req.params.id);
+  const { propertyId } = getNotificationScope(req);
+  const template = await svc.getTemplateById(req.params.id, propertyId);
   if (!template) return res.status(404).json({ success: false, error: 'Template not found' });
   res.json({ success: true, data: template });
 });
@@ -160,14 +181,14 @@ export const createTemplate = asyncHandler(async (req: Request, res: Response) =
     return res.status(400).json({ success: false, error: 'Name, title, and message are required' });
   }
   const svc = getContainer().notificationService();
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
-  const template = await svc.createTemplate({ name, title, message, type, targetType: target_type, priority, actions, variables: variables || [], isActive: is_active, propertyId });
+  const { propertyId, tenantId } = getNotificationScope(req);
+  const template = await svc.createTemplate({ name, title, message, type, targetType: target_type, priority, actions, variables: variables || [], isActive: is_active, propertyId, tenantId });
   res.status(201).json({ success: true, data: template });
 });
 
 export const updateTemplate = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  const { propertyId } = getNotificationScope(req);
   const u = req.body;
   const template = await svc.updateTemplate(req.params.id, {
     name: u.name, title: u.title, message: u.message,
@@ -179,24 +200,28 @@ export const updateTemplate = asyncHandler(async (req: Request, res: Response) =
 
 export const deleteTemplate = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  await svc.deleteTemplate(req.params.id);
+  const { propertyId } = getNotificationScope(req);
+  await svc.deleteTemplate(req.params.id, propertyId);
   res.json({ success: true, message: 'Template deleted' });
 });
 
 export const sendFromTemplate = asyncHandler(async (req: Request, res: Response) => {
   const { variables = {}, target_user_ids, scheduled_for } = req.body;
   const svc = getContainer().notificationService();
+  const { propertyId, tenantId } = getNotificationScope(req);
   const broadcast = await svc.sendFromTemplate(req.params.id, variables, {
     targetUserIds: target_user_ids,
     scheduledFor: scheduled_for,
     createdBy: req.user?.userId || '',
+    propertyId,
+    tenantId,
   });
   res.status(201).json({ success: true, data: broadcast });
 });
 
 export const getBroadcasts = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
+  const { propertyId } = getNotificationScope(req);
   const broadcasts = await svc.getBroadcasts(req.query.target_type as any, propertyId);
   res.json({ success: true, data: broadcasts });
 });
@@ -208,6 +233,7 @@ export const getValidPriorities = asyncHandler(async (req: Request, res: Respons
 
 export const processScheduledNotifications = asyncHandler(async (req: Request, res: Response) => {
   const svc = getContainer().notificationService();
-  const count = await svc.processScheduledNotifications();
+  const { propertyId } = getNotificationScope(req);
+  const count = await svc.processScheduledNotifications(propertyId);
   res.json({ success: true, message: `${count} scheduled notifications processed` });
 });

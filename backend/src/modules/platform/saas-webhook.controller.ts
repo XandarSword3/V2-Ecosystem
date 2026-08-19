@@ -44,6 +44,25 @@ export async function handleSaasStripeWebhook(req: Request, res: Response): Prom
     return;
   }
 
+  // checkout.session.completed is the one event where a downstream failure must
+  // NOT be silently acked: it is the only path that turns a Stripe subscription
+  // into a provisioned tenant, so if provisioning fails we must return non-2xx
+  // and let Stripe retry the delivery. Everything else is a best-effort
+  // billing-status sync and keeps the fast-ack + async behaviour.
+  if (event.type === 'checkout.session.completed') {
+    try {
+      await processWebhookEvent(event);
+      res.status(200).json({ received: true });
+    } catch (err) {
+      logger.error('[SAAS WEBHOOK] checkout.session.completed processing failed', {
+        eventId: event.id,
+        err: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+      });
+      res.status(500).json({ error: 'Webhook processing failed' });
+    }
+    return;
+  }
+
   // Acknowledge immediately — Stripe expects 2xx within 30 s
   res.status(200).json({ received: true });
 
@@ -61,6 +80,13 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
   const provisioning = getProvisioningService();
 
   logger.info('[SAAS WEBHOOK] Processing event', { eventId: event.id, type: event.type });
+
+  // Idempotency check: skip if this event was already processed
+  const alreadyProcessed = await isEventAlreadyProcessed(event.id);
+  if (alreadyProcessed) {
+    logger.info('[SAAS WEBHOOK] Event already processed, skipping', { eventId: event.id, type: event.type });
+    return;
+  }
 
   switch (event.type) {
 
@@ -97,25 +123,55 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       const subscription = await resolveSubscription(session.subscription as string);
       if (!subscription) break;
 
-      const provisionResult = await provisioning.provision({
-        stripeSubscriptionId: subscription.id,
-        stripeCustomerId: subscription.customer as string,
-        tier,
-        billingStatus: SaasBillingService.mapStripeToBillingStatus(subscription.status),
-        operatorEmail: session.customer_details?.email ?? '',
-        operatorName: session.customer_details?.name ?? '',
-        subdomain,
-        trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
-      });
+      // If the subscription is already cancelled there is nothing left to
+      // provision. This is the retry of a checkout whose provisioning failed on
+      // a previous delivery and was cancelled as compensation (see catch below),
+      // or a subscriber who cancelled before completion — either way,
+      // provisioning a cancelled subscription would only create a zombie tenant.
+      if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
+        logger.warn('[SAAS WEBHOOK] checkout.session.completed references a cancelled subscription — skipping provisioning', {
+          sessionId: session.id,
+          subscriptionId: subscription.id,
+          status: subscription.status,
+        });
+        break;
+      }
 
-      await recordBillingHistory({
-        tenantId: provisionResult.tenantId,
-        eventType: 'subscription_created',
-        amount: session.amount_total ?? 0,
-        currency: session.currency ?? 'usd',
-        status: 'created',
-        stripeEventId: event.id,
-      });
+      try {
+        const provisionResult = await provisioning.provision({
+          stripeSubscriptionId: subscription.id,
+          stripeCustomerId: subscription.customer as string,
+          tier,
+          billingStatus: SaasBillingService.mapStripeToBillingStatus(subscription.status),
+          operatorEmail: session.customer_details?.email ?? '',
+          operatorName: session.customer_details?.name ?? '',
+          subdomain,
+          trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+        });
+
+        // Record billing history for idempotency
+        await recordBillingHistory({
+          tenantId: provisionResult.tenantId,
+          eventType: 'subscription_created',
+          amount: session.amount_total ?? 0,
+          currency: session.currency ?? 'usd',
+          status: 'created',
+          stripeEventId: event.id,
+        });
+      } catch (err) {
+        // Compensating action: a subscription that can't be provisioned must not
+        // stay live and silently renew. Cancel it immediately, then re-throw so
+        // handleSaasStripeWebhook returns 500 and Stripe retries the delivery.
+        // On the retry, the cancelled-subscription guard above skips provisioning,
+        // so this failure is terminal rather than a retry loop.
+        logger.error('[SAAS WEBHOOK] Tenant provisioning failed — cancelling subscription', {
+          sessionId: session.id,
+          subscriptionId: subscription.id,
+          err: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+        });
+        await cancelSubscriptionAfterProvisioningFailure(subscription.id);
+        throw err;
+      }
       break;
     }
 
@@ -128,6 +184,19 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       const tier = (sub.metadata?.tier ?? undefined) as SubscriptionTier | undefined;
 
       await provisioning.updateBillingStatus(sub.id, newStatus, tier);
+
+      // Record billing history for idempotency
+      const updatedTenantId = await resolveTenantIdBySubscription(sub.id);
+      if (updatedTenantId) {
+        await recordBillingHistory({
+          tenantId: updatedTenantId,
+          eventType: 'subscription_updated',
+          amount: 0, // Status updates don't have an amount
+          currency: 'usd',
+          status: newStatus,
+          stripeEventId: event.id,
+        });
+      }
       break;
     }
 
@@ -138,6 +207,7 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       const sub = event.data.object as Stripe.Subscription;
       await provisioning.updateBillingStatus(sub.id, 'cancelled');
 
+      // Record billing history for idempotency
       const cancelledTenantId = await resolveTenantIdBySubscription(sub.id);
       if (cancelledTenantId) {
         await recordBillingHistory({
@@ -166,6 +236,7 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       const newStatus = SaasBillingService.mapStripeToBillingStatus(subscription.status);
       await provisioning.updateBillingStatus(subscriptionId, newStatus);
 
+      // Record billing history for idempotency
       const paidTenantId = await resolveTenantIdBySubscription(subscriptionId);
       if (paidTenantId) {
         await recordBillingHistory({
@@ -191,6 +262,7 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
 
       await provisioning.updateBillingStatus(subscriptionId, 'past_due');
 
+      // Record billing history for idempotency
       const failedTenantId = await resolveTenantIdBySubscription(subscriptionId);
       if (failedTenantId) {
         await recordBillingHistory({
@@ -214,6 +286,30 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
 // ------------------------------------------
 // Helpers
 // ------------------------------------------
+
+/**
+ * Check if a Stripe event has already been processed by looking for its
+ * event ID in the billing_history table. This provides idempotency protection.
+ */
+async function isEventAlreadyProcessed(stripeEventId: string): Promise<boolean> {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('billing_history')
+      .select('id')
+      .eq('stripe_event_id', stripeEventId)
+      .maybeSingle();
+
+    if (error) {
+      logger.error('[SAAS WEBHOOK] Failed to check event processing status', { stripeEventId, error: error.message });
+      return false; // On error, assume not processed to avoid blocking
+    }
+    return !!data;
+  } catch (err) {
+    logger.error('[SAAS WEBHOOK] Unexpected error checking event processing status', { stripeEventId, err });
+    return false;
+  }
+}
 
 /**
  * Look up which tenant a Stripe subscription belongs to.
@@ -279,18 +375,22 @@ async function recordBillingHistory(entry: {
 }
 
 async function resolveSubscription(subscriptionId: string): Promise<Stripe.Subscription | null> {
-  try {
-    const billing = getSaasBillingService();
-    // Access the underlying stripe instance via the service's checkout method approach
-    // We use a direct Stripe import here to retrieve the subscription
-    const Stripe = (await import('stripe')).default;
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) throw new Error('STRIPE_SECRET_KEY not set');
+  return getSaasBillingService().getSubscription(subscriptionId);
+}
 
-    const stripe = new Stripe(key, { apiVersion: '2023-10-16' });
-    return await stripe.subscriptions.retrieve(subscriptionId);
+/**
+ * Compensating cancel for a subscription whose provisioning failed. Best-effort:
+ * if the cancel itself throws (network error, already cancelled, etc.) we log
+ * and swallow — the original provisioning error is what the webhook must surface.
+ */
+async function cancelSubscriptionAfterProvisioningFailure(subscriptionId: string): Promise<void> {
+  try {
+    await getSaasBillingService().cancelSubscription(subscriptionId, { atPeriodEnd: false });
+    logger.warn('[SAAS WEBHOOK] Subscription cancelled after provisioning failure', { subscriptionId });
   } catch (err) {
-    logger.error('[SAAS WEBHOOK] Failed to retrieve subscription', { subscriptionId, err });
-    return null;
+    logger.error('[SAAS WEBHOOK] Failed to cancel subscription after provisioning failure', {
+      subscriptionId,
+      err: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+    });
   }
 }

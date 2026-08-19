@@ -183,7 +183,7 @@ export async function getModuleOrders(req: Request, res: Response) {
         customerId: order.customer_id,
         staffId,
         staffName,
-        orderType: order.engine_type,
+        orderType: (meta.order_type as string | undefined) ?? order.engine_type,
         status: order.status,
         paymentMethod: rawPaymentMethod,
         paymentStatus,
@@ -1858,8 +1858,13 @@ export async function searchCustomers(req: Request, res: Response) {
 export async function createModuleOrder(req: Request, res: Response) {
   try {
     const { slug } = req.params;
-    const { serviceLocationId: reqServiceLocId, tableId, tableNumber, customerName, customerId, items, notes } = req.body;
+    const { serviceLocationId: reqServiceLocId, tableId, tableNumber, customerName, customerId, items, notes, orderType } = req.body;
     const serviceLocationId = reqServiceLocId || tableId;
+    // A staff order knows what it is: table orders are dine-in, everything else
+    // (Quick Order tab, no service location) is a counter order. Persisted on
+    // metadata.order_type so every downstream consumer (orders list, KDS,
+    // receipt, analytics) sees a real value rather than the raw engine_type.
+    const resolvedOrderType = orderType ?? (serviceLocationId ? 'dine_in' : 'counter');
     const userId = req.user?.userId;
     const tenantId = req.user?.tenantId;
     const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
@@ -1922,6 +1927,7 @@ export async function createModuleOrder(req: Request, res: Response) {
           customer_name: customerName || 'Guest',
           table_number: locationName || null,
           table_id: locationId || null,
+          order_type: resolvedOrderType,
           notes: notes || null,
           payment_status: 'unpaid',
           payment_method: 'cash',
@@ -2369,7 +2375,7 @@ export async function getModuleMenu(req: Request, res: Response) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('catalog_items')
-        .select('id, category_id, name, description, price, unit_price, image_url, is_available')
+        .select('id, category_id, name, description, price, image_url, is_available')
         .eq('module_id', module.id)
         .eq('is_available', true)
         .order('name', { ascending: true }),
@@ -2383,8 +2389,8 @@ export async function getModuleMenu(req: Request, res: Response) {
       categoryId: item.category_id,
       name: item.name,
       description: item.description,
-      price: item.price ?? item.unit_price ?? 0,
-      unitPrice: item.unit_price ?? item.price ?? 0,
+      price: item.price ?? 0,
+      unitPrice: item.price ?? 0,
       imageUrl: item.image_url,
       isAvailable: item.is_available,
     }));

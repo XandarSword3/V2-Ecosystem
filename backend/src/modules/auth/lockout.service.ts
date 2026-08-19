@@ -317,13 +317,15 @@ export async function applyProgressiveDelay(identifier: string): Promise<void> {
  * Verify Turnstile / CAPTCHA token with Cloudflare Turnstile API
  */
 export async function verifyCaptchaToken(token?: string, ipAddress?: string): Promise<boolean> {
-  if (!token || typeof token !== 'string' || token.trim() === '') {
+  if (!token || typeof token !== 'string' || token.trim() === '' || token.length > 2048) {
     return false;
   }
 
-  const secretKey = config.turnstile?.secretKey;
+  const turnstile = config.turnstile;
+  const secretKey = turnstile?.secretKey;
 
-  // Development/Test mock / bypass:
+  // Development/Test mock / bypass. Production always requires a configured
+  // secret and a successful response from Cloudflare.
   if (!secretKey) {
     if (config.env === 'test' || config.env === 'development') {
       return token.length > 5;
@@ -332,27 +334,27 @@ export async function verifyCaptchaToken(token?: string, ipAddress?: string): Pr
     return false;
   }
 
-  // Cloudflare standard test dummy pass tokens
-  if (token === 'XXXX.DUMMY.TOKEN.XXXX' || token === '1x0000000000000000000000000000000AA') {
-    if (config.env !== 'production') {
-      return true;
-    }
+  // Cloudflare's documented dummy token is useful for local unit tests only.
+  if ((token === 'XXXX.DUMMY.TOKEN.XXXX' || token === '1x0000000000000000000000000000000AA')
+    && config.env !== 'production') {
+    return true;
   }
 
   try {
     const formData = new URLSearchParams();
     formData.append('secret', secretKey);
-    formData.append('response', token);
+    formData.append('response', token.trim());
     if (ipAddress) {
       formData.append('remoteip', ipAddress);
     }
 
-    const response = await fetch(config.turnstile.verifyUrl, {
+    const response = await fetch(turnstile.verifyUrl, {
       method: 'POST',
       body: formData,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {
@@ -360,9 +362,26 @@ export async function verifyCaptchaToken(token?: string, ipAddress?: string): Pr
       return false;
     }
 
-    const data = await response.json() as { success: boolean; 'error-codes'?: string[] };
+    const data = await response.json() as {
+      success: boolean;
+      action?: string;
+      hostname?: string;
+      'error-codes'?: string[];
+    };
     if (!data.success) {
       logger.warn('Turnstile verification failed', { errorCodes: data['error-codes'] });
+      return false;
+    }
+
+    if (data.action !== 'login') {
+      logger.warn('Turnstile action mismatch', { action: data.action });
+      return false;
+    }
+
+    const hostname = data.hostname?.trim().toLowerCase();
+    const expectedHostnames = turnstile.expectedHostnames ?? [];
+    if (!hostname || (!turnstile.allowAnyHostname && !expectedHostnames.includes(hostname))) {
+      logger.warn('Turnstile hostname mismatch', { hostname });
       return false;
     }
 

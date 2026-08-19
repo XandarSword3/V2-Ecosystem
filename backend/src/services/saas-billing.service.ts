@@ -154,15 +154,15 @@ export class SaasBillingService {
 
     logger.info('[SAAS BILLING] Creating checkout session', { tenantId, tier, subdomain });
 
-    // Create or retrieve Stripe customer
-    const customer = await getStripe().customers.create({
-      email: operatorEmail,
-      name: operatorName,
-      metadata: {
-        tenantId,
-        subdomain,
-        tier,
-      },
+    // Reuse an existing Stripe customer for this email when one already exists.
+    // A retried checkout (e.g. the first attempt's webhook provisioning failed
+    // after the session completed) must not mint a brand-new Customer for the
+    // same email — Stripe treats a Customer as a billing identity, so the
+    // existing one is the correct target for the retry.
+    const customer = await this.getOrCreateCustomer(operatorEmail, operatorName, {
+      tenantId,
+      subdomain,
+      tier,
     });
 
     const session = await getStripe().checkout.sessions.create({
@@ -205,6 +205,31 @@ export class SaasBillingService {
     });
 
     return { sessionId: session.id, url: session.url };
+  }
+
+  /**
+   * Find an existing Stripe customer by email, or create one. This is the
+   * dedupe that stops a retried checkout from creating a fresh Customer every
+   * time; the controller's users-table check only catches emails that already
+   * belong to a fully-provisioned tenant owner.
+   */
+  private async getOrCreateCustomer(
+    email: string,
+    name: string,
+    metadata: Record<string, string>,
+  ): Promise<Stripe.Customer> {
+    const existing = await getStripe().customers.list({ email, limit: 1 });
+
+    if (existing.data.length > 0) {
+      const customer = existing.data[0];
+      logger.info('[SAAS BILLING] Reusing existing Stripe customer', {
+        customerId: customer.id,
+        email,
+      });
+      return customer;
+    }
+
+    return getStripe().customers.create({ email, name, metadata });
   }
 
   // ------------------------------------------
@@ -273,6 +298,19 @@ export class SaasBillingService {
       newTier,
       effectiveAt: new Date(updated.current_period_start * 1000),
     };
+  }
+
+  /**
+   * Retrieve a subscription, returning null (instead of throwing) so webhook
+   * handlers can skip gracefully when the subscription is already gone.
+   */
+  async getSubscription(subscriptionId: string): Promise<Stripe.Subscription | null> {
+    try {
+      return await getStripe().subscriptions.retrieve(subscriptionId);
+    } catch (err) {
+      logger.error('[SAAS BILLING] Failed to retrieve subscription', { subscriptionId, err });
+      return null;
+    }
   }
 
   // ------------------------------------------

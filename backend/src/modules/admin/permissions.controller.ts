@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
-import { logActivity } from "../../utils/activityLogger";
-import { permissionCache } from "../../security/permission-cache.service.js";
 import { getScopedClient, tenantContextFor } from '../../security/scoped-client.js';
 // import type { PermissionRow } from './types.js'; // Deprecated
 
@@ -60,71 +58,21 @@ export const getRolePermissions = asyncHandler(async (req: Request, res: Respons
 });
 
 export const updateRolePermissions = asyncHandler(async (req: Request, res: Response) => {
-    const supabase = getSupabase();
-    const { id } = req.params; // role_id
-    const { permission_slugs } = req.body; // Array of strings (slugs)
-    const ctx = tenantContextFor(req);
-    const scoped = getScopedClient(ctx);
-
-    // Resolve role name, auto-scoped to the caller's tenant via the scoped
-    // client — same cross-tenant IDOR fix as getRolePermissions and
-    // roles.controller.ts.
-    const { data: roleData, error: roleError } = await scoped.from('roles').select('name').eq('id', id).maybeSingle();
-
-    if (roleError || !roleData) {
-        return res.status(404).json({ success: false, error: 'Role not found' });
-    }
-    const roleName = roleData.name;
-
-    // 2. Delete all existing for this role.
-    //
-    // KNOWN UNRESOLVED ISSUE — not fixed in this pass, flagging explicitly:
-    // app_role_permissions has NOT NULL tenant_id AND property_id columns,
-    // but `roles` has no property_id concept at all, and the insert below
-    // has never set either column. That means this insert is very likely
-    // already failing against the DB's not-null constraint in production —
-    // this delete would succeed (data loss) and the insert would then throw.
-    // Scoping the delete by tenant_id below limits a *single* tenant's role
-    // update to no longer wipe another tenant's same-named role's rows, but
-    // it does not fix the insert, and does not fix permission-cache.service.ts,
-    // which caches this table's rows keyed by role_name ALONE (no tenant_id),
-    // so two tenants with same-named custom roles currently share one merged
-    // permission set in memory regardless of what's fixed here. That's a
-    // cache re-keying + schema design decision (role_id vs role_name, and
-    // what property_id should mean for a tenant-wide role), not something to
-    // guess at in a security patch. Needs your call before it's touched.
-    let delQuery = supabase.from('app_role_permissions').delete().eq('role_name', roleName);
-    if (ctx.tenantId) delQuery = delQuery.eq('tenant_id', ctx.tenantId);
-    const { error: delError } = await delQuery;
-    
-    if (delError) throw delError;
-
-    // 3. Insert new
-    if (permission_slugs && permission_slugs.length > 0) {
-      const inserts = permission_slugs.map((slug: string) => ({
-        role_name: roleName,
-        permission_slug: slug
-      }));
-      
-      const { error: insError } = await supabase
-        .from('app_role_permissions')
-        .insert(inserts);
-      
-      if (insError) throw insError;
-    }
-
-    // Refresh permission cache so the changes take effect immediately in-memory
-    await permissionCache.refreshCache();
-
-    // Log Activity
-    await logActivity({
-      user_id: req.user!.userId,
-      action: 'UPDATE_ROLE_PERMISSIONS',
-      resource: 'roles',
-      resource_id: id,
-      new_value: { permission_slugs, role_name: roleName }
+    // DISABLED — temporarily neutralized (same as updateUserPermissions below).
+    // The previous implementation deleted every app_role_permissions row for the
+    // role and then re-inserted rows WITHOUT the NOT NULL tenant_id/property_id
+    // columns, so the delete succeeded (data loss) and the insert then threw —
+    // leaving the role with zero grants after a single "Save Permissions" click.
+    // The real fix needs a design decision first: what tenant_id / property_id
+    // should mean for a role-permission grant, and whether permission-cache.service.ts
+    // should key by role_id instead of role_name (two tenants with same-named
+    // roles currently share one merged in-memory permission set). Re-enable only
+    // after that is settled and the schema/inserts are updated accordingly.
+    return res.status(501).json({
+        success: false,
+        error: 'Role permission editing is temporarily disabled pending RBAC schema changes.',
+        code: 'NOT_IMPLEMENTED',
     });
-    res.json({ success: true, message: 'Role permissions updated' });
 });
 
 // -- User Overrides --

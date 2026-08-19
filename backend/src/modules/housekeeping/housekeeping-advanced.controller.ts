@@ -755,12 +755,23 @@ export class HousekeepingAdvancedController {
    */
   private async notifyStaff(supabase: any, staffId: string, task: any) {
     try {
+      const { data: unit } = await supabase
+        .from('accommodation_units')
+        .select('property_id, tenant_id')
+        .eq('id', task.unit_id)
+        .single();
+      if (!unit?.property_id || !unit?.tenant_id) {
+        logger.warn('Skipping housekeeping notification without property/tenant scope', { taskId: task.id });
+        return;
+      }
       await supabase.from('notifications').insert({
         user_id: staffId,
         type: 'housekeeping_task',
         title: 'New Housekeeping Task',
         message: `You have been assigned a ${task.task_type} task (${task.priority} priority)`,
-        metadata: { taskId: task.id, unitId: task.unit_id },
+        data: { taskId: task.id, unitId: task.unit_id },
+        property_id: unit.property_id,
+        tenant_id: unit.tenant_id,
       });
     } catch (e) {
       logger.error('Failed to notify staff:', e);

@@ -104,7 +104,7 @@ export async function autoAssignStaffToLocation(
     serviceLocationId: string;
   }
 ): Promise<string | null> {
-  const { propertyId, moduleId, serviceLocationId } = params;
+  const { tenantId, propertyId, moduleId, serviceLocationId } = params;
 
   // 1. Query staff with active shift for this module (or property fallback)
   const { data: activeShifts, error: shiftError } = await supabase
@@ -186,6 +186,8 @@ export async function autoAssignStaffToLocation(
       priority: 'high',
       targetType: 'service_location',
       targetId: serviceLocationId,
+      propertyId,
+      tenantId,
     }).catch((err) => logger.error('Failed to create table assignment notification', err));
   }
 
@@ -331,6 +333,8 @@ export async function reassignStaffToLocation(
       priority: 'high',
       targetType: 'service_location',
       targetId: serviceLocationId,
+      propertyId: data.property_id,
+      tenantId: data.tenant_id,
     }).catch((err) => logger.error('Failed to create reassignment notification', err));
   }
 

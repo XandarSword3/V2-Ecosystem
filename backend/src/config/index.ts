@@ -6,6 +6,16 @@ const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
 const isTest = process.env.NODE_ENV === 'test';
 
+const TURNSTILE_DUMMY_SECRET = '1x0000000000000000000000000000000AA';
+const turnstileSecret = process.env.TURNSTILE_SECRET_KEY || process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY || '';
+const turnstileHostnames = (process.env.TURNSTILE_HOSTNAMES || (isProduction ? 'v2-ecosystem.vercel.app' : 'localhost,127.0.0.1'))
+  .split(',')
+  .map((hostname) => hostname.trim().toLowerCase())
+  .filter(Boolean);
+const turnstileAllowsAnyHostname = !isProduction
+  && turnstileSecret === TURNSTILE_DUMMY_SECRET
+  && process.env.TURNSTILE_ALLOW_ANY_HOSTNAME === 'true';
+
 const DEV_CORS_ORIGINS = [
   /^http:\/\/localhost:\d+$/,
   /^http:\/\/.*\.v2platform\.local:\d+$/,
@@ -193,8 +203,10 @@ export const config = {
 
   // CAPTCHA / Bot Protection Configuration (Cloudflare Turnstile)
   turnstile: {
-    secretKey: process.env.TURNSTILE_SECRET_KEY || process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY || '',
+    secretKey: turnstileSecret,
     verifyUrl: 'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+    expectedHostnames: turnstileHostnames,
+    allowAnyHostname: turnstileAllowsAnyHostname,
   },
 } as const;
 

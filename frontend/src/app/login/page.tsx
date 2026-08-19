@@ -11,6 +11,7 @@ import { authApi } from '@/lib/api';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Container } from '@/components/layout/Container';
 import { getApiErrorMessage } from '@/types';
+import { TurnstileCaptcha } from '@/components/auth/TurnstileCaptcha';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
 
@@ -27,6 +28,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // CAPTCHA state
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   // 2FA state
   const [show2FA, setShow2FA] = useState(false);
@@ -107,7 +112,7 @@ export default function LoginPage() {
 
     try {
       // Use auth context login which updates state immediately
-      const result = await login(email, password);
+      const result = await login(email, password, captchaToken || undefined);
 
       // Check if 2FA is required (already enrolled)
       if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
@@ -159,7 +164,15 @@ export default function LoginPage() {
         window.location.href = '/';
       }
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Login failed. Please try again.'));
+      // Detect CAPTCHA_REQUIRED error code and show widget
+      const axiosErr = err as { response?: { data?: { code?: string; error?: string } } };
+      if (axiosErr.response?.data?.code === 'CAPTCHA_REQUIRED') {
+        setShowCaptcha(true);
+        setCaptchaToken(null);
+        setError('Too many login attempts. Please complete the security verification below.');
+      } else {
+        setError(getApiErrorMessage(err, 'Login failed. Please try again.'));
+      }
       setIsLoading(false);
     }
   };
@@ -539,10 +552,20 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {/* CAPTCHA - shown after CAPTCHA_REQUIRED error */}
+              {showCaptcha && (
+                <TurnstileCaptcha
+                  action="login"
+                  onVerify={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken(null)}
+                  onError={() => setCaptchaToken(null)}
+                />
+              )}
+
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || (showCaptcha && !captchaToken)}
                 className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg shadow-primary-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isLoading ? (

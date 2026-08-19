@@ -20,12 +20,13 @@ vi.mock('../../../../src/services/email.service.js', () => ({
 vi.mock('../../../../src/services/saas-billing.service.js', () => {
   const mockBilling = {
     constructWebhookEvent: vi.fn(),
-    resolveSubscription: vi.fn().mockResolvedValue({
+    getSubscription: vi.fn().mockResolvedValue({
       id: 'sub_test_123',
       customer: 'cus_test_123',
       status: 'active',
       trial_end: null,
     }),
+    cancelSubscription: vi.fn().mockResolvedValue(undefined),
   };
   return {
     getSaasBillingService: () => mockBilling,
@@ -149,6 +150,7 @@ describe('SaaS Provisioning & Stripe Webhook Unit', () => {
     const mockRolesTable = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({ data: { id: roleId, name: 'tenant_owner' }, error: null }),
       insert: vi.fn().mockResolvedValue({ data: [{ id: roleId, name: 'tenant_owner' }], error: null }),
     };

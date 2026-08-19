@@ -524,7 +524,13 @@ export class CouponController {
       const activeCoupons = allCoupons?.filter(c => c.is_active && (!c.valid_until || new Date(c.valid_until) > new Date())).length || 0;
       const totalUses = allCoupons?.reduce((sum, c) => sum + (c.usage_count || 0), 0) || 0;
 
-      const { data: usageData, error: usageError } = await supabase.from('coupon_usage').select('discount_applied');
+      // coupon_usage is tenant/property-scoped too. Filtering only coupons above
+      // is not enough: aggregating all usage rows leaked discounts from every
+      // tenant into this property's dashboard.
+      const { data: usageData, error: usageError } = await supabase
+        .from('coupon_usage')
+        .select('discount_applied')
+        .eq('property_id', propertyId);
       if (usageError) throw usageError;
       const totalDiscount = usageData?.reduce((sum, u) => sum + (parseFloat(u.discount_applied) || 0), 0) || 0;
 
@@ -536,6 +542,7 @@ export class CouponController {
       const { data: recentUsages, error: recentError } = await supabase
         .from('coupon_usage')
         .select('used_at, discount_applied')
+        .eq('property_id', propertyId)
         .gte('used_at', thirtyDaysAgo)
         .order('used_at', { ascending: false });
       if (recentError) throw recentError;

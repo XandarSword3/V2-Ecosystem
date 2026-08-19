@@ -151,6 +151,17 @@ export default function RolesPage() {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+        <p className="font-medium text-amber-900 dark:text-amber-100">
+          Roles &amp; permissions management is temporarily read-only.
+        </p>
+        <p className="text-amber-800 dark:text-amber-200">
+          Permission editing is disabled while the permission model is being
+          migrated, to prevent accidental loss of role grants. Role creation and
+          permission editing will return once the migration is complete.
+        </p>
+      </div>
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
@@ -158,7 +169,7 @@ export default function RolesPage() {
             Manage system roles and their default permission sets.
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
+        <Button onClick={() => setShowCreateModal(true)} disabled>
           <Plus className="h-4 w-4 mr-2" />
           Create Role
         </Button>
@@ -209,6 +220,7 @@ export default function RolesPage() {
                   variant="outline" 
                   className="w-full"
                   onClick={() => openPermissionsModal(role)}
+                  disabled
                 >
                   <Edit2 className="h-4 w-4 mr-2" />
                   Edit Permissions
