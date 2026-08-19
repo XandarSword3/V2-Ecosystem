@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Mail, Lock, Eye, EyeOff, Loader2, LogIn, UserPlus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
+import { TurnstileCaptcha } from '@/components/auth/TurnstileCaptcha';
 import { toast } from 'sonner';
 
 interface AuthModalProps {
@@ -26,6 +27,10 @@ export function AuthModal({ isOpen, onClose, currentPath, searchParams }: AuthMo
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // CAPTCHA state
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+
   // Build the redirect URL for signup/login pages
   const buildRedirectUrl = () => {
     const queryString = searchParams.toString();
@@ -41,7 +46,7 @@ export function AuthModal({ isOpen, onClose, currentPath, searchParams }: AuthMo
     setIsLoading(true);
 
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, captchaToken || undefined);
 
       // Check if 2FA is required
       if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
@@ -65,8 +70,14 @@ export function AuthModal({ isOpen, onClose, currentPath, searchParams }: AuthMo
       toast.success('Login successful!');
       onClose();
     } catch (err: any) {
-      const errorMessage = err?.response?.data?.error || err?.message || 'Login failed. Please try again.';
-      setError(errorMessage);
+      if (err?.response?.data?.code === 'CAPTCHA_REQUIRED') {
+        setShowCaptcha(true);
+        setCaptchaToken(null);
+        setError('Too many login attempts. Please complete the security verification below.');
+      } else {
+        const errorMessage = err?.response?.data?.error || err?.message || 'Login failed. Please try again.';
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -144,9 +155,18 @@ export function AuthModal({ isOpen, onClose, currentPath, searchParams }: AuthMo
             </motion.div>
           )}
 
+          {showCaptcha && (
+            <TurnstileCaptcha
+              action="login"
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
+          )}
+
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || (showCaptcha && !captchaToken)}
             className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 py-3"
           >
             {isLoading ? (

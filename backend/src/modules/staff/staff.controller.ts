@@ -1348,3 +1348,48 @@ export const getLiveTransactions = asyncHandler(async (req: Request, res: Respon
 
   res.json({ success: true, data: data || [] });
 });
+
+// ============================================
+// Staff Reviews
+// ============================================
+
+/**
+ * GET /api/staff/reviews/me
+ * The caller's own staff-review breakdown: average rating, review count, and
+ * the most recent review rows (rating + optional text). Scoped to
+ * req.user.userId — a staff member can only ever see their own ratings.
+ */
+export const getMyReviews = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.userId;
+  if (!userId) throw new Error('Authentication required');
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '20'), 10) || 20, 1), 100);
+  const supabase = getSupabase();
+
+  const [ratingsResult, recentResult] = await Promise.all([
+    supabase.from('staff_reviews').select('rating').eq('staff_id', userId),
+    supabase
+      .from('staff_reviews')
+      .select('id, rating, text, created_at')
+      .eq('staff_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+  ]);
+
+  if (ratingsResult.error) throw ratingsResult.error;
+  if (recentResult.error) throw recentResult.error;
+
+  const ratings = (ratingsResult.data || []).map((r) => Number(r.rating));
+  const average =
+    ratings.length > 0
+      ? Math.round((ratings.reduce((sum, r) => sum + r, 0) / ratings.length) * 10) / 10
+      : 0;
+
+  res.json({
+    success: true,
+    data: {
+      average_rating: average,
+      review_count: ratings.length,
+      reviews: recentResult.data || [],
+    },
+  });
+});

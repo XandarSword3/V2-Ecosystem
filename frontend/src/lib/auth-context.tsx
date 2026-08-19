@@ -43,7 +43,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<User | TwoFactorRequired | TwoFactorSetupRequired>;
+  login: (email: string, password: string, captchaToken?: string) => Promise<User | TwoFactorRequired | TwoFactorSetupRequired>;
   verify2FA: (userId: string, code: string) => Promise<User>;
   completeTwoFactorSetupLogin: (user: User, accessToken: string) => void;
   logout: () => void;
@@ -286,10 +286,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [router, queryClient, clearCart, clearLocalSession]);
 
-  const login = async (email: string, password: string): Promise<User | TwoFactorRequired | TwoFactorSetupRequired> => {
+  const login = async (email: string, password: string, captchaToken?: string): Promise<User | TwoFactorRequired | TwoFactorSetupRequired> => {
     let response;
     try {
-      response = await api.post('/auth/login', { email, password });
+      const payload: Record<string, string> = { email, password };
+      if (captchaToken) payload.captchaToken = captchaToken;
+      response = await api.post('/auth/login', payload);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { data?: { requiresTwoFactorSetup?: boolean; userId?: string; email?: string; twoFactorSetupToken?: string } } } };
       const errData = axiosErr.response?.data?.data;

@@ -48,6 +48,8 @@ import {
   MapPin,
   Truck,
   ChevronRight,
+  ShoppingCart,
+  Trash2,
 } from 'lucide-react';
 import { ReservationFloorMap } from '@/components/staff/ReservationFloorMap';
 import { DispatchBoard } from '@/components/staff/DispatchBoard';
@@ -108,9 +110,12 @@ interface StaffPOSTemplateProps {
   // Floor Map (host-stand tab) only makes sense for modules that take
   // reservations. Mirrors the gate that used to live in the sidebar nav.
   requireReservation?: boolean | null;
+  // Cash drawer can be disabled per-module (settings.cashHandlingEnabled) so
+  // non-cash tenants skip the opening-cash prompt and cash reconciliation UI.
+  cashHandlingEnabled?: boolean;
 }
 
-type ViewMode = 'floor' | 'orders' | 'kitchen' | 'cashier' | 'floorplan' | 'dispatch';
+type ViewMode = 'floor' | 'orders' | 'kitchen' | 'cashier' | 'floorplan' | 'dispatch' | 'quick-order';
 
 // ============================================
 // Item-level status chip — tap to advance
@@ -196,7 +201,7 @@ function ItemStatusChip({
   );
 }
 
-export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, requireReservation }: StaffPOSTemplateProps) {
+export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, requireReservation, cashHandlingEnabled = true }: StaffPOSTemplateProps) {
   const t = useTranslations();
   const { user } = useAuth();
   const { socket } = useSocket();
@@ -224,6 +229,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   // Item picker modal for adding to existing table order
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [menuItems, setMenuItems] = useState<any[]>([]);
+  // Quick Order tab: full menu (categories + items) and a local tap-to-add cart.
+  const [quickMenuCategories, setQuickMenuCategories] = useState<any[]>([]);
+  const [quickMenuItems, setQuickMenuItems] = useState<any[]>([]);
+  const [quickCustomerName, setQuickCustomerName] = useState('');
+  const [quickCart, setQuickCart] = useState<{ id: string; name: string; price: number; quantity: number }[]>([]);
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -285,6 +295,23 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Quick Order menu — fetched once per module; the tab groups items by the
+  // categories the menu endpoint already returns (currently discarded by the
+  // item-picker path).
+  useEffect(() => {
+    const loadQuickMenu = async () => {
+      try {
+        const res = await api.get(`/staff/modules/${moduleSlug}/menu`);
+        const data = res.data?.data;
+        setQuickMenuCategories(Array.isArray(data?.categories) ? data.categories : []);
+        setQuickMenuItems(Array.isArray(data?.items) ? data.items : []);
+      } catch (error) {
+        console.error('Failed to load quick-order menu:', error);
+      }
+    };
+    loadQuickMenu();
+  }, [moduleSlug]);
 
   // Real-time updates
   useEffect(() => {
@@ -434,6 +461,50 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
     }
   };
 
+  // Quick Order cart actions
+  const addToQuickCart = (item: any) => {
+    setQuickCart(prev => {
+      const existing = prev.find(c => c.id === item.id);
+      if (existing) {
+        return prev.map(c => c.id === item.id ? { ...c, quantity: c.quantity + 1 } : c);
+      }
+      return [...prev, { id: item.id, name: item.name, price: Number(item.price ?? item.unitPrice ?? 0), quantity: 1 }];
+    });
+  };
+
+  const decrementQuickCartItem = (id: string) => {
+    setQuickCart(prev => prev
+      .map(c => c.id === id ? { ...c, quantity: c.quantity - 1 } : c)
+      .filter(c => c.quantity > 0)
+    );
+  };
+
+  const removeQuickCartItem = (id: string) => {
+    setQuickCart(prev => prev.filter(c => c.id !== id));
+  };
+
+  const quickCartTotal = quickCart.reduce((sum, c) => sum + c.price * c.quantity, 0);
+
+  const placeQuickOrder = async () => {
+    if (quickCart.length === 0) {
+      toast.error('Add at least one item');
+      return;
+    }
+    try {
+      await api.post(`/staff/modules/${moduleSlug}/orders`, {
+        items: quickCart.map(c => ({ catalogItemId: c.id, quantity: c.quantity, unitPrice: c.price })),
+        customerName: quickCustomerName.trim() || 'Walk-in',
+        orderType: 'counter',
+      });
+      setQuickCart([]);
+      setQuickCustomerName('');
+      toast.success('Order placed');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to place order');
+    }
+  };
+
   // Split/merge tables
   const splitTable = async (tableId: string, newTableId: string, itemIds: string[]) => {
     try {
@@ -478,9 +549,9 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
     }
   };
 
-  const endShift = async (closingCash: number) => {
+  const endShift = async (closingCash?: number) => {
     try {
-      await api.post(`/staff/shifts/${currentShift?.id}/close`, { closingCash });
+      await api.post(`/staff/shifts/${currentShift?.id}/close`, closingCash !== undefined ? { closingCash } : {});
       setCurrentShift(null);
       setShowShiftModal(false);
       toast.success('Shift ended');
@@ -584,6 +655,19 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
     return minutes;
   };
 
+  // Display label for the persisted order_type (metadata.order_type). Unlike
+  // the old engine_type fallback, this is real order data: 'dine_in',
+  // 'counter', 'takeaway', 'delivery'.
+  const orderTypeLabel = (orderType?: string) => {
+    switch (orderType) {
+      case 'dine_in': return 'Dine-in';
+      case 'counter': return 'Counter';
+      case 'takeaway': return 'Takeaway';
+      case 'delivery': return 'Delivery';
+      default: return orderType ? orderType.replace(/_/g, ' ') : '';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -605,20 +689,22 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
               Please start your shift to begin taking orders
             </p>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Opening Cash</label>
-                <input
-                  type="number"
-                  placeholder="0.00"
-                  className="w-full px-4 py-3 border rounded-lg text-lg"
-                  id="openingCash"
-                />
-              </div>
+              {cashHandlingEnabled && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Opening Cash</label>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    className="w-full px-4 py-3 border rounded-lg text-lg"
+                    id="openingCash"
+                  />
+                </div>
+              )}
               <Button
                 className="w-full"
                 onClick={() => {
-                  const input = document.getElementById('openingCash') as HTMLInputElement;
-                  startShift(parseFloat(input.value) || 0);
+                  const input = document.getElementById('openingCash') as HTMLInputElement | null;
+                  startShift(input ? parseFloat(input.value) || 0 : 0);
                 }}
               >
                 Start Shift
@@ -647,6 +733,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
             {[
               { mode: 'floor' as ViewMode, icon: LayoutGrid, label: 'Stations' },
               { mode: 'orders' as ViewMode, icon: UtensilsCrossed, label: 'Orders' },
+              { mode: 'quick-order' as ViewMode, icon: ShoppingCart, label: 'Quick Order' },
               { mode: 'kitchen' as ViewMode, icon: ChefHat, label: 'Kitchen' },
               { mode: 'dispatch' as ViewMode, icon: Truck, label: 'Dispatch' },
               { mode: 'cashier' as ViewMode, icon: CreditCard, label: 'Cashier' },
@@ -834,7 +921,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                           <div>
                             <CardTitle className="text-lg">#{order.orderNumber}</CardTitle>
                             <p className="text-sm text-gray-500 flex items-center gap-1.5 flex-wrap">
-                              <span>{order.tableNumber ? `Table ${order.tableNumber}` : order.orderType}</span>
+                              <span>{order.tableNumber ? `Table ${order.tableNumber}` : orderTypeLabel(order.orderType)}</span>
                               {order.staffName && (
                                 <span className="text-[11px] bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium px-1.5 py-0.5 rounded">
                                   Server: {order.staffName}
@@ -943,6 +1030,132 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
           </div>
         )}
 
+        {/* Quick Order View */}
+        {viewMode === 'quick-order' && (
+          <div className="h-full grid grid-cols-3 gap-4">
+            {/* Menu grouped by category */}
+            <div className="col-span-2 bg-white dark:bg-gray-800 rounded-xl p-4 overflow-y-auto">
+              {quickMenuCategories.length === 0 ? (
+                <div className="space-y-2">
+                  {quickMenuItems.map((item: any) => (
+                    <button
+                      key={item.id}
+                      onClick={() => addToQuickCart(item)}
+                      className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <span className="font-medium">{item.name}</span>
+                      <span className="text-primary font-semibold">{formatCurrency(item.price ?? item.unitPrice ?? 0)}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {quickMenuCategories.map((cat: any) => (
+                    <div key={cat.id}>
+                      <h3 className="font-semibold capitalize mb-3">{cat.name}</h3>
+                      <div className="space-y-2">
+                        {quickMenuItems
+                          .filter((i: any) => i.categoryId === cat.id)
+                          .map((item: any) => (
+                            <button
+                              key={item.id}
+                              onClick={() => addToQuickCart(item)}
+                              className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                            >
+                              <div className="text-left">
+                                <p className="font-medium">{item.name}</p>
+                                {item.description && <p className="text-xs text-gray-500">{item.description}</p>}
+                              </div>
+                              <span className="text-primary font-semibold">{formatCurrency(item.price ?? item.unitPrice ?? 0)}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  ))}
+                  {quickMenuItems.some((i: any) => !i.categoryId) && (
+                    <div>
+                      <h3 className="font-semibold mb-3">Other</h3>
+                      <div className="space-y-2">
+                        {quickMenuItems
+                          .filter((i: any) => !i.categoryId)
+                          .map((item: any) => (
+                            <button
+                              key={item.id}
+                              onClick={() => addToQuickCart(item)}
+                              className="w-full flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                            >
+                              <span className="font-medium">{item.name}</span>
+                              <span className="text-primary font-semibold">{formatCurrency(item.price ?? item.unitPrice ?? 0)}</span>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Cart */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 flex flex-col overflow-y-auto">
+              <h3 className="text-lg font-bold mb-4">Current Order</h3>
+              <input
+                type="text"
+                placeholder="Customer name (optional)"
+                value={quickCustomerName}
+                onChange={(e) => setQuickCustomerName(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+              />
+              {quickCart.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">Tap items to add them to the order</p>
+              ) : (
+                <div className="flex-1 space-y-2">
+                  {quickCart.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-2 border rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.name}</p>
+                        <p className="text-sm text-gray-500">{formatCurrency(item.price)} each</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => decrementQuickCartItem(item.id)}
+                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <span className="w-6 text-center font-bold">{item.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => addToQuickCart(item)}
+                          className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeQuickCartItem(item.id)}
+                          className="p-1 rounded hover:bg-red-50 text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="border-t pt-4 mt-4 space-y-3">
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total</span>
+                  <span>{formatCurrency(quickCartTotal)}</span>
+                </div>
+                <Button className="w-full" onClick={placeQuickOrder} disabled={quickCart.length === 0}>
+                  <ShoppingCart className="h-4 w-4 mr-2" /> Place Order
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Kitchen Display View */}
         {viewMode === 'kitchen' && (
           <div className="h-full">
@@ -972,7 +1185,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                         </div>
                       </div>
                       <p className="text-sm text-gray-500">
-                        {order.tableNumber ? `Table ${order.tableNumber}` : order.orderType}
+                        {order.tableNumber ? `Table ${order.tableNumber}` : orderTypeLabel(order.orderType)}
                       </p>
                     </CardHeader>
                     <CardContent>
@@ -1042,7 +1255,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                       <div>
                         <span className="font-bold">#{order.orderNumber}</span>
                         <span className="text-gray-500 ml-2">
-                          {order.tableNumber ? `Table ${order.tableNumber}` : order.orderType}
+                          {order.tableNumber ? `Table ${order.tableNumber}` : orderTypeLabel(order.orderType)}
                         </span>
                       </div>
                       <div className="flex items-center gap-4">
@@ -1065,6 +1278,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
 
             {/* Cash Drawer & Quick Actions */}
             <div className="space-y-4">
+              {cashHandlingEnabled && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1107,6 +1321,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               <Card>
                 <CardHeader>
@@ -1131,13 +1346,15 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                       </span>
                     </div>
                   </div>
-                  <Button
-                    className="w-full mt-4"
-                    variant="outline"
-                    onClick={() => setShowShiftModal(true)}
-                  >
-                    <Receipt className="h-4 w-4 mr-2" /> Z-Report & Close
-                  </Button>
+                  {cashHandlingEnabled && (
+                    <Button
+                      className="w-full mt-4"
+                      variant="outline"
+                      onClick={() => setShowShiftModal(true)}
+                    >
+                      <Receipt className="h-4 w-4 mr-2" /> Z-Report & Close
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1169,7 +1386,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {['card', 'cash', 'gift_card', 'split'].map(method => (
+                {(cashHandlingEnabled ? ['card', 'cash', 'gift_card', 'split'] : ['card', 'gift_card', 'split']).map(method => (
                   <button
                     key={method}
                     onClick={() => processPayment(selectedOrder.id, method, selectedOrder.totalAmount)}
@@ -1208,15 +1425,17 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Actual Cash in Drawer</label>
-                  <input
-                    type="number"
-                    placeholder="0.00"
-                    className="w-full px-4 py-3 border rounded-lg text-lg"
-                    id="closingCash"
-                  />
-                </div>
+                {cashHandlingEnabled && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Actual Cash in Drawer</label>
+                    <input
+                      type="number"
+                      placeholder="0.00"
+                      className="w-full px-4 py-3 border rounded-lg text-lg"
+                      id="closingCash"
+                    />
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <Button
                     variant="outline"
@@ -1228,8 +1447,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                   <Button
                     className="flex-1"
                     onClick={() => {
-                      const input = document.getElementById('closingCash') as HTMLInputElement;
-                      endShift(parseFloat(input.value) || 0);
+                      const input = document.getElementById('closingCash') as HTMLInputElement | null;
+                      endShift(input ? parseFloat(input.value) || 0 : undefined);
                     }}
                   >
                     End Shift

@@ -25,6 +25,7 @@ interface ModuleData {
   description?: string;
   is_active: boolean;
   require_reservation?: boolean | null;
+  settings?: { cashHandlingEnabled?: boolean } | null;
 }
 
 export default function ModulesSlugPage() {
@@ -95,6 +96,7 @@ export default function ModulesSlugPage() {
           moduleSlug={slug}
           moduleName={module.name}
           requireReservation={module.require_reservation}
+          cashHandlingEnabled={module.settings?.cashHandlingEnabled !== false}
         />
       );
 

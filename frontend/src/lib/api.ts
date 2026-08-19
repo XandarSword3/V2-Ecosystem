@@ -363,6 +363,14 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Login and refresh are the auth bootstrap endpoints themselves. A 401
+    // from either must be returned to the caller instead of triggering another
+    // refresh request; otherwise a bad login produces a misleading second
+    // POST /auth/refresh and can make the client appear to be stuck in a
+    // refresh loop.
+    const requestUrl = originalRequest?.url || '';
+    const isAuthBootstrapRequest = /\/auth\/(?:login|refresh)$/.test(requestUrl);
+
     // Initialize retry count
     originalRequest._retryCount = originalRequest._retryCount || 0;
 
@@ -384,7 +392,7 @@ api.interceptors.response.use(
     }
 
     // Handle 401 errors with token refresh
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthBootstrapRequest) {
       originalRequest._retry = true;
 
       try {

@@ -266,7 +266,8 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
             { name: t('nav.customers'), href: `${base}/users/customers`, translationKey: 'nav.customers' },
             { name: t('nav.staff'), href: `${base}/users/staff`, translationKey: 'nav.staff' },
             { name: t('nav.admins'), href: `${base}/users/admins`, translationKey: 'nav.admins' },
-            { name: t('nav.rolesPermissions'), href: `${base}/users/roles`, translationKey: 'nav.rolesPermissions' },
+            // Roles & Permissions intentionally hidden — the permission editor is
+            // temporarily disabled (see permissions.controller.ts updateRolePermissions).
             { name: t('nav.liveUsers') || 'Live Users', href: `${base}/users/live`, translationKey: 'nav.liveUsers' },
           ],
         },

@@ -95,6 +95,9 @@ router.delete('/shifts/swap/:id', authorize(...staffRoles), staffController.canc
 router.post('/scan', authorize(...staffRoles), staffController.scanCode);
 router.get('/customers/search', authorize(...staffRoles), staffController.searchCustomers);
 
+// Staff reviews — the caller's own ratings breakdown
+router.get('/reviews/me', authorize(...staffRoles), staffController.getMyReviews);
+
 // Live transactions endpoint for staff dashboard
 router.get('/transactions/live', authorize(...staffRoles), staffController.getLiveTransactions);
 

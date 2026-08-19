@@ -62,7 +62,7 @@ class NotificationService {
       unreadOnly?: boolean;
       type?: string;
       limit?: number;
-      propertyId?: string;
+      propertyId: string;
     }
   ): Promise<Notification[]> {
     const supabase = getSupabase();
@@ -72,6 +72,8 @@ class NotificationService {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+
+    query = query.eq('property_id', options.propertyId);
 
     if (options.unreadOnly) {
       query = query.eq('read', false);
@@ -98,13 +100,15 @@ class NotificationService {
   /**
    * Mark a notification as read
    */
-  async markAsRead(id: string): Promise<Notification | null> {
+  async markAsRead(id: string, userId: string, propertyId: string): Promise<Notification | null> {
     const supabase = getSupabase();
     
     const { data, error } = await supabase
       .from('notifications')
       .update({ read: true, read_at: new Date().toISOString() })
       .eq('id', id)
+      .eq('user_id', userId)
+      .eq('property_id', propertyId)
       .select()
       .single();
 
@@ -119,13 +123,14 @@ class NotificationService {
   /**
    * Mark all notifications as read for a user
    */
-  async markAllAsRead(userId: string): Promise<number> {
+  async markAllAsRead(userId: string, propertyId: string): Promise<number> {
     const supabase = getSupabase();
     
     const { data, error } = await supabase
       .from('notifications')
       .update({ read: true, read_at: new Date().toISOString() })
       .eq('user_id', userId)
+      .eq('property_id', propertyId)
       .eq('read', false)
       .select('id');
 
@@ -150,7 +155,8 @@ class NotificationService {
     actions?: any[];
     scheduledFor?: string;
     createdBy?: string;
-    propertyId?: string;
+    propertyId: string;
+    tenantId: string;
   }): Promise<NotificationBroadcast> {
     const supabase = getSupabase();
     
@@ -163,6 +169,8 @@ class NotificationService {
         priority: options.priority || 'normal',
         scheduled_for: options.scheduledFor,
         created_by: options.createdBy,
+        property_id: options.propertyId,
+        tenant_id: options.tenantId,
       })
       .select()
       .single();
@@ -183,6 +191,8 @@ class NotificationService {
         priority: options.priority || 'normal',
         target_type: options.targetType,
         actions: options.actions || [],
+        property_id: options.propertyId,
+        tenant_id: options.tenantId,
       }));
 
       const { error: notifError } = await supabase
@@ -200,13 +210,15 @@ class NotificationService {
   /**
    * Delete a notification
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, userId: string, propertyId: string): Promise<void> {
     const supabase = getSupabase();
     
     const { error } = await supabase
       .from('notifications')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', userId)
+      .eq('property_id', propertyId);
 
     if (error) {
       logger.error('Error deleting notification:', error);
@@ -217,13 +229,15 @@ class NotificationService {
   /**
    * Delete multiple notifications
    */
-  async deleteMultiple(ids: string[]): Promise<number> {
+  async deleteMultiple(ids: string[], userId: string, propertyId: string): Promise<number> {
     const supabase = getSupabase();
     
     const { error } = await supabase
       .from('notifications')
       .delete()
-      .in('id', ids);
+      .in('id', ids)
+      .eq('user_id', userId)
+      .eq('property_id', propertyId);
 
     if (error) {
       logger.error('Error deleting notifications:', error);
@@ -236,13 +250,15 @@ class NotificationService {
   /**
    * Get notification templates
    */
-  async getTemplates(activeOnly: boolean = true, propertyId?: string): Promise<NotificationTemplate[]> {
+  async getTemplates(activeOnly: boolean = true, propertyId: string): Promise<NotificationTemplate[]> {
     const supabase = getSupabase();
     
     let query = supabase
       .from('notification_templates')
       .select('*')
       .order('created_at', { ascending: false });
+
+    query = query.eq('property_id', propertyId);
 
     if (activeOnly) {
       query = query.eq('is_active', true);
@@ -261,13 +277,14 @@ class NotificationService {
   /**
    * Get a template by ID
    */
-  async getTemplateById(id: string): Promise<NotificationTemplate | null> {
+  async getTemplateById(id: string, propertyId: string): Promise<NotificationTemplate | null> {
     const supabase = getSupabase();
     
     const { data, error } = await supabase
       .from('notification_templates')
       .select('*')
       .eq('id', id)
+      .eq('property_id', propertyId)
       .single();
 
     if (error) {
@@ -291,7 +308,8 @@ class NotificationService {
     actions?: any[];
     variables?: any[];
     isActive?: boolean;
-    propertyId?: string;
+    propertyId: string;
+    tenantId: string;
   }): Promise<NotificationTemplate> {
     const supabase = getSupabase();
     
@@ -305,6 +323,8 @@ class NotificationService {
         body_template: options.message,
         variables: options.variables || [],
         is_active: options.isActive !== false,
+        property_id: options.propertyId,
+        tenant_id: options.tenantId,
       })
       .select()
       .single();
@@ -332,7 +352,7 @@ class NotificationService {
       actions?: any[];
       variables?: any[];
       isActive?: boolean;
-      propertyId?: string;
+      propertyId: string;
     }
   ): Promise<NotificationTemplate | null> {
     const supabase = getSupabase();
@@ -352,6 +372,7 @@ class NotificationService {
       .from('notification_templates')
       .update(updateData)
       .eq('id', id)
+      .eq('property_id', options.propertyId)
       .select()
       .single();
 
@@ -366,13 +387,14 @@ class NotificationService {
   /**
    * Delete a notification template
    */
-  async deleteTemplate(id: string): Promise<void> {
+  async deleteTemplate(id: string, propertyId: string): Promise<void> {
     const supabase = getSupabase();
     
     const { error } = await supabase
       .from('notification_templates')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('property_id', propertyId);
 
     if (error) {
       logger.error('Error deleting template:', error);
@@ -390,9 +412,11 @@ class NotificationService {
       targetUserIds?: string[];
       scheduledFor?: string;
       createdBy?: string;
+      propertyId: string;
+      tenantId: string;
     }
   ): Promise<NotificationBroadcast> {
-    const template = await this.getTemplateById(templateId);
+    const template = await this.getTemplateById(templateId, options.propertyId);
     
     if (!template) {
       throw new Error('Template not found');
@@ -414,20 +438,27 @@ class NotificationService {
       targetUserIds: options.targetUserIds,
       scheduledFor: options.scheduledFor,
       createdBy: options.createdBy,
+      propertyId: options.propertyId,
+      tenantId: options.tenantId,
     });
   }
 
   /**
    * Get notification broadcasts
    */
-  async getBroadcasts(targetType?: string, propertyId?: string): Promise<NotificationBroadcast[]> {
+  async getBroadcasts(targetType: string | undefined, propertyId: string): Promise<NotificationBroadcast[]> {
     const supabase = getSupabase();
     
-    const { data, error } = await supabase
+    let query = supabase
       .from('notification_broadcasts')
       .select('*')
+      .eq('property_id', propertyId)
       .order('created_at', { ascending: false })
       .limit(50);
+
+    if (targetType) query = query.eq('target_type', targetType);
+
+    const { data, error } = await query;
 
     if (error) {
       logger.error('Error fetching broadcasts:', error);
@@ -447,7 +478,7 @@ class NotificationService {
   /**
    * Process scheduled notifications
    */
-  async processScheduledNotifications(): Promise<number> {
+  async processScheduledNotifications(propertyId: string): Promise<number> {
     const supabase = getSupabase();
     
     const now = new Date().toISOString();
@@ -455,6 +486,7 @@ class NotificationService {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
+      .eq('property_id', propertyId)
       .lte('scheduled_for', now)
       .is('sent_at', null);
 
@@ -472,7 +504,8 @@ class NotificationService {
     const { error: updateError } = await supabase
       .from('notifications')
       .update({ sent_at: now })
-      .in('id', ids);
+      .in('id', ids)
+      .eq('property_id', propertyId);
 
     if (updateError) {
       logger.error('Error updating scheduled notifications:', updateError);
@@ -495,6 +528,8 @@ class NotificationService {
     targetType?: string;
     targetId?: string;
     actions?: any[];
+    propertyId: string;
+    tenantId: string;
   }): Promise<Notification | null> {
     const supabase = getSupabase();
 
@@ -511,6 +546,8 @@ class NotificationService {
         target_id: options.targetId,
         actions: options.actions || [],
         read: false,
+        property_id: options.propertyId,
+        tenant_id: options.tenantId,
       })
       .select()
       .single();
