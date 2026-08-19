@@ -1570,7 +1570,7 @@ function buildInstantTransactionRouter(router: Router): void {
         // POST /orders below) but were previously never selected here, so
         // the confirmation page had no way to show a subtotal/discount/tax
         // breakdown even though the data existed on the row.
-        .select('id, customer_id, staff_id, status, amount, tax_amount, discount_amount, created_at, metadata')
+        .select('id, customer_id, staff_id, service_location_id, status, amount, tax_amount, discount_amount, created_at, metadata')
         .eq('engine_type', 'instant_transaction')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
@@ -1584,14 +1584,26 @@ function buildInstantTransactionRouter(router: Router): void {
       }
       const meta = (data?.metadata ?? {}) as Record<string, unknown>;
       // Expose the serving staff member so the customer can leave a staff
-      // review (POST /orders/:id/staff-review). staff_id on a transaction is
-      // the serving staff's users.id, so resolve the display name from users.
+      // review (POST /orders/:id/staff-review). The serving staff is the
+      // table's assigned server (service_locations.assigned_staff_id) when the
+      // order is tied to a table, falling back to transactions.staff_id (set
+      // when a staff member created the order directly).
+      let resolvedStaffId: string | null = data?.staff_id ?? null;
+      if (data?.service_location_id) {
+        const { data: location } = await supabase
+          .from('service_locations')
+          .select('id, assigned_staff_id')
+          .eq('id', data.service_location_id)
+          .eq('module_id', mounted.id)
+          .maybeSingle();
+        if (location?.assigned_staff_id) resolvedStaffId = location.assigned_staff_id;
+      }
       let staffName: string | null = null;
-      if (data?.staff_id) {
+      if (resolvedStaffId) {
         const { data: staffRow } = await supabase
           .from('users')
           .select('id, full_name, email')
-          .eq('id', data.staff_id)
+          .eq('id', resolvedStaffId)
           .maybeSingle();
         staffName = staffRow?.full_name || staffRow?.email || null;
       }
@@ -1646,7 +1658,7 @@ function buildInstantTransactionRouter(router: Router): void {
           order_type: meta.order_type ?? 'dine_in',
           customer_name: meta.customer_name ?? null,
           customer_phone: meta.customer_phone ?? null,
-          staff_id: data?.staff_id ?? null,
+          staff_id: resolvedStaffId,
           staff_name: staffName,
           notes: meta.notes ?? ledgerBreakdown?.notes ?? null,
           table_id: meta.table_number ?? null,
@@ -1804,19 +1816,37 @@ function buildInstantTransactionRouter(router: Router): void {
       const supabase = getSupabase();
       const { data: order } = await supabase
         .from('transactions')
-        .select('staff_id')
+        .select('staff_id, service_location_id')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
 
-      if (!order || !order.staff_id) {
+      if (!order) {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+
+      // Serving staff is resolved the same way GET /orders/:id does: table
+      // orders route through service_locations.assigned_staff_id, everything
+      // else falls back to the transaction's own staff_id.
+      let staffId: string | null = order.staff_id ?? null;
+      if (order.service_location_id) {
+        const { data: location } = await supabase
+          .from('service_locations')
+          .select('assigned_staff_id')
+          .eq('id', order.service_location_id)
+          .eq('module_id', mounted.id)
+          .maybeSingle();
+        if (location?.assigned_staff_id) staffId = location.assigned_staff_id;
+      }
+
+      if (!staffId) {
         return res.status(400).json({ success: false, error: 'Order has no assigned staff member to review' });
       }
 
       const review = await submitStaffReview({
         tenantId,
         propertyId: mounted.property_id,
-        staffId: order.staff_id,
+        staffId,
         orderId: req.params.id,
         rating: Number(rating),
         text: text ? String(text) : null,

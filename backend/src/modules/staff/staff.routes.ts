@@ -49,6 +49,10 @@ router.delete('/shifts/:id', authorize(...managerRoles), staffController.deleteS
 router.post('/shifts/:id/clock-in', authorize(...staffRoles), staffController.clockIn);
 router.post('/shifts/:id/clock-out', authorize(...staffRoles), staffController.clockOut);
 
+// Record late/early-leave reasons after the fact (lateness is only known once
+// clock-in/clock-out compares actual vs scheduled time).
+router.patch('/shifts/:id/reasons', authorize(...staffRoles), staffController.updateShiftReasons);
+
 // ============================================
 // Staff Assignments
 // ============================================

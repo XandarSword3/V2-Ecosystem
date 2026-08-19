@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger.js';
 import { validateBody } from '../../validation/schemas.js';
 import { emitToUnit } from '../../socket/index.js';
 import { autoAssignStaffToLocation, reassignStaffToLocation } from '../reservations/reservations.service.js';
+import { resolveAndPriceCatalogItems } from '../../services/catalog-pricing.service.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
@@ -1858,7 +1859,7 @@ export async function searchCustomers(req: Request, res: Response) {
 export async function createModuleOrder(req: Request, res: Response) {
   try {
     const { slug } = req.params;
-    const { serviceLocationId: reqServiceLocId, tableId, tableNumber, customerName, customerId, items, notes, orderType } = req.body;
+    const { serviceLocationId: reqServiceLocId, tableId, tableNumber, customerName, customerId, items, notes, orderType, paymentMethod } = req.body;
     const serviceLocationId = reqServiceLocId || tableId;
     // A staff order knows what it is: table orders are dine-in, everything else
     // (Quick Order tab, no service location) is a counter order. Persisted on
@@ -1901,12 +1902,79 @@ export async function createModuleOrder(req: Request, res: Response) {
     }
 
     const orderItemsInput = Array.isArray(items) ? items : [];
-    let calculatedAmount = 0;
-    for (const item of orderItemsInput) {
-      const qty = Number(item.quantity || item.qty || 1);
-      const price = Number(item.unitPrice || item.price || 0);
-      calculatedAmount += qty * price;
+
+    // Staff orders price through the SAME pipeline the customer path uses,
+    // instead of hand-rolling qty * (client-supplied unitPrice). Prices are
+    // resolved server-side from catalog_items, so a staff caller can't
+    // over/under-charge by sending their own unitPrice.
+    let pricing: any = null;
+    let resolvedItems: Array<{
+      itemId: string;
+      name: string;
+      basePrice: number;
+      quantity: number;
+      modifierAdjustment: number;
+      taxCategory: string;
+      metadata?: Record<string, unknown>;
+    }> = [];
+    let receiptLineItems: Array<Record<string, unknown>> = [];
+
+    if (orderItemsInput.length > 0) {
+      const catalogRequests = orderItemsInput.map((i: any) => ({
+        catalog_item_id: i.catalogItemId || i.itemId || i.id,
+        quantity: Number(i.quantity || i.qty || 1),
+        ...(Array.isArray(i.selectedModifiers) && i.selectedModifiers.length > 0
+          ? { metadata: { selectedModifiers: i.selectedModifiers } }
+          : {}),
+      }));
+
+      const catalogResult = await resolveAndPriceCatalogItems(catalogRequests, module.id);
+      if (catalogResult.validationErrors.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'INVALID_CATALOG_ITEMS',
+          message: 'One or more items could not be priced',
+          details: catalogResult.validationErrors,
+        });
+      }
+      resolvedItems = catalogResult.resolvedItems;
+
+      const lineItems = resolvedItems.map((item) => ({
+        itemId: item.itemId,
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.basePrice + item.modifierAdjustment,
+        metadata: item.metadata,
+        taxCategory: item.taxCategory,
+      }));
+
+      const engineService = getEngineService();
+      pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
+        moduleId: module.id,
+        propertyId: propertyId ?? undefined,
+        customerId: customerId ?? undefined,
+        staffId: userId ?? undefined,
+        conditions: { orderType: resolvedOrderType, paymentMethod: paymentMethod || 'cash' },
+      });
+
+      receiptLineItems = resolvedItems.map((item) => {
+        const unitPrice = item.basePrice + item.modifierAdjustment;
+        return {
+          itemId: item.itemId,
+          name: item.name,
+          quantity: item.quantity,
+          unitPrice,
+          lineTotal: unitPrice * item.quantity,
+          ...(Array.isArray(item.metadata?.selectedModifiers)
+            ? { selectedModifiers: item.metadata.selectedModifiers }
+            : {}),
+        };
+      });
     }
+
+    const totalAmount = pricing ? pricing.totalAmount : 0;
+    const taxAmount = pricing ? pricing.taxAmount : 0;
+    const discountAmount = pricing ? pricing.totalDiscount : 0;
 
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase().slice(-5)}`;
 
@@ -1915,7 +1983,9 @@ export async function createModuleOrder(req: Request, res: Response) {
       .insert({
         engine_type: 'instant_transaction',
         status: 'confirmed',
-        amount: Math.round(calculatedAmount * 100) / 100,
+        amount: Math.round(totalAmount * 100) / 100,
+        tax_amount: Math.round(taxAmount * 100) / 100,
+        discount_amount: Math.round(discountAmount * 100) / 100,
         module_id: module.id,
         service_location_id: locationId || null,
         staff_id: userId || null,
@@ -1930,7 +2000,15 @@ export async function createModuleOrder(req: Request, res: Response) {
           order_type: resolvedOrderType,
           notes: notes || null,
           payment_status: 'unpaid',
-          payment_method: 'cash',
+          // No payment-method default: an unpaid order has no method until
+          // payModuleOrder settles it. Passing paymentMethod here is only
+          // meaningful for flows that settle at creation time.
+          payment_method: paymentMethod || null,
+          // The full pricing breakdown is snapshotted at creation so
+          // payModuleOrder can record the exact same numbers to the financial
+          // ledger when payment actually happens (see payModuleOrder).
+          ...(pricing ? { pricing } : {}),
+          ...(receiptLineItems.length > 0 ? { lineItems: receiptLineItems } : {}),
         },
       })
       .select()
@@ -1939,10 +2017,10 @@ export async function createModuleOrder(req: Request, res: Response) {
     if (txError) throw txError;
 
     // Deduct inventory atomically with audit trail; roll back on stock failure
-    if (orderItemsInput.length > 0) {
-      const deductionPayload = orderItemsInput.map((i: any) => ({
-        catalog_item_id: i.catalogItemId || i.itemId || i.id,
-        quantity: Number(i.quantity || i.qty || 1),
+    if (resolvedItems.length > 0) {
+      const deductionPayload = resolvedItems.map((item) => ({
+        catalog_item_id: item.itemId,
+        quantity: item.quantity,
       }));
       const { error: deductError } = await supabase.rpc('deduct_inventory_for_order_items', {
         p_items: deductionPayload,
@@ -1962,30 +2040,31 @@ export async function createModuleOrder(req: Request, res: Response) {
     }
 
     const createdItems: any[] = [];
-    if (orderItemsInput.length > 0) {
+    if (resolvedItems.length > 0) {
       // selectedModifiers isn't sent by any current staff UI (StaffPOSTemplate /
       // AdminPOSTemplate have no customization selector today — only the
       // customer-facing MenuService/DynamicModuleRenderer flow does), so this
       // is defensive: if a caller ever does send it (future staff modifier UI,
       // a customer-cart handoff, direct API use), it's captured and actually
-      // acted on below instead of silently discarded. Previously this field
-      // was dropped entirely — the item would be charged for and recorded,
-      // but its ingredients/add-ons were never deducted, which is a much
-      // harder bug to notice after the fact than a loud failure now.
-      const itemInserts = orderItemsInput.map((i: any) => ({
-        transaction_id: transaction.id,
-        catalog_item_id: i.catalogItemId || i.itemId || i.id,
-        quantity: Number(i.quantity || i.qty || 1),
-        unit_price: Number(i.unitPrice || i.price || 0),
-        subtotal: Math.round(Number(i.quantity || i.qty || 1) * Number(i.unitPrice || i.price || 0) * 100) / 100,
-        special_instructions: i.notes || i.instructions || null,
-        status: 'pending',
-        metadata: {
-          ...(Array.isArray(i.selectedModifiers) && i.selectedModifiers.length > 0
-            ? { selectedModifiers: i.selectedModifiers }
-            : {}),
-        },
-      }));
+      // acted on below instead of silently discarded.
+      const itemInserts = resolvedItems.map((item, index) => {
+        const source = (orderItemsInput[index] ?? {}) as any;
+        const unitPrice = item.basePrice + item.modifierAdjustment;
+        return {
+          transaction_id: transaction.id,
+          catalog_item_id: item.itemId,
+          quantity: item.quantity,
+          unit_price: unitPrice,
+          subtotal: Math.round(unitPrice * item.quantity * 100) / 100,
+          special_instructions: source.notes || source.instructions || null,
+          status: 'pending',
+          metadata: {
+            ...(Array.isArray(item.metadata?.selectedModifiers) && item.metadata.selectedModifiers.length > 0
+              ? { selectedModifiers: item.metadata.selectedModifiers }
+              : {}),
+          },
+        };
+      });
 
       const { data: insertedItems, error: itemsError } = await supabase
         .from('order_items')
@@ -2002,15 +2081,9 @@ export async function createModuleOrder(req: Request, res: Response) {
       // Mirrors dynamic-module.router.ts's customer order path exactly —
       // same RPC, same order_type, same compensating transaction on
       // failure — so the two order-creation paths stay consistent instead
-      // of silently diverging in what they deduct.
-      //
-      // Known gap NOT addressed here: calculatedAmount above is qty*price
-      // only and doesn't include any totalPriceAdjustment from selections
-      // (the customer path's total comes from a separate PricingPipeline
-      // this staff endpoint doesn't call at all). Inventory deduction is
-      // correct after this change; the order total is not, if modifiers
-      // carry a price adjustment. That's a pricing-pipeline gap, not an
-      // inventory one — flagging rather than folding into this fix.
+      // of silently diverging in what they deduct. Order totals now come
+      // from calculatePricing (see above), so modifier price adjustments
+      // are included in the charged amount and in the snapshotted pricing.
       if (createdItems.length > 0) {
         try {
           for (const orderItem of createdItems) {
@@ -2235,6 +2308,45 @@ export async function payModuleOrder(req: Request, res: Response) {
 
     if (updateErr) throw updateErr;
 
+    // Record the settled charge to the financial ledger — this is what makes a
+    // staff-originated sale visible to the books (receipts, reconciliation,
+    // reporting). The exact pricing snapshot was captured at creation
+    // (createModuleOrder stores metadata.pricing), so the ledger gets the same
+    // server-resolved numbers. Idempotent: a re-settle (already paid) skips
+    // the write so a double-tap can't double the books.
+    const wasAlreadyPaid = orderMeta.payment_status === 'paid';
+    const pricingSnapshot = orderMeta.pricing as any;
+    if (!wasAlreadyPaid && pricingSnapshot) {
+      try {
+        const engineService = getEngineService();
+        const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+        await engineService.recordToLedger(pricingSnapshot, {
+          tenantId: req.user?.tenantId || 'unknown',
+          propertyId,
+          moduleId: module.id,
+          templateType: 'instant_transaction',
+          entityId: order.id,
+          entityType: 'order',
+          transactionType: 'charge',
+          actorType: 'staff',
+          actorId: userId,
+          entityState: targetStatus,
+          paymentMethod,
+          idempotencyKey: `settle:${order.id}`,
+          metadata: {
+            lineItems: orderMeta.lineItems ?? [],
+            taxBreakdown: pricingSnapshot.taxBreakdown ?? [],
+            feeBreakdown: pricingSnapshot.feeBreakdown ?? [],
+          },
+        });
+      } catch (ledgerErr: any) {
+        logger.warn('Failed to record staff payment to financial ledger', {
+          orderId: order.id,
+          error: ledgerErr?.message || ledgerErr,
+        });
+      }
+    }
+
     // Award loyalty points for cash/staff-settled orders (idempotent, safe no-op if loyalty disabled or customer missing)
     try {
       await awardLoyaltyPointsForPayment('order', order.id, paidAmount);
@@ -2344,6 +2456,194 @@ export async function printModuleOrderReceipt(req: Request, res: Response) {
   }
 }
 
+// ============================================
+// Batched menu customizations (kills the per-item N+1)
+// ============================================
+
+interface MenuCustomizationOption {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+  description?: string | null;
+  customizationType: string;
+  priceAdjustment: number;
+  priceType: string;
+  maxQuantity: number;
+  isDefault: boolean;
+  isPopular: boolean;
+  badgeText?: string | null;
+  imageUrl?: string | null;
+  isAvailable: boolean;
+  inventoryItemId?: string | null;
+  quantityPerSelection: number;
+  sortOrder: number;
+}
+
+interface MenuCustomizationGroup {
+  groupId: string;
+  groupName: string;
+  groupNameAr?: string | null;
+  displayName?: string | null;
+  displayNameAr?: string | null;
+  selectionMode: string;
+  minSelections: number;
+  maxSelections: number;
+  isRequired: boolean;
+  sortOrder: number;
+  options: MenuCustomizationOption[];
+}
+
+/**
+ * Batch-fetch customization groups + options for a set of catalog items in a
+ * CONSTANT number of queries (links → groups → options), replacing the previous
+ * one get_entity_customizations RPC call per menu item.
+ *
+ * Mirrors the RPC's logic (explicit entity links + global groups, override
+ * fields, time-based availability, option filtering/stock), but scoped to the
+ * module's tenant/property — the RPC runs under the service role and returned
+ * every tenant's global groups, which is a cross-tenant leak for a per-property
+ * menu.
+ */
+async function fetchMenuCustomizationsBatched(
+  supabase: ReturnType<typeof getSupabase>,
+  itemIds: string[],
+  module: { id: string; tenant_id?: string | null; property_id?: string | null }
+): Promise<Map<string, MenuCustomizationGroup[]>> {
+  const result = new Map<string, MenuCustomizationGroup[]>();
+  if (itemIds.length === 0) return result;
+
+  // 1. Explicit entity_customizations links for these items.
+  const { data: links, error: linksErr } = await supabase
+    .from('entity_customizations')
+    .select('entity_id, customization_group_id, is_required_override, min_selections_override, max_selections_override, price_multiplier, sort_order')
+    .eq('entity_type', 'catalog_item')
+    .in('entity_id', itemIds)
+    .eq('is_enabled', true);
+  if (linksErr) throw linksErr;
+
+  const linkedGroupIds = [...new Set((links || []).map((l) => l.customization_group_id).filter(Boolean))];
+
+  // 2. Candidate groups: linked ones + global groups applicable to
+  //    'catalog_item', scoped to this module's tenant/property.
+  let globalQuery = supabase
+    .from('customization_groups')
+    .select('id, name, name_ar, display_name, display_name_ar, selection_mode, min_selections, max_selections, is_required, is_global, applicable_entity_types, available_from, available_until, available_days, sort_order')
+    .is('deleted_at', null)
+    .eq('is_available', true)
+    .eq('is_global', true);
+  if (module.tenant_id) globalQuery = globalQuery.eq('tenant_id', module.tenant_id);
+  if (module.property_id) globalQuery = globalQuery.eq('property_id', module.property_id);
+  const { data: globalGroups, error: globalErr } = await globalQuery;
+  if (globalErr) throw globalErr;
+
+  const allGroupIds = [...new Set([...linkedGroupIds, ...(globalGroups || []).map((g) => g.id)])];
+  const { data: linkedGroups, error: linkedGroupsErr } = allGroupIds.length > 0
+    ? await supabase
+        .from('customization_groups')
+        .select('id, name, name_ar, display_name, display_name_ar, selection_mode, min_selections, max_selections, is_required, is_global, applicable_entity_types, available_from, available_until, available_days, sort_order')
+        .in('id', allGroupIds)
+        .is('deleted_at', null)
+        .eq('is_available', true)
+    : { data: [] as any[], error: null };
+  if (linkedGroupsErr) throw linkedGroupsErr;
+
+  // 3. Options for every candidate group.
+  const { data: optionRows, error: optionsErr } = allGroupIds.length > 0
+    ? await supabase
+        .from('customization_options')
+        .select('id, group_id, name, name_ar, description, customization_type, price_adjustment, price_type, max_quantity, is_default, is_popular, badge_text, image_url, is_available, available_stock, inventory_item_id, quantity_per_selection, sort_order')
+        .in('group_id', allGroupIds)
+        .is('deleted_at', null)
+        .eq('is_available', true)
+    : { data: [] as any[], error: null };
+  if (optionsErr) throw optionsErr;
+
+  const optionsByGroup = new Map<string, any[]>();
+  for (const o of optionRows || []) {
+    const list = optionsByGroup.get(o.group_id) ?? [];
+    list.push(o);
+    optionsByGroup.set(o.group_id, list);
+  }
+
+  // 4. Time-based availability, same as the RPC (available_from/until as
+  //    HH:MM:SS strings; available_days as DOW 0=Sunday..6=Saturday).
+  const nowTime = new Date().toTimeString().slice(0, 8);
+  const todayDow = new Date().getDay();
+  const isGroupAvailableNow = (g: any) => {
+    if (g.available_from && nowTime < g.available_from) return false;
+    if (g.available_until && nowTime > g.available_until) return false;
+    if (Array.isArray(g.available_days) && g.available_days.length > 0 && !g.available_days.includes(todayDow)) return false;
+    return true;
+  };
+
+  const groupById = new Map((linkedGroups || []).map((g) => [g.id, g]));
+  const applicableGlobalIds = new Set(
+    (globalGroups || [])
+      .filter((g) => Array.isArray(g.applicable_entity_types) && g.applicable_entity_types.includes('catalog_item'))
+      .map((g) => g.id)
+  );
+
+  // 5. Assemble per item: linked groups (with per-link overrides) + applicable
+  //    global groups, sorted by sort_order like the RPC.
+  const assembleGroup = (g: any, link: any): MenuCustomizationGroup => {
+    const multiplier = link?.price_multiplier ?? 1;
+    const rawOptions = (optionsByGroup.get(g.id) ?? [])
+      .slice()
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.name ?? '').localeCompare(String(b.name ?? '')));
+    const options: MenuCustomizationOption[] = rawOptions.map((o) => ({
+      id: o.id,
+      name: o.name,
+      nameAr: o.name_ar ?? null,
+      description: o.description ?? null,
+      customizationType: o.customization_type,
+      priceAdjustment: Number(o.price_adjustment ?? 0) * multiplier,
+      priceType: o.price_type,
+      maxQuantity: o.max_quantity ?? 1,
+      isDefault: o.is_default ?? false,
+      isPopular: o.is_popular ?? false,
+      badgeText: o.badge_text ?? null,
+      imageUrl: o.image_url ?? null,
+      isAvailable: Boolean(o.is_available) && (o.available_stock == null || o.available_stock > 0),
+      inventoryItemId: o.inventory_item_id ?? null,
+      quantityPerSelection: o.quantity_per_selection ?? 1,
+      sortOrder: o.sort_order ?? 0,
+    }));
+    return {
+      groupId: g.id,
+      groupName: g.name,
+      groupNameAr: g.name_ar ?? null,
+      displayName: g.display_name ?? null,
+      displayNameAr: g.display_name_ar ?? null,
+      selectionMode: g.selection_mode,
+      minSelections: link?.min_selections_override ?? g.min_selections ?? 0,
+      maxSelections: link?.max_selections_override ?? g.max_selections ?? 99,
+      isRequired: link?.is_required_override ?? g.is_required ?? false,
+      sortOrder: link?.sort_order ?? g.sort_order ?? 0,
+      options,
+    };
+  };
+
+  for (const itemId of itemIds) {
+    const itemGroups: MenuCustomizationGroup[] = [];
+    const seen = new Set<string>();
+    for (const link of (links || []).filter((l) => l.entity_id === itemId)) {
+      const g = groupById.get(link.customization_group_id);
+      if (!g || seen.has(g.id) || !isGroupAvailableNow(g)) continue;
+      seen.add(g.id);
+      itemGroups.push(assembleGroup(g, link));
+    }
+    for (const g of globalGroups || []) {
+      if (seen.has(g.id) || !applicableGlobalIds.has(g.id) || !isGroupAvailableNow(g)) continue;
+      seen.add(g.id);
+      itemGroups.push(assembleGroup(g, undefined));
+    }
+    itemGroups.sort((a, b) => a.sortOrder - b.sortOrder || a.groupName.localeCompare(b.groupName));
+    result.set(itemId, itemGroups);
+  }
+
+  return result;
+}
+
 /**
  * Fetch catalog categories and active catalog items for order entry UI
  * GET /staff/modules/:slug/menu
@@ -2355,7 +2655,7 @@ export async function getModuleMenu(req: Request, res: Response) {
 
     const { data: module, error: moduleErr } = await supabase
       .from('modules')
-      .select('id, engine_type')
+      .select('id, engine_type, tenant_id, property_id')
       .eq('slug', slug)
       .single();
 
@@ -2384,7 +2684,7 @@ export async function getModuleMenu(req: Request, res: Response) {
     if (categoriesRes.error) throw categoriesRes.error;
     if (itemsRes.error) throw itemsRes.error;
 
-    const formattedItems = (itemsRes.data || []).map((item) => ({
+    const baseItems = (itemsRes.data || []).map((item) => ({
       id: item.id,
       categoryId: item.category_id,
       name: item.name,
@@ -2395,11 +2695,30 @@ export async function getModuleMenu(req: Request, res: Response) {
       isAvailable: item.is_available,
     }));
 
+    // Enrich each item with its customization groups + options so the Quick
+    // Order tab can offer modifier selection. Done in a constant number of
+    // queries (links → groups → options) rather than one RPC per item.
+    // Optional by design — a failure to load modifiers must not take down the
+    // whole menu.
+    let customizationsByItem: Map<string, MenuCustomizationGroup[]> = new Map();
+    try {
+      customizationsByItem = await fetchMenuCustomizationsBatched(supabase, baseItems.map((i) => i.id), module);
+    } catch (err) {
+      logger.warn('Failed to load menu customizations in batch', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    const itemsWithCustomizations = baseItems.map((item) => ({
+      ...item,
+      customizations: customizationsByItem.get(item.id) ?? [],
+    }));
+
     res.json({
       success: true,
       data: {
         categories: categoriesRes.data || [],
-        items: formattedItems,
+        items: itemsWithCustomizations,
       },
     });
   } catch (error: any) {

@@ -694,7 +694,11 @@ function ConfirmationContent() {
         })()}
 
         {/* ========== RATE YOUR SERVER (menu_service) ========== */}
-        {order && order.staff_id && ['ready', 'delivered', 'completed'].includes(order.status) && (
+        {/* Gated on the *resolved* server name, not transactions.staff_id:
+            the backend now routes table orders through
+            service_locations.assigned_staff_id, so staff_name is the single
+            source of truth for whether this order has someone to rate. */}
+        {order && order.staff_name && ['ready', 'delivered', 'completed'].includes(order.status) && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
