@@ -5,6 +5,11 @@
 
 import { supabase } from "../lib/supabase.js";
 import { getRedis } from "../config/session-store.js";
+import { getOnlineUsers } from "../socket/index.js";
+
+// Scopes that map to staff/admin (authorization tier is scope, not the legacy
+// users.role column).
+const STAFF_SCOPES = ['property_staff', 'property_manager', 'tenant_admin', 'tenant_owner'];
 
 export interface BookingMetrics {
   total_bookings: number;
@@ -249,7 +254,7 @@ class BusinessMetricsService {
           .from('users')
           .select('id', { count: 'exact', head: true })
           .gte('created_at', day7),
-        supabase.from('users').select('role'),
+        supabase.from('users').select('scope'),
       ]);
 
     const metrics: UserMetrics = {
@@ -263,10 +268,10 @@ class BusinessMetricsService {
       retention_rate: 0,
     };
 
-    // Group by role
+    // Group by scope (users.role is legacy/frozen)
     for (const user of roleData.data || []) {
-      const role = user.role || 'guest';
-      metrics.users_by_role[role] = (metrics.users_by_role[role] || 0) + 1;
+      const scope = user.scope || 'customer';
+      metrics.users_by_role[scope] = (metrics.users_by_role[scope] || 0) + 1;
     }
 
     // Calculate retention (simplified: active in 7d / active in 30d)
@@ -292,18 +297,22 @@ class BusinessMetricsService {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [txData, staffOnline, activeSessions] = await Promise.all([
+    const [txData, staffUsers, activeSessions] = await Promise.all([
       supabase
         .from('transactions')
         .select('status, engine_type')
         .gte('created_at', todayStart.toISOString()),
       supabase
         .from('users')
-        .select('id', { count: 'exact', head: true })
-        .in('role', ['staff', 'admin', 'kitchen'])
-        .eq('is_online', true),
+        .select('id')
+        .in('scope', STAFF_SCOPES),
       this.getActiveSessionCount(),
     ]);
+
+    // "Online" is presence data from the socket layer, not a users column
+    // (the previous users.is_online predicate targeted a column that doesn't exist).
+    const onlineUserIds = getOnlineUsers();
+    const staffOnlineCount = (staffUsers.data || []).filter((u: any) => onlineUserIds.includes(u.id)).length;
 
     const txs = txData.data || [];
     const transactionsByEngine: Record<string, number> = {};
@@ -317,7 +326,7 @@ class BusinessMetricsService {
       transactions_pending: txs.filter((t: any) => t.status === 'pending').length,
       transactions_completed: txs.filter((t: any) => t.status === 'completed').length,
       transactions_by_engine: transactionsByEngine,
-      staff_online: staffOnline.count || 0,
+      staff_online: staffOnlineCount,
       active_sessions: activeSessions,
     };
 

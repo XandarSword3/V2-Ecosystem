@@ -150,7 +150,7 @@ export async function getModuleOrders(req: Request, res: Response) {
     const staffNameById = new Map<string, string>();
     if (staffIds.length > 0) {
       const { data: staffRows } = await supabase
-        .from('profiles')
+        .from('users')
         .select('id, full_name, email')
         .in('id', staffIds);
 
@@ -1790,7 +1790,7 @@ export async function searchCustomers(req: Request, res: Response) {
       .from('users')
       .select('id, full_name, email, phone, created_at')
       .or(`full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
-      .eq('role', 'customer')
+      .eq('scope', 'customer')
       .limit(20);
 
     if (error) throw error;

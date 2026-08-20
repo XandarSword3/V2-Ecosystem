@@ -437,12 +437,20 @@ describe('OAuthService', () => {
       );
     });
 
-    it('should assign customer role to new users', async () => {
+    it('should create new users with customer scope (no legacy roles/user_roles)', async () => {
       setupGoogleMocks();
       await handleGoogleCallback('google-auth-code');
 
-      expect(mockFrom).toHaveBeenCalledWith('roles');
-      expect(mockFrom).toHaveBeenCalledWith('user_roles');
+      // scope is the authorization source of truth — the frozen roles/user_roles
+      // tables are no longer written or read on the OAuth path.
+      expect(mockFrom).not.toHaveBeenCalledWith('roles');
+      expect(mockFrom).not.toHaveBeenCalledWith('user_roles');
+      expect(generateTokens).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: 'customer',
+          roles: ['customer'],
+        })
+      );
     });
   });
 

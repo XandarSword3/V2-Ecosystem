@@ -12,12 +12,14 @@ import { generateTokens } from './auth.utils.js';
 import { config } from '../../config/index';
 import { logger } from '../../utils/logger.js';
 import { logActivity } from '../../utils/activityLogger.js';
+import { scopeToRoles } from '../../security/permissions.js';
 
 interface OAuthUser {
   id: string;
   email: string;
   fullName: string;
   roles: string[];
+  scope?: string;
   profileImageUrl?: string;
 }
 
@@ -469,7 +471,7 @@ async function findOrCreateOAuthUser(data: {
   if (!existingUser) {
     const { data: emailUser } = await supabase
       .from('users')
-      .select('id, email, full_name, profile_image_url, oauth_provider, token_version')
+      .select('id, email, full_name, profile_image_url, oauth_provider, token_version, scope')
       .eq('email', data.email.toLowerCase())
       .single();
 
@@ -486,7 +488,7 @@ async function findOrCreateOAuthUser(data: {
             email_verified: true, // OAuth emails are verified
           })
           .eq('id', emailUser.id)
-          .select('id, email, full_name, profile_image_url, token_version')
+          .select('id, email, full_name, profile_image_url, token_version, scope')
           .single();
 
         if (updateError) {
@@ -516,8 +518,9 @@ async function findOrCreateOAuthUser(data: {
         profile_image_url: data.profileImageUrl,
         email_verified: true, // OAuth emails are verified
         password_hash: null, // No password for OAuth users
+        scope: 'customer', // scope is the authorization source of truth
       })
-      .select('id, email, full_name, profile_image_url, token_version')
+      .select('id, email, full_name, profile_image_url, token_version, scope')
       .single();
 
     if (createError) {
@@ -528,46 +531,19 @@ async function findOrCreateOAuthUser(data: {
     existingUser = newUser;
     isNewUser = true;
 
-    // Assign default customer role
-    const { data: customerRole } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', 'customer')
-      .single();
-
-    if (customerRole) {
-      await supabase
-        .from('user_roles')
-        .insert({
-          user_id: newUser.id,
-          role_id: customerRole.id,
-        });
-    }
-
     logger.info(`Created new ${data.provider} OAuth user: ${newUser.id}`);
   }
 
-  // Get user roles
-  const { data: userRoles } = await supabase
-    .from('user_roles')
-    .select('roles(name)')
-    .eq('user_id', existingUser.id);
-
-  interface UserRoleRow {
-    roles: { name: string } | null;
-  }
-  const roles = (userRoles as unknown as UserRoleRow[] | null)?.map((ur) => ur.roles?.name).filter(Boolean) as string[] || ['customer'];
+  // Derive roles[] from scope (the single source of truth), not user_roles.
+  const userScope = (existingUser as any).scope || 'customer';
+  const roles = scopeToRoles(userScope as any);
 
   // Generate JWT tokens
   const { accessToken, refreshToken } = generateTokens({
     userId: existingUser.id,
     email: existingUser.email,
     roles,
-    scope: roles.includes('super_admin') ? 'super_admin'
-         : roles.includes('admin')       ? 'tenant_admin'
-         : roles.includes('manager')     ? 'property_manager'
-         : roles.includes('staff')       ? 'property_staff'
-         : 'customer',
+    scope: userScope,
     tokenVersion: existingUser.token_version ?? 0,
   });
 
@@ -585,6 +561,7 @@ async function findOrCreateOAuthUser(data: {
       email: existingUser.email,
       fullName: existingUser.full_name,
       roles,
+      scope: userScope,
       profileImageUrl: existingUser.profile_image_url,
     },
     accessToken,

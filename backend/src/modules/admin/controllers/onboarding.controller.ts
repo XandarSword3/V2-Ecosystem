@@ -520,14 +520,21 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
         }
 
         if (userAuthId) {
-          // Upsert user profile in public users table using the auth user's ID
+          // Upsert user profile in public users table using the auth user's ID.
+          // users.scope is the source of truth for authorization; the legacy
+          // role string is mapped to the closest scope tier.
+          const staffScope =
+            staff.role === 'admin' ? 'tenant_admin' :
+            staff.role === 'manager' ? 'property_manager' :
+            'property_staff';
+
           const { data: newUser, error: uErr } = await supabase
             .from('users')
             .upsert({
               id: userAuthId,
               email: staff.email,
               full_name: staff.name || staff.email.split('@')[0],
-              role: staff.role || 'staff',
+              scope: staffScope,
               is_active: true,
             })
             .select()
@@ -540,7 +547,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
               .upsert({
                 user_id: userAuthId,
                 property_id: propertyId,
-                access_level: staff.role === 'admin' ? 'admin' : 'write',
+                access_level: staffScope === 'tenant_admin' ? 'admin' : 'write',
               });
           }
         }

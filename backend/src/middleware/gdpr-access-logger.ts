@@ -29,8 +29,10 @@ const PII_ROUTES: Array<{ method: string; pattern: RegExp; resource: string }> =
 export function gdprAccessLogger(req: Request, res: Response, next: NextFunction): void {
   const user = req.user;
   
-  // Only log for authenticated staff/admin users, not customer self-service
-  if (!user || !['staff', 'manager', 'admin', 'super_admin'].some(r => (user as any).role === r || (user as any).roles?.includes(r))) {
+  // Only log for authenticated staff/admin users, not customer self-service.
+  // scope is the single source of truth for the authorization tier.
+  const staffScopes = ['property_staff', 'property_manager', 'tenant_admin', 'tenant_owner', 'super_admin', 'platform_admin'];
+  if (!user || !staffScopes.includes(user.scope ?? '')) {
     return next();
   }
 

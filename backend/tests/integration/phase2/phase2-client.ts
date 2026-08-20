@@ -810,6 +810,7 @@ export class Phase2Client {
     phone?: string;
     role?: string;
     roles?: string[];
+    scope?: string;
   }): Promise<ApiResponse> {
     return this.post('/admin/users', data);
   }

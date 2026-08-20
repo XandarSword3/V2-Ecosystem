@@ -38,6 +38,7 @@ const TENANT_SCOPED_TABLES = new Set([
   'order_customizations',
   // Added as part of the cross-tenant IDOR sweep (see CONTEXT.md):
   'roles',
+  'staff_profiles',
   'gift_cards',
   'coupons',
   'reviews',

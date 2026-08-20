@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { generateTokens } from './auth.utils.js';
+import { scopeToRoles } from '../../security/permissions.js';
 import { logger } from '../../utils/logger.js';
 import { AppError } from '../../utils/AppError.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -378,30 +379,16 @@ export async function authenticateComplete(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // Get user roles
-    const { data: userRolesList } = await supabase
-      .from('user_roles')
-      .select('roles (name)')
-      .eq('user_id', userId);
-
-    interface RoleJoinResult { roles?: { name?: string }[] | { name?: string } | null }
-    const roleNames = ((userRolesList || []) as RoleJoinResult[]).map((r) => {
-      const roles = r.roles;
-      if (!roles) return undefined;
-      if (Array.isArray(roles)) return roles[0]?.name;
-      return (roles as { name?: string }).name;
-    }).filter(Boolean) as string[];
+    // scope is the authorization source of truth; roles[] is derived from it.
+    const userScope = user.scope || 'customer';
+    const roleNames = scopeToRoles(userScope as any);
 
     // Generate tokens
     const tokens = generateTokens({
       userId: user.id,
       email: user.email,
       roles: roleNames,
-      scope: roleNames.includes('super_admin') ? 'super_admin'
-           : roleNames.includes('admin')       ? 'tenant_admin'
-           : roleNames.includes('manager')     ? 'property_manager'
-           : roleNames.includes('staff')       ? 'property_staff'
-           : 'customer',
+      scope: userScope,
       tokenVersion: user.token_version ?? 0,
     });
 

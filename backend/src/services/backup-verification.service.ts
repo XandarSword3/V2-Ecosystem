@@ -268,11 +268,12 @@ export class BackupVerificationService {
   private async checkCriticalData(): Promise<{ passed: boolean; message: string }> {
     const issues: string[] = [];
 
-    // Check that admin user exists
+    // Check that an admin-scoped user exists (scope is the authorization
+    // source of truth; users.role is legacy/frozen)
     const { data: adminUsers, error: adminError } = await supabase
       .from('users')
       .select('id')
-      .eq('role', 'admin')
+      .in('scope', ['tenant_admin', 'tenant_owner', 'super_admin', 'platform_admin'])
       .limit(1);
 
     if (adminError || !adminUsers || adminUsers.length === 0) {

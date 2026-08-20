@@ -513,7 +513,8 @@ describe('Biometric Controller', () => {
             }),
           };
         } else if (completeDbCall === 3) {
-          // 3. Get user details
+          // 3. Get user details (scope is read from the user row — no separate
+          //    user_roles lookup anymore)
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
@@ -523,6 +524,7 @@ describe('Biometric Controller', () => {
                     email: 'test@example.com',
                     full_name: 'Test User',
                     token_version: 0,
+                    scope: 'customer',
                   },
                   error: null,
                 }),
@@ -530,19 +532,7 @@ describe('Biometric Controller', () => {
             }),
           };
         } else if (completeDbCall === 4) {
-          // 4. Get user roles
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({
-                  data: [{ roles: { name: 'customer' } }],
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        } else if (completeDbCall === 5) {
-          // 5. Update user last login
+          // 4. Update user last login
           return {
             update: vi.fn().mockReturnValue({
               eq: vi.fn().mockResolvedValue({ data: null, error: null }),

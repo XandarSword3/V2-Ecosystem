@@ -506,8 +506,8 @@ export const exportReport = asyncHandler(async (req: Request, res: Response) => 
   if (legacyType === 'users') {
     const { data: userAccessList } = await supabase.from('user_property_access').select('user_id').eq('property_id', propertyId);
     const userIds = (userAccessList || []).map(u => u.user_id);
-    const { data } = await supabase.from('users').select('id, full_name, email, role, created_at').in('id', userIds).order('created_at', { ascending: false });
-    const csvData = 'ID,Name,Email,Role,Joined\n' + (data || []).map((u: any) => `${u.id},${u.full_name || ''},${u.email},${u.role},${u.created_at}`).join('\n');
+    const { data } = await supabase.from('users').select('id, full_name, email, scope, created_at').in('id', userIds).order('created_at', { ascending: false });
+    const csvData = 'ID,Name,Email,Role,Joined\n' + (data || []).map((u: any) => `${u.id},${u.full_name || ''},${u.email},${u.scope},${u.created_at}`).join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="users-report.csv"');
     res.send(csvData);
