@@ -252,7 +252,9 @@ export const deleteFile = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
     const userId = req.user?.userId;
     const propertyId = (req as any).propertyId || (req.headers['x-property-id'] as string);
-    const { path } = req.params;
+    // Normalize wildcard parameters so nested storage paths work across router versions.
+    const rawPath = req.params.path;
+    const path = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
     
     if (!path) {
       return res.status(400).json({

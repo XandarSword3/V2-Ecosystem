@@ -418,7 +418,7 @@ export async function getRevenueOverview(_req: Request, res: Response): Promise<
     // as $0 just because a plan is missing.
     const tierMrr = await resolveTierMrrMap();
 
-    const counts = { starter: 0, growth: 0, enterprise: 0, total: 0 };
+    const counts: Record<string, number> = { starter: 0, growth: 0, enterprise: 0, total: 0 };
     let mrrCents = 0;
 
     for (const t of (data ?? [])) {
