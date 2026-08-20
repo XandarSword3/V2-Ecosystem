@@ -1,5 +1,22 @@
 version: 2
 updates:
+  # The repository has a root package.json used by E2E and CI tooling.
+  # Keep it monitored separately from the backend and frontend applications.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "root"
+    groups:
+      root-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
   - package-ecosystem: "npm"
     directory: "/backend"
     schedule:
@@ -9,6 +26,19 @@ updates:
     labels:
       - "dependencies"
       - "backend"
+    # Express 5 is an isolated migration project; keep the production API on
+    # the Express 4 line until route-layer no-mock coverage and permission-model
+    # decisions are complete.
+    ignore:
+      - dependency-name: "express"
+        versions: [">=5.0.0"]
+      - dependency-name: "@types/express"
+        versions: [">=5.0.0"]
+    groups:
+      backend-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "npm"
     directory: "/frontend"
@@ -19,3 +49,8 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+    groups:
+      frontend-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"

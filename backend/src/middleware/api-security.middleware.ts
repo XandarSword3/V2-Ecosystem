@@ -107,7 +107,10 @@ export function xssSanitizer(req: Request, res: Response, next: NextFunction) {
   }
 
   if (req.query && typeof req.query === 'object') {
-    req.query = sanitizeObject(req.query as Record<string, any>);
+    // Express 5 exposes req.query through a getter without a setter. Mutate the
+    // parsed query object in place instead of replacing the request property.
+    const query = req.query as Record<string, any>;
+    Object.assign(query, sanitizeObject(query));
   }
 
   if (req.params && typeof req.params === 'object') {
