@@ -16,11 +16,31 @@ export interface UserRow {
   phone?: string | null;
   profile_image_url?: string | null;
   preferred_language?: string;
+  scope?: string;
   is_active: boolean;
   created_at: string;
   updated_at?: string | null;
   last_login_at?: string | null;
   deleted_at?: string | null;
+}
+
+export interface StaffProfileRow {
+  id: string;
+  user_id: string;
+  tenant_id: string;
+  employee_id?: string | null;
+  position?: string | null;
+  department?: string | null;
+  employment_type?: string | null;
+  hire_date?: string | null;
+  base_wage?: string | number | null;
+  wage_currency?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  emergency_contact_relationship?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface RoleRow {

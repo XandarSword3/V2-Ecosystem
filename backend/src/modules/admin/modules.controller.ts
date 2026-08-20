@@ -309,74 +309,50 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
       // Non-fatal - module still created
     }
 
-    // --- Auto-create Roles & Staff User ---
+    // --- Auto-create default staff user (idempotent via email) ---
+    // users.scope is the source of truth for authorization — no roles/
+    // user_roles rows are seeded here. The staff record (staff_profiles)
+    // carries the module as the member's department/sub-role.
     try {
-      // 1. Upsert Roles (use upsert to avoid unique-constraint crash when the
-      //    role already exists — e.g. from a previous failed attempt or duplicate slug)
-      const roleNames = [`${finalSlug}_admin`, `${finalSlug}_staff`];
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('roles')
+      const staffEmail = `staff.${finalSlug}@v2ecosystem.com`;
+      const staffPassword = await bcrypt.hash(`Staff${finalSlug.charAt(0).toUpperCase() + finalSlug.slice(1)}123!`, 12);
+      const tenantId = requireTenantScope(req);
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
         .upsert(
-          roleNames.map(r => ({ name: r, description: `Role for ${name}` })),
-          { onConflict: 'name', ignoreDuplicates: false }
+          {
+            email: staffEmail,
+            password_hash: staffPassword,
+            full_name: `${name} Staff`,
+            phone: '',
+            is_active: true,
+            email_verified: true,
+            scope: 'property_staff',
+            tenant_id: tenantId,
+          },
+          { onConflict: 'email', ignoreDuplicates: false }
         )
-        .select();
+        .select()
+        .single();
 
-      if (!rolesError && rolesData) {
-        // 2. Permissions were already upserted in the block above — no need to call
-        //    buildModulePermissionRows a second time.  Re-use the slugs we already
-        //    pushed and just wire them up to the new module-specific roles.
-        const modulePermissionSlugs = buildModulePermissionRows(finalSlug, engine_type);
-
-        const adminRoleName = `${finalSlug}_admin`;
-        const staffRoleName = `${finalSlug}_staff`;
-
-        const rolePermissions: { role_name: string; permission_slug: string }[] = [];
-        modulePermissionSlugs.forEach(slug => {
-          rolePermissions.push({ role_name: adminRoleName, permission_slug: slug });
-          if (slug.endsWith(':view')) {
-            rolePermissions.push({ role_name: staffRoleName, permission_slug: slug });
-          }
-        });
-
-        if (rolePermissions.length > 0) {
-          await supabase.from('app_role_permissions').upsert(rolePermissions, { onConflict: 'role_name,permission_slug' });
-          logger.info(`[Modules] Created ${rolePermissions.length} role-permission links for ${finalSlug}`);
-          await permissionCache.refreshCache();
-        }
-
-        // 3. Create Default Staff User (one per module, idempotent via email)
-        const staffEmail = `staff.${finalSlug}@v2ecosystem.com`;
-        const staffPassword = await bcrypt.hash(`Staff${finalSlug.charAt(0).toUpperCase() + finalSlug.slice(1)}123!`, 12);
-
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .upsert(
-            {
-              email: staffEmail,
-              password: staffPassword,
-              full_name: `${name} Staff`,
-              phone: '',
-              is_active: true,
-              email_verified: true,
-              roles: roleNames,
-            },
-            { onConflict: 'email', ignoreDuplicates: false }
-          )
-          .select()
-          .single();
-
-        if (!userError && userData) {
-          const userRolesInserts = rolesData.map((role: { id: string; name: string }) => ({
+      if (!userError && userData) {
+        const { error: staffProfileError } = await supabase.from('staff_profiles').upsert(
+          {
             user_id: userData.id,
-            role_id: role.id,
-          }));
-          await supabase.from('user_roles').upsert(userRolesInserts, { onConflict: 'user_id,role_id', ignoreDuplicates: true });
-          logger.info(`[Modules] Created/updated staff user ${staffEmail} with roles for ${finalSlug}`);
+            tenant_id: tenantId,
+            department: finalSlug,
+          },
+          { onConflict: 'user_id' }
+        );
+        if (staffProfileError) {
+          logger.warn(`[Modules] Staff profile upsert failed for ${staffEmail}`, staffProfileError.message);
+        } else {
+          logger.info(`[Modules] Created/updated staff user ${staffEmail} (property_staff) with staff record for ${finalSlug}`);
         }
       }
     } catch (innerError) {
-      logger.error('Failed to auto-create staff/roles/permissions for module:', innerError);
+      logger.error('Failed to auto-create staff user for module:', innerError);
       // Non-fatal — module row is already committed above, log and continue
     }
 

@@ -9,18 +9,11 @@
  *   1. Upsert tenants row (idempotency key: stripe_subscription_id)
  *   2. Upsert property_groups row linked to tenant
  *   3. Upsert default property inside the group
- *   4. Seed roles (tenant_owner, admin, staff, customer) scoped to tenant
- *   5. Create owner user account with hashed temporary password
- *   6. Assign tenant_owner + admin roles to owner within tenant
- *
- * NOTE: the owner role is named 'tenant_owner', NOT 'super_admin'. The string
- * 'super_admin' is treated as an unconditional, tenant-blind bypass by
- * authorize() (auth.middleware.ts) and by requirePermission/canAccess
- * (permission.middleware.ts) — it is reserved for the actual platform
- * operator (is_platform_root tenant / isPlatformAdmin flag). Never assign a
- * role literally named 'super_admin' here; doing so previously handed every
- * paying customer the same unconditional bypass as the platform operator.
- *   7. Queue welcome / credential email (fire-and-forget)
+ *   4. Create owner user account with hashed temporary password and
+ *      scope = 'tenant_owner' (scope is the single source of truth for
+ *      authorization — no roles/user_roles rows are seeded per tenant)
+ *   5. Grant property access for the owner
+ *   6. Queue welcome / credential email (fire-and-forget)
  *
  * On partial failure the service logs the error and re-throws so the webhook
  * handler can return a non-200 response — Stripe will retry the webhook.
@@ -60,21 +53,6 @@ export interface ProvisioningResult {
   /** True if this was a fresh provision; false if idempotent no-op */
   created: boolean;
 }
-
-// Default roles seeded for every new tenant.
-//
-// IMPORTANT: the tenant owner's role is named 'tenant_owner', never
-// 'super_admin'. authorize() (auth.middleware.ts) and the permission.middleware.ts
-// helpers treat the literal string 'super_admin' as an unconditional, tenant-
-// blind bypass reserved for the platform operator. Seeding that name here
-// would hand every paying customer the same unconditional bypass as the
-// platform operator — which is exactly what happened before this fix.
-const DEFAULT_ROLES = [
-  { name: 'tenant_owner', description: 'Full administrative access within this tenant (tenant owner only)', permissions: ['*'] },
-  { name: 'admin',       description: 'Administrative access excluding billing',  permissions: ['admin.*'] },
-  { name: 'staff',       description: 'Day-to-day operational access',            permissions: ['staff.*'] },
-  { name: 'customer',    description: 'Guest-facing access',                      permissions: ['customer.*'] },
-];
 
 // ============================================
 // Slug generation for properties.public_slug
@@ -272,23 +250,7 @@ export class ProvisioningService {
       throw new Error(`[PROVISIONING] Failed to create property: ${propErr?.message}`);
     }
 
-    // ---- Step 5: Seed roles (tenant-scoped) ----
-    // Insert roles one by one to handle unique constraint conflicts gracefully
-    for (const role of DEFAULT_ROLES) {
-      const { error: roleErr } = await supabase
-        .from('roles')
-        .insert({
-          ...role,
-          tenant_id: tenantId,
-          permissions: role.permissions,
-        });
-
-      if (roleErr) {
-        logger.warn('[PROVISIONING] Role seeding had error (non-fatal)', { role: role.name, error: roleErr.message });
-      }
-    }
-
-    // ---- Step 6: Create owner user ----
+    // ---- Step 5: Create owner user ----
     // FIX: crypto.randomBytes(...).toString('base64url') only ever produces
     // [A-Za-z0-9-_] — it can never contain a special character, so a temp
     // password generated that way can fail this very platform's own
@@ -321,33 +283,7 @@ export class ProvisioningService {
       throw new Error(`[PROVISIONING] Failed to create owner user: ${userErr?.message}`);
     }
 
-    // ---- Step 7: Assign tenant_owner + admin roles ----
-    // tenant_owner: the elevated, owner-only actions within this tenant
-    // (roles/permissions management, user deletion, etc. — see admin.routes.ts).
-    // admin: the standard tenant-admin role, so the owner also has full access
-    // to every route already gated by authorize('admin', ...) / authorizeManager,
-    // same as any staff member promoted to admin within this tenant.
-    const { data: ownerRoles } = await supabase
-      .from('roles')
-      .select('id, name')
-      .eq('tenant_id', tenantId)
-      .in('name', ['tenant_owner', 'admin']);
-
-    if (ownerRoles && ownerRoles.length > 0) {
-      const roleAssignments = ownerRoles.map((r) => ({ user_id: user.id, role_id: r.id, tenant_id: tenantId }));
-      const { error: roleAssignErr } = await supabase
-        .from('user_roles')
-        .insert(roleAssignments)
-        .select();
-
-      if (roleAssignErr) {
-        logger.warn('[PROVISIONING] Owner role assignment had errors (non-fatal)', { error: roleAssignErr.message });
-      }
-    } else {
-      logger.error('[PROVISIONING] tenant_owner/admin roles not found after seeding — owner will have no admin access', { tenantId });
-    }
-
-    // ---- Step 8: Property access for owner ----
+    // ---- Step 6: Property access for owner ----
     const { error: accessErr } = await supabase
       .from('user_property_access')
       .insert({
@@ -361,7 +297,7 @@ export class ProvisioningService {
       logger.error('[PROVISIONING] Failed to create user_property_access for owner', { error: accessErr.message });
     }
 
-    // ---- Step 9: Invalidate tenant cache ----
+    // ---- Step 7: Invalidate tenant cache ----
     invalidateTenantCache(tenantId, subdomain);
 
     logger.info('[PROVISIONING] Tenant provisioned successfully', {
@@ -372,7 +308,7 @@ export class ProvisioningService {
       subdomain,
     });
 
-    // ---- Step 10: Queue welcome email (fire-and-forget) ----
+    // ---- Step 8: Queue welcome email (fire-and-forget) ----
     this.sendWelcomeEmail(operatorEmail, operatorName, subdomain, tempPassword).catch((err) =>
       logger.error('[PROVISIONING] Welcome email failed (non-fatal)', { err }),
     );

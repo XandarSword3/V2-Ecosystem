@@ -200,24 +200,30 @@ async function loginUser(email: string, password: string): Promise<{ token?: str
   };
 }
 
+// Map the legacy seed `role` string to the scope model. users.scope is the
+// authorization source of truth — the admin create-user endpoint accepts
+// `scope`, and the legacy roles/user_roles tables are frozen.
+function roleToScope(role: string): string {
+  switch (role) {
+    case 'admin': return 'tenant_admin';
+    case 'staff': return 'property_staff';
+    case 'customer': return 'customer';
+    default: return 'customer';
+  }
+}
+
 async function ensureUser(admin: Phase2Client, seed: UserSeed): Promise<void> {
   let login = await loginUser(seed.email, seed.password);
 
   if (!login.token) {
     await admin.createAdminUser({
       full_name: seed.name,
-      name: seed.name,
       email: seed.email,
       password: seed.password,
-      role: seed.role,
-      roles: [seed.role],
+      scope: roleToScope(seed.role),
     });
 
     login = await loginUser(seed.email, seed.password);
-  }
-
-  if (login.userId) {
-    await admin.updateUserRoles(login.userId, [seed.role]);
   }
 
   setState(seed.tokenKey, login.token);

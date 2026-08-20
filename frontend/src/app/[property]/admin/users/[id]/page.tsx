@@ -44,6 +44,23 @@ export default function UserDetailsPage() {
     is_active: true,
   });
 
+  // Staff employment-record state (staff_profiles)
+  const [staffProfile, setStaffProfile] = useState<any>(null);
+  const [staffForm, setStaffForm] = useState({
+    employee_id: '',
+    position: '',
+    department: '',
+    employment_type: '',
+    hire_date: '',
+    base_wage: '' as string | number,
+    wage_currency: 'USD',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relationship: '',
+    notes: '',
+  });
+  const [savingStaffProfile, setSavingStaffProfile] = useState(false);
+
   // Role selection state
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   
@@ -55,8 +72,9 @@ export default function UserDetailsPage() {
         Promise.all([
             api.get(`/admin/users/${id}`),
             api.get('/admin/permissions'),
-            api.get('/admin/roles')
-        ]).then(([userRes, permRes, rolesRes]) => {
+            api.get('/admin/roles'),
+            api.get(`/admin/users/${id}/staff-profile`)
+        ]).then(([userRes, permRes, rolesRes, staffRes]) => {
             const userPayload = userRes.data?.data ?? userRes.data ?? null;
             if (userPayload) {
                 setUser(userPayload);
@@ -75,6 +93,23 @@ export default function UserDetailsPage() {
                     initialOverrides[p.permission_slug] = p.is_granted;
                 });
                 setOverrides(initialOverrides);
+
+                // Initialize staff employment record (if the user has one)
+                const staffPayload = staffRes.data?.data ?? staffRes.data ?? null;
+                setStaffProfile(staffPayload);
+                setStaffForm({
+                    employee_id: staffPayload?.employee_id || '',
+                    position: staffPayload?.position || '',
+                    department: staffPayload?.department || '',
+                    employment_type: staffPayload?.employment_type || '',
+                    hire_date: staffPayload?.hire_date || '',
+                    base_wage: staffPayload?.base_wage ?? '',
+                    wage_currency: staffPayload?.wage_currency || 'USD',
+                    emergency_contact_name: staffPayload?.emergency_contact_name || '',
+                    emergency_contact_phone: staffPayload?.emergency_contact_phone || '',
+                    emergency_contact_relationship: staffPayload?.emergency_contact_relationship || '',
+                    notes: staffPayload?.notes || '',
+                });
             }
             const permsPayload = permRes.data?.data ?? permRes.data ?? [];
             setAllPermissions(Array.isArray(permsPayload) ? permsPayload : []);
@@ -114,6 +149,25 @@ export default function UserDetailsPage() {
       toast.error('Failed to update roles');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveStaffProfile = async () => {
+    setSavingStaffProfile(true);
+    try {
+      const payload = {
+        ...staffForm,
+        hire_date: staffForm.hire_date || null,
+        base_wage: staffForm.base_wage === '' || staffForm.base_wage === null ? null : Number(staffForm.base_wage),
+        wage_currency: staffForm.wage_currency || null,
+      };
+      await api.put(`/admin/users/${id}/staff-profile`, payload);
+      setStaffProfile(payload);
+      toast.success('Staff profile updated successfully');
+    } catch (error) {
+      toast.error('Failed to update staff profile');
+    } finally {
+      setSavingStaffProfile(false);
     }
   };
 
@@ -355,6 +409,135 @@ export default function UserDetailsPage() {
                       </div>
                   </CardContent>
               </Card>
+
+              {['property_staff', 'property_manager'].includes(user.scope) && (
+                  <Card>
+                      <CardHeader className="flex flex-row items-center justify-between">
+                          <div>
+                              <CardTitle>Staff Profile</CardTitle>
+                              <CardDescription>
+                                  Employment record — position, department, wage and emergency contact.
+                              </CardDescription>
+                          </div>
+                          <Button onClick={handleSaveStaffProfile} disabled={savingStaffProfile}>
+                              {savingStaffProfile ? 'Saving...' : <><Save className="h-4 w-4 mr-2" /> Save</>}
+                          </Button>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                  <label className="text-sm font-medium mb-1 block">Employee ID</label>
+                                  <input
+                                      type="text"
+                                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.employee_id}
+                                      onChange={(e) => setStaffForm({ ...staffForm, employee_id: e.target.value })}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-sm font-medium mb-1 block">Position</label>
+                                  <input
+                                      type="text"
+                                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.position}
+                                      onChange={(e) => setStaffForm({ ...staffForm, position: e.target.value })}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-sm font-medium mb-1 block">Department / Sub-role</label>
+                                  <input
+                                      type="text"
+                                      placeholder="front_desk, housekeeping, restaurant…"
+                                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.department}
+                                      onChange={(e) => setStaffForm({ ...staffForm, department: e.target.value })}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-sm font-medium mb-1 block">Employment Type</label>
+                                  <select
+                                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.employment_type}
+                                      onChange={(e) => setStaffForm({ ...staffForm, employment_type: e.target.value })}
+                                  >
+                                      <option value="">Select…</option>
+                                      <option value="full_time">Full-time</option>
+                                      <option value="part_time">Part-time</option>
+                                      <option value="seasonal">Seasonal</option>
+                                      <option value="contract">Contract</option>
+                                  </select>
+                              </div>
+                              <div>
+                                  <label className="text-sm font-medium mb-1 block">Hire Date</label>
+                                  <input
+                                      type="date"
+                                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.hire_date}
+                                      onChange={(e) => setStaffForm({ ...staffForm, hire_date: e.target.value })}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-sm font-medium mb-1 block">Base Wage</label>
+                                  <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.base_wage}
+                                      onChange={(e) => setStaffForm({ ...staffForm, base_wage: e.target.value })}
+                                  />
+                              </div>
+                              <div>
+                                  <label className="text-sm font-medium mb-1 block">Wage Currency</label>
+                                  <input
+                                      type="text"
+                                      maxLength={3}
+                                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.wage_currency}
+                                      onChange={(e) => setStaffForm({ ...staffForm, wage_currency: e.target.value })}
+                                  />
+                              </div>
+                          </div>
+
+                          <div className="pt-2">
+                              <h3 className="text-sm font-semibold mb-2">Emergency Contact</h3>
+                              <div className="grid grid-cols-3 gap-3">
+                                  <input
+                                      type="text"
+                                      placeholder="Name"
+                                      className="border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.emergency_contact_name}
+                                      onChange={(e) => setStaffForm({ ...staffForm, emergency_contact_name: e.target.value })}
+                                  />
+                                  <input
+                                      type="text"
+                                      placeholder="Phone"
+                                      className="border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.emergency_contact_phone}
+                                      onChange={(e) => setStaffForm({ ...staffForm, emergency_contact_phone: e.target.value })}
+                                  />
+                                  <input
+                                      type="text"
+                                      placeholder="Relationship"
+                                      className="border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                      value={staffForm.emergency_contact_relationship}
+                                      onChange={(e) => setStaffForm({ ...staffForm, emergency_contact_relationship: e.target.value })}
+                                  />
+                              </div>
+                          </div>
+
+                          <div>
+                              <label className="text-sm font-medium mb-1 block">Notes</label>
+                              <textarea
+                                  rows={2}
+                                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                  value={staffForm.notes}
+                                  onChange={(e) => setStaffForm({ ...staffForm, notes: e.target.value })}
+                              />
+                          </div>
+                      </CardContent>
+                  </Card>
+              )}
           </div>
 
           <div className="md:col-span-2">
