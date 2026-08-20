@@ -1080,26 +1080,12 @@ export class HousekeepingController {
     try {
       const supabase = getSupabase();
 
-      const { data: roles } = await supabase
-        .from('roles')
-        .select('id, name')
-        .in('name', ['staff', 'admin', 'super_admin']);
-
-      const roleIds = (roles || []).map(r => r.id);
-
-      const { data: userRoleData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .in('role_id', roleIds);
-
-      if (rolesError) throw rolesError;
-
-      const userIds = [...new Set((userRoleData || []).map(ur => ur.user_id))];
-
+      // Staff/admin are identified by users.scope, not the frozen
+      // roles/user_roles tables (scope is the authorization source of truth).
       const { data: staffUsers, error: usersError } = await supabase
         .from('users')
         .select('id, full_name, email')
-        .in('id', userIds);
+        .in('scope', ['property_staff', 'property_manager', 'tenant_admin', 'tenant_owner', 'super_admin']);
 
       if (usersError) throw usersError;
 

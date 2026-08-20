@@ -24,6 +24,7 @@ import {
 import { assertStaffUserLimit } from '../../services/feature-limits.service.js';
 import { getCallerTenantId } from '../../security/tenant-scope.js';
 import { validatePassword } from '../../services/password-policy.service.js';
+import { scopeToRoles } from '../../security/permissions.js';
 
 // Interface for user with roles from Supabase query
 interface UserWithRolesQuery extends UserRow {
@@ -203,15 +204,19 @@ export const getUsers = asyncHandler(async (req: Request, res: Response) => {
 
     const onlineUserIds = getOnlineUsers();
 
-    // Process users to add 'is_online' and role-based categorization
+    // Process users to add 'is_online' and scope-based categorization.
+    // users.scope is the authorization source of truth; roles[] is derived
+    // from it (legacy user_roles is frozen/read-only for the Roles UI).
     const enhancedUsers: EnhancedUser[] = users.map((user) => {
-      const roles = user.user_roles?.map((ur) => ur.roles?.name).filter((r): r is string => !!r) || [];
-      const isStaff = roles.some((r) => r.includes('staff') || r.includes('admin'));
-      const isAdmin = roles.some((r) => r === 'admin' || r === 'super_admin' || r.endsWith('_admin'));
+      const scope = (user as any).scope || 'customer';
+      const roles = scopeToRoles(scope as any);
+      const isAdmin = ['super_admin', 'platform_admin', 'tenant_owner', 'tenant_admin'].includes(scope);
+      const isStaff = ['property_manager', 'property_staff'].includes(scope);
 
       return {
         ...user,
-        roles: roles,
+        scope,
+        roles,
         is_online: onlineUserIds.includes(user.id),
         user_type: isAdmin ? 'admin' : (isStaff ? 'staff' : 'customer')
       };
@@ -385,12 +390,26 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
       }
     });
 
+    const userScope = (typedUser as any).scope || 'customer';
+
+    // Staff record (staff_profiles) — 1:1 with users, tenant-scoped.
+    const { data: staffProfile } = await supabase
+      .from('staff_profiles')
+      .select('*')
+      .eq('user_id', id)
+      .maybeSingle();
+
     const detailedUser = {
       ...typedUser,
-      roles: typedUser.user_roles?.map((ur) => ur.roles?.name).filter((n): n is string => !!n) || [],
+      scope: userScope,
+      roles: scopeToRoles(userScope as any),
+      // Legacy frozen surface for the Roles/permissions admin UI (read-only
+      // compatibility — authorization no longer consults user_roles).
+      legacy_roles: typedUser.user_roles?.map((ur) => ur.roles?.name).filter((n): n is string => !!n) || [],
       role_permissions: Array.from(rolePermissions),
       user_permissions_overrides: typedUser.user_permissions || [], // Raw overrides for UI
-      effective_permissions: Array.from(effectivePermissions)
+      effective_permissions: Array.from(effectivePermissions),
+      staff_profile: staffProfile || null
     };
 
     res.json({ success: true, data: detailedUser });

@@ -7,6 +7,7 @@ import * as translationsController from "./translations.controller";
 
 import * as usersController from "./users.controller";
 import * as permissionsController from "./permissions.controller";
+import * as staffProfilesController from "./staff-profiles.controller.js";
 
 // Import refactored controllers
 import * as rolesController from "./controllers/roles.controller";
@@ -101,6 +102,10 @@ router.put('/users/:id/roles', authorize('admin', 'super_admin', 'tenant_owner')
 router.delete('/users/:id', authorize('super_admin', 'tenant_owner'), usersController.deleteUser);
 router.put('/users/:id/permissions', authorize('super_admin', 'tenant_owner'), permissionsController.updateUserPermissions); // User Override
 router.post('/users/:id/revoke-sessions', authorize('admin', 'super_admin', 'tenant_owner'), usersController.revokeUserSessions); // Force logout a compromised account
+
+// Staff profiles (employment records in staff_profiles, 1:1 with users)
+router.get('/users/:id/staff-profile', authorizeManager, staffProfilesController.getStaffProfile);
+router.put('/users/:id/staff-profile', authorizeManager, staffProfilesController.upsertStaffProfile);
 
 // Roles & Permissions (using refactored controller) - TENANT OWNER (or platform super_admin)
 // tenant_owner is scoped to this tenant's own roles table (tenant_id FK) — not platform-global.

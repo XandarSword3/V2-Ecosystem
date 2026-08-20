@@ -1355,7 +1355,7 @@ export const searchCustomers = asyncHandler(async (req: Request, res: Response) 
     .from('users')
     .select('id, full_name, email, phone, created_at')
     .or(`full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%`)
-    .eq('role', 'customer')
+    .eq('scope', 'customer')
     .limit(20);
 
   if (error) throw error;

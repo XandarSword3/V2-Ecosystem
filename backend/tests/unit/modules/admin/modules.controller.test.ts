@@ -203,7 +203,7 @@ function mockReq(overrides: Record<string, unknown> = {}): Record<string, unknow
     // even for a simulated super_admin — a pre-existing fixture/type-drift
     // bug (scope was added to AuthenticatedUser after this file was written),
     // unrelated to and predating today's getModule/getModules tenant-scoping fix.
-    user: { userId: 'admin-1', id: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
+    user: { userId: 'admin-1', id: 'admin-1', roles: ['super_admin'], scope: 'super_admin', tenantId: 'tenant-1' },
     ip: '127.0.0.1',
     get: vi.fn().mockReturnValue('vitest-agent'),
     ...overrides,
@@ -243,6 +243,7 @@ describe('ModulesController', () => {
       roles: [{ id: 'role-1', name: 'menu_service_admin' }, { id: 'role-2', name: 'menu_service_staff' }],
       users: [],
       user_roles: [],
+      staff_profiles: [],
       site_settings: [{ id: 1, navbar: { links: [] } }],
       catalog_items: [],
       catalog_categories: [],
@@ -346,13 +347,14 @@ describe('ModulesController', () => {
     it('should provision dynamic permissions for the new module', async () => {
       const sb = setupSupabase();
       const req = mockReq({
-        body: { template_type: 'session_access', name: 'Spa', slug: 'spa' },
+        body: { engine_type: 'shared_capacity_access', name: 'Spa', slug: 'spa' },
       });
       const res = mockRes();
       await (createModule as Function)(req, res, mockNext());
 
       expect(sb.from).toHaveBeenCalledWith('modules');
-      expect(sb.from).toHaveBeenCalledWith('roles');
+      expect(sb.from).toHaveBeenCalledWith('app_permissions');
+      expect(sb.from).toHaveBeenCalledWith('app_role_permissions');
     });
 
     it('should create default staff user for the module', async () => {
@@ -363,7 +365,12 @@ describe('ModulesController', () => {
       const res = mockRes();
       await (createModule as Function)(req, res, mockNext());
 
-      // Staff user creation is no longer part of module creation
+      // Staff user is created via users (scope property_staff) + a staff_profiles
+      // record — the legacy roles/user_roles tables are no longer written.
+      expect(sb.from).toHaveBeenCalledWith('users');
+      expect(sb.from).toHaveBeenCalledWith('staff_profiles');
+      expect(sb.from).not.toHaveBeenCalledWith('roles');
+      expect(sb.from).not.toHaveBeenCalledWith('user_roles');
       expect(res.status).toHaveBeenCalledWith(201);
     });
 
@@ -774,7 +781,7 @@ describe('ModulesController', () => {
         // fallback this test exercises. scope-only (no userId) preserves
         // the original intent: verify the (req.user as any)?.userId ||
         // 'system' fallback in logActivity.
-        user: { scope: 'super_admin' },
+        user: { scope: 'super_admin', tenantId: 'tenant-1' },
       });
       const res = mockRes();
       // createModule reads (req.user as any)?.userId || 'system'
@@ -785,21 +792,15 @@ describe('ModulesController', () => {
       }));
     });
 
-    it('should handle roles creation failure gracefully', async () => {
+    it('should handle staff profile creation failure gracefully', async () => {
       const sb = setupSupabase();
-      let rolesCallCount = 0;
       sb.from.mockImplementation((t: string) => {
-        if (t === 'roles') {
-          rolesCallCount++;
-          // Make roles insert fail
+        if (t === 'staff_profiles') {
+          // Make the staff_profiles upsert fail — should be non-fatal.
           const chain = createQueryMock(() => []);
-          chain.insert = vi.fn().mockImplementation(() => ({
-            select: vi.fn().mockReturnValue({
-              then: (r: (v: { data: unknown; error: unknown }) => void) =>
-                r({ data: null, error: { message: 'roles insert failed' } }),
-            }),
+          chain.upsert = vi.fn().mockImplementation(() => ({
             then: (r: (v: { data: unknown; error: unknown }) => void) =>
-              r({ data: null, error: { message: 'roles insert failed' } }),
+              r({ data: null, error: { message: 'staff profile upsert failed' } }),
           }));
           return chain;
         }
@@ -812,7 +813,7 @@ describe('ModulesController', () => {
       const res = mockRes();
       await (createModule as Function)(req, res, mockNext());
 
-      // Module still created despite roles failure
+      // Module still created despite staff profile failure
       expect(res.status).toHaveBeenCalledWith(201);
     });
   });

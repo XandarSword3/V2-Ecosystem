@@ -287,26 +287,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
 
     createdUserId = newUser.id;
 
-    // 5. Assign super_admin role
-    const { data: superAdminRole } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', 'super_admin')
-      .single();
-
-    if (!superAdminRole) {
-      throw new Error('super_admin role not found after seeding — this should never happen');
-    }
-
-    const { error: roleAssignError } = await supabase
-      .from('user_roles')
-      .insert({ user_id: newUser.id, role_id: superAdminRole.id });
-
-    if (roleAssignError) {
-      throw new Error(`Role assignment failed: ${roleAssignError.message}`);
-    }
-
-    // 6. FIX BUG-03: Create a default property so all property-scoped module queries work
+    // 5. FIX BUG-03: Create a default property so all property-scoped module queries work
     const { data: defaultProperty, error: propError } = await supabase
       .from('properties')
       .insert({
@@ -324,7 +305,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       logger.info('Install: default property created', { propertyId: defaultProperty.id });
     }
 
-    // 7. Seed site_settings
+    // 6. Seed site_settings
     //    a) onboarding_state (wizard will consume this)
     //    b) business_name   (used across the UI)
     await supabase.from('site_settings').upsert([
@@ -344,7 +325,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       },
     ], { onConflict: 'key' });
 
-    // 8. Persist machine_id — this is what future status checks compare against
+    // 7. Persist machine_id — this is what future status checks compare against
     const { error: configError } = await supabase
       .from('system_config')
       .upsert(
@@ -364,7 +345,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       throw new Error(`Failed to persist machine ID: ${configError.message}`);
     }
 
-    // 9. Issue JWT so the browser is immediately authenticated
+    // 8. Issue JWT so the browser is immediately authenticated
     const tokens = generateTokens({
       userId:       newUser.id,
       email:        newUser.email,

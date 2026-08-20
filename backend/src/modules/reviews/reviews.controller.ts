@@ -160,13 +160,15 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
         return res.status(403).json({ success: false, error: 'You can only review staff involved in one of your orders here' });
       }
     } else {
-      // No property context (e.g. test env) — fall back to existence-only.
+      // No property context (e.g. test env) — fall back to validating the
+      // target is a real staff/admin account via its scope.
       const { data: staffMember } = await supabase
-        .from('profiles')
-        .select('id')
+        .from('users')
+        .select('id, scope')
         .eq('id', resolvedTargetId)
         .maybeSingle();
-      if (!staffMember) {
+      const staffScopes = ['property_staff', 'property_manager', 'tenant_admin', 'tenant_owner', 'super_admin', 'platform_admin'];
+      if (!staffMember || !staffScopes.includes(staffMember.scope)) {
         return res.status(400).json({ success: false, error: 'Invalid staff member target' });
       }
     }

@@ -122,15 +122,15 @@ export async function getPropertiesInGroup(groupId: string): Promise<Property[]>
 export async function getUserAccessibleProperties(userId: string): Promise<Property[]> {
   const client = supabase;
 
-  // Get user role
+  // Get user scope (single source of truth for authorization tier)
   const { data: user } = await client
     .from('users')
-    .select('role')
+    .select('scope')
     .eq('id', userId)
     .single();
 
   // Super admins can access all properties
-  if (user?.role === 'super_admin') {
+  if (user?.scope === 'super_admin') {
     const { data } = await client
       .from('properties')
       .select('*')

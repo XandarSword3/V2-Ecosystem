@@ -145,27 +145,32 @@ describe('BusinessMetricsService', () => {
 
   describe('getOperationalMetrics', () => {
     it('should return operational metrics structure', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        select: vi.fn().mockImplementation((_cols?: string, options?: any) => {
-          if (options?.count === 'exact') {
-            return {
-              gte: vi.fn().mockResolvedValue({ data: null, count: 10, error: null }),
-              in: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ data: null, count: 3, error: null }),
-              }),
-            };
-          }
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        if (table === 'transactions') {
           return {
-            gte: vi.fn().mockResolvedValue({ 
-              data: [
-                { status: 'pending', created_at: '2024-01-15T10:00:00Z' },
-                { status: 'completed', created_at: '2024-01-15T09:00:00Z', completed_at: '2024-01-15T09:30:00Z' },
-              ], 
-              error: null 
+            select: vi.fn().mockReturnValue({
+              gte: vi.fn().mockResolvedValue({
+                data: [
+                  { status: 'pending', engine_type: 'instant_transaction' },
+                  { status: 'completed', engine_type: 'shared_capacity_access' },
+                ],
+                error: null,
+              }),
             }),
-          };
-        }),
-      } as any);
+          } as any;
+        }
+        if (table === 'users') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [{ id: 'staff-1' }, { id: 'staff-2' }],
+                error: null,
+              }),
+            }),
+          } as any;
+        }
+        return createQueryMock([]);
+      });
 
       const result = await businessMetricsService.getOperationalMetrics();
 
@@ -173,6 +178,7 @@ describe('BusinessMetricsService', () => {
       expect(result).toHaveProperty('transactions_today');
       expect(result).toHaveProperty('transactions_pending');
       expect(result).toHaveProperty('transactions_completed');
+      expect(result).toHaveProperty('staff_online');
     });
   });
 

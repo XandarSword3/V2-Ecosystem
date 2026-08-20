@@ -54,14 +54,14 @@ async function main() {
   // Resolve roles for all shift owners in one query.
   const staffIds = [...new Set(shifts.map((s) => s.staff_id).filter((x): x is string => !!x))];
   const { data: staffRows } = staffIds.length > 0
-    ? await supabase.from('users').select('id, role, scope').in('id', staffIds)
+    ? await supabase.from('users').select('id, scope').in('id', staffIds)
     : { data: [] };
   const staffById = new Map((staffRows || []).map((u) => [u.id, u]));
 
   const isSuperAdmin = (staffId: string | null) => {
     if (!staffId) return false;
     const u = staffById.get(staffId);
-    return u?.role === 'super_admin' || u?.scope === 'super_admin';
+    return u?.scope === 'super_admin';
   };
 
   const targets = shifts.filter(
