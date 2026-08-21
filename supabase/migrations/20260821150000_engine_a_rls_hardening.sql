@@ -84,10 +84,13 @@ REVOKE SELECT ON "public"."fulfillment_events" FROM "anon";
 -- ============================================================
 -- 3. SECURITY DEFINER RPCs — service_role only
 -- ============================================================
--- next_fiscal_document_number: authenticated had an explicit EXECUTE grant;
--- nothing in the frontend calls it (fiscal-numbering.service.ts is the only
--- caller, over service_role). Remove it.
-REVOKE EXECUTE ON FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", "integer") FROM "authenticated";
+-- next_fiscal_document_number: authenticated had an explicit EXECUTE grant,
+-- and PostgreSQL's DEFAULT grants EXECUTE on new functions to PUBLIC (which
+-- includes anon). Nothing in the frontend calls it
+-- (fiscal-numbering.service.ts is the only caller, over service_role). It is
+-- SECURITY DEFINER and trusts p_tenant_id blindly — revoke BOTH grants.
+REVOKE EXECUTE ON FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", integer) FROM "authenticated";
+REVOKE EXECUTE ON FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", integer) FROM PUBLIC;
 
 -- transition_fulfillment / ensure_fulfillment: default PUBLIC execute on a
 -- SECURITY DEFINER function would let any caller transition another tenant's

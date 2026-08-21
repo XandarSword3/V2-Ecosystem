@@ -2229,6 +2229,13 @@ export async function createModuleOrder(req: Request, res: Response) {
           subtotal: Math.round(unitPrice * item.quantity * 100) / 100,
           special_instructions: source.notes || source.instructions || null,
           status: 'pending',
+          // order_items.tenant_id / property_id are NOT NULL — omitting them
+          // silently failed the insert for every staff order (the error was
+          // swallowed as a warn), so staff orders never had order_items: the
+          // kitchen never saw them and the BOM resolver found nothing to
+          // allocate. Mirrors the customer path exactly.
+          tenant_id: tenantId,
+          property_id: propertyId,
           metadata: {
             ...(Array.isArray(item.metadata?.selectedModifiers) && item.metadata.selectedModifiers.length > 0
               ? { selectedModifiers: item.metadata.selectedModifiers }
@@ -2305,6 +2312,37 @@ export async function createModuleOrder(req: Request, res: Response) {
           });
         }
       }
+    }
+
+    // Resource allocation (plan Phase 5 — no-window invariant). The staff
+    // path creates orders DIRECTLY as 'confirmed' (no choke-point confirm
+    // transition), so the pre-flight allocation runs here, right after the
+    // order_items exist — the same invariant the choke point enforces: an
+    // order is never confirmed without its allocation. Physical stock was
+    // already deducted at creation above (the ONE stock authority); this
+    // records the generic reservation. On failure the order is rolled back.
+    const allocation = await itemPathResourceConsumption.allocateForConfirmation(supabase, {
+      transactionId: transaction.id,
+      engineType: 'instant_transaction',
+      mode: fulfillmentSelection.mode as FulfillmentMode | undefined,
+      propertyId: String(propertyId ?? ''),
+      tenantId: String(tenantId ?? ''),
+      context: { orderId: transaction.id, staffCreated: true },
+    });
+    if (!allocation.ok) {
+      logger.error('[Staff Order] Refusing staff order — resource allocation failed', {
+        orderId: transaction.id,
+        error: allocation.error,
+      });
+      await supabase.from('order_items').delete().eq('transaction_id', transaction.id);
+      await supabase.from('fulfillments').delete().eq('transaction_id', transaction.id);
+      await supabase.from('resource_allocations').delete().eq('transaction_id', transaction.id);
+      await supabase.from('transactions').delete().eq('id', transaction.id);
+      return res.status(409).json({
+        success: false,
+        error: 'RESOURCE_ALLOCATION_FAILED',
+        message: allocation.error || 'Resource allocation failed for this order',
+      });
     }
 
     const resultPayload = {

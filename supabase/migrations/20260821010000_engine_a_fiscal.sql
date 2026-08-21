@@ -99,7 +99,11 @@ CREATE TABLE IF NOT EXISTS "public"."fiscal_documents" (
     CONSTRAINT "chk_fiscal_documents_status"
         CHECK (("status" = ANY (ARRAY['issued'::"text", 'cancelled'::"text", 'voided'::"text"]))),
     CONSTRAINT "chk_fiscal_documents_total_invariant"
-        CHECK (("abs"(("total_amount" - GREATEST((0)::numeric, (((("subtotal" + "tax_amount") + "service_charge") + "delivery_fee") - "total_discount"))) < 0.03))
+        -- total_amount must reconcile with the itemized snapshot; a small
+        -- rounding tolerance is allowed. (Parentheses were previously
+        -- unbalanced — this constraint never parsed, so the migration could
+        -- not be applied to any database.)
+        CHECK ("abs"(("total_amount" - GREATEST((0)::numeric, (((("subtotal" + "tax_amount") + "service_charge") + "delivery_fee") - "total_discount")))) < 0.03::numeric)
 );
 
 -- ============================================================
@@ -198,9 +202,9 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", "integer") OWNER TO "postgres";
-GRANT ALL ON FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", "integer") TO "service_role";
-GRANT EXECUTE ON FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", "integer") TO "authenticated";
+ALTER FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", integer) OWNER TO "postgres";
+GRANT ALL ON FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", integer) TO "service_role";
+GRANT EXECUTE ON FUNCTION "public"."next_fiscal_document_number"("uuid", "uuid", "uuid", "text", "text", integer) TO "authenticated";
 
 -- ============================================================
 -- 6. RLS

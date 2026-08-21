@@ -406,6 +406,40 @@ describe('Engine A inventory authority (plan Phase 5 proof)', () => {
     expect(router).toMatch(/INSUFFICIENT_STOCK/);
   });
 
+  it('fulfillment-path code never calls a stock-deduction RPC (one stock authority)', () => {
+    // Physical stock is mutated ONLY at creation: deduct_inventory_for_order_items
+    // in POST /orders AND in the staff New-Order path (createModuleOrder),
+    // both at creation time. Confirmation, fulfillment moves, and the KDS
+    // item path perform allocate/consume/release on resource_allocations —
+    // bookkeeping, never inventory_items.current_stock. This guard fails if
+    // a deduct call is wired into either fulfillment-path surface.
+    const DEDUCT_RPCS = /deduct_inventory_for_order_items|deduct_inventory_for_order|deduct_stock_fifo/;
+
+    // The order-status choke point (confirm / fulfillment / cancel) must
+    // never touch stock.
+    const chokePoint = readFileSync(join(__dirname, '../../../src/engines/order-status.service.ts'), 'utf8');
+    expect(chokePoint).not.toMatch(DEDUCT_RPCS);
+
+    // The KDS item path (updateModuleOrderItemStatus) must never touch
+    // stock — but createModuleOrder (creation) legitimately calls the ONE
+    // authority RPC. Slice the item-status function's body and assert it is
+    // clean.
+    const staffCtrl = readFileSync(join(__dirname, '../../../src/modules/staff/module-staff.controller.ts'), 'utf8');
+    const itemStart = staffCtrl.indexOf('export async function updateModuleOrderItemStatus');
+    const itemEnd = staffCtrl.indexOf('export async function splitModuleOrder');
+    expect(itemStart).toBeGreaterThan(0);
+    expect(itemEnd).toBeGreaterThan(itemStart);
+    const itemPath = staffCtrl.slice(itemStart, itemEnd);
+    expect(itemPath).not.toMatch(DEDUCT_RPCS);
+
+    // And the staff creation path uses the SAME authority RPC — no second
+    // stock-mutation function.
+    expect(staffCtrl).toMatch(/rpc\('deduct_inventory_for_order_items'/);
+    // It also runs the pre-flight allocation (staff orders are created
+    // directly as 'confirmed').
+    expect(staffCtrl).toMatch(/allocateForConfirmation/);
+  });
+
   it('the KDS item path also drives the resource lifecycle (consumption fires there too)', () => {
     const src = readFileSync(join(__dirname, '../../../src/modules/staff/module-staff.controller.ts'), 'utf8');
     // Item-derived fulfillment moves (mark_ready / deliver) drive the same

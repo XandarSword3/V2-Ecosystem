@@ -193,7 +193,7 @@ BEGIN
     RETURNING id INTO v_id;
 
     IF v_id IS NULL THEN
-        SELECT id, status INTO v_id, NULL FROM fulfillments WHERE transaction_id = p_transaction_id;
+        SELECT id INTO v_id FROM fulfillments WHERE transaction_id = p_transaction_id;
         RETURN QUERY SELECT true, v_id, 'existing'::TEXT, NULL::TEXT;
         RETURN;
     END IF;

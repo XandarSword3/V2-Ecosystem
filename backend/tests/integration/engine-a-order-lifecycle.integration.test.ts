@@ -35,6 +35,15 @@
  *      cannot act on this order via its id. Confirmed against the real
  *      handler that the module_id-scoped fetch in changeInstantTransactionOrderStatus
  *      is what enforces this.
+ *   8. CONCURRENCY — N simultaneous orders against limited stock: the
+ *      creation-time authority admits exactly floor(stock/qty) of them
+ *      (the rest get INSUFFICIENT_STOCK), stock never goes negative, and
+ *      every admitted order confirms concurrently with its pre-flight
+ *      allocation + trigger-created fulfillment row intact.
+ *   9. The staff New-Order path (createModuleOrder) creates orders
+ *      DIRECTLY as 'confirmed' but still runs the pre-flight allocation
+ *      and gets the trigger row — same no-window invariant as the
+ *      choke-point path; cancelling it releases the allocation.
  */
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
@@ -500,6 +509,171 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     await supabase.from('fulfillments').delete().eq('transaction_id', secondOrderId);
     await supabase.from('resource_allocations').delete().eq('transaction_id', secondOrderId);
     await supabase.from('transactions').delete().eq('id', secondOrderId);
+  });
+
+  it('8. concurrent orders against limited stock: creation admits exactly floor(stock/qty); every admitted order confirms with allocation + fulfillment row', async () => {
+    // A fresh, controlled race: stock 5, qty 2 per order → exactly 2 of 5
+    // concurrent creations may succeed; the other 3 must be rejected with
+    // INSUFFICIENT_STOCK (the creation-time authority, atomic via
+    // deduct_stock_fifo's row lock).
+    const RACE_STOCK = 5;
+    const RACE_QTY = 2;
+    const CONCURRENT = 5;
+    const EXPECTED_WINS = Math.floor(RACE_STOCK / RACE_QTY); // 2
+
+    const { data: raceCat } = await supabase
+      .from('catalog_items')
+      .insert({ name: 'Race Burger', price: 10, module_id: moduleId, tenant_id: tenantId, property_id: propertyId, is_available: true })
+      .select('id')
+      .single();
+    const { data: raceInv } = await supabase
+      .from('inventory_items')
+      .insert({ name: 'Race Patty', unit: 'piece', current_stock: RACE_STOCK, tenant_id: tenantId, property_id: propertyId, module_id: moduleId, is_active: true })
+      .select('id')
+      .single();
+    await supabase.from('inventory_batches').insert({
+      item_id: raceInv.id,
+      batch_number: 'RACE-001',
+      quantity: RACE_STOCK,
+      remaining_quantity: RACE_STOCK,
+      status: 'active',
+      tenant_id: tenantId,
+      property_id: propertyId,
+    });
+    await supabase.from('menu_item_ingredients').insert({
+      catalog_item_id: raceCat.id,
+      inventory_item_id: raceInv.id,
+      quantity_required: 1,
+      unit: 'piece',
+      tenant_id: tenantId,
+      property_id: propertyId,
+    });
+
+    const creations = await Promise.all(
+      Array.from({ length: CONCURRENT }, (_, i) =>
+        request(app)
+          .post(`/api/v1/${moduleSlug}/orders`)
+          .set('Authorization', `Bearer ${staffToken}`)
+          .set('X-Tenant-ID', tenantId)
+          .send({ items: [{ catalog_item_id: raceCat.id, quantity: RACE_QTY }], table_number: `R-${i}` })
+      )
+    );
+
+    const succeeded = creations.filter((r) => r.status === 201);
+    const rejected = creations.filter((r) => r.status === 400);
+    expect(succeeded).toHaveLength(EXPECTED_WINS);
+    expect(rejected).toHaveLength(CONCURRENT - EXPECTED_WINS);
+    for (const r of rejected) {
+      expect(r.body.error).toBe('INSUFFICIENT_STOCK');
+    }
+
+    // Stock never went negative and exactly wins × qty was consumed.
+    const { data: raceStock } = await supabase.from('inventory_items').select('current_stock').eq('id', raceInv.id).single();
+    expect(raceStock!.current_stock).toBe(RACE_STOCK - RACE_QTY * succeeded.length);
+    expect(raceStock!.current_stock).toBeGreaterThanOrEqual(0);
+
+    // Concurrently confirm every admitted order: pre-flight allocation + the
+    // confirm trigger must hold for all of them.
+    const confirmations = await Promise.all(
+      succeeded.map((r) =>
+        request(app)
+          .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${r.body.data.id}/status`)
+          .set('Authorization', `Bearer ${staffToken}`)
+          .set('X-Tenant-ID', tenantId)
+          .send({ status: 'confirmed' })
+      )
+    );
+    for (const cr of confirmations) {
+      expect(cr.status).toBe(200);
+      expect(cr.body.data.status).toBe('confirmed');
+    }
+
+    // Every admitted order carries its allocation + trigger-created row.
+    for (const r of succeeded) {
+      const orderId = r.body.data.id;
+      const { data: allocs } = await supabase
+        .from('resource_allocations')
+        .select('kind, resource_ref, quantity, status')
+        .eq('transaction_id', orderId);
+      expect(allocs).toHaveLength(1);
+      expect(allocs![0].kind).toBe('inventory_item');
+      expect(allocs![0].resource_ref).toBe(raceInv.id);
+      expect(allocs![0].quantity).toBe(RACE_QTY);
+      expect(allocs![0].status).toBe('allocated');
+      const { data: f } = await supabase.from('fulfillments').select('status').eq('transaction_id', orderId).single();
+      expect(f!.status).toBe('queued');
+    }
+
+    // Cleanup the race fixtures.
+    for (const r of succeeded) {
+      await supabase.from('order_items').delete().eq('transaction_id', r.body.data.id);
+      await supabase.from('fulfillments').delete().eq('transaction_id', r.body.data.id);
+      await supabase.from('resource_allocations').delete().eq('transaction_id', r.body.data.id);
+      await supabase.from('inventory_transactions').delete().eq('reference_id', r.body.data.id);
+      await supabase.from('transactions').delete().eq('id', r.body.data.id);
+    }
+    await supabase.from('menu_item_ingredients').delete().eq('catalog_item_id', raceCat.id);
+    await supabase.from('inventory_batches').delete().eq('item_id', raceInv.id);
+    await supabase.from('inventory_items').delete().eq('id', raceInv.id);
+    await supabase.from('catalog_items').delete().eq('id', raceCat.id);
+  });
+
+  it('9. staff New-Order path confirms directly but still allocates pre-flight + seeds the trigger row; cancel releases', async () => {
+    const res = await request(app)
+      .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
+      .send({
+        items: [{ catalogItemId: catalogItemId, quantity: ORDER_QTY }],
+        tableNumber: 'T-9',
+      });
+
+    expect(res.status).toBe(201);
+    const staffOrderId = res.body.data.id;
+    expect(res.body.data.status).toBe('confirmed');
+
+    // No-window invariant on the staff path too: the pre-flight allocation
+    // ran (the same authority deducted stock at creation) and the trigger
+    // seeded the fulfillment row.
+    const { data: allocs } = await supabase
+      .from('resource_allocations')
+      .select('kind, resource_ref, quantity, status')
+      .eq('transaction_id', staffOrderId);
+    expect(allocs).toHaveLength(1);
+    expect(allocs![0].kind).toBe('inventory_item');
+    expect(allocs![0].resource_ref).toBe(inventoryItemId);
+    expect(allocs![0].quantity).toBe(RECIPE_QTY_PER_ITEM * ORDER_QTY);
+    expect(allocs![0].status).toBe('allocated');
+
+    const { data: f } = await supabase
+      .from('fulfillments')
+      .select('status, mode')
+      .eq('transaction_id', staffOrderId)
+      .single();
+    expect(f!.status).toBe('queued');
+    // Staff path without a service location defaults to a counter order →
+    // pickup mode (its own machine, same hospitality lifecycle).
+    expect(f!.mode).toBe('pickup');
+
+    // Cancelling the staff order releases its allocation.
+    const cancel = await request(app)
+      .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${staffOrderId}/status`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
+      .send({ status: 'cancelled' });
+    expect(cancel.status).toBe(200);
+
+    const { data: allocsAfter } = await supabase
+      .from('resource_allocations')
+      .select('status')
+      .eq('transaction_id', staffOrderId);
+    expect(allocsAfter).toHaveLength(1);
+    expect(allocsAfter![0].status).toBe('released');
+
+    await supabase.from('order_items').delete().eq('transaction_id', staffOrderId);
+    await supabase.from('fulfillments').delete().eq('transaction_id', staffOrderId);
+    await supabase.from('resource_allocations').delete().eq('transaction_id', staffOrderId);
+    await supabase.from('transactions').delete().eq('id', staffOrderId);
   });
 
   it('7. a staff member from a different tenant cannot act on this order by id', async () => {

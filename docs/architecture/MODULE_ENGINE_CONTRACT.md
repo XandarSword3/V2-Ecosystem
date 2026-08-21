@@ -46,6 +46,52 @@ fulfillment-mode registry may ever appear in `EngineType`.
 Future modes (`shipment`, `service_execution`, …) extend the mode registry
 and the engine's bindings — they do not create engines.
 
+## Physical inventory vs generic resource allocation: two layers, one stock authority (hard rule)
+
+An Engine A order touches inventory at TWO distinct layers. They look alike
+but are deliberately different systems, and confusing them is how a second
+stock mutation gets introduced. Proven end-to-end against a real database in
+`tests/integration/engine-a-order-lifecycle.integration.test.ts`.
+
+### Layer 1 — Physical inventory (stock): the ONE mutation authority
+
+| | |
+|---|---|
+| What | `inventory_items.current_stock` + `inventory_transactions` audit rows |
+| Who | `deduct_inventory_for_order_items` (→ `deduct_stock_fifo`, atomic, `FOR UPDATE` row lock, never negative) |
+| When | **Order creation** (`POST /orders`) — an order cannot even be created against unavailable stock; `INSUFFICIENT_STOCK` rolls the order back |
+| Compensation | `restore_inventory_for_order_items` / `restore_inventory_for_order` on cancellation |
+
+Confirmation performs **no** stock mutation. The legacy confirm-time deduct
+side effect is deliberately unregistered (`registry.ts` wires only
+`restoreInventorySideEffect` on `cancel`) — registering it would double-
+deduct every confirmed order. The concurrent-creation test proves the
+authority: N simultaneous orders on limited stock admit exactly
+`floor(stock/qty)`, stock never goes negative.
+
+### Layer 2 — Generic resource allocation (the reservation record): NOT a stock mutation
+
+| | |
+|---|---|
+| What | `resource_allocations` rows (`kind`, `ref`, `quantity`, `status`) + append-only `resource_allocation_events` |
+| Who | `allocate_resources` / `consume_resources` / `release_resources`, driven by the generic mode-aware `ResourceConsumptionService` |
+| When | **Pre-flight at confirmation** (never a confirmed order without its allocation — the confirm write is gated on it), consume at the mode's handoff, release on cancellation |
+
+Allocation records the transaction's *reservation/consumption fact* for the
+generic engine layer. It never writes `inventory_items.current_stock` — the
+physical stock was already reserved at creation.
+
+### The rule
+
+Exactly one thing mutates physical stock for an order: creation-time
+deduction; exactly one thing compensates it: cancel-time restore. Confirmation,
+allocation, consumption, completion, and every fulfillment move must never
+write stock. A new RPC that writes `inventory_items`/`inventory_transactions`
+for orders is forbidden unless the authority is deliberately extended.
+The architecture tests enforce the readable half of this mechanically:
+the registry registers no confirm-time deduction, and neither the
+order-status choke point nor the KDS item path may call a deduct RPC.
+
 ## `template_type`: frozen, read-only legacy compat
 
 `modules.template_type` is kept only so nothing that still joins on it breaks.
