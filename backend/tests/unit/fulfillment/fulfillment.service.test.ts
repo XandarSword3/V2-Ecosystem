@@ -412,4 +412,41 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     expect(router).toMatch(/fulfillment_mode: fulfillmentSelection\.mode/);
     expect(staff).toMatch(/fulfillment_mode: fulfillmentSelection\.mode/);
   });
+
+  it('source: RLS hardening — fiscal + fulfillment policies are scoped, never USING (true)', () => {
+    const migrationsDir = join(__dirname, '../../../../supabase/migrations');
+    const hardening = readFileSync(join(migrationsDir, '20260821150000_engine_a_rls_hardening.sql'), 'utf8');
+    // The USING (true) fiscal policies are dropped...
+    for (const name of ['fiscal_profiles_read_authenticated', 'fiscal_documents_read_authenticated', 'fiscal_submissions_read_authenticated']) {
+      expect(hardening).toMatch(new RegExp(`DROP POLICY IF EXISTS "${name}"`));
+    }
+    // ...and replaced by tenant/property-scoped policies using the schema helpers.
+    expect(hardening).toMatch(/fiscal_profiles_isolation/);
+    expect(hardening).toMatch(/fiscal_documents_isolation/);
+    expect(hardening).toMatch(/fiscal_submissions_isolation/);
+    expect(hardening).toMatch(/user_has_tenant_access/);
+    // fulfillments + fulfillment_events get RLS + scoped policies.
+    expect(hardening).toMatch(/fulfillments_isolation/);
+    expect(hardening).toMatch(/fulfillment_events_isolation/);
+    expect(hardening.match(/ENABLE ROW LEVEL SECURITY/g)!.length).toBeGreaterThanOrEqual(2);
+    // SECURITY DEFINER RPCs are service_role-only.
+    expect(hardening).toMatch(/REVOKE EXECUTE ON FUNCTION "public"."transition_fulfillment"/);
+    expect(hardening).toMatch(/REVOKE EXECUTE ON FUNCTION "public"."next_fiscal_document_number"/);
+    // The schema default is flipped so future tables fail closed.
+    expect(hardening).toMatch(/ALTER DEFAULT PRIVILEGES[\s\S]*REVOKE SELECT ON TABLES FROM "?authenticated"?/);
+    // The fulfillment service must not be impacted: it still reaches the RPCs
+    // over the service-role client (see transition/ensure tests above).
+  });
+
+  it('source: the verification artifact exists and covers the proof steps', () => {
+    const verifyPath = join(__dirname, '../../../../supabase/verify/rls-tenant-isolation.sql');
+    const verify = readFileSync(verifyPath, 'utf8');
+    expect(verify).toMatch(/SET ROLE authenticated/);
+    expect(verify).toMatch(/permission denied/);
+    // The script must assert the isolation outcome itself: cross-tenant rows are
+    // invisible to authenticated, and the RPCs are service_role-only.
+    expect(verify).toMatch(/visible_rows = 0/);
+    expect(verify).toMatch(/has_function_privilege/);
+    expect(verify).toMatch(/transition_fulfillment/);
+  });
 });

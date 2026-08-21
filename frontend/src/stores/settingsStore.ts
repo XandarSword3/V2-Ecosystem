@@ -17,7 +17,14 @@ export const currencyNames: Record<Currency, string> = {
   LBP: 'Lebanese Pound',
 };
 
-// Approximate exchange rates (for display purposes)
+// STATIC FALLBACK rates for display conversion — NOT a source of truth.
+// The authoritative rates live in the backend exchange_rates table
+// (immutable facts, see backend ExchangeRateService.getFact). These
+// hardcoded values are only the initial/offline fallback until the app
+// hydrates from the backend (TODO: fetch rates via ExchangeRateService and
+// replace this map); the backend prices and stores amounts in the module's
+// own currency, so a stale rate here can mis-display. Do not treat this as
+// authoritative.
 export const exchangeRates: Record<Currency, number> = {
   USD: 1,
   EUR: 0.92,

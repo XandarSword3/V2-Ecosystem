@@ -17,12 +17,11 @@ function resolveTenant(req: Request): string {
 }
 
 function resolveProperty(req: Request, fallback?: string | null): string {
-  const propertyId =
-    (req as any).propertyId ||
-    req.body?.propertyId ||
-    req.headers?.['x-property-id'] ||
-    fallback ||
-    null;
+  // Only a VALIDATED property may be used: the fiscal routes run
+  // validatePropertyAccess, which checks the requested property against the
+  // caller's tenant + property assignments before setting req.propertyId.
+  // The raw client x-property-id header is never trusted here.
+  const propertyId = (req as any).propertyId || fallback || null;
   if (!propertyId) {
     throw new FiscalDocumentError('PROPERTY_REQUIRED', 'property_id is required');
   }
