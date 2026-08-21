@@ -44,6 +44,11 @@ const TENANT_SCOPED_TABLES = new Set([
   'reviews',
   'payments',
   'payment_ledger',
+  // Fiscal engine (migration 20260821010000) — tenant-scoped like the rest.
+  'fiscal_profiles',
+  'fiscal_document_series',
+  'fiscal_documents',
+  'fiscal_submissions',
 ]);
 
 /**

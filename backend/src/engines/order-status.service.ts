@@ -215,5 +215,32 @@ export async function changeInstantTransactionOrderStatus(
     logger.warn('Failed to log order status activity:', logError.message);
   }
 
+  // Fiscal document issuance (DOMAIN.md G1) — once the transaction is
+  // economically committed, the fiscal engine must produce its document from
+  // the immutable snapshot. Non-fatal by design: a fiscal hiccup must never
+  // block the order transition; the fiscal API and the payment webhook are
+  // the explicit retry paths. Dynamic import keeps the engine layer free of a
+  // static dependency on the fiscal module.
+  const FISCALLY_COMMITTED = new Set(['confirmed', 'preparing', 'ready', 'delivered', 'completed']);
+  if (FISCALLY_COMMITTED.has(transition.targetState)) {
+    try {
+      const { fiscalDocumentService } = await import('../modules/fiscal/fiscal-document.service.js');
+      await fiscalDocumentService.issueForTransaction(orderId, {
+        tenantId: tenantId ?? String(order.tenant_id),
+        propertyId: String(order.property_id),
+        actorId: userId ?? null,
+      });
+      logger.info('[OrderStatus] Fiscal document issued after status transition', {
+        orderId,
+        state: transition.targetState,
+      });
+    } catch (fiscalErr: any) {
+      logger.warn('[OrderStatus] Fiscal document issuance deferred (retry via fiscal API)', {
+        orderId,
+        error: fiscalErr?.message ?? String(fiscalErr),
+      });
+    }
+  }
+
   return { ok: true, status: 200, order };
 }

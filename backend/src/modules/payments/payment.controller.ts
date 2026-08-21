@@ -187,6 +187,28 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           metadata: { stripe_event_id: event.id },
         });
 
+        // Step 5: Fiscal document issuance (DOMAIN.md G1) — non-fatal, the
+        // fiscal API and the order-status path are the explicit retry routes.
+        if (referenceType === 'transaction') {
+          try {
+            const { data: payRow } = await supabase
+              .from('payments')
+              .select('tenant_id, property_id')
+              .eq('stripe_payment_intent_id', paymentIntent.id)
+              .maybeSingle();
+            if (payRow) {
+              const { fiscalDocumentService } = await import('../fiscal/fiscal-document.service.js');
+              await fiscalDocumentService.issueForTransaction(referenceId, {
+                tenantId: String(payRow.tenant_id),
+                propertyId: String(payRow.property_id),
+                actorId: 'system',
+              });
+            }
+          } catch (fiscalErr: any) {
+            logger.warn('Fiscal document issuance after payment deferred:', fiscalErr?.message ?? String(fiscalErr));
+          }
+        }
+
         logger.info(`Payment succeeded for ${referenceType}:${referenceId}`);
       };
 
