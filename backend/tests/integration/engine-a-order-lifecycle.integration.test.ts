@@ -44,6 +44,11 @@
  *      DIRECTLY as 'confirmed' but still runs the pre-flight allocation
  *      and gets the trigger row — same no-window invariant as the
  *      choke-point path; cancelling it releases the allocation.
+ *  10. Staff payment (payModuleOrder) records SETTLEMENT only — completion
+ *      goes through the capability-gated choke point. Paying mid-
+ *      preparation settles without completing (fulfillment gate refuses);
+ *      paying at handed_off completes. Payment never mutates stock, and
+ *      completing by payment never re-consumes (exactly-once).
  */
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
@@ -674,6 +679,144 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     await supabase.from('fulfillments').delete().eq('transaction_id', staffOrderId);
     await supabase.from('resource_allocations').delete().eq('transaction_id', staffOrderId);
     await supabase.from('transactions').delete().eq('id', staffOrderId);
+  });
+
+  it('10. staff payment settles but completes only through the gate; payment never touches stock and never re-consumes', async () => {
+    // Stock is deducted once, at creation, by the ONE authority. Capture
+    // the level so we can prove payment itself is stock-neutral.
+    const readStock = async () => {
+      const { data: inv } = await supabase
+        .from('inventory_items')
+        .select('current_stock')
+        .eq('id', inventoryItemId)
+        .single();
+      return inv!.current_stock;
+    };
+    const stockBefore = await readStock();
+
+    const create = await request(app)
+      .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
+      .send({ items: [{ catalogItemId, quantity: ORDER_QTY }], tableNumber: 'T-10' });
+    expect(create.status).toBe(201);
+    const payOrderId = create.body.data.id;
+    expect(create.body.data.status).toBe('confirmed');
+    const stockAfterCreate = await readStock();
+    expect(stockAfterCreate).toBe(stockBefore - RECIPE_QTY_PER_ITEM * ORDER_QTY);
+
+    // Advance to in_progress only — not yet handoff-eligible.
+    const { data: payItem } = await supabase
+      .from('order_items')
+      .select('id')
+      .eq('transaction_id', payOrderId)
+      .single();
+    const toPreparing = await request(app)
+      .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${payOrderId}/items/${payItem!.id}/status`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
+      .send({ status: 'preparing' });
+    expect(toPreparing.status).toBe(200);
+
+    // PAY #1 — mid-preparation: settlement succeeds, completion is deferred
+    // by the fulfillment gate (cannot complete from in_progress).
+    const payMidPrep = await request(app)
+      .post(`/api/v1/staff/modules/${moduleSlug}/orders/${payOrderId}/pay`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
+      .send({ paymentMethod: 'cash', amountPaid: 100 });
+    expect(payMidPrep.status).toBe(200);
+    expect(payMidPrep.body.data.paymentStatus).toBe('paid');
+    expect(payMidPrep.body.data.completionStatus).toBe('pending_fulfillment_handoff');
+    expect(payMidPrep.body.data.status).toBe('in_progress');
+
+    const { data: fMid } = await supabase
+      .from('fulfillments')
+      .select('status')
+      .eq('transaction_id', payOrderId)
+      .single();
+    expect(fMid!.status).toBe('in_progress');
+    const { data: tMid } = await supabase
+      .from('transactions')
+      .select('status, metadata')
+      .eq('id', payOrderId)
+      .single();
+    expect(tMid!.status).toBe('confirmed');
+    expect(tMid!.metadata.payment_status).toBe('paid');
+    // Settlement never touches stock.
+    expect(await readStock()).toBe(stockAfterCreate);
+
+    // Advance to handed_off (served) — resource consumption fires here, via
+    // the item path's lifecycle driver.
+    for (const s of ['ready', 'served']) {
+      const r = await request(app)
+        .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${payOrderId}/items/${payItem!.id}/status`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .set('X-Tenant-ID', tenantId)
+        .send({ status: s });
+      expect(r.status).toBe(200);
+    }
+    const { data: fHanded } = await supabase
+      .from('fulfillments')
+      .select('status')
+      .eq('transaction_id', payOrderId)
+      .single();
+    expect(fHanded!.status).toBe('handed_off');
+
+    const { data: allocsHanded } = await supabase
+      .from('resource_allocations')
+      .select('id, status')
+      .eq('transaction_id', payOrderId);
+    expect(allocsHanded).toHaveLength(1);
+    expect(allocsHanded![0].status).toBe('consumed');
+    const { data: allocEventsBefore } = await supabase
+      .from('resource_allocation_events')
+      .select('to_status')
+      .eq('allocation_id', allocsHanded![0].id);
+    // 'allocated' + 'consumed' — exactly the two lifecycle events so far.
+    expect(allocEventsBefore!.map((e: any) => e.to_status).sort()).toEqual(['allocated', 'consumed']);
+
+    // PAY #2 — at handed_off: the gate grants completion.
+    const payAtHandoff = await request(app)
+      .post(`/api/v1/staff/modules/${moduleSlug}/orders/${payOrderId}/pay`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .set('X-Tenant-ID', tenantId)
+      .send({ paymentMethod: 'cash', amountPaid: 100 });
+    expect(payAtHandoff.status).toBe(200);
+    expect(payAtHandoff.body.data.completionStatus).toBe('completed');
+    expect(payAtHandoff.body.data.status).toBe('completed');
+
+    const { data: fDone } = await supabase
+      .from('fulfillments')
+      .select('status')
+      .eq('transaction_id', payOrderId)
+      .single();
+    expect(fDone!.status).toBe('completed');
+    const { data: tDone } = await supabase
+      .from('transactions')
+      .select('status')
+      .eq('id', payOrderId)
+      .single();
+    expect(tDone!.status).toBe('completed');
+
+    // Exactly-once consumption: payment-completion did NOT re-consume — the
+    // allocation is still 'consumed' with the same two events.
+    const { data: allocEventsAfter } = await supabase
+      .from('resource_allocation_events')
+      .select('to_status')
+      .eq('allocation_id', allocsHanded![0].id);
+    expect(allocEventsAfter!.map((e: any) => e.to_status).sort()).toEqual(['allocated', 'consumed']);
+
+    // Payment (both times) never touched physical stock — single authority.
+    expect(await readStock()).toBe(stockAfterCreate);
+
+    // Best-effort teardown (mirrors test 9; fulfillment_events is
+    // append-only so the fulfillment delete may be refused by the cascade —
+    // the sweep in the shared-instance cleanup handles stragglers).
+    await supabase.from('order_items').delete().eq('transaction_id', payOrderId);
+    await supabase.from('fulfillments').delete().eq('transaction_id', payOrderId);
+    await supabase.from('resource_allocations').delete().eq('transaction_id', payOrderId);
+    await supabase.from('transactions').delete().eq('id', payOrderId);
   });
 
   it('7. a staff member from a different tenant cannot act on this order by id', async () => {

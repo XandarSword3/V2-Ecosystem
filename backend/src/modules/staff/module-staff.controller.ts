@@ -8,7 +8,7 @@ import { resolveAndPriceCatalogItems } from '../../services/catalog-pricing.serv
 import { getEngineService } from '../../engines/engine-service.js';
 import { resolveModuleCurrency } from '../../engines/currency-resolver.js';
 import { TEMPLATE_TO_ENGINE, type FulfillmentMode } from '../../engines/types.js';
-import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
+import { changeInstantTransactionOrderStatus, actorForUser } from '../../engines/order-status.service.js';
 import { getFulfillmentService } from '../fulfillment/index.js';
 import { ResourceConsumptionService } from '../resource/index.js';
 import { hospitalityResourceResolver } from '../../adapters/hospitality/resources.js';
@@ -2378,12 +2378,11 @@ export async function createModuleOrder(req: Request, res: Response) {
 export async function addModuleOrderItem(req: Request, res: Response) {
   try {
     const { slug, orderId } = req.params;
-    const { catalogItemId, itemId, quantity, unitPrice, price, notes } = req.body;
+    const { catalogItemId, itemId, quantity, notes } = req.body;
     const supabase = getSupabase();
 
     const targetCatalogId = catalogItemId || itemId;
     const qty = Number(quantity || 1);
-    const itemPrice = Number(unitPrice || price || 0);
 
     const { data: module } = await supabase
       .from('modules')
@@ -2397,7 +2396,7 @@ export async function addModuleOrderItem(req: Request, res: Response) {
 
     const { data: order, error: fetchErr } = await supabase
       .from('transactions')
-      .select('id, amount, status, metadata')
+      .select('id, amount, status, metadata, tenant_id, property_id, customer_id')
       .eq('id', orderId)
       .eq('module_id', module.id)
       .single();
@@ -2410,29 +2409,207 @@ export async function addModuleOrderItem(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: `Cannot add items to a ${order.status} order` });
     }
 
-    const subtotal = Math.round(qty * itemPrice * 100) / 100;
+    const orderMeta = (order.metadata ?? {}) as Record<string, any>;
 
+    // Phase 5 invariant: an order whose fulfillment has already reached the
+    // handoff/consumption point can never accept new items — the new
+    // allocation rows could never be consumed (the completion move skips
+    // consumption, by design). Fail-closed: a fulfillment read error refuses
+    // the write rather than proceeding on a stale assumption.
+    let fulfillmentStatus: string | null = null;
+    try {
+      const f = await getFulfillmentService().getForTransaction(supabase, order.id);
+      fulfillmentStatus = f?.status ?? null;
+    } catch (fErr) {
+      logger.error('[Staff Order] Failed reading fulfillment state before adding item:', fErr);
+      return res.status(500).json({ success: false, error: 'Failed to verify order state', message: 'Could not verify fulfillment state before adding the item' });
+    }
+    if (fulfillmentStatus === 'handed_off' || fulfillmentStatus === 'completed') {
+      return res.status(400).json({ success: false, error: 'Cannot add items to an order that has already been served' });
+    }
+
+    const userId = req.user?.userId;
+    const tenantId = req.user?.tenantId ?? order.tenant_id ?? null;
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined) || order.property_id || null;
+
+    // Price the FULL item set (existing order_items + the new line) through
+    // the same server-side pipeline createModuleOrder uses — a staff caller
+    // can't over/under-charge by sending their own unitPrice, and the
+    // transaction amount + pricing snapshot stay consistent after the add.
+    const { data: existingItems, error: existingErr } = await supabase
+      .from('order_items')
+      .select('catalog_item_id, quantity, metadata')
+      .eq('transaction_id', order.id);
+    if (existingErr) throw existingErr;
+
+    const catalogRequests = [
+      ...(existingItems ?? []).map((i: any) => ({
+        catalog_item_id: i.catalog_item_id,
+        quantity: Number(i.quantity),
+        ...(i.metadata?.selectedModifiers && Array.isArray(i.metadata.selectedModifiers) && i.metadata.selectedModifiers.length > 0
+          ? { metadata: { selectedModifiers: i.metadata.selectedModifiers } }
+          : {}),
+      })),
+      {
+        catalog_item_id: targetCatalogId,
+        quantity: qty,
+        ...(notes ? { metadata: { notes } } : {}),
+      },
+    ];
+
+    const catalogResult = await resolveAndPriceCatalogItems(catalogRequests, module.id);
+    if (catalogResult.validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_CATALOG_ITEMS',
+        message: 'One or more items could not be priced',
+        details: catalogResult.validationErrors,
+      });
+    }
+    const resolvedItems = catalogResult.resolvedItems;
+    const newResolvedItem = resolvedItems.find((r) => r.itemId === targetCatalogId);
+    if (!newResolvedItem) {
+      return res.status(400).json({ success: false, error: 'Item could not be resolved for pricing' });
+    }
+
+    const lineItems = resolvedItems.map((item) => ({
+      itemId: item.itemId,
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.basePrice + item.modifierAdjustment,
+      metadata: item.metadata,
+      taxCategory: item.taxCategory,
+    }));
+
+    const engineService = getEngineService();
+    const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
+      moduleId: module.id,
+      propertyId: propertyId ?? undefined,
+      currency: await resolveModuleCurrency(module.id, propertyId),
+      customerId: order.customer_id ?? undefined,
+      staffId: userId ?? undefined,
+      conditions: {
+        orderType: orderMeta.order_type ?? 'dine_in',
+        paymentMethod: orderMeta.payment_method ?? 'cash',
+      },
+    });
+
+    const receiptLineItems = resolvedItems.map((item) => {
+      const unitPrice = item.basePrice + item.modifierAdjustment;
+      return {
+        itemId: item.itemId,
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice,
+        lineTotal: unitPrice * item.quantity,
+        ...(Array.isArray(item.metadata?.selectedModifiers)
+          ? { selectedModifiers: item.metadata.selectedModifiers }
+          : {}),
+      };
+    });
+
+    // Stock for the NEW line only, through the ONE inventory authority
+    // (creation-time deduction RPC — same as createModuleOrder; add-item is
+    // a creation-time-equivalent stock event, never a second authority).
+    // The RPC raises on shortfall, rolling back its own deductions.
+    const deductionPayload = [{ catalog_item_id: targetCatalogId, quantity: newResolvedItem.quantity }];
+    const { error: deductError } = await supabase.rpc('deduct_inventory_for_order_items', {
+      p_items: deductionPayload,
+      p_user_id: userId || null,
+      p_order_id: order.id,
+    });
+    if (deductError) {
+      logger.warn('Add item rejected due to insufficient stock:', deductError.message);
+      return res.status(400).json({
+        success: false,
+        error: 'INSUFFICIENT_STOCK',
+        message: deductError.message || 'One or more items in the order are out of stock',
+      });
+    }
+
+    const newUnitPrice = newResolvedItem.basePrice + newResolvedItem.modifierAdjustment;
     const { data: newItem, error: insertErr } = await supabase
       .from('order_items')
       .insert({
         transaction_id: order.id,
         catalog_item_id: targetCatalogId,
-        quantity: qty,
-        unit_price: itemPrice,
-        subtotal,
+        quantity: newResolvedItem.quantity,
+        unit_price: newUnitPrice,
+        subtotal: Math.round(newUnitPrice * newResolvedItem.quantity * 100) / 100,
         special_instructions: notes || null,
         status: 'pending',
+        // order_items.tenant_id / property_id are NOT NULL — omitting them
+        // silently failed this insert for every staff add-item (same bug as
+        // createModuleOrder's item insert, fixed there).
+        tenant_id: tenantId,
+        property_id: propertyId,
       })
       .select('*')
       .single();
 
-    if (insertErr) throw insertErr;
+    if (insertErr) {
+      await supabase.rpc('restore_inventory_for_order_items', {
+        p_items: deductionPayload,
+        p_user_id: userId || null,
+      });
+      throw insertErr;
+    }
 
-    const newTotal = Math.round(((order.amount || 0) + subtotal) * 100) / 100;
-    await supabase
+    const newTotal = Math.round(pricing.totalAmount * 100) / 100;
+    const { error: updateErr } = await supabase
       .from('transactions')
-      .update({ amount: newTotal, updated_at: new Date().toISOString() })
+      .update({
+        amount: newTotal,
+        tax_amount: Math.round(pricing.taxAmount * 100) / 100,
+        discount_amount: Math.round(pricing.totalDiscount * 100) / 100,
+        metadata: { ...orderMeta, pricing, lineItems: receiptLineItems },
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', order.id);
+
+    if (updateErr) {
+      await supabase.from('order_items').delete().eq('id', newItem.id);
+      await supabase.rpc('restore_inventory_for_order_items', {
+        p_items: deductionPayload,
+        p_user_id: userId || null,
+      });
+      throw updateErr;
+    }
+
+    // Incremental generic allocation (Phase 5). allocate_resources is
+    // idempotent per (transaction_id, kind, resource_ref) — re-running the
+    // FULL requirement set after the item insert adds only the new rows and
+    // leaves the existing allocation untouched. The served-order guard above
+    // ensures any new 'allocated' rows are still consumed when this order
+    // reaches handoff.
+    const allocation = await itemPathResourceConsumption.allocateForConfirmation(supabase, {
+      transactionId: order.id,
+      engineType: 'instant_transaction',
+      mode: orderMeta.fulfillment_mode as FulfillmentMode | undefined,
+      propertyId: String(propertyId ?? ''),
+      tenantId: String(tenantId ?? ''),
+      context: { orderId: order.id, staffCreated: true, addedItem: true },
+    });
+    if (!allocation.ok) {
+      logger.error('[Staff Order] Allocation failed after adding item — rolling back:', {
+        orderId: order.id,
+        error: allocation.error,
+      });
+      await supabase.from('order_items').delete().eq('id', newItem.id);
+      await supabase.rpc('restore_inventory_for_order_items', {
+        p_items: deductionPayload,
+        p_user_id: userId || null,
+      });
+      await supabase
+        .from('transactions')
+        .update({ amount: order.amount, metadata: orderMeta, updated_at: new Date().toISOString() })
+        .eq('id', order.id);
+      return res.status(409).json({
+        success: false,
+        error: 'RESOURCE_ALLOCATION_FAILED',
+        message: allocation.error || 'Resource allocation failed for the added item',
+      });
+    }
 
     try {
       const updatePayload = { orderId: order.id, status: order.status, addedItem: newItem };
@@ -2500,14 +2677,17 @@ export async function payModuleOrder(req: Request, res: Response) {
       paid_by_staff_id: userId || null,
     };
 
-    const targetStatus = ['delivered', 'ready', 'preparing', 'confirmed', 'pending'].includes(order.status)
-      ? 'completed'
-      : order.status;
-
+    // Settlement write — payment records PAYMENT, never completion. A direct
+    // status write here would impersonate completion: it would bypass the
+    // fulfillment machine, the capability-gated completion condition
+    // (required fulfillment must reach its terminal handoff state first),
+    // resource consumption at handoff, and fiscal issuance. Payment and
+    // completion are separate facts; only the state machine may change
+    // status (plan Phase 5 mutation-path inventory — payModuleOrder was the
+    // one Engine A path writing transactions.status directly).
     const { data: updatedOrder, error: updateErr } = await supabase
       .from('transactions')
       .update({
-        status: targetStatus,
         metadata: updatedMetadata,
         updated_at: new Date().toISOString(),
       })
@@ -2516,6 +2696,55 @@ export async function payModuleOrder(req: Request, res: Response) {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // Completion through the capability-gated choke point. The gate refuses
+    // 'completed' until the fulfillment layer has reached its terminal
+    // handoff condition — paying mid-preparation settles the order without
+    // completing it (the KDS/frontend completes it at handoff). Settlement
+    // already persisted above; a 400 refusal here is expected for
+    // not-yet-handoff-eligible orders, and a fail-closed (500) error is
+    // logged loudly rather than failing an already-settled payment.
+    let completionStatus: 'completed' | 'pending_fulfillment_handoff';
+    let displayStatus: string;
+    if (order.status === 'completed') {
+      // Already terminal — nothing to gate, nothing to read.
+      completionStatus = 'completed';
+      displayStatus = 'completed';
+    } else {
+      completionStatus = 'pending_fulfillment_handoff';
+      const completion = await changeInstantTransactionOrderStatus(supabase, {
+        orderId: order.id,
+        moduleId: module.id,
+        moduleSlug: slug,
+        moduleEngineTypeRaw: module.engine_type,
+        requestedStatus: 'completed',
+        actor: actorForUser(req),
+        userId,
+        tenantId: req.user?.tenantId ?? null,
+      });
+      if (completion.ok) {
+        completionStatus = 'completed';
+        displayStatus = 'completed';
+      } else {
+        if (completion.status !== 400) {
+          logger.error('[Staff Order] Payment settled but completion through the status gate failed', {
+            orderId: order.id,
+            status: completion.status,
+            error: completion.error,
+          });
+        }
+        // Canonical state for the response/socket when completion is
+        // deferred: the fulfillment row's canonical state (fulfillment
+        // moves leave transactions.status at 'confirmed'). Never the stale
+        // pre-payment transactions.status.
+        try {
+          const f = await getFulfillmentService().getForTransaction(supabase, order.id);
+          displayStatus = f?.status ?? updatedOrder.status;
+        } catch {
+          displayStatus = updatedOrder.status;
+        }
+      }
+    }
 
     // Record the settled charge to the financial ledger — this is what makes a
     // staff-originated sale visible to the books (receipts, reconciliation,
@@ -2539,7 +2768,7 @@ export async function payModuleOrder(req: Request, res: Response) {
           transactionType: 'charge',
           actorType: 'staff',
           actorId: userId,
-          entityState: targetStatus,
+          entityState: displayStatus,
           paymentMethod,
           idempotencyKey: `settle:${order.id}`,
           metadata: {
@@ -2566,7 +2795,7 @@ export async function payModuleOrder(req: Request, res: Response) {
     try {
       emitToUnit(req.user?.tenantId || 'default', slug, 'order:updated', {
         orderId: order.id,
-        status: targetStatus,
+        status: displayStatus,
         paymentStatus: 'paid',
       });
     } catch (sErr: any) {
@@ -2577,7 +2806,8 @@ export async function payModuleOrder(req: Request, res: Response) {
       success: true,
       data: {
         id: updatedOrder.id,
-        status: updatedOrder.status,
+        status: displayStatus,
+        completionStatus,
         paymentStatus: 'paid',
         paymentMethod,
         totalAmount: updatedOrder.amount,

@@ -17,7 +17,10 @@ import { getOrderNumber } from '../utils/order-number.js';
 import { customizationService } from '../modules/customization/services/customization.service.js';
 import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reversal.js';
 import { actorForUser, resolveAction, changeInstantTransactionOrderStatus } from '../engines/order-status.service.js';
+import type { FulfillmentMode } from '../engines/types.js';
 import { resolveFulfillmentSelection } from '../modules/fulfillment/fulfillment-selection.js';
+import { ResourceConsumptionService } from '../modules/resource/index.js';
+import { hospitalityResourceResolver } from '../adapters/hospitality/resources.js';
 import { emitToUnit } from '../socket/index.js';
 import { resolveAndPriceCatalogItems, type CatalogItemRequest } from '../services/catalog-pricing.service.js';
 import {
@@ -209,6 +212,12 @@ function asNumber(input: unknown, fallback = 0): number {
 // instant_transaction terminal states (engines/definitions/instant-transaction.ts).
 // A location counts as occupied when it has any order NOT in one of these.
 const INSTANT_TRANSACTION_TERMINAL_STATES = ['completed', 'cancelled'];
+
+// Resource lifecycle driver for the customer-router item path (plan Phase
+// 5): adding items to a confirmed order must refresh the generic
+// allocation through the same idempotent allocate the choke point uses.
+const routerResourceConsumption = new ResourceConsumptionService(hospitalityResourceResolver);
+
 interface ServiceLocationRow {
   id: string;
   name: string;
@@ -1378,6 +1387,26 @@ function buildInstantTransactionRouter(router: Router): void {
       if (INSTANT_TRANSACTION_TERMINAL_STATES.includes(order.status)) {
         return res.status(400).json({ success: false, error: `Cannot add items to a ${order.status} order` });
       }
+
+      // Phase 5 invariant: an order whose fulfillment has already reached
+      // the handoff/consumption point can never accept new items — the new
+      // allocation rows could never be consumed (completion skips
+      // consumption, by design). Fail-closed: a fulfillment read error
+      // refuses the write rather than proceeding on a stale assumption.
+      {
+        const { data: fRow, error: fErr } = await supabase
+          .from('fulfillments')
+          .select('status')
+          .eq('transaction_id', order.id)
+          .maybeSingle();
+        if (fErr) {
+          logger.error('[Dynamic Router] Failed reading fulfillment state before adding items:', fErr.message);
+          return res.status(500).json({ success: false, error: 'Failed to verify order state' });
+        }
+        if (fRow?.status === 'handed_off' || fRow?.status === 'completed') {
+          return res.status(400).json({ success: false, error: 'Cannot add items to an order that has already been served' });
+        }
+      }
       const items = Array.isArray(req.body?.items) ? req.body.items : [];
       if (items.length === 0) {
         return res.status(400).json({ success: false, error: 'At least one item is required' });
@@ -1454,11 +1483,39 @@ function buildInstantTransactionRouter(router: Router): void {
           property_id: order.property_id,
         };
       });
+      // Stock for the ADDED items only, through the ONE inventory authority
+      // (same creation-time RPC as POST /orders — add-item is a
+      // creation-equivalent stock event, never a second authority). Raises
+      // on shortfall, rolling back its own deductions.
+      const deductionPayload = catalogResult.resolvedItems.map((item) => ({
+        catalog_item_id: item.itemId,
+        quantity: item.quantity,
+      }));
+      const { error: deductError } = await supabase.rpc('deduct_inventory_for_order_items', {
+        p_items: deductionPayload,
+        p_user_id: req.user?.userId ?? null,
+        p_order_id: order.id,
+      });
+      if (deductError) {
+        logger.warn('[Dynamic Router] Add items rejected due to insufficient stock:', deductError.message);
+        return res.status(400).json({
+          success: false,
+          error: 'INSUFFICIENT_STOCK',
+          message: deductError.message || 'One or more items are out of stock',
+        });
+      }
+
       const { data: insertedItems, error: orderItemsError } = await supabase
         .from('order_items')
         .insert(orderItemRows)
         .select();
-      if (orderItemsError) throw orderItemsError;
+      if (orderItemsError) {
+        await supabase.rpc('restore_inventory_for_order_items', {
+          p_items: deductionPayload,
+          p_user_id: req.user?.userId ?? null,
+        });
+        throw orderItemsError;
+      }
       const { data: updatedOrder, error: updateError } = await supabase
         .from('transactions')
         .update({
@@ -1469,7 +1526,59 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('id', order.id)
         .select('id, module_id, status, amount, tax_amount, service_charge, discount_amount, service_location_id, created_at, metadata')
         .single();
-      if (updateError) throw updateError;
+      if (updateError) {
+        await supabase
+          .from('order_items')
+          .delete()
+          .in('id', (insertedItems ?? []).map((i: any) => i.id));
+        await supabase.rpc('restore_inventory_for_order_items', {
+          p_items: deductionPayload,
+          p_user_id: req.user?.userId ?? null,
+        });
+        throw updateError;
+      }
+
+      // Incremental generic allocation (Phase 5). allocate_resources is
+      // idempotent per (transaction_id, kind, resource_ref) — re-running the
+      // FULL requirement set after the insert adds only the new rows and
+      // leaves the existing allocation untouched. The served-order guard
+      // above ensures any new 'allocated' rows are consumed at handoff.
+      const allocation = await routerResourceConsumption.allocateForConfirmation(supabase, {
+        transactionId: order.id,
+        engineType: 'instant_transaction',
+        mode: (order.metadata as any)?.fulfillment_mode as FulfillmentMode | undefined,
+        propertyId: String(order.property_id ?? ''),
+        tenantId: String(order.tenant_id ?? ''),
+        context: { orderId: order.id, staffCreated: false, addedItem: true },
+      });
+      if (!allocation.ok) {
+        logger.error('[Dynamic Router] Allocation failed after adding items — rolling back:', {
+          orderId: order.id,
+          error: allocation.error,
+        });
+        await supabase
+          .from('order_items')
+          .delete()
+          .in('id', (insertedItems ?? []).map((i: any) => i.id));
+        await supabase.rpc('restore_inventory_for_order_items', {
+          p_items: deductionPayload,
+          p_user_id: req.user?.userId ?? null,
+        });
+        await supabase
+          .from('transactions')
+          .update({
+            amount: asNumber(order.amount, 0),
+            tax_amount: asNumber(order.tax_amount, 0),
+            service_charge: asNumber(order.service_charge, 0),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', order.id);
+        return res.status(409).json({
+          success: false,
+          error: 'RESOURCE_ALLOCATION_FAILED',
+          message: allocation.error || 'Resource allocation failed for the added items',
+        });
+      }
       // Non-fatal, matches POST /orders: the order_items + transactions
       // update above are already the authoritative record of what
       // happened; the ledger entry only enriches it.

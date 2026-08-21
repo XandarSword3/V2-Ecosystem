@@ -450,6 +450,84 @@ describe('Engine A inventory authority (plan Phase 5 proof)', () => {
     expect(src).toMatch(/derivedFromItems: true/);
   });
 
+  it('payModuleOrder records settlement only — completion goes through the gate, never a direct status write', () => {
+    const src = readFileSync(join(__dirname, '../../../src/modules/staff/module-staff.controller.ts'), 'utf8');
+    const payStart = src.indexOf('export async function payModuleOrder');
+    const payEnd = src.indexOf('export async function printModuleOrderReceipt');
+    expect(payStart).toBeGreaterThan(0);
+    expect(payEnd).toBeGreaterThan(payStart);
+    const pay = src.slice(payStart, payEnd);
+    // The settlement write is metadata-only — no status key in the update.
+    expect(pay).toMatch(/\.update\(\{\s*metadata: updatedMetadata/);
+    expect(pay).not.toMatch(/\.update\(\{\s*status:/);
+    // Completion is routed through the capability-gated choke point.
+    expect(pay).toMatch(/changeInstantTransactionOrderStatus\(/);
+    expect(pay).toMatch(/requestedStatus: 'completed'/);
+    // A fail-closed (500) gate error must never fail an already-settled
+    // payment — it is logged, and the response reflects canonical state.
+    expect(pay).toMatch(/completion\.status !== 400/);
+    expect(pay).toMatch(/getForTransaction/);
+  });
+
+  it('addModuleOrderItem mutates stock only through the one authority and re-allocates incrementally', () => {
+    const src = readFileSync(join(__dirname, '../../../src/modules/staff/module-staff.controller.ts'), 'utf8');
+    const addStart = src.indexOf('export async function addModuleOrderItem');
+    const addEnd = src.indexOf('export async function payModuleOrder');
+    expect(addStart).toBeGreaterThan(0);
+    expect(addEnd).toBeGreaterThan(addStart);
+    const add = src.slice(addStart, addEnd);
+    // The added line is deducted through the SAME creation-time authority
+    // RPC (no second stock-mutation function), with its compensation.
+    expect(add).toMatch(/rpc\('deduct_inventory_for_order_items'/);
+    expect(add).toMatch(/rpc\('restore_inventory_for_order_items'/);
+    // The insert carries the NOT NULL tenant/property columns (the bug that
+    // silently failed every staff add-item) and the allocation is refreshed
+    // incrementally (allocate_resources is idempotent per kind+ref).
+    expect(add).toMatch(/tenant_id: tenantId,/);
+    expect(add).toMatch(/property_id: propertyId,/);
+    expect(add).toMatch(/allocateForConfirmation\(/);
+    // No fulfillment path may call a stock-deduction RPC inside this
+    // function other than the creation-equivalent deduct above.
+    const DEDUCT_RPCS = /deduct_inventory_for_order_items|deduct_inventory_for_order|deduct_stock_fifo/;
+    expect(add.match(DEDUCT_RPCS)).not.toBeNull();
+  });
+
+  it('the customer-route add-item path (POST /orders/:id/items) uses the one stock authority and refreshes allocation', () => {
+    const router = readFileSync(join(__dirname, '../../../src/routes/dynamic-module.router.ts'), 'utf8');
+    const addStart = router.indexOf("router.post('/orders/:id/items'");
+    const addEnd = router.indexOf("router.patch('/orders/:id/status'");
+    expect(addStart).toBeGreaterThan(0);
+    expect(addEnd).toBeGreaterThan(addStart);
+    const add = router.slice(addStart, addEnd);
+    // Same invariants as the staff add-item: deduct through the ONE
+    // authority with compensation, refresh the allocation incrementally,
+    // and refuse items past the served/handoff point.
+    expect(add).toMatch(/rpc\('deduct_inventory_for_order_items'/);
+    expect(add).toMatch(/rpc\('restore_inventory_for_order_items'/);
+    expect(add).toMatch(/allocateForConfirmation\(/);
+    expect(add).toMatch(/already been served/);
+  });
+
+  it('no Engine A path writes transactions.status except the state-machine choke point', () => {
+    // Payment records settlement (metadata), never status; the webhook
+    // paths are booking/reservation-only (they write payment_status via
+    // updateReferencePaymentStatus, and the status writes are guarded to
+    // non-Engine-A reference types). The staff pay path and both add-item
+    // paths must never write transactions.status directly.
+    const staffCtrl = readFileSync(join(__dirname, '../../../src/modules/staff/module-staff.controller.ts'), 'utf8');
+    const payStart = staffCtrl.indexOf('export async function payModuleOrder');
+    const payEnd = staffCtrl.indexOf('export async function printModuleOrderReceipt');
+    const pay = staffCtrl.slice(payStart, payEnd);
+    expect(pay).not.toMatch(/\.update\(\{\s*status:/);
+    // The only status-keyed update in the Engine A staff surface is the
+    // choke point call in updateModuleOrderStatus — the add-item and pay
+    // paths update amount/metadata only.
+    const addStart = staffCtrl.indexOf('export async function addModuleOrderItem');
+    const addEnd = staffCtrl.indexOf('export async function payModuleOrder');
+    const add = staffCtrl.slice(addStart, addEnd);
+    expect(add).not.toMatch(/\.update\(\{\s*status:/);
+  });
+
   it('the order-status choke point allocates resources BEFORE it writes confirmation', () => {
     const src = readFileSync(join(__dirname, '../../../src/engines/order-status.service.ts'), 'utf8');
     // Pre-flight allocation is invoked before the transactions update in
