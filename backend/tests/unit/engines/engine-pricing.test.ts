@@ -3,19 +3,27 @@
  * Comprehensive regression tests for all engine paths
  */
 
-import { EngineService } from '../../src/engines/engine-service.js';
-import { getEngineByTemplate } from '../../src/engines/registry.js';
-import { OrderConfigService } from '../../src/services/order-config.service.js';
+import { EngineService } from '../../../src/engines/engine-service.js';
+import { getEngineByTemplate } from '../../../src/engines/registry.js';
+import { OrderConfigService } from '../../../src/services/order-config.service.js';
 
-vi.mock('../../src/services/tax.service.js', () => {
+vi.mock('../../../src/services/tax.service.js', () => {
   return {
     TaxService: class MockTaxService {
       getTaxRate = vi.fn().mockResolvedValue(0.1);
+      computeTaxBreakdown = vi.fn().mockImplementation(async (_items, taxableAmount) => [{
+        id: 'tax-vat',
+        name: 'VAT',
+        rate: 10,
+        amount: Math.round(taxableAmount * 10) / 100,
+        type: 'vat',
+      }]);
+      computeFeeBreakdown = vi.fn().mockResolvedValue([]);
     },
   };
 });
 
-vi.mock('../../src/services/order-config.service.js', () => {
+vi.mock('../../../src/services/order-config.service.js', () => {
   return {
     OrderConfigService: class MockOrderConfigService {
       getOrderConfig = vi.fn().mockResolvedValue({
