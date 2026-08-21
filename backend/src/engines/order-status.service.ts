@@ -18,6 +18,7 @@ import type { Request } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getEngineService } from './engine-service.js';
 import { TEMPLATE_TO_ENGINE } from './types.js';
+import { canonicalizeFulfillmentState } from './fulfillment-states.js';
 import { reverseDiscounts } from './discount-reversal.js';
 import { emitToUnit, emitToOrder } from '../socket/index.js';
 import { logger } from '../utils/logger.js';
@@ -151,6 +152,13 @@ export async function changeInstantTransactionOrderStatus(
     ...(transition.targetState === 'completed' ? { completed_at: now } : {}),
     ...(isCancelling ? { cancelled_at: now } : {}),
     ...(isCancelling && !alreadyReversed ? { discountsReversedAt: now } : {}),
+    // Canonical FULFILLMENT-layer state (plan Phase 3). transactions.status
+    // keeps the legacy composite for the operational surface until the
+    // fulfillment table exists (Stage 6); this field carries the canonical
+    // value (in_progress/ready/handed_off) for Stage 6 to consume.
+    ...(transition.targetState === 'preparing' || transition.targetState === 'ready' || transition.targetState === 'delivered'
+      ? { fulfillment_state: canonicalizeFulfillmentState(transition.targetState) }
+      : {}),
   };
 
   const { data: order, error: updateError } = await supabase
@@ -221,6 +229,8 @@ export async function changeInstantTransactionOrderStatus(
   // block the order transition; the fiscal API and the payment webhook are
   // the explicit retry paths. Dynamic import keeps the engine layer free of a
   // static dependency on the fiscal module.
+  // "Economically committed" = transaction confirmed/completed OR fulfillment
+  // in progress (the legacy composite states preparing/ready/delivered).
   const FISCALLY_COMMITTED = new Set(['confirmed', 'preparing', 'ready', 'delivered', 'completed']);
   if (FISCALLY_COMMITTED.has(transition.targetState)) {
     try {

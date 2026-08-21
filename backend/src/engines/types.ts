@@ -180,14 +180,17 @@ export interface InteractionContract {
   compensatingAction?: string;
 }
 
-export interface EngineDefinition<TStatus extends string = string> {
+export interface EngineDefinition<TStatus extends string = string, TFulfillmentStatus extends string = string> {
   type: EngineType;
   name: string;
   description: string;
   commercialEntity: string;
+  /** TRANSACTION-layer state machine (canonical, generic). */
   stateMachine: StateMachineDefinition<TStatus>;
   pricing: PricingConfig;
   interactions: InteractionContract[];
+  /** Declarative capabilities — what this engine supports (plan Phase 2). */
+  capabilities: EngineCapabilities;
   dataExtraction?: Record<string, {
     enabled: boolean;
     fields: string[];
@@ -195,6 +198,36 @@ export interface EngineDefinition<TStatus extends string = string> {
   }>;
 }
 
+// ============================================================
+// Layered state model (DOMAIN.md — plan Phase 3)
+//
+// Transaction state ≠ fulfillment state. The engine's `stateMachine` is the
+// TRANSACTION layer; `capabilities.fulfillment.stateMachine` is the
+// FULFILLMENT layer (adapter-shaped). They interact but neither impersonates
+// the other. Until the fulfillment table exists (Stage 6), the hospitality
+// adapter's fulfillment states are bridged onto transactions.status via the
+// legacy composite values (see engines/fulfillment-states.ts).
+// ============================================================
+
+export type TransactionState =
+  | 'draft'      // cart/workspace layer — never persisted by the engine
+  | 'pending'
+  | 'confirmed'  // economically committed
+  | 'completed'
+  | 'cancelled';
+
+/** Canonical hospitality fulfillment lifecycle (adapter-shaped). */
+export type InstantTransactionFulfillmentStatus =
+  | 'queued'
+  | 'in_progress'
+  | 'ready'
+  | 'handed_off';
+
+/**
+ * Legacy composite status persisted on transactions.status for instant
+ * transactions (the storage bridge until the fulfillment table exists).
+ * Union of the transaction layer + the legacy hospitality fulfillment names.
+ */
 export type InstantTransactionStatus =
   | 'pending'
   | 'confirmed'
@@ -203,6 +236,115 @@ export type InstantTransactionStatus =
   | 'delivered'
   | 'completed'
   | 'cancelled';
+
+export type FulfillmentMode =
+  | 'none'
+  | 'pickup'
+  | 'on_premise'
+  | 'local_delivery'
+  | 'shipment'
+  | 'digital_delivery'
+  | 'service_execution';
+
+export type DestinationType =
+  | 'none'
+  | 'address'
+  | 'pickup_location'
+  | 'service_location'
+  | 'on_premise_location'
+  | 'room'
+  | 'digital_account';
+
+// ============================================================
+// Declarative capability contract (DOMAIN.md — plan Phase 2)
+//
+// Every engine declares WHAT it supports so the generic core never needs
+// vertical vocabulary. The hospitality adapter (Stage 24) implements these
+// capabilities; the core only reads the declarations.
+// ============================================================
+
+export interface FulfillmentDefinition<TFulfillmentStatus extends string = string> {
+  /** Fulfillment modes this engine can serve. */
+  modes: FulfillmentMode[];
+  /** Destination types this engine can deliver to. */
+  destinations: DestinationType[];
+  /** Whether one transaction can split into multiple fulfillment groups (partial fulfillment). */
+  groups: boolean;
+  /** Whether fulfillment carries carrier/execution tracking. */
+  tracking: boolean;
+  /** Whether handoff (who/what/when/where/proof) is modeled. */
+  handoff: boolean;
+  /** The fulfillment lifecycle — adapter-shaped state machine (absent when the engine has no fulfillment layer). */
+  stateMachine?: StateMachineDefinition<TFulfillmentStatus>;
+}
+
+export interface ExecutionDefinition {
+  enabled: boolean;
+  workCenters: boolean;
+  operators: boolean;
+  states: string[];
+  /** When the work center / operator is notified. */
+  notificationTrigger: 'on_purchase' | 'on_confirm' | 'on_payment' | 'on_fulfillment_start';
+}
+
+export interface CommitmentModel {
+  /** How the transaction commits scarce resources. */
+  type: 'none' | 'inventory' | 'resource' | 'capacity' | 'inventory_and_capacity';
+  reservation: boolean;
+  deductionTrigger: 'on_purchase' | 'on_confirm' | 'on_fulfillment_start';
+  reversalOnCancel: boolean;
+}
+
+export interface EconomicCapabilities {
+  multiTender: boolean;
+  refunds: boolean;
+  voids: boolean;
+  ledger: boolean;
+  loyalty: 'none' | 'earn' | 'earn_and_redeem';
+  coupons: boolean;
+  giftCards: boolean;
+  pos: boolean;
+  /** Explicit ISO 4217 currency required on every monetary record (DOMAIN.md F2). */
+  currencyRequired: boolean;
+}
+
+export interface CustomerCapabilities {
+  guests: boolean;
+  accounts: boolean;
+  staffAssisted: boolean;
+  reviews: boolean;
+  serviceRecovery: boolean;
+}
+
+export interface FiscalCapabilities {
+  documents: string[];
+  eInvoicing: boolean;
+  controlledNumbering: boolean;
+}
+
+export interface ReturnCapabilities {
+  refund: 'none' | 'full' | 'partial';
+  physicalReturn: boolean;
+  exchange: boolean;
+  replacement: boolean;
+  cancellation: boolean;
+}
+
+export interface EngineCapabilities {
+  transactionModel: {
+    supportsDraft: boolean;
+    autoComplete: boolean;
+    /** The engine's own transaction-lifecycle states (canonical for generic commerce). */
+    states: string[];
+  };
+  commitment: CommitmentModel;
+  fulfillment: FulfillmentDefinition;
+  execution: ExecutionDefinition;
+  economics: EconomicCapabilities;
+  customer: CustomerCapabilities;
+  fiscal: FiscalCapabilities;
+  returns: ReturnCapabilities;
+}
 
 export type TimeExclusiveReservationStatus =
   | 'pending'

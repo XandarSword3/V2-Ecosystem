@@ -194,6 +194,63 @@ export const platformEntitlementEngine: EngineDefinition<PlatformEntitlementStat
   stateMachine: platformEntitlementStateMachine,
   pricing: platformEntitlementPricing,
   interactions: platformEntitlementInteractions,
+  capabilities: {
+    transactionModel: {
+      supportsDraft: false,
+      autoComplete: false,
+      states: ['trialing', 'active', 'past_due', 'suspended', 'cancelled'],
+    },
+    commitment: {
+      type: 'none',
+      reservation: false,
+      deductionTrigger: 'on_purchase',
+      reversalOnCancel: false,
+    },
+    fulfillment: {
+      modes: ['digital_delivery'],
+      destinations: ['digital_account'],
+      groups: false,
+      tracking: false,
+      handoff: false,
+    },
+    execution: {
+      enabled: true,
+      workCenters: false,
+      operators: false,
+      states: ['provisioning', 'provisioned', 'deprovisioned'],
+      notificationTrigger: 'on_purchase',
+    },
+    economics: {
+      multiTender: false,
+      refunds: false,
+      voids: false,
+      ledger: true,
+      loyalty: 'none',
+      coupons: false,
+      giftCards: false,
+      pos: false,
+      currencyRequired: true,
+    },
+    customer: {
+      guests: false,
+      accounts: true,
+      staffAssisted: false,
+      reviews: false,
+      serviceRecovery: false,
+    },
+    fiscal: {
+      documents: ['invoice', 'credit_note'],
+      eInvoicing: false,
+      controlledNumbering: true,
+    },
+    returns: {
+      refund: 'none',
+      physicalReturn: false,
+      exchange: false,
+      replacement: false,
+      cancellation: true,
+    },
+  },
   dataExtraction: {
     mrr: {
       enabled: true,

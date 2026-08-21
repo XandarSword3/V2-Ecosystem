@@ -8,15 +8,21 @@
 
 import { StateMachine, StateMachineError } from '../../../src/engines/state-machine.js';
 import { instantTransactionStateMachine } from '../../../src/engines/definitions/instant-transaction.js';
+import { instantTransactionFulfillmentStateMachine } from '../../../src/engines/fulfillment-states.js';
 import { timeExclusiveReservationStateMachine } from '../../../src/engines/definitions/time-exclusive-reservation.js';
 import { sharedCapacityAccessStateMachine } from '../../../src/engines/definitions/shared-capacity-access.js';
 import { ongoingEntitlementStateMachine } from '../../../src/engines/definitions/ongoing-entitlement.js';
 
 // ============================================
-// Engine A: Instant Transaction State Machine
+// Engine A: Instant Transaction — LAYERED state model (plan Phase 3)
+//
+// Transaction layer (instantTransactionStateMachine):
+//   pending → confirmed → completed / cancelled
+// Fulfillment layer (instantTransactionFulfillmentStateMachine):
+//   confirmed → queued → in_progress → ready → handed_off
 // ============================================
 
-describe('StateMachine - Instant Transaction (Engine A)', () => {
+describe('StateMachine - Instant Transaction (Engine A) — TRANSACTION layer', () => {
   let sm: StateMachine;
 
   beforeEach(() => {
@@ -32,37 +38,23 @@ describe('StateMachine - Instant Transaction (Engine A)', () => {
       expect(sm.isTerminal('completed')).toBe(true);
       expect(sm.isTerminal('cancelled')).toBe(true);
       expect(sm.isTerminal('pending')).toBe(false);
-      expect(sm.isTerminal('preparing')).toBe(false);
+    });
+
+    it('should NOT contain fulfillment states (separation of layers)', () => {
+      const states = sm.getStates();
+      expect(states).not.toContain('preparing');
+      expect(states).not.toContain('delivered');
+      expect(states).not.toContain('in_progress');
     });
   });
 
-  describe('happy path: pending → confirmed → preparing → ready → delivered → completed', () => {
-    it('should transition through the full lifecycle', async () => {
+  describe('transaction lifecycle: pending → confirmed → completed', () => {
+    it('should confirm then complete at the transaction layer', async () => {
       let result = await sm.transition('pending', 'confirm', 'staff');
       expect(result.success).toBe(true);
       expect(result.newState).toBe('confirmed');
 
-      result = await sm.transition('confirmed', 'start_preparation', 'staff');
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('preparing');
-
-      result = await sm.transition('preparing', 'mark_ready', 'staff');
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('ready');
-
-      result = await sm.transition('ready', 'deliver', 'staff');
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('delivered');
-
-      result = await sm.transition('delivered', 'complete', 'staff');
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('completed');
-    });
-  });
-
-  describe('takeaway shortcut: ready → completed (skip delivery)', () => {
-    it('should allow direct completion from ready state', async () => {
-      const result = await sm.transition('ready', 'complete', 'staff');
+      result = await sm.transition('confirmed', 'complete', 'staff');
       expect(result.success).toBe(true);
       expect(result.newState).toBe('completed');
     });
@@ -81,18 +73,6 @@ describe('StateMachine - Instant Transaction (Engine A)', () => {
       expect(result.newState).toBe('cancelled');
     });
 
-    it('should only allow admin to cancel preparing orders', async () => {
-      const result = await sm.transition('preparing', 'cancel', 'admin');
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('cancelled');
-    });
-
-    it('should block staff from cancelling preparing orders', async () => {
-      await expect(
-        sm.transition('preparing', 'cancel', 'staff'),
-      ).rejects.toThrow();
-    });
-
     it('should block cancellation from terminal states', async () => {
       await expect(
         sm.transition('completed', 'cancel', 'admin'),
@@ -101,18 +81,6 @@ describe('StateMachine - Instant Transaction (Engine A)', () => {
   });
 
   describe('invalid transitions', () => {
-    it('should reject skipping states (pending → preparing)', async () => {
-      await expect(
-        sm.transition('pending', 'start_preparation', 'staff'),
-      ).rejects.toThrow();
-    });
-
-    it('should reject backwards transitions (ready → preparing)', async () => {
-      await expect(
-        sm.transition('ready', 'start_preparation', 'staff'),
-      ).rejects.toThrow();
-    });
-
     it('should reject unknown actions', async () => {
       await expect(
         sm.transition('pending', 'nonexistent_action', 'staff'),
@@ -154,6 +122,86 @@ describe('StateMachine - Instant Transaction (Engine A)', () => {
     it('should show no actions for terminal states', () => {
       const actions = sm.getAvailableActions('completed', 'admin');
       expect(actions).toHaveLength(0);
+    });
+  });
+});
+
+// ============================================
+// Engine A FULFILLMENT layer (adapter-shaped lifecycle)
+// ============================================
+
+describe('StateMachine - Instant Transaction (Engine A) — FULFILLMENT layer', () => {
+  let fm: StateMachine;
+
+  beforeEach(() => {
+    fm = new StateMachine(instantTransactionFulfillmentStateMachine);
+  });
+
+  describe('canonical fulfillment lifecycle', () => {
+    it('queued → in_progress → ready → handed_off', async () => {
+      let result = await fm.transition('queued', 'start_preparation', 'staff');
+      expect(result.success).toBe(true);
+      expect(result.newState).toBe('in_progress');
+
+      result = await fm.transition('in_progress', 'mark_ready', 'staff');
+      expect(result.newState).toBe('ready');
+
+      result = await fm.transition('ready', 'deliver', 'staff');
+      expect(result.newState).toBe('handed_off');
+    });
+  });
+
+  describe('entry from the transaction layer', () => {
+    it('queues automatically once the transaction is confirmed', async () => {
+      const result = await fm.transition('confirmed', 'queue_fulfillment', 'system');
+      expect(result.newState).toBe('queued');
+    });
+
+    it('can start preparation directly from confirmed (legacy: confirmed → preparing)', async () => {
+      const result = await fm.transition('confirmed', 'start_preparation', 'staff');
+      expect(result.newState).toBe('in_progress');
+    });
+  });
+
+  describe('completion crosses into the transaction layer', () => {
+    it('handed_off → completed', async () => {
+      const result = await fm.transition('handed_off', 'complete', 'staff');
+      expect(result.newState).toBe('completed');
+    });
+
+    it('ready → completed (takeaway/counter shortcut)', async () => {
+      const result = await fm.transition('ready', 'complete', 'staff');
+      expect(result.newState).toBe('completed');
+    });
+  });
+
+  describe('cancellation from fulfillment stages', () => {
+    it('only admin can cancel once preparation has started', async () => {
+      const admin = await fm.transition('in_progress', 'cancel', 'admin');
+      expect(admin.newState).toBe('cancelled');
+      await expect(fm.transition('in_progress', 'cancel', 'staff')).rejects.toThrow();
+    });
+
+    it('only admin can cancel ready / handed_off orders', async () => {
+      expect((await fm.transition('ready', 'cancel', 'admin')).newState).toBe('cancelled');
+      expect((await fm.transition('handed_off', 'cancel', 'admin')).newState).toBe('cancelled');
+      await expect(fm.transition('ready', 'cancel', 'staff')).rejects.toThrow();
+    });
+  });
+
+  describe('invalid fulfillment transitions', () => {
+    it('rejects skipping (queued → ready)', async () => {
+      await expect(fm.transition('queued', 'mark_ready', 'staff')).rejects.toThrow();
+    });
+
+    it('rejects backwards transitions (ready → in_progress)', async () => {
+      await expect(fm.transition('ready', 'start_preparation', 'staff')).rejects.toThrow();
+    });
+
+    it('rejects cancellation from the queued state by staff (no admin gate on queued)', async () => {
+      // queued has no direct cancel transition — the transaction layer cancels
+      // confirmed orders; preparation-stage cancels are admin-only.
+      await expect(fm.transition('queued', 'cancel', 'admin')).rejects.toThrow();
     });
   });
 });

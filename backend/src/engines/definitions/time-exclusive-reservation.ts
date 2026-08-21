@@ -166,6 +166,63 @@ export const timeExclusiveReservationEngine: EngineDefinition<TimeExclusiveReser
   stateMachine: timeExclusiveReservationStateMachine,
   pricing: timeExclusiveReservationPricing,
   interactions: timeExclusiveReservationInteractions,
+  capabilities: {
+    transactionModel: {
+      supportsDraft: false,
+      autoComplete: false,
+      states: ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show'],
+    },
+    commitment: {
+      type: 'capacity',
+      reservation: true,
+      deductionTrigger: 'on_purchase',
+      reversalOnCancel: true,
+    },
+    fulfillment: {
+      modes: ['on_premise'],
+      destinations: ['on_premise_location'],
+      groups: false,
+      tracking: false,
+      handoff: false,
+    },
+    execution: {
+      enabled: false,
+      workCenters: false,
+      operators: false,
+      states: [],
+      notificationTrigger: 'on_confirm',
+    },
+    economics: {
+      multiTender: true,
+      refunds: true,
+      voids: true,
+      ledger: true,
+      loyalty: 'earn_and_redeem',
+      coupons: true,
+      giftCards: true,
+      pos: true,
+      currencyRequired: true,
+    },
+    customer: {
+      guests: true,
+      accounts: true,
+      staffAssisted: true,
+      reviews: true,
+      serviceRecovery: true,
+    },
+    fiscal: {
+      documents: ['invoice', 'receipt', 'credit_note', 'debit_note'],
+      eInvoicing: false,
+      controlledNumbering: true,
+    },
+    returns: {
+      refund: 'full',
+      physicalReturn: false,
+      exchange: false,
+      replacement: false,
+      cancellation: true,
+    },
+  },
   // Economics data extraction capabilities
   dataExtraction: {
     staffAttribution: {

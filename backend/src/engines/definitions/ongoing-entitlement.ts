@@ -188,6 +188,63 @@ export const ongoingEntitlementEngine: EngineDefinition<OngoingEntitlementStatus
   stateMachine: ongoingEntitlementStateMachine,
   pricing: ongoingEntitlementPricing,
   interactions: ongoingEntitlementInteractions,
+  capabilities: {
+    transactionModel: {
+      supportsDraft: false,
+      autoComplete: false,
+      states: ['pending', 'active', 'paused', 'expired', 'cancelled'],
+    },
+    commitment: {
+      type: 'none',
+      reservation: false,
+      deductionTrigger: 'on_purchase',
+      reversalOnCancel: false,
+    },
+    fulfillment: {
+      modes: ['service_execution'],
+      destinations: ['service_location'],
+      groups: false,
+      tracking: false,
+      handoff: false,
+    },
+    execution: {
+      enabled: true,
+      workCenters: false,
+      operators: false,
+      states: ['active', 'paused', 'expired'],
+      notificationTrigger: 'on_confirm',
+    },
+    economics: {
+      multiTender: false,
+      refunds: true,
+      voids: true,
+      ledger: true,
+      loyalty: 'earn',
+      coupons: false,
+      giftCards: false,
+      pos: false,
+      currencyRequired: true,
+    },
+    customer: {
+      guests: false,
+      accounts: true,
+      staffAssisted: true,
+      reviews: true,
+      serviceRecovery: true,
+    },
+    fiscal: {
+      documents: ['invoice', 'receipt', 'credit_note'],
+      eInvoicing: false,
+      controlledNumbering: true,
+    },
+    returns: {
+      refund: 'full',
+      physicalReturn: false,
+      exchange: false,
+      replacement: false,
+      cancellation: true,
+    },
+  },
   // Economics data extraction capabilities
   dataExtraction: {
     churnTracking: {

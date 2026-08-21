@@ -1,16 +1,20 @@
 /**
  * Engine A: Instant Transaction
- * 
- * Economic Pattern: Order → Prepare → Deliver → Done
+ *
+ * Economic Pattern: one-time commercial transaction with downstream fulfillment.
  * Commercial Entity: Order
- * Examples: Menu service, kiosk, room service, any catalog-based instant ordering
- * 
- * This engine handles:
- *   - Menu items with categories, modifiers, and variants
- *   - Full pricing pipeline (tax, service charge, delivery fee, discounts)
- *   - Order lifecycle from placement to completion
- *   - Kitchen Display System (KDS) integration
- *   - Inventory deduction on order creation
+ *
+ * GENERIC CORE — no vertical vocabulary. "Menu", "kitchen", "table", "waiter"
+ * are hospitality ADAPTER concepts (Stages 24/43); this definition declares
+ * capabilities and lets adapters implement them.
+ *
+ * LAYERED STATE MODEL (plan Phase 3):
+ *   - `stateMachine`            = TRANSACTION layer: pending → confirmed →
+ *                                 completed / cancelled
+ *   - `capabilities.fulfillment`= FULFILLMENT layer: confirmed → queued →
+ *                                 in_progress → ready → handed_off
+ * Until the fulfillment table exists (Stage 6), fulfillment state is bridged
+ * onto transactions.status via legacy composite values (engines/fulfillment-states.ts).
  */
 
 import type {
@@ -18,22 +22,23 @@ import type {
   StateMachineDefinition,
   PricingConfig,
   InteractionContract,
-  InstantTransactionStatus,
+  TransactionState,
 } from '../types.js';
+import { instantTransactionFulfillmentStateMachine } from '../fulfillment-states.js';
 
 // ============================================
-// State Machine
+// Transaction-layer state machine
 // ============================================
 
-export const instantTransactionStateMachine: StateMachineDefinition<InstantTransactionStatus> = {
-  states: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'],
+export const instantTransactionStateMachine: StateMachineDefinition<TransactionState> = {
+  states: ['pending', 'confirmed', 'completed', 'cancelled'],
 
   initialState: 'pending',
 
   terminalStates: ['completed', 'cancelled'],
 
   transitions: [
-    // Happy path
+    // Economic commitment
     {
       from: 'pending',
       to: 'confirmed',
@@ -41,57 +46,22 @@ export const instantTransactionStateMachine: StateMachineDefinition<InstantTrans
       allowedActors: ['staff', 'system'],
       guardDescription: 'Payment validated or pay-at-counter accepted',
     },
+    // Completion — the transaction can complete once its fulfillment layer
+    // reports handoff (fulfillment machine carries the fulfillment moves).
     {
       from: 'confirmed',
-      to: 'preparing',
-      action: 'start_preparation',
-      allowedActors: ['staff', 'system'],
-      guardDescription: 'Kitchen/bar has accepted the order',
-    },
-    {
-      from: 'preparing',
-      to: 'ready',
-      action: 'mark_ready',
-      allowedActors: ['staff'],
-      guardDescription: 'All items in the order are prepared',
-    },
-    {
-      from: 'confirmed',
-      to: 'ready',
-      action: 'mark_ready',
-      allowedActors: ['staff'],
-      guardDescription: 'All items in the order are prepared (direct from confirmed)',
-    },
-    {
-      from: 'ready',
-      to: 'delivered',
-      action: 'deliver',
-      allowedActors: ['staff'],
-      guardDescription: 'Order handed to customer or placed at table',
-    },
-    {
-      from: 'delivered',
       to: 'completed',
       action: 'complete',
       allowedActors: ['staff', 'system'],
-      guardDescription: 'Customer confirmed receipt / auto-complete after timeout',
+      guardDescription: 'Fulfillment handed off and acknowledged (or no fulfillment required)',
     },
-    // Direct completion for quick-serve (takeaway/counter)
-    {
-      from: 'ready',
-      to: 'completed',
-      action: 'complete',
-      allowedActors: ['staff', 'system'],
-      guardDescription: 'Takeaway/counter orders skip delivery step',
-    },
-
-    // Cancellation paths
+    // Cancellation
     {
       from: 'pending',
       to: 'cancelled',
       action: 'cancel',
       allowedActors: ['customer', 'staff', 'admin'],
-      guardDescription: 'Order not yet confirmed — free cancellation',
+      guardDescription: 'Not yet confirmed — free cancellation',
     },
     {
       from: 'confirmed',
@@ -99,27 +69,6 @@ export const instantTransactionStateMachine: StateMachineDefinition<InstantTrans
       action: 'cancel',
       allowedActors: ['staff', 'admin'],
       guardDescription: 'Staff/admin can cancel confirmed orders (triggers refund)',
-    },
-    {
-      from: 'preparing',
-      to: 'cancelled',
-      action: 'cancel',
-      allowedActors: ['admin'],
-      guardDescription: 'Only admin can cancel orders in preparation (requires refund + inventory reversal)',
-    },
-    {
-      from: 'ready',
-      to: 'cancelled',
-      action: 'cancel',
-      allowedActors: ['admin'],
-      guardDescription: 'Admin-only comp/void after food is ready — requires refund + inventory reversal',
-    },
-    {
-      from: 'delivered',
-      to: 'cancelled',
-      action: 'cancel',
-      allowedActors: ['admin'],
-      guardDescription: 'Admin-only comp/void after delivery — requires refund + inventory reversal',
     },
   ],
 };
@@ -160,16 +109,18 @@ export const instantTransactionInteractions: InteractionContract[] = [
     name: 'deduct_inventory_on_purchase',
     applicableEngines: ['instant_transaction'],
     trigger: 'on_purchase',
-    guardDescription: 'Menu items have inventory tracking enabled',
+    guardDescription: 'Products have inventory tracking enabled',
     idempotent: true,
     failureMode: 'log_and_continue',
     compensatingAction: 'Restore inventory if order is cancelled',
   },
   {
-    name: 'notify_kitchen_on_confirm',
+    // Generic execution notification — the hospitality adapter implements this
+    // as the kitchen display system (KDS) notification (plan Phase 20/43).
+    name: 'notify_execution_on_confirm',
     applicableEngines: ['instant_transaction'],
     trigger: 'on_purchase',
-    guardDescription: 'Module has KDS enabled',
+    guardDescription: 'Engine has an execution work center enabled',
     idempotent: true,
     failureMode: 'log_and_continue',
   },
@@ -179,14 +130,72 @@ export const instantTransactionInteractions: InteractionContract[] = [
 // Complete Engine Definition
 // ============================================
 
-export const instantTransactionEngine: EngineDefinition<InstantTransactionStatus> = {
+export const instantTransactionEngine: EngineDefinition<TransactionState> = {
   type: 'instant_transaction',
   name: 'Instant Transaction',
-  description: 'Order → Prepare → Deliver → Done. Menu-based instant commerce.',
+  description: 'One-time commercial transaction with downstream fulfillment: commitment → execution → handoff → completion.',
   commercialEntity: 'order',
   stateMachine: instantTransactionStateMachine,
   pricing: instantTransactionPricing,
   interactions: instantTransactionInteractions,
+  capabilities: {
+    transactionModel: {
+      supportsDraft: false, // draft lives in the cart workspace (plan Phase 13)
+      autoComplete: true,
+      states: ['draft', 'pending', 'confirmed', 'completed', 'cancelled'],
+    },
+    commitment: {
+      type: 'inventory',
+      reservation: false,
+      deductionTrigger: 'on_purchase',
+      reversalOnCancel: true,
+    },
+    fulfillment: {
+      modes: ['on_premise', 'pickup', 'local_delivery'],
+      destinations: ['on_premise_location', 'pickup_location', 'room', 'address'],
+      groups: false,
+      tracking: false,
+      handoff: true,
+      stateMachine: instantTransactionFulfillmentStateMachine,
+    },
+    execution: {
+      enabled: true,
+      workCenters: true,
+      operators: true,
+      states: ['queued', 'in_progress', 'ready', 'handed_off'],
+      notificationTrigger: 'on_confirm',
+    },
+    economics: {
+      multiTender: true,
+      refunds: true,
+      voids: true,
+      ledger: true,
+      loyalty: 'earn_and_redeem',
+      coupons: true,
+      giftCards: true,
+      pos: true,
+      currencyRequired: true,
+    },
+    customer: {
+      guests: true,
+      accounts: true,
+      staffAssisted: true,
+      reviews: true,
+      serviceRecovery: true,
+    },
+    fiscal: {
+      documents: ['invoice', 'receipt', 'credit_note', 'debit_note'],
+      eInvoicing: false,
+      controlledNumbering: true,
+    },
+    returns: {
+      refund: 'full',
+      physicalReturn: false,
+      exchange: false,
+      replacement: false,
+      cancellation: true,
+    },
+  },
   // Economics data extraction capabilities
   dataExtraction: {
     staffAttribution: {

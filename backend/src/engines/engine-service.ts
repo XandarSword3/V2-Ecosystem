@@ -32,6 +32,7 @@ import { TEMPLATE_TO_ENGINE } from './types.js';
 import { getEngine, getEngineByTemplate, createStateMachine } from './registry.js';
 import { PricingPipeline, type PricingPipelineDeps } from './pricing-pipeline.js';
 import { StateMachine, StateMachineError } from './state-machine.js';
+import { canonicalizeFulfillmentState, legacyFulfillmentState } from './fulfillment-states.js';
 import { createDiscountResolvers } from './discount-resolvers.js';
 import { getFinancialLedgerService, type LedgerTransactionType } from './financial-ledger.js';
 import { getTransactionManager, type TransactionStep, type EngineOperationContext } from './transaction-manager.js';
@@ -45,6 +46,7 @@ import { logger } from '../utils/logger.js';
 export class EngineService {
   private pricingPipeline: PricingPipeline;
   private stateMachines: Map<EngineType, StateMachine> = new Map();
+  private fulfillmentMachines: Map<EngineType, StateMachine | null> = new Map();
 
   constructor(deps?: Partial<PricingPipelineDeps>) {
     // Create pricing pipeline with default or injected dependencies
@@ -138,6 +140,50 @@ export class EngineService {
   }
 
   /**
+   * Get or create the FULFILLMENT-layer state machine declared by the engine's
+   * capabilities (plan Phase 2/3). Returns null when the engine has none — its
+   * whole lifecycle lives on the transaction machine.
+   */
+  private getFulfillmentMachine(engineType: EngineType): StateMachine | null {
+    if (this.fulfillmentMachines.has(engineType)) {
+      return this.fulfillmentMachines.get(engineType)!;
+    }
+    const definition = getEngine(engineType).capabilities?.fulfillment?.stateMachine;
+    const fm = definition ? new StateMachine(definition) : null;
+    this.fulfillmentMachines.set(engineType, fm);
+    return fm;
+  }
+
+  /**
+   * The layered transition check: try the transaction machine, then the
+   * fulfillment machine (canonical current state). Returns which machine
+   * (if any) allowed the move.
+   */
+  private checkLayeredTransition(
+    sm: StateMachine,
+    fm: StateMachine | null,
+    currentState: string,
+    action: string,
+    actor: 'system' | 'staff' | 'customer' | 'admin',
+    context: Record<string, unknown>,
+  ): { allowed: boolean; error?: string; targetState?: string; machine: StateMachine | null } {
+    const txCheck = sm.canTransition(currentState, action, actor, context);
+    if (txCheck.allowed) {
+      return { ...txCheck, machine: sm };
+    }
+    if (fm) {
+      const canonicalCurrent = canonicalizeFulfillmentState(currentState);
+      const fmCheck = fm.canTransition(canonicalCurrent, action, actor, context);
+      if (fmCheck.allowed) {
+        return { ...fmCheck, machine: fm };
+      }
+    }
+    // Report the transaction machine's error (it understands canonical states
+    // and produces the friendlier "available actions" message).
+    return { allowed: false, error: txCheck.error, machine: null };
+  }
+
+  /**
    * Attempt a state transition using the engine's state machine.
    * Returns a result indicating success/failure without throwing.
    * 
@@ -157,18 +203,20 @@ export class EngineService {
   ): Promise<{ allowed: boolean; targetState: string; error?: string }> {
     const engineType = this.resolveEngineType(templateType);
     const sm = this.getStateMachine(engineType);
+    const fm = this.getFulfillmentMachine(engineType);
 
     logger.info(`[ENGINE SERVICE] State transition attempt`, {
       engineType,
       currentState,
       action,
       actor,
+      layer: fm ? 'transaction+fulfillment' : 'transaction',
     });
 
-    // Use canTransition first to check without throwing
-    const check = sm.canTransition(currentState, action, actor, context);
+    // Layered check: transaction machine first, then fulfillment machine.
+    const check = this.checkLayeredTransition(sm, fm, currentState, action, actor, context);
 
-    if (!check.allowed) {
+    if (!check.allowed || !check.machine) {
       logger.info(`[ENGINE SERVICE] State transition rejected`, {
         engineType,
         currentState,
@@ -178,16 +226,27 @@ export class EngineService {
       return { allowed: false, targetState: currentState, error: check.error };
     }
 
-    // Execute the actual transition (runs side effects)
+    // Execute the actual transition (runs side effects on the chosen machine)
     try {
-      const result = await sm.transition(currentState, action, actor, context);
+      const stateForMachine =
+        check.machine === fm ? canonicalizeFulfillmentState(currentState) : currentState;
+      const result = await check.machine.transition(stateForMachine, action, actor, context);
+      // A fulfillment-layer transition must still fire the transaction layer's
+      // side effects for the action (e.g. inventory restore on cancel).
+      if (check.machine === fm) {
+        await sm.runSideEffects(action, context);
+      }
+      // Persisted state is the legacy composite until the fulfillment table
+      // exists (Stage 6) — see engines/fulfillment-states.ts.
+      const targetState = legacyFulfillmentState(result.newState);
       logger.info(`[ENGINE SERVICE] State transition succeeded`, {
         engineType,
         previousState: result.previousState,
         newState: result.newState,
+        persistedState: targetState,
         action: result.action,
       });
-      return { allowed: true, targetState: result.newState };
+      return { allowed: true, targetState };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       logger.error(`[ENGINE SERVICE] State transition error`, { engineType, error });
@@ -207,7 +266,10 @@ export class EngineService {
   ): { allowed: boolean; error?: string; targetState?: string } {
     const engineType = this.resolveEngineType(templateType);
     const sm = this.getStateMachine(engineType);
-    return sm.canTransition(currentState, action, actor, context);
+    const fm = this.getFulfillmentMachine(engineType);
+    const check = this.checkLayeredTransition(sm, fm, currentState, action, actor, context);
+    if (!check.allowed) return { allowed: false, error: check.error };
+    return { allowed: true, targetState: check.targetState };
   }
 
   /**
@@ -221,7 +283,20 @@ export class EngineService {
   ): Array<{ action: string; targetState: string }> {
     const engineType = this.resolveEngineType(templateType);
     const sm = this.getStateMachine(engineType);
-    return sm.getAvailableActions(currentState, actor);
+    const fm = this.getFulfillmentMachine(engineType);
+    const merged = new Map<string, { action: string; targetState: string }>();
+    for (const a of sm.getAvailableActions(currentState, actor)) {
+      merged.set(a.action, { action: a.action, targetState: legacyFulfillmentState(a.targetState) });
+    }
+    if (fm) {
+      const canonicalCurrent = canonicalizeFulfillmentState(currentState);
+      for (const a of fm.getAvailableActions(canonicalCurrent, actor)) {
+        if (!merged.has(a.action)) {
+          merged.set(a.action, { action: a.action, targetState: legacyFulfillmentState(a.targetState) });
+        }
+      }
+    }
+    return [...merged.values()];
   }
 
   /**

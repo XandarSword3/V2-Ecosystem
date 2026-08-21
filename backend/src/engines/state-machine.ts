@@ -250,6 +250,27 @@ export class StateMachine<TStatus extends string = string> {
   }
 
   /**
+   * Run registered side effects for an action WITHOUT validating the state.
+   * Used by the layered engine service: when a fulfillment-layer machine
+   * executes a transition, the transaction layer's effects for that action
+   * (e.g. inventory restore on cancel) must still fire.
+   */
+  async runSideEffects(
+    action: string,
+    context: Record<string, unknown> = {},
+  ): Promise<void> {
+    const effects = this.sideEffects.get(action) || [];
+    for (const effect of effects) {
+      try {
+        await effect({ action, from: '', to: '' } as StateTransition, context);
+      } catch (err) {
+        // Side effects are fire-and-forget — log but don't block
+        console.error(`Side effect failed for action '${action}':`, err);
+      }
+    }
+  }
+
+  /**
    * Get the full state machine definition (for introspection/documentation).
    */
   getDefinition(): StateMachineDefinition<TStatus> {

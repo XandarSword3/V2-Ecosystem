@@ -148,6 +148,63 @@ export const sharedCapacityAccessEngine: EngineDefinition<SharedCapacityAccessSt
   stateMachine: sharedCapacityAccessStateMachine,
   pricing: sharedCapacityAccessPricing,
   interactions: sharedCapacityAccessInteractions,
+  capabilities: {
+    transactionModel: {
+      supportsDraft: false,
+      autoComplete: false,
+      states: ['valid', 'active', 'used', 'expired', 'cancelled'],
+    },
+    commitment: {
+      type: 'capacity',
+      reservation: false,
+      deductionTrigger: 'on_fulfillment_start',
+      reversalOnCancel: true,
+    },
+    fulfillment: {
+      modes: ['service_execution'],
+      destinations: ['service_location'],
+      groups: false,
+      tracking: false,
+      handoff: false,
+    },
+    execution: {
+      enabled: true,
+      workCenters: false,
+      operators: false,
+      states: ['valid', 'active', 'used', 'expired'],
+      notificationTrigger: 'on_fulfillment_start',
+    },
+    economics: {
+      multiTender: true,
+      refunds: true,
+      voids: true,
+      ledger: true,
+      loyalty: 'earn_and_redeem',
+      coupons: true,
+      giftCards: true,
+      pos: true,
+      currencyRequired: true,
+    },
+    customer: {
+      guests: true,
+      accounts: true,
+      staffAssisted: true,
+      reviews: true,
+      serviceRecovery: true,
+    },
+    fiscal: {
+      documents: ['invoice', 'receipt', 'credit_note', 'debit_note'],
+      eInvoicing: false,
+      controlledNumbering: true,
+    },
+    returns: {
+      refund: 'full',
+      physicalReturn: false,
+      exchange: false,
+      replacement: false,
+      cancellation: true,
+    },
+  },
   // Economics data extraction capabilities
   dataExtraction: {
     capacityUtilization: {
