@@ -50,6 +50,7 @@ function createValidEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     entityId: 'entity-1',
     entityType: 'order',
     transactionType: 'charge',
+    currency: 'EUR',
     subtotal: 100,
     taxAmount: 11,
     taxRate: 0.11,
@@ -223,6 +224,7 @@ describe('FinancialLedgerService', () => {
   describe('recordFromPricing', () => {
     it('should create a ledger entry from a PricingResult', async () => {
       const pricingResult: PricingResult = {
+        currency: 'EUR',
         subtotal: 100,
         taxAmount: 11,
         taxRate: 0.11,
@@ -290,6 +292,7 @@ describe('FinancialLedgerService', () => {
         moduleId: 'module-1',
         engineType: 'instant_transaction',
         entityType: 'order',
+        currency: 'EUR',
         refundAmount: 50,
         reason: 'Customer request',
         actorType: 'admin',

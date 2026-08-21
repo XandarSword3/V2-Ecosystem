@@ -15,8 +15,36 @@ import type { PricingLineItem, PricingContext } from '../../../../shared/types/e
 // Mock Dependencies
 // ============================================
 
+// Fee rates the mock applies, mirroring tax_configuration-driven fees
+// (DOMAIN.md: fees are data-driven, not order-type hardcoded).
+let mockFeeRates: Array<{ type: string; rate?: number; amount?: number }> = [];
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
 const mockTaxService = {
   getTaxRate: vi.fn().mockResolvedValue(0.11), // 11% default
+  // Multi-rate tax path used by the current pipeline.
+  computeTaxBreakdown: vi.fn().mockImplementation(
+    async (_lineItems: unknown, taxableAmount: number) => [{
+      id: 'tax-vat',
+      name: 'VAT',
+      rate: 11,
+      amount: round2(taxableAmount * 0.11),
+      type: 'vat',
+    }],
+  ),
+  // Fee config is data-driven — the mock applies the explicitly configured rates.
+  computeFeeBreakdown: vi.fn().mockImplementation(
+    async (lineItems: Array<{ unitPrice: number; unitAdjustment?: number; quantity: number }>) => {
+      const subtotal = lineItems.reduce((s, li) => s + (li.unitPrice + (li.unitAdjustment ?? 0)) * li.quantity, 0);
+      return mockFeeRates.map((f, i) => ({
+        id: `fee-${i}`,
+        type: f.type as 'service_charge' | 'delivery_fee' | 'resort_fee' | 'custom',
+        name: f.type,
+        amount: round2(f.amount ?? subtotal * (f.rate ?? 0)),
+        ...(f.rate !== undefined ? { rate: round2(f.rate * 100) } : {}),
+      }));
+    },
+  ),
 };
 
 const mockOrderConfigService = {
@@ -58,6 +86,7 @@ describe('EngineService — Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFeeRates = [];
     resetEngineService();
     service = createTestService();
   });
@@ -103,6 +132,7 @@ describe('EngineService — Integration', () => {
         { name: 'Fries', unitPrice: 3.50, quantity: 1 },
       ];
       const context: PricingContext = {
+        currency: 'EUR',
         conditions: { orderType: 'takeaway' },
       };
 
@@ -125,18 +155,21 @@ describe('EngineService — Integration', () => {
       ];
 
       const result = await service.calculatePricing('instant_transaction', lineItems, {
+        currency: 'EUR',
         conditions: { orderType: 'takeaway' },
       });
 
       expect(result.serviceCharge).toBe(0);
     });
 
-    it('should apply service charge for dine-in', async () => {
+    it('should apply service charge when configured', async () => {
+      mockFeeRates = [{ type: 'service_charge', rate: 0.10 }];
       const lineItems: PricingLineItem[] = [
         { name: 'Steak', unitPrice: 25.00, quantity: 1 },
       ];
 
       const result = await service.calculatePricing('instant_transaction', lineItems, {
+        currency: 'EUR',
         conditions: { orderType: 'dine_in' },
       });
 
@@ -197,6 +230,7 @@ describe('EngineService — Integration', () => {
         { name: 'Pizza', unitPrice: 15.00, quantity: 2, unitAdjustment: 2.00 },
       ];
       const context: PricingContext = {
+        currency: 'EUR',
         conditions: { orderType: 'dine_in' },
         couponCode: 'SAVE5',
         customerId: 'cust-1',
@@ -231,6 +265,7 @@ describe('EngineService — Integration', () => {
         { name: 'Pasta', unitPrice: 20.00, quantity: 1 },
       ];
       const context: PricingContext = {
+        currency: 'EUR',
         conditions: { orderType: 'takeaway' },
         couponCode: 'CODE',
         giftCardCodes: ['GC-ABC123'],
@@ -254,6 +289,7 @@ describe('EngineService — Integration', () => {
         { name: 'Salad', unitPrice: 12.00, quantity: 1 },
       ];
       const context: PricingContext = {
+        currency: 'EUR',
         conditions: { orderType: 'takeaway' },
         loyaltyPointsToRedeem: 200,
         customerId: 'cust-1',
@@ -267,12 +303,14 @@ describe('EngineService — Integration', () => {
       expect(loyaltyDiscount!.metadata?.pointsUsed).toBe(200);
     });
 
-    it('should apply delivery fee for delivery orders', async () => {
+    it('should apply delivery fee when configured', async () => {
+      mockFeeRates = [{ type: 'delivery_fee', amount: 3.00 }];
       const lineItems: PricingLineItem[] = [
         { name: 'Soup', unitPrice: 8.00, quantity: 1 },
       ];
 
       const result = await service.calculatePricing('instant_transaction', lineItems, {
+        currency: 'EUR',
         conditions: { orderType: 'delivery' },
       });
 
@@ -291,7 +329,7 @@ describe('EngineService — Integration', () => {
         { name: 'Child Ticket', unitPrice: 15.00, quantity: 1 },
       ];
 
-      const result = await service.calculatePricing('shared_capacity_access', lineItems, {});
+      const result = await service.calculatePricing('shared_capacity_access', lineItems, { currency: 'EUR' });
 
       // subtotal = 50 + 15 = 65
       expect(result.subtotal).toBe(65);
@@ -405,7 +443,7 @@ describe('EngineService — Integration', () => {
         { name: 'Extra Bed', unitPrice: 30.00, quantity: 3 },
       ];
 
-      const result = await service.calculatePricing('time_exclusive_reservation', lineItems, {});
+      const result = await service.calculatePricing('time_exclusive_reservation', lineItems, { currency: 'EUR' });
 
       // subtotal = (120*3) + (30*3) = 360 + 90 = 450
       expect(result.subtotal).toBe(450);
@@ -482,6 +520,7 @@ describe('EngineService — Integration', () => {
       });
 
       const result = await service.calculatePricing('instant_transaction', lineItems, {
+        currency: 'EUR',
         conditions: { orderType: 'takeaway' },
         couponCode: 'BIG',
       });
@@ -491,6 +530,7 @@ describe('EngineService — Integration', () => {
 
     it('should handle empty line items gracefully', async () => {
       const result = await service.calculatePricing('instant_transaction', [], {
+        currency: 'EUR',
         conditions: { orderType: 'takeaway' },
       });
 
@@ -502,7 +542,7 @@ describe('EngineService — Integration', () => {
       // Minimal context — all fields optional
       const result = await service.calculatePricing('shared_capacity_access', [
         { name: 'Ticket', unitPrice: 10, quantity: 1 },
-      ], {});
+      ], { currency: 'EUR' });
 
       expect(result.subtotal).toBe(10);
       expect(result.totalAmount).toBeGreaterThan(0);
@@ -512,7 +552,7 @@ describe('EngineService — Integration', () => {
       const result = await service.calculatePricing('instant_transaction', [
         { name: 'A', unitPrice: 5, quantity: 1 },
         { name: 'B', unitPrice: 3, quantity: 2 },
-      ], { conditions: { orderType: 'takeaway' } });
+      ], { currency: 'EUR', conditions: { orderType: 'takeaway' } });
 
       expect(result.lineItems[0].itemId).toBe('line-0');
       expect(result.lineItems[1].itemId).toBe('line-1');
@@ -521,7 +561,7 @@ describe('EngineService — Integration', () => {
     it('should preserve provided line item IDs', async () => {
       const result = await service.calculatePricing('instant_transaction', [
         { itemId: 'custom-id', name: 'A', unitPrice: 5, quantity: 1 },
-      ], { conditions: { orderType: 'takeaway' } });
+      ], { currency: 'EUR', conditions: { orderType: 'takeaway' } });
 
       expect(result.lineItems[0].itemId).toBe('custom-id');
     });
@@ -540,7 +580,7 @@ describe('EngineService — Integration', () => {
 
     it('should throw for unknown template type in pricing', async () => {
       await expect(
-        service.calculatePricing('totally_unknown', [], {})
+        service.calculatePricing('totally_unknown', [], { currency: 'EUR' })
       ).rejects.toThrow();
     });
 

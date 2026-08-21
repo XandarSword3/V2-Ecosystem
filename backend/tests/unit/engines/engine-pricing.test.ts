@@ -66,6 +66,7 @@ describe('Engine Integration Tests', () => {
       const pricingContext = {
         propertyId: 'prop-1',
         moduleId: 'mod-1',
+        currency: 'EUR',
         staffId: 'staff-1',
         couponCode: 'TEST20'
       };
@@ -120,6 +121,7 @@ describe('Engine Integration Tests', () => {
       const pricingContext = {
         propertyId: 'prop-1',
         moduleId: 'mod-1',
+        currency: 'EUR',
       };
 
       const result = await engineService.calculatePricing(
@@ -161,6 +163,7 @@ describe('Engine Integration Tests', () => {
       const pricingContext = {
         propertyId: 'prop-1',
         moduleId: 'mod-1',
+        currency: 'EUR',
         customerId: 'customer-1'
       };
 

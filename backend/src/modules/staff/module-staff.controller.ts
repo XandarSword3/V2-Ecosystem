@@ -6,6 +6,7 @@ import { emitToUnit } from '../../socket/index.js';
 import { autoAssignStaffToLocation, reassignStaffToLocation } from '../reservations/reservations.service.js';
 import { resolveAndPriceCatalogItems } from '../../services/catalog-pricing.service.js';
 import { getEngineService } from '../../engines/engine-service.js';
+import { resolveModuleCurrency } from '../../engines/currency-resolver.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
 import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
@@ -1952,6 +1953,7 @@ export async function createModuleOrder(req: Request, res: Response) {
       pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: module.id,
         propertyId: propertyId ?? undefined,
+        currency: await resolveModuleCurrency(module.id, propertyId),
         customerId: customerId ?? undefined,
         staffId: userId ?? undefined,
         conditions: { orderType: resolvedOrderType, paymentMethod: paymentMethod || 'cash' },

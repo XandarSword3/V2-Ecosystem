@@ -33,6 +33,16 @@ import type {
 } from './types.js';
 import type { TaxService } from '../services/tax.service.js';
 import { logger } from '../utils/logger.js';
+import { roundMoney, validateCurrency } from './money.js';
+
+/** Thrown when pricing runs without an explicit currency (DOMAIN.md F2). */
+export class PricingCurrencyError extends Error {
+  public readonly code = 'PRICING_CURRENCY_REQUIRED';
+  constructor(currency: unknown) {
+    super(`Pricing requires an explicit ISO 4217 currency; got '${String(currency)}'. Resolve it via currency-resolver before calling the pipeline.`);
+    this.name = 'PricingCurrencyError';
+  }
+}
 
 // ============================================
 // Discount Resolver Interface
@@ -121,6 +131,12 @@ export class PricingPipeline {
   ): Promise<PricingResult> {
     const pipelineStart = Date.now();
     console.log('[PricingPipeline] Starting calculation at:', new Date().toISOString());
+
+    // ---- Step 0: Currency authority (DOMAIN.md F2) ----
+    // The pipeline never invents a currency: the caller must resolve one
+    // (currency-resolver) and pass it in context. Missing currency fails loudly.
+    validateCurrency(context.currency);
+    const currency = context.currency!;
 
     // ---- Step 1: Calculate subtotal ----
     const subtotalStart = Date.now();
@@ -290,6 +306,7 @@ export class PricingPipeline {
     console.log(`[PricingPipeline] Total pipeline time: ${pipelineTotal}ms`);
 
     const result: PricingResult = {
+      currency,
       subtotal: round(subtotal),
       taxAmount: round(taxAmount),
       taxRate,
@@ -366,16 +383,8 @@ export class PricingPipeline {
     decimalPlaces: number,
     strategy: 'round' | 'floor' | 'ceil',
   ): number {
-    const factor = Math.pow(10, decimalPlaces);
-    switch (strategy) {
-      case 'floor':
-        return Math.floor(amount * factor) / factor;
-      case 'ceil':
-        return Math.ceil(amount * factor) / factor;
-      case 'round':
-      default:
-        return Math.round(amount * factor) / factor;
-    }
+    // Delegate to the canonical deterministic rounding (DOMAIN.md F3).
+    return roundMoney(amount, strategy, decimalPlaces);
   }
 
   /**

@@ -6,6 +6,7 @@ import { requireModule, getModuleStatus } from '../middleware/moduleGuard.middle
 import { asyncHandler } from '../middleware/async-handler.js';
 import { getSupabase } from '../database/connection.js';
 import { getEngineService } from '../engines/engine-service.js';
+import { resolveModuleCurrency } from '../engines/currency-resolver.js';
 import { logger } from '../utils/logger.js';
 import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.js';
 import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purchase.js';
@@ -930,9 +931,12 @@ function buildInstantTransactionRouter(router: Router): void {
         });
         return res.status(500).json({ success: false, error: 'tenant_id is required but could not be resolved for this module' });
       }
+      // Resolve the authoritative currency before pricing (DOMAIN.md F2).
+      const currency = await resolveModuleCurrency(mounted.id, propertyId);
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
         propertyId: propertyId,
+        currency,
         customerId: req.user?.userId ?? undefined,
         couponCode: typeof req.body?.couponCode === 'string' ? req.body.couponCode : undefined,
         giftCardCodes: giftCardCodes.length > 0 ? giftCardCodes : undefined,
@@ -1018,6 +1022,7 @@ function buildInstantTransactionRouter(router: Router): void {
           // was never populated at creation — every order with a service
           // charge silently showed $0 for it downstream.
           service_charge: pricing.serviceCharge ?? 0,
+          currency,
           service_location_id: serviceLocationId,
           metadata: {
             // FIX: order_number was never written on this (customer-facing)
@@ -1401,6 +1406,7 @@ function buildInstantTransactionRouter(router: Router): void {
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
         propertyId: order.property_id ?? undefined,
+        currency: await resolveModuleCurrency(mounted.id, order.property_id),
         conditions: { orderType: resolvedOrderType, paymentMethod: resolvedPaymentMethod },
       });
       const orderItemRows = items.map((item: unknown, index: number) => {
@@ -2095,7 +2101,7 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
           ...lineItem,
           taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
         }],
-        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
+        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
       );
       // Atomic insert with double-booking protection via advisory lock
       const { data: rpcResult, error: rpcError } = await supabase.rpc('reserve_unit_exclusive_atomic', {
@@ -2330,7 +2336,7 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
         lineItems,
-        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
+        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
       );
       const ticketDateRaw =
         (bodyMetadata as Record<string, unknown> | undefined)?.ticket_date
@@ -2521,7 +2527,7 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
         lineItems,
-        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
+        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
       );
       const ticketDate = dayjs().format('YYYY-MM-DD');
       const purchase = await purchaseSharedCapacityAtomic(supabase, {
@@ -2933,7 +2939,7 @@ function buildOngoingEntitlementRouter(router: Router): void {
           ...lineItem,
           taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
         }],
-        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined },
+        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
       );
       const { data, error } = await supabase
         .from('memberships')

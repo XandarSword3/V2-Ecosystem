@@ -67,6 +67,16 @@ function createMockDeps() {
   return {
     taxService: {
       getTaxRate: vi.fn().mockResolvedValue(0.10),
+      computeTaxBreakdown: vi.fn().mockImplementation(
+        async (_lineItems: unknown, taxableAmount: number) => [{
+          id: 'tax-vat',
+          name: 'VAT',
+          rate: 10,
+          amount: Math.round((taxableAmount * 0.10 + Number.EPSILON) * 100) / 100,
+          type: 'vat',
+        }],
+      ),
+      computeFeeBreakdown: vi.fn().mockResolvedValue([]),
     },
     orderConfigService: {
       getOrderConfig: vi.fn().mockResolvedValue({
@@ -101,6 +111,7 @@ function createLineItems(items: Array<{ name: string; price: number; qty: number
 function createContext(overrides: Partial<PricingContext> = {}): PricingContext {
   return {
     moduleId: 'mod-1',
+    currency: 'EUR',
     tenantId: 'tenant-1',
     ...overrides,
   };

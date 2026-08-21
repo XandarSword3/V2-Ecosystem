@@ -8,6 +8,7 @@ import { seasonalPricingService } from '../../services/seasonal-pricing.service'
 import { logger } from '../../utils/logger';
 import { getCallerTenantId } from '../../security/tenant-scope.js';
 import { getEngineService } from '../../engines/engine-service.js';
+import { resolveModuleCurrency } from '../../engines/currency-resolver.js';
 import { resolveTaxCategory, getModuleTaxCategory } from '../../services/tax.service.js';
 import { getEngineByTemplate } from '../../engines/registry.js';
 import { resolveAndPriceCatalogItems, type CatalogItemRequest } from '../../services/catalog-pricing.service.js';
@@ -410,8 +411,10 @@ router.post(
     console.log(`[PricingController] RequestID: ${requestId} - Item processing: ${Date.now() - itemProcessingStart}ms`);
 
     // Build pricing context
+    const resolvedPropertyId = (req as any).property?.id || propertyId || ((req as any).propertyId as string | undefined) || (req.headers?.['x-property-id'] as string | undefined);
     const pricingContext: PricingContext = {
       moduleId,
+      currency: await resolveModuleCurrency(moduleId, resolvedPropertyId),
       conditions: conditions || { orderType: orderType, paymentMethod: req.body.paymentMethod },
       customerId,
       couponCode,
@@ -420,7 +423,7 @@ router.post(
       // FIX 3: Use consistent propertyId resolution order with order endpoint
       // Order endpoint uses: mounted.property_id || req.propertyId || req.headers['x-property-id']
       // Preview uses: req.property?.id (same middleware source as mounted.property_id) || body.propertyId || fallbacks
-      propertyId: (req as any).property?.id || propertyId || ((req as any).propertyId as string | undefined) || (req.headers?.['x-property-id'] as string | undefined),
+      propertyId: resolvedPropertyId,
       staffId: (req.user as any)?.userId
     };
 

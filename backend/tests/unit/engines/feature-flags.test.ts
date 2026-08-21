@@ -41,6 +41,32 @@ vi.mock('../../../src/utils/logger.js', () => ({
   },
 }));
 
+// The service caches results in the module-level Redis cache (src/utils/cache.ts).
+// It was never mocked, so cache entries leaked between tests — later tests in the
+// same file hit the previous test's cached value within the 100ms TTL and asserted
+// on stale data. Mock it with a controllable in-memory store cleared per test.
+const cacheStore = new Map<string, unknown>();
+vi.mock('../../../src/utils/cache.js', () => {
+  const fakeRedis = {
+    keys: async (pattern: string) => {
+      const prefix = pattern.replace('*', '');
+      return [...cacheStore.keys()].filter(k => k.startsWith(prefix));
+    },
+    del: async (...keys: string[]) => {
+      keys.forEach(k => cacheStore.delete(k));
+      return keys.length;
+    },
+  };
+  return {
+    cache: {
+      get: async (key: string) => (cacheStore.has(key) ? cacheStore.get(key) : null),
+      set: async (key: string, value: unknown) => { cacheStore.set(key, value); return true; },
+      del: async (key: string) => cacheStore.delete(key),
+      getClient: () => fakeRedis,
+    },
+  };
+});
+
 function setupFlagResponse(enabled: boolean, rolloutPercentage: number = 100) {
   mockSupabase.from = vi.fn().mockReturnValue({
     select: vi.fn().mockReturnValue({
@@ -89,6 +115,7 @@ describe('FeatureFlagService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    cacheStore.clear();
     // Short cache TTL for testing
     service = new FeatureFlagService(100);
   });
@@ -197,7 +224,7 @@ describe('FeatureFlagService', () => {
       setupFlagResponse(true);
       await service.isEnabled('tenant-1', 'engine_v2_full');
 
-      service.clearCache();
+      await service.clearCache();
 
       setupFlagResponse(false);
       const result = await service.isEnabled('tenant-1', 'engine_v2_full');

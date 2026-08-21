@@ -64,13 +64,10 @@ export interface LedgerEntry {
 
   entityId: string;
 
-  entityType: string;
+  entityType: string;  transactionType: LedgerTransactionType;
 
-  transactionType: LedgerTransactionType;
-
-  currency?: string;
-
-  
+  /** ISO 4217 currency — REQUIRED on every entry (DOMAIN.md F2). No implicit defaults. */
+  currency: string;
 
   // Pricing breakdown
 
@@ -228,7 +225,14 @@ export class FinancialLedgerService {
 
     const supabase = getSupabase();
 
-
+    // Currency authority — a ledger entry without an explicit currency is a
+    // programming error (DOMAIN.md F2). Never default silently.
+    if (!entry.currency || !/^[A-Z]{3}$/.test(entry.currency)) {
+      throw new LedgerWriteError(
+        `Ledger entry requires an explicit ISO 4217 currency; got '${String(entry.currency)}'`,
+        entry,
+      );
+    }
 
     // Validate the financial invariant before writing
 
@@ -252,7 +256,7 @@ export class FinancialLedgerService {
 
       transaction_type: entry.transactionType,
 
-      currency: entry.currency || 'EUR',
+      currency: entry.currency,
 
       subtotal: entry.subtotal,
 
@@ -434,6 +438,10 @@ export class FinancialLedgerService {
 
       transactionType: context.transactionType,
 
+      // Currency flows from the authoritative pricing result — never a default.
+
+      currency: pricingResult.currency,
+
       subtotal: pricingResult.subtotal,
 
       taxAmount: pricingResult.taxAmount,
@@ -512,6 +520,9 @@ export class FinancialLedgerService {
 
       entityType: string;
 
+      /** ISO 4217 currency of the refund — required (DOMAIN.md F2). */
+      currency: string;
+
       refundAmount: number;
 
       reason: string;
@@ -539,6 +550,8 @@ export class FinancialLedgerService {
       entityType: context.entityType,
 
       transactionType: 'refund',
+
+      currency: context.currency,
 
       subtotal: context.refundAmount,
 

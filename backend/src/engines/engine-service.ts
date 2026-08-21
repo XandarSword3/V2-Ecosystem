@@ -281,6 +281,8 @@ export class EngineService {
       moduleId: string;
       templateType: string;
       entityType: string;
+      /** ISO 4217 currency of the refund — required (DOMAIN.md F2). */
+      currency: string;
       refundAmount: number;
       reason: string;
       actorType: 'system' | 'staff' | 'customer' | 'admin';

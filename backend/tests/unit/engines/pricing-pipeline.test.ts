@@ -17,10 +17,39 @@ import { sharedCapacityAccessEngine } from '../../../src/engines/definitions/sha
 // Mock Dependencies
 // ============================================
 
+// Fee rates the mock applies, mirroring tax_configuration-driven fees
+// (DOMAIN.md: fees are data-driven, not order-type hardcoded).
+// { type, rate?, amount? } — rate is a decimal (0.10); amount overrides with a flat fee.
+let mockFeeRates: Array<{ type: string; rate?: number; amount?: number }> = [];
+
 function createMockTaxService(rate: number = 0.11) {
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
   return {
     getTaxRate: vi.fn().mockResolvedValue(rate),
     updateTaxConfiguration: vi.fn().mockResolvedValue(undefined),
+    // Multi-rate tax path used by the current pipeline.
+    computeTaxBreakdown: vi.fn().mockImplementation(
+      async (_lineItems: unknown, taxableAmount: number) => [{
+        id: 'tax-1',
+        name: 'VAT',
+        rate: rate * 100,
+        amount: round2(taxableAmount * rate),
+        type: 'vat',
+      }],
+    ),
+    // Fee config is data-driven — the mock applies the explicitly configured rates.
+    computeFeeBreakdown: vi.fn().mockImplementation(
+      async (lineItems: Array<{ unitPrice: number; unitAdjustment?: number; quantity: number }>) => {
+        const subtotal = lineItems.reduce((s, li) => s + (li.unitPrice + (li.unitAdjustment ?? 0)) * li.quantity, 0);
+        return mockFeeRates.map((f, i) => ({
+          id: `fee-${i}`,
+          type: f.type as 'service_charge' | 'delivery_fee' | 'resort_fee' | 'custom',
+          name: f.type,
+          amount: round2(f.amount ?? subtotal * (f.rate ?? 0)),
+          ...(f.rate !== undefined ? { rate: round2(f.rate * 100) } : {}),
+        }));
+      },
+    ),
   };
 }
 
@@ -88,6 +117,7 @@ function createLineItem(overrides: Partial<PricingLineItem> = {}): PricingLineIt
 function createContext(overrides: Partial<PricingContext> = {}): PricingContext {
   return {
     moduleId: 'mod-1',
+    currency: 'EUR',
     engineType: 'instant_transaction',
     conditions: {},
     ...overrides,
@@ -103,6 +133,7 @@ describe('PricingPipeline - Instant Transaction (Engine A)', () => {
   let deps: PricingPipelineDeps;
 
   beforeEach(() => {
+    mockFeeRates = [];
     deps = createDeps();
     pipeline = new PricingPipeline(deps);
   });
@@ -155,7 +186,8 @@ describe('PricingPipeline - Instant Transaction (Engine A)', () => {
   });
 
   describe('service charge', () => {
-    it('should apply 10% service charge for dine-in', async () => {
+    it('should apply 10% service charge when configured', async () => {
+      mockFeeRates = [{ type: 'service_charge', rate: 0.10 }];
       const items = [createLineItem({ unitPrice: 100, quantity: 1 })];
       const context = createContext({ conditions: { orderType: 'dine_in' } });
       const result = await pipeline.calculate(items, instantTransactionEngine.pricing, context);
@@ -164,7 +196,7 @@ describe('PricingPipeline - Instant Transaction (Engine A)', () => {
       expect(result.serviceChargeRate).toBe(0.10);
     });
 
-    it('should NOT apply service charge for takeaway', async () => {
+    it('should NOT apply service charge when no fee configured', async () => {
       const items = [createLineItem({ unitPrice: 100, quantity: 1 })];
       const context = createContext({ conditions: { orderType: 'takeaway' } });
       const result = await pipeline.calculate(items, instantTransactionEngine.pricing, context);
@@ -174,7 +206,8 @@ describe('PricingPipeline - Instant Transaction (Engine A)', () => {
   });
 
   describe('delivery fee', () => {
-    it('should apply delivery fee for delivery orders', async () => {
+    it('should apply delivery fee when configured', async () => {
+      mockFeeRates = [{ type: 'delivery_fee', amount: 5 }];
       const items = [createLineItem({ unitPrice: 100, quantity: 1 })];
       const context = createContext({ conditions: { orderType: 'delivery' } });
       const result = await pipeline.calculate(items, instantTransactionEngine.pricing, context);
@@ -182,7 +215,7 @@ describe('PricingPipeline - Instant Transaction (Engine A)', () => {
       expect(result.deliveryFee).toBe(5);
     });
 
-    it('should NOT apply delivery fee for dine-in', async () => {
+    it('should NOT apply delivery fee when no fee configured', async () => {
       const items = [createLineItem({ unitPrice: 100, quantity: 1 })];
       const context = createContext({ conditions: { orderType: 'dine_in' } });
       const result = await pipeline.calculate(items, instantTransactionEngine.pricing, context);
@@ -193,6 +226,7 @@ describe('PricingPipeline - Instant Transaction (Engine A)', () => {
 
   describe('complete dine-in order', () => {
     it('should calculate subtotal + tax + service charge correctly', async () => {
+      mockFeeRates = [{ type: 'service_charge', rate: 0.10 }];
       const items = [createLineItem({ unitPrice: 100, quantity: 1 })];
       const context = createContext({ conditions: { orderType: 'dine_in' } });
       const result = await pipeline.calculate(items, instantTransactionEngine.pricing, context);
@@ -208,6 +242,7 @@ describe('PricingPipeline - Instant Transaction (Engine A)', () => {
 
   describe('complete delivery order', () => {
     it('should calculate subtotal + tax + delivery fee correctly', async () => {
+      mockFeeRates = [{ type: 'delivery_fee', amount: 5 }];
       const items = [createLineItem({ unitPrice: 100, quantity: 1 })];
       const context = createContext({ conditions: { orderType: 'delivery' } });
       const result = await pipeline.calculate(items, instantTransactionEngine.pricing, context);
@@ -230,6 +265,7 @@ describe('PricingPipeline - Time-Exclusive Reservation (Engine B)', () => {
   let pipeline: PricingPipeline;
 
   beforeEach(() => {
+    mockFeeRates = [];
     pipeline = new PricingPipeline(createDeps());
   });
 
@@ -280,6 +316,7 @@ describe('PricingPipeline - Shared Capacity Access (Engine C)', () => {
   let pipeline: PricingPipeline;
 
   beforeEach(() => {
+    mockFeeRates = [];
     pipeline = new PricingPipeline(createDeps());
   });
 

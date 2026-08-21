@@ -105,6 +105,9 @@ export interface EconomicsReporting {
 
 export interface PricingContext extends EconomicsReporting {
   engineType?: EngineType;
+  /** ISO 4217 currency for this commercial operation. Required at runtime —
+   *  resolve via currency-resolver before calling the pipeline. */
+  currency?: string;
   conditions?: Record<string, unknown>;
   customerId?: UUID;
   couponCode?: string;
@@ -138,6 +141,8 @@ export interface FeeBreakdownItem {
 }
 
 export interface PricingResult extends EconomicsReporting {
+  /** ISO 4217 currency — always populated by the pipeline (DOMAIN.md F2). */
+  currency: string;
   subtotal: number;
   taxAmount: number;
   taxRate: number;

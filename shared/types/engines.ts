@@ -151,6 +151,8 @@ export interface PricingContext {
   moduleId?: UUID;
   /** Engine type driving this calculation (auto-set by engine service if omitted) */
   engineType?: EngineType;
+  /** ISO 4217 currency for this commercial operation. Required at runtime (DOMAIN.md F2). */
+  currency?: string;
   /** Runtime conditions (e.g., { orderType: 'dine_in' }). Defaults to {} */
   conditions?: Record<string, unknown>;
   /** Customer ID (for loyalty/coupon eligibility lookups) */
@@ -189,6 +191,8 @@ export interface DiscountBreakdown {
  * INVARIANT: All amounts are rounded to `decimalPlaces`
  */
 export interface PricingResult {
+  /** ISO 4217 currency — always populated by the pipeline (DOMAIN.md F2). */
+  currency: string;
   /** Sum of (unitPrice + unitAdjustments) * quantity for all items */
   subtotal: number;
   /** Tax amount (subtotal * taxRate, adjusted for pre-tax discounts) */

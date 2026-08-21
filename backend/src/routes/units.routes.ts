@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { getSupabase } from '../database/connection.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { getEngineService } from '../engines/engine-service.js';
+import { resolveModuleCurrency } from '../engines/currency-resolver.js';
 import { logger } from '../utils/logger.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 import { resolveTaxCategory } from '../services/tax.service.js';
@@ -260,7 +261,7 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
         ...lineItem,
         taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
       }],
-      { moduleId: unit.module_id ?? undefined, customerId: req.user?.userId ?? undefined },
+      { moduleId: unit.module_id ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(unit.module_id) },
     );
 
     const { data: created, error } = await supabase
