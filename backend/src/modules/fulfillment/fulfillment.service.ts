@@ -182,12 +182,19 @@ export class FulfillmentService {
     // comes from the row itself, never hardcoded, so non-hospitality
     // fulfillment adapters work through this same service.
     const currentState = fulfillment.status;
+    // The row's MODE is the runtime authority: only the mode's binding
+    // machine may validate this move (a digital_delivery row can never be
+    // moved with a hospitality action, even if adapters ever share a state
+    // name). An unknown/null mode resolves to no fulfillment layer and fails
+    // closed — the mode is NOT NULL by contract, so this only happens on
+    // corrupt data.
     const transition = await engineService.transitionState(
       fulfillment.engine_type,
       currentState,
       params.action,
       params.actor,
       { ...(params.context ?? {}), transactionId: params.transactionId },
+      (fulfillment.mode ?? undefined) as FulfillmentMode | undefined,
     );
 
     if (!transition.allowed || !transition.targetState) {

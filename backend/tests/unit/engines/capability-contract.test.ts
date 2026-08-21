@@ -340,6 +340,99 @@ describe('A non-hospitality fulfillment adapter rides on Engine A as a MODE', ()
 });
 
 // ============================================================
+// 8b. Same Engine A — cross-mode proof (the Phase 4 definition of done)
+// ============================================================
+
+describe('Same Engine A — every fulfillment mode runs on ONE engine definition', () => {
+  const engine = getEngine('instant_transaction');
+  const fulfillment = engine.capabilities.fulfillment;
+  const HOSPITALITY_MODES = ['on_premise', 'pickup', 'local_delivery'] as const;
+
+  it('each declared mode resolves to its own adapter machine', () => {
+    for (const mode of HOSPITALITY_MODES) {
+      const machine = resolveFulfillmentMachine(fulfillment, mode)!;
+      expect(machine.states).toContain('queued');
+      expect(machine.states).toContain('handed_off');
+    }
+    const digital = resolveFulfillmentMachine(fulfillment, 'digital_delivery')!;
+    expect(digital.states).toContain('provisioning');
+    expect(digital.states).toContain('delivered');
+    expect(digital.states).not.toContain('queued');
+  });
+
+  it('all four modes share ONE transaction core — same confirm, same engine, same economics', async () => {
+    const service = new EngineService();
+    for (const mode of [...HOSPITALITY_MODES, 'digital_delivery']) {
+      const confirm = await service.transitionState('instant_transaction', 'pending', 'confirm', 'system', {}, mode);
+      expect(confirm.allowed, `confirm for mode '${mode}'`).toBe(true);
+      expect(confirm.targetState).toBe('confirmed');
+      expect(confirm.layer).toBe('transaction');
+    }
+    // One engine definition, one commercial entity, one economic model — the
+    // modes never split into new engine semantics.
+    expect(getAllEngines().filter(e => e.type === 'instant_transaction')).toHaveLength(1);
+    expect(engine.commercialEntity).toBe('order');
+    expect(engine.capabilities.economics.multiTender).toBe(true);
+    expect(engine.capabilities.economics.ledger).toBe(true);
+  });
+
+  it('runs a full lifecycle per mode — hospitality AND digital — through the SAME engine', async () => {
+    const service = new EngineService();
+    // Hospitality (pickup): queued → in_progress → ready → auto-handoff complete.
+    let r = await service.transitionState('instant_transaction', 'queued', 'start_preparation', 'staff', {}, 'pickup');
+    expect(r.allowed).toBe(true);
+    expect(r.canonicalState).toBe('in_progress');
+    r = await service.transitionState('instant_transaction', 'in_progress', 'mark_ready', 'staff', {}, 'pickup');
+    expect(r.allowed).toBe(true);
+    expect(r.canonicalState).toBe('ready');
+    r = await service.transitionState('instant_transaction', 'ready', 'complete', 'staff', {}, 'pickup');
+    expect(r.allowed).toBe(true);
+    expect(r.targetState).toBe('completed');
+    // Digital: provisioning → provisioned → delivered → completed.
+    r = await service.transitionState('instant_transaction', 'provisioning', 'finish_provisioning', 'system', {}, 'digital_delivery');
+    expect(r.allowed).toBe(true);
+    expect(r.canonicalState).toBe('provisioned');
+    r = await service.transitionState('instant_transaction', 'provisioned', 'deliver_digital', 'system', {}, 'digital_delivery');
+    expect(r.allowed).toBe(true);
+    expect(r.canonicalState).toBe('delivered');
+    r = await service.transitionState('instant_transaction', 'delivered', 'complete', 'system', {}, 'digital_delivery');
+    expect(r.allowed).toBe(true);
+    expect(r.targetState).toBe('completed');
+  });
+
+  it('MODE-SCOPED: a digital_delivery row can never use hospitality actions — the binding is the authority', async () => {
+    const service = new EngineService();
+    // From a digital state…
+    let r = await service.transitionState('instant_transaction', 'provisioning', 'start_preparation', 'staff', {}, 'digital_delivery');
+    expect(r.allowed).toBe(false);
+    // …and crucially from the SHARED cross-layer state 'confirmed', where the
+    // hospitality machine also has a start_preparation transition. The mode
+    // binding filters the machine set, so the hospitality machine is never
+    // consulted for a digital row.
+    r = await service.transitionState('instant_transaction', 'confirmed', 'start_preparation', 'staff', {}, 'digital_delivery');
+    expect(r.allowed).toBe(false);
+  });
+
+  it('MODE-SCOPED: a hospitality row can never use digital actions', async () => {
+    const service = new EngineService();
+    let r = await service.transitionState('instant_transaction', 'queued', 'provision', 'system', {}, 'pickup');
+    expect(r.allowed).toBe(false);
+    r = await service.transitionState('instant_transaction', 'confirmed', 'provision', 'system', {}, 'pickup');
+    expect(r.allowed).toBe(false);
+  });
+
+  it('MODE-SCOPED: an unoffered mode fails closed — no fulfillment layer is consulted', async () => {
+    const service = new EngineService();
+    // 'shipment' is a legal GLOBAL mode but Engine A does not offer it.
+    const r = await service.transitionState('instant_transaction', 'queued', 'start_preparation', 'staff', {}, 'shipment');
+    expect(r.allowed).toBe(false);
+    // …and the digital machine is not reachable through it either.
+    const digital = await service.transitionState('instant_transaction', 'provisioning', 'finish_provisioning', 'system', {}, 'shipment');
+    expect(digital.allowed).toBe(false);
+  });
+});
+
+// ============================================================
 // 6. Generic core vocabulary guard (requirement 8)
 // ============================================================
 

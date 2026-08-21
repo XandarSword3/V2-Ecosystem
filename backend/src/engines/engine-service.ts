@@ -23,6 +23,7 @@
 
 import type {
   EngineType,
+  FulfillmentMode,
   PricingLineItem,
   PricingContext,
   PricingResult,
@@ -46,7 +47,8 @@ import { logger } from '../utils/logger.js';
 export class EngineService {
   private pricingPipeline: PricingPipeline;
   private stateMachines: Map<EngineType, StateMachine> = new Map();
-  private fulfillmentMachines: Map<EngineType, StateMachine[]> = new Map();
+  // Keyed by engine type, or `${engineType}::${mode}` when mode-scoped.
+  private fulfillmentMachines: Map<string, StateMachine[]> = new Map();
 
   constructor(deps?: Partial<PricingPipelineDeps>) {
     // Create pricing pipeline with default or injected dependencies
@@ -141,31 +143,55 @@ export class EngineService {
 
   /**
    * Get or create the FULFILLMENT-layer state machines declared by the
-   * engine's capability contract (plan Phase 2/3, per-mode bindings). One per
-   * adapter binding — Engine A binds the hospitality machine AND the digital
-   * machine as MODES of the same engine. Empty when the engine has none — its
-   * whole lifecycle lives on the transaction machine.
+   * engine's capability contract (plan Phase 2/3, per-mode bindings). When a
+   * MODE is given, ONLY that mode's binding machine is returned — the
+   * binding is the runtime authority, so a digital_delivery row can never be
+   * validated against the hospitality machine (or vice versa), even if the
+   * two adapters ever share a state name. Without a mode (transaction-layer
+   * surfaces) every bound machine is used. Empty when the engine has none.
    */
-  private getFulfillmentMachines(engineType: EngineType): StateMachine[] {
-    if (this.fulfillmentMachines.has(engineType)) {
-      return this.fulfillmentMachines.get(engineType)!;
-    }
+  private getFulfillmentMachines(engineType: EngineType, mode?: FulfillmentMode): StateMachine[] {
+    const key = mode ? `${engineType}::${mode}` : engineType;
+    const cached = this.fulfillmentMachines.get(key);
+    if (cached) return cached;
     const bindings = getEngine(engineType).capabilities?.fulfillment?.modeMachines ?? [];
-    const machines = bindings.map(binding => new StateMachine(binding.machine));
-    this.fulfillmentMachines.set(engineType, machines);
+    let machines: StateMachine[];
+    if (mode) {
+      const binding = bindings.find(b => b.modes.includes(mode));
+      // A mode the engine does not offer resolves to NO fulfillment layer —
+      // fail closed (the transaction machine still works).
+      machines = binding ? [new StateMachine(binding.machine)] : [];
+    } else {
+      machines = bindings.map(binding => new StateMachine(binding.machine));
+    }
+    this.fulfillmentMachines.set(key, machines);
     return machines;
   }
 
   /**
-   * Build the layered validator for an engine: transaction machine + every
-   * fulfillment machine bound in its capability contract (if any). The
+   * Build the layered validator for an engine: transaction machine + the
+   * fulfillment machine(s) for the requested mode. When a MODE is given, the
+   * fulfillment definition handed to the validator is FILTERED to that mode's
+   * binding, so even the auto-handoff policy is scoped to the selected mode
+   * — the binding is the runtime authority, never an engine-wide guess. The
    * completion gate is applied generically inside LayeredStateMachine.
    */
-  private buildLayered(engineType: EngineType): LayeredStateMachine {
+  private buildLayered(engineType: EngineType, mode?: FulfillmentMode): LayeredStateMachine {
     const sm = this.getStateMachine(engineType);
-    const fm = this.getFulfillmentMachines(engineType);
     const definition = getEngine(engineType);
-    return new LayeredStateMachine(sm, fm, definition.capabilities.fulfillment);
+    const fulfillment = definition.capabilities.fulfillment;
+    if (mode) {
+      const binding = (fulfillment.modeMachines ?? []).find(b => b.modes.includes(mode));
+      if (!binding) {
+        // Mode not offered by this engine — no fulfillment layer for the move.
+        return new LayeredStateMachine(sm, [], { ...fulfillment, modeMachines: [] });
+      }
+      return new LayeredStateMachine(sm, this.getFulfillmentMachines(engineType, mode), {
+        ...fulfillment,
+        modeMachines: [binding],
+      });
+    }
+    return new LayeredStateMachine(sm, this.getFulfillmentMachines(engineType), fulfillment);
   }
 
   /**
@@ -185,6 +211,13 @@ export class EngineService {
     action: string,
     actor: 'system' | 'staff' | 'customer' | 'admin',
     context: Record<string, unknown> = {},
+    /**
+     * The fulfillment MODE of the entity being moved (the row's mode). When
+     * given, only THAT mode's binding machine validates fulfillment-layer
+     * moves — a digital_delivery row can never be moved with a hospitality
+     * action. Omit for transaction-layer surfaces (engine-wide view).
+     */
+    fulfillmentMode?: FulfillmentMode,
   ): Promise<{
     allowed: boolean;
     targetState: string;
@@ -195,7 +228,7 @@ export class EngineService {
     layer?: 'transaction' | 'fulfillment';
   }> {
     const engineType = this.resolveEngineType(templateType);
-    const layered = this.buildLayered(engineType);
+    const layered = this.buildLayered(engineType, fulfillmentMode);
 
     logger.info(`[ENGINE SERVICE] State transition attempt`, {
       engineType,
@@ -252,9 +285,10 @@ export class EngineService {
     action: string,
     actor: 'system' | 'staff' | 'customer' | 'admin',
     context: Record<string, unknown> = {},
+    fulfillmentMode?: FulfillmentMode,
   ): { allowed: boolean; error?: string; targetState?: string } {
     const engineType = this.resolveEngineType(templateType);
-    const check = this.buildLayered(engineType).canTransition(currentState, action, actor, context);
+    const check = this.buildLayered(engineType, fulfillmentMode).canTransition(currentState, action, actor, context);
     if (!check.allowed) return { allowed: false, error: check.error };
     return { allowed: true, targetState: check.targetState };
   }
@@ -267,9 +301,10 @@ export class EngineService {
     templateType: string,
     currentState: string,
     actor: 'system' | 'staff' | 'customer' | 'admin',
+    fulfillmentMode?: FulfillmentMode,
   ): Array<{ action: string; targetState: string }> {
     const engineType = this.resolveEngineType(templateType);
-    return this.buildLayered(engineType).getAvailableActions(currentState, actor);
+    return this.buildLayered(engineType, fulfillmentMode).getAvailableActions(currentState, actor);
   }
 
   /**

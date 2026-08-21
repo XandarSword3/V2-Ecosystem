@@ -15,6 +15,7 @@ import {
   isValidTemplateType,
   resolveEngineType,
 } from '../../../src/engines/registry.js';
+import { LEGAL_FULFILLMENT_COMBINATIONS } from '../../../src/engines/fulfillment-contract.js';
 import type { EngineType } from '../../../../shared/types/engines.js';
 
 describe('Engine Registry', () => {
@@ -113,6 +114,34 @@ describe('Engine Registry', () => {
       expect(types).toContain('ongoing_entitlement');
       expect(types).toContain('platform_entitlement');
       expect(types).not.toContain('digital_delivery');
+    });
+  });
+
+  describe('Architecture invariant — fulfillment modes are never engine types', () => {
+    it('the engine registry contains EXACTLY the canonical five engines (no additions during Engine A work)', () => {
+      expect(getAllEngineTypes().sort()).toEqual([
+        'instant_transaction',
+        'ongoing_entitlement',
+        'platform_entitlement',
+        'shared_capacity_access',
+        'time_exclusive_reservation',
+      ]);
+    });
+
+    it('no fulfillment MODE — including future ones — may ever be an EngineType', () => {
+      // Every value in the generic mode registry (pickup, on_premise,
+      // local_delivery, shipment, digital_delivery, service_execution, …) is
+      // a FULFILLMENT MODE. If one ever appears as an engine type, that is
+      // the exact mistake this phase removed — fail the suite. This is what
+      // prevents a future 'shipment' or 'service_execution' engine from
+      // sneaking in.
+      const engineTypes = new Set(getAllEngineTypes());
+      for (const mode of Object.keys(LEGAL_FULFILLMENT_COMBINATIONS)) {
+        expect(
+          engineTypes.has(mode as EngineType),
+          `fulfillment mode '${mode}' must never be an engine type`,
+        ).toBe(false);
+      }
     });
   });
 

@@ -117,8 +117,10 @@ function queuedRow(overrides: Record<string, unknown> = {}): Row {
     property_id: null,
     tenant_id: null,
     status: 'queued',
-    mode: null,
-    destination_type: null,
+    // Realistic rows carry a snapshotted mode — the service routes every
+    // move through THAT mode's binding (mode-scoped validation).
+    mode: 'on_premise',
+    destination_type: 'on_premise_location',
     destination_ref: null,
     tracking_ref: null,
     queued_at: new Date().toISOString(),
@@ -536,6 +538,22 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     expect(verify).toMatch(/visible_rows = 0/);
     expect(verify).toMatch(/has_function_privilege/);
     expect(verify).toMatch(/transition_fulfillment/);
+  });
+
+  it('source: legacy digital_delivery-ENGINE rows are explicitly migrated to Engine A + hardened', () => {
+    const migrationsDir = join(__dirname, '../../../../supabase/migrations');
+    const legacy = readFileSync(join(migrationsDir, '20260821200000_engine_a_digital_legacy_rows.sql'), 'utf8');
+    // The conversion is explicit and scoped to the only valid digital mode —
+    // rows become Engine A digital-mode fulfillments, never silently dropped.
+    expect(legacy).toMatch(/UPDATE "public"."fulfillments"/);
+    expect(legacy).toMatch(/"engine_type" = 'digital_delivery' AND "mode" = 'digital_delivery'/);
+    expect(legacy).toMatch(/"engine_type" = 'instant_transaction'/);
+    // The persistence layer rejects any future orphan engine_type: the
+    // canonical-five CHECK is enforced on fulfillments too, so the
+    // engine-vs-mode mistake cannot recur at the DB boundary.
+    expect(legacy).toMatch(/chk_fulfillments_engine_type/);
+    expect(legacy).toMatch(/'instant_transaction'/);
+    expect(legacy).not.toMatch(/digital_delivery.*engine_type CHECK/);
   });
 
   it('source: resource persistence (Phase 5) is RLS-hardened from day one', () => {

@@ -22,6 +22,30 @@ module **must** set `engine_type` at creation time. There is no fallback path
 anymore — code that used to read `m.engine_type || resolveEngineType(m.template_type)`
 has been deleted (`analytics.controller.ts`, `metrics-layer.service.ts`).
 
+## Fulfillment modes are never engine types (hard rule)
+
+A **fulfillment mode** is a capability of an engine — not an engine. One
+engine (Engine A / `instant_transaction`) may expose several fulfillment
+modes, each backed by its own adapter state machine, through the per-mode
+bindings in its capability contract (`capabilities.fulfillment.modeMachines`):
+
+| Engine A mode            | Adapter machine                              |
+|---------------------------|----------------------------------------------|
+| `on_premise` / `pickup` / `local_delivery` | hospitality adapter (`queued → in_progress → ready → handed_off`) |
+| `digital_delivery`        | digital adapter (`provisioning → provisioned → delivered → completed`) |
+
+Adding a fulfillment mode NEVER adds an `EngineType`. `digital_delivery` was
+briefly registered as an engine (a mistake this phase removed) — it is now a
+**mode** of `instant_transaction`, proved at runtime by the same-engine
+cross-mode tests and the mode-scoped validator: a `digital_delivery` row is
+validated only against the digital binding, a hospitality row only against
+the hospitality binding. The architecture gate enforces this: the engine
+registry must contain exactly the five canonical engines, and no value in the
+fulfillment-mode registry may ever appear in `EngineType`.
+
+Future modes (`shipment`, `service_execution`, …) extend the mode registry
+and the engine's bindings — they do not create engines.
+
 ## `template_type`: frozen, read-only legacy compat
 
 `modules.template_type` is kept only so nothing that still joins on it breaks.
