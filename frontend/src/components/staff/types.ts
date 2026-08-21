@@ -1,3 +1,5 @@
+import type { FulfillmentState, FulfillmentStatus } from '@/types';
+
 export type ItemStatus = 'pending' | 'preparing' | 'ready' | 'served';
 
 export interface OrderItem {
@@ -22,7 +24,7 @@ export interface Order {
   orderType: 'dine_in' | 'takeaway' | 'delivery';
   status: string;
   /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
-  fulfillmentStatus?: string | null;
+  fulfillmentStatus?: FulfillmentStatus | null;
   items: OrderItem[];
   totalAmount: number;
   createdAt: string;
@@ -42,7 +44,8 @@ export interface Order {
 // transaction layer owns pending/confirmed/completed/cancelled. The KDS
 // columns key off the CANONICAL fulfillment state, never the legacy
 // composites (preparing/delivered) that pre-Stage-6 rows carried.
-export const statusFlow = ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed'];
+export const statusFlow = ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed'] as const;
+export const FULFILLMENT_LAYER_STATES: readonly FulfillmentState[] = ['queued', 'in_progress', 'ready', 'handed_off'];
 
 /**
  * Resolve the canonical fulfillment state for an order. Stage 6: the backend

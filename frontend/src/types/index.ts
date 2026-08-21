@@ -7,6 +7,11 @@
 // Re-export shared types
 export * from './module-builder';
 
+// Canonical Engine A domain contracts (plan F1) — the typed layer frontend
+// components consume instead of inferring semantics from arbitrary JSON.
+import type { FulfillmentState } from '../lib/engine-a/types';
+export * from '../lib/engine-a/types';
+
 // ============================================
 // API Response Types
 // ============================================
@@ -54,8 +59,9 @@ export interface AuthTokens {
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled';
 // Stage 6: canonical fulfillment-layer states. The KDS consumes
 // fulfillmentStatus (in_progress/ready/handed_off), NOT the transaction-layer
-// status, for kitchen/dispatch columns.
-export type FulfillmentStatus = 'queued' | 'in_progress' | 'ready' | 'handed_off' | 'completed' | 'cancelled';
+// status, for kitchen/dispatch columns. Derived from the canonical domain
+// layer (lib/engine-a/types) so the two can never drift.
+export type FulfillmentStatus = FulfillmentState | 'completed' | 'cancelled';
 export type PaymentStatus = 'pending' | 'partial' | 'paid' | 'refunded';
 export type PaymentMethod = 'cash' | 'card' | 'whish' | 'online';
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery' | 'room_service';

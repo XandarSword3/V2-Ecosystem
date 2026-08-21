@@ -18,7 +18,8 @@ import {
   Minus,
   ShoppingCart,
 } from 'lucide-react';
-import { Order, OrderItem, ItemStatus, itemStatusFlow, canonicalFulfillmentState } from './types';
+import { Order, OrderItem, ItemStatus, itemStatusFlow, canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from './types';
+import type { FulfillmentState, FulfillmentStatus } from '@/types';
 
 import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
 import { createOfflineOrderStatusUpdate, createOfflineOrder } from '@/lib/offline/offline-sync';
@@ -178,8 +179,6 @@ function nextCanonicalTarget(order: Order): string | null {
   }
 }
 
-/** Canonical fulfillment-layer states (vs transaction-layer statuses). */
-const FULFILLMENT_LAYER_STATES = new Set(['queued', 'in_progress', 'ready', 'handed_off']);
 
 function ItemStatusChip({
   item,
@@ -388,7 +387,9 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
       interface StatusUpdate {
         id: string;
         status: string;
-        fulfillmentStatus?: string | null;
+        // Canonical type — the payload is validated at the boundary rather
+        // than smuggled in as an arbitrary string (plan F1).
+        fulfillmentStatus?: FulfillmentStatus | null;
       }
 
       const handleStatusUpdate = (update: StatusUpdate) => {
@@ -506,8 +507,8 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                 ...order,
                 // Stage 6: fulfillment-layer moves update fulfillmentStatus
                 // (the board's key); transaction-layer moves update status.
-                ...(FULFILLMENT_LAYER_STATES.has(newStatus)
-                  ? { fulfillmentStatus: newStatus }
+                ...(FULFILLMENT_LAYER_STATES.includes(newStatus as FulfillmentState)
+                  ? { fulfillmentStatus: newStatus as FulfillmentStatus }
                   : { status: newStatus }),
               }
             : order
@@ -523,8 +524,8 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
             order.id === orderId
               ? {
                   ...order,
-                  ...(FULFILLMENT_LAYER_STATES.has(newStatus)
-                    ? { fulfillmentStatus: newStatus }
+                  ...(FULFILLMENT_LAYER_STATES.includes(newStatus as FulfillmentState)
+                    ? { fulfillmentStatus: newStatus as FulfillmentStatus }
                     : { status: newStatus }),
                 }
               : order
