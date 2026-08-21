@@ -31,44 +31,73 @@ export class ResourceContractError extends Error {
 /**
  * Validate an engine's declared resource-consumption model at registration.
  * Throws on any impossible configuration — enforced by code, not convention.
+ *
+ * The ENGINE-LEVEL model is validated against the engine's fulfillment layer
+ * as before. Additionally, each fulfillment MODE BINDING's per-mode resource
+ * override (plan Phase 5 — mode-aware) is validated against THAT binding's
+ * own semantics — the exact per-mode analog of the engine-wide rules:
+ *
+ *   - a binding declaring consumption on fulfillment handoff must actually
+ *     model a handoff step (handoff: true) — a handoff-less mode (digital
+ *     delivery) can never claim to consume at handoff;
+ *   - a binding's override must declare its kinds when it consumes.
  */
 export function assertValidResourceConsumption(
   resources: ResourceConsumptionModel,
   fulfillment: FulfillmentDefinition,
   execution?: ExecutionDefinition,
 ): void {
-  if (resources.type === 'none') {
-    return;
-  }
-  if (!resources.kinds || resources.kinds.length === 0) {
-    throw new ResourceContractError(
-      `Resource consumption model '${resources.type}' must declare at least one resource kind`,
-    );
-  }
-  // Consumption tied to fulfillment handoff requires a required fulfillment
-  // layer — you cannot consume on a handoff that never happens.
-  if (resources.consumption === 'on_fulfillment_handoff') {
-    if (!fulfillment.required) {
+  if (resources.type !== 'none') {
+    if (!resources.kinds || resources.kinds.length === 0) {
       throw new ResourceContractError(
-        "Resource consumption on 'on_fulfillment_handoff' requires a required fulfillment layer — the engine cannot consume on a handoff it never performs",
+        `Resource consumption model '${resources.type}' must declare at least one resource kind`,
       );
     }
-    if (!fulfillment.modeMachines || fulfillment.modeMachines.length === 0) {
-      throw new ResourceContractError(
-        "Resource consumption on 'on_fulfillment_handoff' requires a fulfillment state machine to determine when handoff occurs",
-      );
+    // Consumption tied to fulfillment handoff requires a required fulfillment
+    // layer — you cannot consume on a handoff that never happens.
+    if (resources.consumption === 'on_fulfillment_handoff') {
+      if (!fulfillment.required) {
+        throw new ResourceContractError(
+          "Resource consumption on 'on_fulfillment_handoff' requires a required fulfillment layer — the engine cannot consume on a handoff it never performs",
+        );
+      }
+      if (!fulfillment.modeMachines || fulfillment.modeMachines.length === 0) {
+        throw new ResourceContractError(
+          "Resource consumption on 'on_fulfillment_handoff' requires a fulfillment state machine to determine when handoff occurs",
+        );
+      }
+    }
+    // Allocation on fulfillment start requires SOME declared way to detect it:
+    // a fulfillment machine, or an execution model with states (engines like
+    // shared_capacity_access model fulfillment start in the transaction machine
+    // — valid → active on entry — and declare it via execution.states).
+    if (resources.allocation === 'on_fulfillment_start') {
+      const hasFulfillmentMachine = Boolean(fulfillment.modeMachines && fulfillment.modeMachines.length > 0);
+      const hasExecutionModel = Boolean(execution?.enabled && execution.states.length > 0);
+      if (!hasFulfillmentMachine && !hasExecutionModel) {
+        throw new ResourceContractError(
+          "Resource allocation on 'on_fulfillment_start' requires a fulfillment machine OR an execution model with states to determine when fulfillment starts",
+        );
+      }
     }
   }
-  // Allocation on fulfillment start requires SOME declared way to detect it:
-  // a fulfillment machine, or an execution model with states (engines like
-  // shared_capacity_access model fulfillment start in the transaction machine
-  // — valid → active on entry — and declare it via execution.states).
-  if (resources.allocation === 'on_fulfillment_start') {
-    const hasFulfillmentMachine = Boolean(fulfillment.modeMachines && fulfillment.modeMachines.length > 0);
-    const hasExecutionModel = Boolean(execution?.enabled && execution.states.length > 0);
-    if (!hasFulfillmentMachine && !hasExecutionModel) {
+
+  // Per-mode resource overrides: each binding's model is validated against
+  // THAT binding's own lifecycle. A binding always has a machine (required),
+  // so the only per-mode rule that can be violated is consuming on a handoff
+  // the mode never performs.
+  for (const binding of fulfillment.modeMachines ?? []) {
+    const override = binding.resources;
+    if (!override || override.type === 'none') continue;
+    if (!override.kinds || override.kinds.length === 0) {
       throw new ResourceContractError(
-        "Resource allocation on 'on_fulfillment_start' requires a fulfillment machine OR an execution model with states to determine when fulfillment starts",
+        `Mode binding [${binding.modes.join(', ')}] declares resource consumption '${override.type}' but no resource kinds`,
+      );
+    }
+    if (override.consumption === 'on_fulfillment_handoff' && !binding.handoff) {
+      throw new ResourceContractError(
+        `Mode binding [${binding.modes.join(', ')}] declares consumption on fulfillment handoff but handoff: false — ` +
+          `this mode has no handoff step to consume on`,
       );
     }
   }

@@ -58,6 +58,20 @@ describe('Generic resource consumption contract (plan Phase 5)', () => {
     expect(platform.capabilities.resources.type).toBe('none');
   });
 
+  it('MODE-AWARE: digital delivery overrides to no consumption; hospitality modes use the engine default', () => {
+    const instant = getEngine('instant_transaction');
+    const fulfillment = instant.capabilities.fulfillment;
+    const digital = fulfillment.modeMachines!.find(b => b.modes.includes('digital_delivery'))!;
+    const hospitality = fulfillment.modeMachines!.find(b => b.modes.includes('on_premise'))!;
+    // The digital binding overrides the engine-wide inventory model to 'none' —
+    // the engine-wide setting would be too restrictive for a mode with no
+    // handoff step and no physical inventory.
+    expect(digital.resources).toEqual({ type: 'none' });
+    // Hospitality modes declare no override → the engine-level model is the
+    // default, resolved per (engine, mode) by the service.
+    expect(hospitality.resources).toBeUndefined();
+  });
+
   it('capacity engines consume capacity slots', () => {
     const timeExclusive = getEngine('time_exclusive_reservation');
     expect(timeExclusive.capabilities.resources.type).toBe('capacity');
@@ -95,6 +109,47 @@ describe('Generic resource consumption contract (plan Phase 5)', () => {
           reversalOnCancel: true,
         },
         noFulfillment,
+      ),
+    ).not.toThrow();
+  });
+
+  it('MODE-AWARE: a mode binding cannot consume on a handoff its mode never performs', () => {
+    // Digital-style binding: handoff: false (no handoff step) yet the override
+    // claims handoff-time consumption — impossible, rejected at registration.
+    expect(() =>
+      assertValidResourceConsumption(
+        { type: 'inventory', kinds: ['inventory_item'], allocation: 'on_purchase', consumption: 'on_fulfillment_handoff', reversalOnCancel: true },
+        {
+          required: true,
+          options: [{ mode: 'digital_delivery', destinations: ['digital_account'] }],
+          groups: false,
+          tracking: false,
+          modeMachines: [{
+            modes: ['digital_delivery'],
+            handoff: false,
+            resources: { type: 'inventory', kinds: ['inventory_item'], allocation: 'on_purchase', consumption: 'on_fulfillment_handoff', reversalOnCancel: true },
+            machine: { states: ['provisioning', 'delivered', 'completed'], initialState: 'provisioning', terminalStates: ['completed'], transitions: [] },
+          }],
+        },
+      ),
+    ).toThrow(/no handoff step/);
+
+    // ...while a handoff: true binding (hospitality-style) CAN consume at handoff.
+    expect(() =>
+      assertValidResourceConsumption(
+        { type: 'inventory', kinds: ['inventory_item'], allocation: 'on_purchase', consumption: 'on_fulfillment_handoff', reversalOnCancel: true },
+        {
+          required: true,
+          options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
+          groups: false,
+          tracking: false,
+          modeMachines: [{
+            modes: ['pickup'],
+            handoff: true,
+            resources: { type: 'inventory', kinds: ['inventory_item'], allocation: 'on_purchase', consumption: 'on_fulfillment_handoff', reversalOnCancel: true },
+            machine: { states: ['queued', 'handed_off', 'completed'], initialState: 'queued', terminalStates: ['completed'], transitions: [] },
+          }],
+        },
       ),
     ).not.toThrow();
   });
@@ -314,6 +369,193 @@ describe('ResourceConsumptionService (generic)', () => {
     expect(release.released).toBe(2);
     expect(supabase.rpcCalls.some(c => c.name === 'release_resources')).toBe(true);
   });
+
+  it('MODE-AWARE: validate() resolves the model per (engine, mode)', () => {
+    const service = new ResourceConsumptionService();
+    const req: ResourceRequirement[] = [{ kind: 'inventory_item', ref: 'inv-1', quantity: 1 }];
+    // Hospitality mode → engine default (inventory) accepts.
+    expect(() => service.validate('instant_transaction', req, 'on_premise')).not.toThrow();
+    // Mode-less → engine default accepts.
+    expect(() => service.validate('instant_transaction', req)).not.toThrow();
+    // Digital mode → its binding overrides to 'none': the SAME requirements
+    // are now a contract violation (the engine-wide setting must never force
+    // a mode into resource behavior it cannot satisfy).
+    expect(() => service.validate('instant_transaction', req, 'digital_delivery')).toThrow(/no resource consumption/);
+  });
+
+  it('MODE-AWARE: allocate() for a digital-delivery mode fails closed — RPC never called', async () => {
+    const service = new ResourceConsumptionService();
+    const supabase = createSupabaseMock();
+    const result = await service.allocate(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'digital_delivery',
+      requirements: [{ kind: 'inventory_item', ref: 'inv-1', quantity: 1 }],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/no resource consumption/);
+    expect(supabase.rpcCalls.some(c => c.name === 'allocate_resources')).toBe(false);
+  });
+
+  it('MODE-AWARE: consume() validates mode-scoped — a digital row cannot consume with a hospitality action', async () => {
+    const service = new ResourceConsumptionService();
+    const supabase = createSupabaseMock();
+    // Digital row at 'provisioning'; 'start_preparation' is a hospitality
+    // action — the digital binding (mode-scoped transition validation)
+    // rejects it before any consume RPC.
+    const result = await service.consume(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'digital_delivery',
+      action: 'start_preparation',
+      actor: 'staff',
+      currentState: 'provisioning',
+    });
+    expect(result.ok).toBe(false);
+    expect(supabase.rpcCalls.some(c => c.name === 'consume_resources')).toBe(false);
+  });
+
+  it('MODE-AWARE: resolveForTransaction validates against the mode model', async () => {
+    const service = new ResourceConsumptionService({
+      async resolveRequirements() {
+        return [{ kind: 'inventory_item', ref: 'inv-1', quantity: 1 }];
+      },
+    });
+    const supabase = createSupabaseMock();
+    // Digital mode: the same resolved requirements are rejected (model 'none').
+    await expect(
+      service.resolveForTransaction(supabase, 't1', 'instant_transaction', 'digital_delivery'),
+    ).rejects.toThrow(/no resource consumption/);
+    // Hospitality mode: accepted against the engine default.
+    const ok = await service.resolveForTransaction(supabase, 't1', 'instant_transaction', 'on_premise');
+    expect(ok).toEqual([{ kind: 'inventory_item', ref: 'inv-1', quantity: 1 }]);
+  });
+
+  // ── Lifecycle driver (plan Phase 5 — wired at the order-status choke point) ──
+
+  function lifecycleMock() {
+    const rpc: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const supabase: any = {
+      rpcCalls: rpc,
+      from: (table: string) => ({
+        select: () => ({
+          eq: async () => {
+            if (table === 'order_items') {
+              return { data: [{ id: 'oi1', quantity: 1, catalog_item_id: 'cat-1' }], error: null };
+            }
+            if (table === 'menu_item_ingredients') {
+              return { data: [{ inventory_item_id: 'inv-1', quantity_required: 1, unit: 'piece' }], error: null };
+            }
+            return { data: [], error: null };
+          },
+        }),
+      }),
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        rpc.push({ name, args });
+        if (name === 'allocate_resources') return { data: [{ success: true, allocated: 1 }], error: null };
+        if (name === 'consume_resources') return { data: [{ success: true, consumed: 1 }], error: null };
+        if (name === 'release_resources') return { data: [{ success: true, released: 1 }], error: null };
+        return { data: [{ success: false, error_message: `unknown rpc ${name}` }], error: null };
+      },
+    };
+    return supabase;
+  }
+
+  it('LIFECYCLE: confirm allocates, handoff consumes, complete does NOT consume twice', async () => {
+    const service = new ResourceConsumptionService(hospitalityResourceResolver);
+    const supabase = lifecycleMock();
+
+    // Economic confirmation → allocate (layer transaction, target confirmed).
+    const confirm = await service.handleLifecycleMove(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'on_premise',
+      action: 'confirm',
+      actor: 'system',
+      currentState: 'pending',
+      targetState: 'confirmed',
+      layer: 'transaction',
+      propertyId: 'p1',
+      tenantId: 't1',
+      context: { orderId: 't1' },
+    });
+    expect(confirm).toMatchObject({ ok: true, op: 'allocated' });
+
+    // Fulfillment handoff (deliver → handed_off) → consume.
+    const deliver = await service.handleLifecycleMove(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'on_premise',
+      action: 'deliver',
+      actor: 'staff',
+      currentState: 'ready',
+      targetState: 'handed_off',
+      layer: 'fulfillment',
+      propertyId: 'p1',
+      tenantId: 't1',
+    });
+    expect(deliver).toMatchObject({ ok: true, op: 'consumed' });
+
+    // Completion LEAVES the handoff-reaching state — consumption must NOT
+    // fire again (exactly-once at the service boundary; the idempotent RPC
+    // is the DB backstop).
+    const complete = await service.handleLifecycleMove(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'on_premise',
+      action: 'complete',
+      actor: 'staff',
+      currentState: 'handed_off',
+      targetState: 'completed',
+      layer: 'fulfillment',
+      propertyId: 'p1',
+      tenantId: 't1',
+    });
+    expect(complete).toMatchObject({ ok: true, op: 'none' });
+
+    const names = supabase.rpcCalls.map((c: any) => c.name);
+    expect(names).toEqual(['allocate_resources', 'consume_resources']);
+  });
+
+  it('LIFECYCLE: cancellation releases allocations exactly once (compensation)', async () => {
+    const service = new ResourceConsumptionService(hospitalityResourceResolver);
+    const supabase = lifecycleMock();
+
+    const cancel = await service.handleLifecycleMove(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'pickup',
+      action: 'cancel',
+      actor: 'admin',
+      currentState: 'confirmed',
+      targetState: 'cancelled',
+      layer: 'transaction',
+      propertyId: 'p1',
+      tenantId: 't1',
+    });
+    expect(cancel).toMatchObject({ ok: true, op: 'released' });
+    expect(supabase.rpcCalls.map((c: any) => c.name)).toEqual(['release_resources']);
+  });
+
+  it('LIFECYCLE: a digital-delivery mode drives no resource RPCs at all (model none)', async () => {
+    const service = new ResourceConsumptionService(hospitalityResourceResolver);
+    const supabase = lifecycleMock();
+
+    const result = await service.handleLifecycleMove(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'digital_delivery',
+      action: 'confirm',
+      actor: 'system',
+      currentState: 'pending',
+      targetState: 'confirmed',
+      layer: 'transaction',
+      propertyId: 'p1',
+      tenantId: 't1',
+    });
+    expect(result).toEqual({ ok: true, op: 'none' });
+    expect(supabase.rpcCalls.length).toBe(0);
+  });
 });
 
 // ============================================================
@@ -376,5 +618,27 @@ describe('Resource boundary (plan Phase 5)', () => {
     // The adapter OWNS that vocabulary.
     const adapter = readFileSync(join(srcDir, 'adapters', 'hospitality', 'resources.ts'), 'utf8');
     expect(adapter).toMatch(/menu_item_ingredients/);
+  });
+
+  it('the latest resource migration records events only for rows actually transitioned', () => {
+    const migrationsDir = join(__dirname, '../../../../supabase/migrations');
+    // Latest definition is the law (20260821210000 supersedes the Phase-5
+    // bodies): event inserts are driven by a PRE-update snapshot of the rows
+    // this call actually transitions.
+    const latest = readFileSync(join(migrationsDir, '20260821210000_engine_a_resource_events_idempotent.sql'), 'utf8');
+    const consumeFn = latest.split('CREATE OR REPLACE FUNCTION "public"."consume_resources"')[1]
+      ?.split('CREATE OR REPLACE FUNCTION "public"."release_resources"')[0] ?? '';
+    const releaseFn = latest.split('CREATE OR REPLACE FUNCTION "public"."release_resources"')[1] ?? '';
+    expect(consumeFn).toMatch(/FROM _consumed_rows/);
+    expect(releaseFn).toMatch(/FROM _released_rows/);
+    // The Phase-5 bug — re-selecting by the FINAL status after the UPDATE
+    // (duplicated events on repeat calls, and release recording the new
+    // status as from_status) — must be gone from the latest bodies. The old
+    // event inserts re-selected rows with a single-line WHERE on the final
+    // status; the new snapshots select only the pre-update rows.
+    expect(consumeFn).not.toMatch(/FROM resource_allocations\s*WHERE transaction_id = p_transaction_id AND engine_type = p_engine_type AND status = 'consumed'/);
+    expect(releaseFn).not.toMatch(/FROM resource_allocations\s*WHERE transaction_id = p_transaction_id AND engine_type = p_engine_type AND status = 'released'/);
+    // release records the TRUE pre-release status.
+    expect(releaseFn).toMatch(/SELECT id, from_status, 'released'/);
   });
 });

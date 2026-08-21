@@ -164,8 +164,10 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
     },
     resources: {
       // Engine A consumes inventory via the hospitality BOM (order items →
-      // recipe ingredients). The generic service allocates/consumes/releases;
-      // the hospitality adapter resolves the requirements (plan Phase 5).
+      // recipe ingredients) — the DEFAULT model for the hospitality modes.
+      // Mode bindings may override (digital_delivery consumes nothing); the
+      // generic service resolves the model per (engine, mode), never
+      // engine-wide (plan Phase 5 — mode-aware).
       type: 'inventory',
       kinds: ['inventory_item'],
       allocation: 'on_purchase',
@@ -187,9 +189,11 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
       tracking: false,
       // Per-mode machine routing: hospitality modes → the hospitality
       // adapter's machine; digital_delivery → the digital adapter's machine.
-      // Handoff semantics are per MODE, never engine-wide: hospitality
-      // models a separate handoff step (handed_off state), digital delivery
-      // has none — delivery to the digital account IS the handoff.
+      // Handoff and RESOURCE semantics are per MODE, never engine-wide:
+      // hospitality models a separate handoff step (handed_off state) and
+      // consumes inventory at handoff; digital delivery has no handoff step
+      // (delivery to the digital account IS the handoff) and consumes no
+      // physical inventory.
       modeMachines: [
         {
           modes: ['on_premise', 'pickup', 'local_delivery'],
@@ -200,6 +204,10 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
         {
           modes: ['digital_delivery'],
           handoff: false,
+          // Digital goods consume no physical inventory, and this mode has
+          // no handoff step — the engine-wide inventory model would be
+          // WRONG for it (too restrictive). The override resolves to 'none'.
+          resources: { type: 'none' },
           machine: digitalFulfillmentStateMachine,
         },
       ],

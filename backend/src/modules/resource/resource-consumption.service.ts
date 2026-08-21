@@ -7,7 +7,11 @@
  * resolves a transaction's commercial lines into typed ResourceRequirement[]
  * (the generic BOM line); this service:
  *
- *   - validates the resolved requirements against the engine's DECLARED model
+ *   - validates the resolved requirements against the DECLARED model for
+ *     (engine, mode) — MODE-AWARE (plan Phase 5): the engine-level model is
+ *     the default, and a mode binding may override it (digital_delivery
+ *     consumes nothing), so an engine-wide setting can never force a mode
+ *     into resource behavior it cannot satisfy
  *     (fail closed — an undeclared kind is a contract violation);
  *   - allocates (reserves), consumes (deducts on fulfillment), and releases
  *     (compensates on cancellation) through the engine's layered validator,
@@ -27,7 +31,9 @@ import {
   assertValidResourceRequirements,
   ResourceContractError,
 } from '../../engines/resource-contract.js';
+import { COMPLETION_STATE } from '../../engines/fulfillment-contract.js';
 import type {
+  FulfillmentMode,
   ResourceConsumptionModel,
   ResourceRequirement,
 } from '../../engines/types.js';
@@ -47,6 +53,8 @@ export interface ResourceRequirementResolver {
 export interface ResourceAllocateParams {
   transactionId: string;
   engineType: string;
+  /** The transaction's fulfillment MODE — selects the mode's resource model (mode-aware). */
+  mode?: FulfillmentMode;
   requirements: ResourceRequirement[];
   propertyId?: string | null;
   tenantId?: string | null;
@@ -55,11 +63,43 @@ export interface ResourceAllocateParams {
 export interface ResourceOperationParams {
   transactionId: string;
   engineType: string;
+  /** The transaction's fulfillment MODE — selects the mode's resource model and mode-scoped validation. */
+  mode?: FulfillmentMode;
   /** The fulfillment-layer move that triggers the operation (e.g. 'deliver', 'cancel'). */
   action: string;
   actor: ResourceActor;
   actorId?: string | null;
   context?: Record<string, unknown>;
+}
+
+/** Facts of one canonical state move, for the mode-aware lifecycle driver. */
+export interface ResourceLifecycleMoveParams {
+  transactionId: string;
+  engineType: string;
+  /** The transaction's fulfillment MODE — selects the mode's resource model. */
+  mode?: FulfillmentMode;
+  /** The move that was performed (e.g. 'confirm', 'deliver', 'cancel'). */
+  action: string;
+  actor: ResourceActor;
+  actorId?: string | null;
+  /** Canonical state BEFORE the move (the row's status / transactions.status). */
+  currentState: string;
+  /** Canonical target state of the move. */
+  targetState: string;
+  /** Which layer performed the move. */
+  layer: 'transaction' | 'fulfillment';
+  propertyId?: string | null;
+  tenantId?: string | null;
+  context?: Record<string, unknown>;
+}
+
+export interface ResourceLifecycleResult {
+  ok: boolean;
+  op: 'none' | 'allocated' | 'consumed' | 'released';
+  error?: string;
+  allocated?: number;
+  consumed?: number;
+  released?: number;
 }
 
 export interface ResourceAllocationRow {
@@ -83,13 +123,14 @@ export class ResourceConsumptionService {
 
   /**
    * Resolve a transaction's resource requirements through the adapter, then
-   * validate them against the engine's declared model. Fail-closed: an
+   * validate them against the model for (engine, mode). Fail-closed: an
    * undeclared kind or a negative quantity throws BEFORE any write.
    */
   async resolveForTransaction(
     supabase: SupabaseClient,
     transactionId: string,
     engineType: string,
+    mode?: FulfillmentMode,
     context?: Record<string, unknown>,
   ): Promise<ResourceRequirement[]> {
     if (!this.resolver) {
@@ -98,26 +139,39 @@ export class ResourceConsumptionService {
       );
     }
     const requirements = await this.resolver.resolveRequirements(supabase, transactionId, context);
-    const resources = this.getResourceModel(engineType);
+    const resources = this.getResourceModel(engineType, mode);
     assertValidResourceRequirements(resources, requirements);
     return requirements;
   }
 
-  /** The engine's declared resource model (throws on an unknown engine). */
-  private getResourceModel(engineType: string): ResourceConsumptionModel {
+  /**
+   * The resource model for (engine, mode) — MODE-AWARE (plan Phase 5). The
+   * engine-level model is the default; a mode binding may override it for
+   * its modes (digital_delivery overrides to 'none' — no physical
+   * inventory, no handoff step). An unknown mode resolves to the engine
+   * default; the model itself then fails closed for the mode's requirements.
+   * Throws on an unknown engine.
+   */
+  private getResourceModel(engineType: string, mode?: FulfillmentMode): ResourceConsumptionModel {
     const engine = getEngine(engineType as keyof EngineRegistry);
+    if (mode) {
+      const binding = (engine.capabilities.fulfillment.modeMachines ?? [])
+        .find(b => b.modes.includes(mode));
+      if (binding?.resources) return binding.resources;
+    }
     return engine.capabilities.resources;
   }
 
   /**
-   * Validate a resolved requirement set against the engine's model.
+   * Validate a resolved requirement set against the model for (engine, mode).
    * Fail-closed: throws ResourceContractError on any undeclared kind.
    */
   validate(
     engineType: string,
     requirements: ResourceRequirement[],
+    mode?: FulfillmentMode,
   ): void {
-    const resources = this.getResourceModel(engineType);
+    const resources = this.getResourceModel(engineType, mode);
     assertValidResourceRequirements(resources, requirements);
   }
 
@@ -131,7 +185,7 @@ export class ResourceConsumptionService {
     params: ResourceAllocateParams,
   ): Promise<{ ok: boolean; error?: string; allocated?: number }> {
     try {
-      this.validate(params.engineType, params.requirements);
+      this.validate(params.engineType, params.requirements, params.mode);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error('[Resource] allocate rejected by capability validation', {
@@ -173,12 +227,17 @@ export class ResourceConsumptionService {
     params: ResourceOperationParams & { currentState: string },
   ): Promise<{ ok: boolean; error?: string; consumed?: number }> {
     const engineService = getEngineService();
+    // Mode-scoped validation: the move is legal only on the selected mode's
+    // binding (a digital row can never be consumed with a hospitality
+    // action). consume() must only be reached when the mode's model says
+    // consumption happens here — the declaration gates it.
     const transition = await engineService.transitionState(
       params.engineType,
       params.currentState,
       params.action,
       params.actor,
       { ...(params.context ?? {}), transactionId: params.transactionId },
+      params.mode,
     );
     if (!transition.allowed) {
       return { ok: false, error: transition.error ?? 'Resource consume move rejected' };
@@ -214,12 +273,15 @@ export class ResourceConsumptionService {
     params: ResourceOperationParams & { currentState: string },
   ): Promise<{ ok: boolean; error?: string; released?: number }> {
     const engineService = getEngineService();
+    // Mode-scoped validation (same as consume): cancellation is only legal
+    // on the selected mode's binding.
     const transition = await engineService.transitionState(
       params.engineType,
       params.currentState,
       params.action,
       params.actor,
       { ...(params.context ?? {}), transactionId: params.transactionId },
+      params.mode,
     );
     if (!transition.allowed) {
       return { ok: false, error: transition.error ?? 'Resource release move rejected' };
@@ -241,6 +303,137 @@ export class ResourceConsumptionService {
       return { ok: false, error: row?.error_message ?? 'release_resources failed' };
     }
     return { ok: true, released: row.released ?? 0 };
+  }
+
+  /**
+   * MODE-AWARE lifecycle driver (plan Phase 5 — resume: wire resources into
+   * the order lifecycle). Given the canonical move facts of a persisted state
+   * change, performs the resource operation the (engine, mode) model
+   * declares — and NOTHING when the mode's model is 'none' (digital
+   * delivery skips the whole inventory lifecycle):
+   *
+   *   - cancellation → release (compensation) when the model reverses on
+   *     cancel, validated mode-scoped;
+   *   - economic confirmation (layer 'transaction', target 'confirmed') with
+   *     allocation on_purchase/on_confirm → resolve requirements through the
+   *     resolver and allocate;
+   *   - consumption: on_fulfillment_handoff fires when the fulfillment layer
+   *     reaches a state from which the transaction completes (the handoff
+   *     condition — derived generically from the mode binding's machine, so
+   *     it works for hospitality 'handed_off' AND a digital-style
+   *     'delivered' the same way); on_transaction_complete fires at
+   *     'completed'; on_purchase fires at confirmation.
+   *
+   * Consumption/release moves are validated mode-scoped (the selected mode's
+   * binding is the authority) before any write.
+   */
+  async handleLifecycleMove(
+    supabase: SupabaseClient,
+    params: ResourceLifecycleMoveParams,
+  ): Promise<ResourceLifecycleResult> {
+    const model = this.getResourceModel(params.engineType, params.mode);
+    if (model.type === 'none') {
+      return { ok: true, op: 'none' };
+    }
+
+    // 1. Cancellation → compensation.
+    if (params.targetState === 'cancelled') {
+      if (!model.reversalOnCancel) return { ok: true, op: 'none' };
+      const release = await this.release(supabase, {
+        transactionId: params.transactionId,
+        engineType: params.engineType,
+        mode: params.mode,
+        action: params.action,
+        actor: params.actor,
+        actorId: params.actorId,
+        currentState: params.currentState,
+        context: params.context,
+      });
+      return { ok: release.ok, op: 'released', error: release.error, released: release.released };
+    }
+
+    // 2. Economic confirmation → allocation.
+    if (
+      params.layer === 'transaction' &&
+      params.targetState === 'confirmed' &&
+      (model.allocation === 'on_purchase' || model.allocation === 'on_confirm')
+    ) {
+      if (!this.resolver) {
+        return {
+          ok: false,
+          op: 'none',
+          error: 'Resource model allocates at confirmation but no requirement resolver is wired for this lifecycle move',
+        };
+      }
+      try {
+        const requirements = await this.resolver.resolveRequirements(supabase, params.transactionId, params.context);
+        const allocate = await this.allocate(supabase, {
+          transactionId: params.transactionId,
+          engineType: params.engineType,
+          mode: params.mode,
+          requirements,
+          propertyId: params.propertyId,
+          tenantId: params.tenantId,
+        });
+        return { ok: allocate.ok, op: 'allocated', error: allocate.error, allocated: allocate.allocated };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { ok: false, op: 'none', error: message };
+      }
+    }
+
+    // 3. Consumption timing.
+    let shouldConsume = false;
+    if (model.consumption === 'on_fulfillment_handoff') {
+      shouldConsume =
+        params.layer === 'fulfillment' &&
+        this.isHandoffReached(params.engineType, params.mode, params.targetState) &&
+        // Exactly-once at the service boundary: consumption fires when the
+        // move ENTERS a handoff-reaching state (deliver → handed_off), and
+        // must NOT fire again when the follow-up move LEAVES it (complete →
+        // completed). The DB RPC is idempotent as the backstop; this keeps
+        // the redundant call from happening at all.
+        !this.isHandoffReached(params.engineType, params.mode, params.currentState);
+    } else if (model.consumption === 'on_transaction_complete') {
+      shouldConsume = params.targetState === 'completed';
+    } else if (model.consumption === 'on_purchase') {
+      shouldConsume = params.layer === 'transaction' && params.targetState === 'confirmed';
+    }
+    if (shouldConsume) {
+      const consume = await this.consume(supabase, {
+        transactionId: params.transactionId,
+        engineType: params.engineType,
+        mode: params.mode,
+        action: params.action,
+        actor: params.actor,
+        actorId: params.actorId,
+        currentState: params.currentState,
+        context: params.context,
+      });
+      return { ok: consume.ok, op: 'consumed', error: consume.error, consumed: consume.consumed };
+    }
+
+    return { ok: true, op: 'none' };
+  }
+
+  /**
+   * Whether the fulfillment layer reached its handoff condition: the target
+   * state is 'completed' (cross-layer completion, incl. auto-handoff) or is
+   * a state from which the mode binding's machine completes (hospitality
+   * 'handed_off', digital-style 'delivered'). Derived from the machine — the
+   * generic core never names a vertical handoff state.
+   */
+  private isHandoffReached(
+    engineType: string,
+    mode: FulfillmentMode | undefined,
+    targetState: string,
+  ): boolean {
+    if (targetState === COMPLETION_STATE) return true;
+    if (!mode) return false;
+    const binding = (getEngine(engineType as keyof EngineRegistry).capabilities.fulfillment.modeMachines ?? [])
+      .find(b => b.modes.includes(mode));
+    if (!binding) return false;
+    return binding.machine.transitions.some(t => t.from === targetState && t.to === COMPLETION_STATE);
   }
 
   /**

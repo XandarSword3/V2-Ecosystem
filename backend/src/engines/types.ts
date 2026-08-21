@@ -300,6 +300,16 @@ export interface FulfillmentModeBinding<TFulfillmentStatus extends string = stri
    * step — delivery to the digital account IS the handoff.
    */
   handoff: boolean;
+  /**
+   * Per-mode resource consumption override (plan Phase 5 — mode-aware).
+   * Resource TIMING and kinds are a property of the mode's lifecycle, not
+   * the engine: the engine-level model is the DEFAULT, and a binding may
+   * override it for its modes. Digital delivery overrides to 'none' — a
+   * digital good consumes no physical inventory and the mode has no handoff
+   * step to consume on. The contract rejects a binding that claims
+   * handoff-time consumption without a handoff step (handoff: false).
+   */
+  resources?: ResourceConsumptionModel;
   /** The adapter's fulfillment lifecycle — adapter-shaped state machine. */
   machine: StateMachineDefinition<TFulfillmentStatus>;
   /**

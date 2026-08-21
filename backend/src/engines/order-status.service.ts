@@ -19,9 +19,19 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getEngineService } from './engine-service.js';
 import { TEMPLATE_TO_ENGINE } from './types.js';
 import { getFulfillmentService } from '../modules/fulfillment/index.js';
+import { ResourceConsumptionService } from '../modules/resource/index.js';
+import { hospitalityResourceResolver } from '../adapters/hospitality/resources.js';
+import type { FulfillmentMode } from './types.js';
 import { reverseDiscounts } from './discount-reversal.js';
 import { emitToUnit, emitToOrder } from '../socket/index.js';
 import { logger } from '../utils/logger.js';
+
+// The generic resource service is wired with the hospitality BOM resolver at
+// this call site — the adapter owns the menu_item_ingredients vocabulary; the
+// service only ever sees typed generic requirements. This file is the
+// hospitality order-status orchestrator, so the adapter dependency belongs
+// HERE, not in the generic core (plan Phase 5 boundary).
+const resourceConsumption = new ResourceConsumptionService(hospitalityResourceResolver);
 
 export type Actor = 'system' | 'staff' | 'customer' | 'admin';
 
@@ -281,6 +291,48 @@ export async function changeInstantTransactionOrderStatus(
         orderId: current.id,
       });
     }
+  }
+
+  // ── Resource lifecycle (plan Phase 5) ────────────────────────────────────
+  // The order-status choke point drives the generic resource layer from the
+  // canonical move facts: allocate on economic confirmation, consume at the
+  // selected mode's handoff condition, release on cancellation. The row's
+  // fulfillment MODE is the authority — digital_delivery resolves to its
+  // per-mode 'none' model (no inventory lifecycle) while hospitality modes
+  // allocate/consume via the BOM adapter.
+  //
+  // Non-fatal by design, same boundary as fiscal issuance below: the state
+  // move has already persisted and must not be rolled back by a side-effect
+  // hiccup. The RPCs are idempotent (20260821210000 — events record only
+  // rows actually transitioned), and the resolver validates fail-closed
+  // before any write, so a failed move is retryable and never corrupts state.
+  try {
+    const lifecycle = await resourceConsumption.handleLifecycleMove(supabase, {
+      transactionId: orderId,
+      engineType,
+      mode: (fulfillment?.mode as FulfillmentMode | undefined) ?? undefined,
+      action,
+      actor,
+      actorId: userId ?? null,
+      currentState,
+      targetState: transition.targetState ?? persistedState,
+      layer: transition.layer ?? (isCancelling ? 'transaction' : 'fulfillment'),
+      propertyId: String(order.property_id ?? ''),
+      tenantId: tenantId ?? String(order.tenant_id),
+      context: { orderId, moduleId },
+    });
+    if (!lifecycle.ok) {
+      logger.error('[OrderStatus] Resource lifecycle move failed', {
+        orderId,
+        op: lifecycle.op,
+        error: lifecycle.error,
+      });
+    }
+  } catch (lifecycleErr) {
+    logger.error(
+      '[OrderStatus] Resource lifecycle move threw',
+      lifecycleErr instanceof Error ? lifecycleErr.message : String(lifecycleErr),
+    );
   }
 
   // Real-time notify the KDS. Previously only the staff-controller path did
