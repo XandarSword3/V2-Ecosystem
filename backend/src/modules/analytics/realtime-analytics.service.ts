@@ -226,7 +226,9 @@ export class RealtimeAnalyticsService {
       .select('*', { count: 'exact', head: true })
       .eq('engine_type', 'instant_transaction')
       .eq('property_id', propertyId)
-      .in('status', ['pending', 'preparing', 'ready']);
+      // Stage 6: fulfillment-active orders stay 'confirmed' on the transaction
+      // layer; 'preparing'/'ready' retained only for historical rows.
+      .in('status', ['pending', 'confirmed', 'preparing', 'ready']);
 
     metrics.push({
       metric: 'active_orders',

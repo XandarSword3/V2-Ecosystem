@@ -9,10 +9,32 @@ import { getEngineService } from '../../engines/engine-service.js';
 import { resolveModuleCurrency } from '../../engines/currency-resolver.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
+import { getFulfillmentService } from '../fulfillment/index.js';
 import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
 import { getOrderNumber } from '../../utils/order-number.js';
 import { awardLoyaltyPointsForPayment } from '../payments/loyalty-integration.js';
 import dayjs from 'dayjs';
+
+/**
+ * TRANSITIONAL read-side map (Stage 6): historical instant_transaction rows
+ * may still carry legacy fulfillment composites on transactions.status
+ * (preparing/ready/delivered/served). New rows get their fulfillment meaning
+ * from the fulfillments table; this map only lets old rows display correctly
+ * until they are re-touched. It is the ONLY remaining read of legacy
+ * composites, lives in the API surface (never the engine core), and should
+ * be deleted once all historical rows have fulfillment rows.
+ */
+function legacyFulfillmentToCanonical(status: string | null): string | null {
+  switch (status) {
+    case 'preparing': return 'in_progress';
+    case 'delivered':
+    case 'served':    return 'handed_off';
+    case 'ready':     return 'ready';
+    case 'completed': return 'completed';
+    case 'cancelled': return 'cancelled';
+    default:          return null;
+  }
+}
 
 /**
  * Dynamic Module Staff Controller
@@ -54,21 +76,85 @@ export async function getModuleOrders(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Module is not a menu service' });
     }
 
-    // Build query for orders — use transactions table for instant_transaction engine
+    // Build query for orders — use transactions table for instant_transaction
+    // engine. Stage 6: fulfillment meaning lives in the fulfillments table, so
+    // the canonical fulfillment state is joined in and returned as
+    // fulfillment_status. transactions.status carries only the transaction
+    // layer (pending/confirmed/completed/cancelled).
     let query = supabase
       .from('transactions')
       .select(`
         id, customer_id, staff_id, engine_type, status, amount, created_at,
-        reference_id, reference_table, metadata, service_location_id
+        reference_id, reference_table, metadata, service_location_id,
+        fulfillments ( status )
       `)
       .eq('engine_type', 'instant_transaction')
       .eq('module_id', moduleId || module.id)
       .order('created_at', { ascending: false });
 
-    // Filter by status
+    // Filter by status (Stage 6). The KDS sends legacy composite filters
+    // ('preparing'/'delivered') OR canonical fulfillment states. Both are
+    // translated to their canonical layer: transaction states filter
+    // transactions.status, fulfillment states filter the fulfillments join.
     if (status) {
-      const statuses = (status as string).split(',');
-      query = query.in('status', statuses);
+      const statuses = (status as string).split(',').map(s => s.trim()).filter(Boolean);
+      const txStatuses = new Set<string>();
+      const fmStatuses = new Set<string>();
+      for (const s of statuses) {
+        switch (s) {
+          case 'pending':
+          case 'confirmed':
+          case 'completed':
+          case 'cancelled':
+            txStatuses.add(s);
+            fmStatuses.add(s); // terminal/cross-layer states also live on fulfillments
+            break;
+          case 'preparing':
+          case 'in_progress':
+            fmStatuses.add('in_progress');
+            break;
+          case 'ready':
+            fmStatuses.add('ready');
+            break;
+          case 'delivered':
+          case 'served':
+          case 'handed_off':
+            fmStatuses.add('handed_off');
+            break;
+          default:
+            // Unknown status — let the DB filter return nothing rather than
+            // silently broadening the result set.
+            txStatuses.add('__none__');
+        }
+      }
+      // Resolve fulfillment-layer statuses to transaction ids FIRST (a plain
+      // query on fulfillments — deliberately avoids PostgREST embedded-resource
+      // filter syntax, which varies by server version), then combine with
+      // transaction-layer statuses in a single OR over the transactions query.
+      // The migration backfilled a fulfillment row for every existing
+      // instant_transaction row, and ensure creates one at confirm, so the
+      // fulfillments table is authoritative for fulfillment meaning.
+      const fmTxIds: string[] = [];
+      if (fmStatuses.size > 0) {
+        const { data: fmRows, error: fmError } = await supabase
+          .from('fulfillments')
+          .select('transaction_id')
+          .in('status', [...fmStatuses]);
+        if (fmError) throw fmError;
+        for (const r of fmRows ?? []) fmTxIds.push(r.transaction_id);
+      }
+      if (txStatuses.size > 0 && fmTxIds.length > 0) {
+        query = query.or(`status.in.(${[...txStatuses].join(',')}),id.in.(${fmTxIds.join(',')})`);
+      } else if (txStatuses.size > 0) {
+        query = query.in('status', [...txStatuses]);
+      } else if (fmTxIds.length > 0) {
+        query = query.in('id', fmTxIds);
+      } else if (fmStatuses.size > 0) {
+        // Only fulfillment states were requested and none matched — return
+        // nothing rather than silently broadening to all orders. The zero
+        // uuid matches no real row.
+        query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
+      }
     }
 
     // Pagination
@@ -178,6 +264,17 @@ export async function getModuleOrders(req: Request, res: Response) {
       );
       const staffId = (order as { staff_id?: string | null }).staff_id ?? null;
       const staffName = staffId ? (staffNameById.get(staffId) ?? null) : null;
+      // Stage 6: canonical fulfillment state from the fulfillments join.
+      // Fall back to metadata.fulfillment_state (transitional) then to a
+      // legacy-composite mapping (historical rows) so the KDS keeps working
+      // for pre-Stage-6 data.
+      const fulfillmentRel = (order as { fulfillments?: Array<{ status?: string | null }> | { status?: string | null } | null }).fulfillments ?? null;
+      const fulfillmentStatus = Array.isArray(fulfillmentRel)
+        ? (fulfillmentRel[0]?.status ?? null)
+        : (fulfillmentRel?.status ?? null);
+      const canonicalFulfillmentState = fulfillmentStatus
+        ?? (meta.fulfillment_state as string | undefined)
+        ?? legacyFulfillmentToCanonical(order.status);
       return {
         id: order.id,
         orderNumber: getOrderNumber(order.id, meta),
@@ -187,6 +284,8 @@ export async function getModuleOrders(req: Request, res: Response) {
         staffName,
         orderType: (meta.order_type as string | undefined) ?? order.engine_type,
         status: order.status,
+        // Canonical fulfillment state — the KDS consumes THIS, not status.
+        fulfillmentStatus: canonicalFulfillmentState,
         paymentMethod: rawPaymentMethod,
         paymentStatus,
         isPaidOnline: isOnlinePayment,
@@ -578,13 +677,12 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
     }
 
-    // Valid status transitions. 'delivered' is the real instant_transaction
-    // engine state (instant-transaction.ts) — staff-facing UI still calls
-    // this step "Served", but the value written to transactions.status has
-    // to match what the engine actually recognizes. Fast-fail here before
-    // touching the DB; changeInstantTransactionOrderStatus independently
-    // validates against the real engine either way.
-    const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'];
+    // Valid statuses (Stage 6): canonical fulfillment states for fulfillment
+    // moves, transaction states for transaction moves. Legacy composites
+    // (preparing/delivered) are deliberately gone — resolveAction in
+    // order-status.service.ts still maps them if any old client sends them,
+    // but this route fast-fails on them so nothing new starts using them.
+    const validStatuses = ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, error: 'Invalid status' });
     }
@@ -681,7 +779,7 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
 
     const { data: parentOrder, error: orderFetchError } = await supabase
       .from('transactions')
-      .select('id, status, module_id, metadata')
+      .select('id, status, module_id, property_id, tenant_id, metadata')
       .eq('id', orderId)
       .eq('module_id', module.id)
       .single();
@@ -716,22 +814,26 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
       logger.warn('Failed to emit order:item:status', socketErr.message);
     }
 
-    // Auto-derive the parent order's status once every item hits the same
-    // milestone. Only for 'ready'/'served' — 'preparing' has no order-level
-    // action worth forcing, and a cancelled/completed order is never
-    // touched by this regardless of item states.
+    // Auto-derive the parent order's fulfillment state once every item hits
+    // the same milestone. Only for 'ready'/'served' — 'preparing' has no
+    // order-level action worth forcing, and a cancelled/completed order is
+    // never touched by this regardless of item states.
     //
-    // Two bugs fixed here: this used to run as actor 'system', but
-    // mark_ready's allowedActors on the engine is ['staff'] only — so this
-    // was rejected every single time, never just "sometimes." Runs as
-    // 'staff' now, which is accurate anyway: a staff member did trigger
-    // this, just indirectly by bumping the order's last item. It also used
-    // to ask for a 'mark_served' action that has never existed on the
-    // engine — the item milestone is still called 'served', but the order
-    // status it derives to is the engine's real 'delivered'.
+    // Stage 6: this derivation now writes the CANONICAL fulfillment state to
+    // the fulfillments table via the fulfillment service. It NEVER touches
+    // transactions.status — that stays at its transaction-layer value
+    // (confirmed) until the transaction itself completes/cancels. Pre-Stage-6
+    // rows without a fulfillment row are self-healed by ensure.
+    //
+    // Two older bugs fixed here: this used to run as actor 'system', but
+    // mark_ready's allowedActors on the engine is ['staff'] only — so it
+    // was rejected every single time. Runs as 'staff' now, which is accurate
+    // anyway: a staff member did trigger this, just indirectly by bumping
+    // the order's last item. It also used to ask for a 'mark_served' action
+    // that has never existed on the engine — the item milestone is still
+    // called 'served', but the order state it derives to is the engine's
+    // canonical 'handed_off'.
     if (status === 'ready' || status === 'served') {
-      const derivedOrderStatus = status === 'ready' ? 'ready' : 'delivered';
-
       const { data: siblingItems, error: siblingError } = await supabase
         .from('order_items')
         .select('status')
@@ -740,39 +842,45 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
       const allAtStatus = !siblingError && (siblingItems ?? []).length > 0
         && (siblingItems ?? []).every((i) => i.status === status);
 
-      if (allAtStatus && parentOrder.status !== derivedOrderStatus
-          && parentOrder.status !== 'cancelled' && parentOrder.status !== 'completed') {
-        const engineService = getEngineService();
-        const engineAction = status === 'ready' ? 'mark_ready' : 'deliver';
-        const transitionResult = await engineService.transitionState(
-          'instant_transaction',
-          parentOrder.status,
-          engineAction,
-          'staff',
-          { orderId, derivedFromItems: true },
-        );
-
-        if (transitionResult.allowed) {
-          const orderMeta = (parentOrder.metadata ?? {}) as Record<string, unknown>;
-          const timestampField = status === 'ready'
-            ? { actual_ready_time: new Date().toISOString() }
-            : { served_at: new Date().toISOString() };
-
-          const { data: derivedOrder } = await supabase
-            .from('transactions')
-            .update({
-              status: transitionResult.targetState,
-              updated_at: new Date().toISOString(),
-              metadata: { ...orderMeta, ...timestampField },
-            })
-            .eq('id', orderId)
-            .select('id, status')
-            .single();
-
-          if (derivedOrder) {
-            emitToUnit(req.user?.tenantId || 'default', slug, 'order:status', derivedOrder);
-            emitToUnit(req.user?.tenantId || 'default', module.id, 'order:status', derivedOrder);
+      if (allAtStatus && parentOrder.status !== 'cancelled' && parentOrder.status !== 'completed') {
+        const fulfillmentService = getFulfillmentService();
+        let fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
+        if (!fulfillment) {
+          const ensured = await fulfillmentService.ensure(supabase, {
+            transactionId: orderId,
+            engineType: 'instant_transaction',
+            moduleId: module.id,
+            propertyId: parentOrder.property_id ?? null,
+            tenantId: parentOrder.tenant_id ?? null,
+          });
+          if (ensured.ok) {
+            fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
           }
+        }
+
+        const engineAction = status === 'ready' ? 'mark_ready' : 'deliver';
+        const result = fulfillment
+          ? await fulfillmentService.transition(supabase, {
+              transactionId: orderId,
+              action: engineAction,
+              actor: 'staff',
+              actorId: req.user?.userId ?? null,
+              expectedFrom: fulfillment.status,
+              context: { orderId, derivedFromItems: true },
+            })
+          : { ok: false as const, error: 'No fulfillment row for this transaction' };
+
+        if (result.ok && result.canonicalState) {
+          // Same payload shape as order-status.service.ts — the KDS consumes
+          // fulfillmentStatus, not status.
+          const derivedPayload = {
+            id: orderId,
+            status: parentOrder.status,
+            fulfillmentStatus: result.canonicalState,
+            tableNumber: (parentOrder.metadata as Record<string, unknown>)?.table_number ?? null,
+          };
+          emitToUnit(req.user?.tenantId || 'default', slug, 'order:status', derivedPayload);
+          emitToUnit(req.user?.tenantId || 'default', module.id, 'order:status', derivedPayload);
         }
         // Not allowed just means the order won't auto-advance this time —
         // the item update above already succeeded and is not rolled back.

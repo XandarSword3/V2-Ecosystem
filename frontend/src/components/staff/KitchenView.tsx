@@ -18,7 +18,7 @@ import {
   Minus,
   ShoppingCart,
 } from 'lucide-react';
-import { Order, OrderItem, ItemStatus, statusFlow, itemStatusFlow } from './types';
+import { Order, OrderItem, ItemStatus, itemStatusFlow, canonicalFulfillmentState } from './types';
 
 import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
 import { createOfflineOrderStatusUpdate, createOfflineOrder } from '@/lib/offline/offline-sync';
@@ -125,11 +125,61 @@ const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
   pending: 'Start',
   preparing: 'Ready',
   // Kitchen's job stops at 'ready'. Advancing an item to 'served' (and the
-  // order-level auto-derivation to 'delivered' that follows) is Dispatch's
+  // order-level auto-derivation to 'handed_off' that follows) is Dispatch's
   // action now — see DispatchBoard — not something the kitchen board offers.
   ready: null,
   served: null,
 };
+
+// ============================================
+// Board columns — canonical fulfillment states (Stage 6)
+// ============================================
+// The board keys off the CANONICAL fulfillment state (order.fulfillmentStatus),
+// never the transaction-layer status (order.status stays pending/confirmed/
+// completed/cancelled). A confirmed order with no fulfillment row yet is
+// queued by definition, so 'confirmed' maps into the 'queued' column.
+const BOARD_COLUMNS = ['pending', 'queued', 'in_progress', 'ready', 'handed_off', 'completed'] as const;
+
+interface BoardColumnStyle {
+  bg: string;
+  border: string;
+  text: string;
+  action: string | null;
+  actionBg: string;
+  label: string;
+}
+
+const BOARD_COLUMN_STYLE: Record<string, BoardColumnStyle> = {
+  pending: { bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-300 dark:border-blue-700', text: 'text-blue-700 dark:text-blue-300', action: 'Confirm', actionBg: 'bg-blue-600 hover:bg-blue-700', label: 'New' },
+  queued: { bg: 'bg-indigo-50 dark:bg-indigo-900/10', border: 'border-indigo-300 dark:border-indigo-700', text: 'text-indigo-700 dark:text-indigo-300', action: 'Start Prep', actionBg: 'bg-indigo-600 hover:bg-indigo-700', label: 'Queued' },
+  in_progress: { bg: 'bg-orange-50 dark:bg-orange-900/10', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-orange-300', action: 'Mark Ready', actionBg: 'bg-orange-500 hover:bg-orange-600', label: 'In Progress' },
+  ready: { bg: 'bg-green-50 dark:bg-green-900/10', border: 'border-green-300 dark:border-green-700', text: 'text-green-700 dark:text-green-300', action: null, actionBg: '', label: 'Ready' },
+  // Key is 'handed_off' (the engine's canonical state) — label stays
+  // 'Served' since that's the term staff actually use.
+  handed_off: { bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-300 dark:border-purple-700', text: 'text-purple-700 dark:text-purple-300', action: 'Complete', actionBg: 'bg-gray-600 hover:bg-gray-700', label: 'Served' },
+  completed: { bg: 'bg-gray-50 dark:bg-gray-900/10', border: 'border-gray-300 dark:border-gray-700', text: 'text-gray-700 dark:text-gray-300', action: null, actionBg: '', label: 'Completed' },
+};
+
+/** Which board column an order belongs in (canonical fulfillment state). */
+function boardColumn(order: Order): string {
+  const c = canonicalFulfillmentState(order);
+  if (c === 'confirmed') return 'queued';
+  return c ?? 'queued';
+}
+
+/** The next canonical target state for a column's quick action. */
+function nextCanonicalTarget(order: Order): string | null {
+  switch (boardColumn(order)) {
+    case 'pending': return 'confirmed';
+    case 'queued': return 'in_progress';
+    case 'in_progress': return 'ready';
+    case 'handed_off': return 'completed';
+    default: return null; // ready — waiting on dispatch; terminal states
+  }
+}
+
+/** Canonical fulfillment-layer states (vs transaction-layer statuses). */
+const FULFILLMENT_LAYER_STATES = new Set(['queued', 'in_progress', 'ready', 'handed_off']);
 
 function ItemStatusChip({
   item,
@@ -336,15 +386,24 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
       };
 
       interface StatusUpdate {
-        orderId: string;
+        id: string;
         status: string;
+        fulfillmentStatus?: string | null;
       }
 
       const handleStatusUpdate = (update: StatusUpdate) => {
         setOrders((prev) =>
           prev.map((order) =>
-            order.id === update.orderId
-              ? { ...order, status: update.status }
+            // Payload key is `id` (order-status.service.ts); accept
+            // `orderId` too for older emitters.
+            order.id === update.id || order.id === (update as { orderId?: string }).orderId
+              ? {
+                  ...order,
+                  status: update.status,
+                  // Stage 6: fulfillment moves carry the canonical state
+                  // here; the board columns key off it.
+                  fulfillmentStatus: update.fulfillmentStatus ?? order.fulfillmentStatus,
+                }
               : order
           )
         );
@@ -406,11 +465,11 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
       try {
         const response = await api.get(`/staff/modules/${slug}/orders`, {
           params: {
-            // 'delivered' is the engine's real name for this step (see
-            // instant-transaction.ts) — the board used to ask for 'served'
-            // here, which no order could ever actually reach.
-            // Confirmation gate: exclude 'pending' — only confirmed orders reach kitchen
-            status: 'confirmed,preparing,ready,delivered',
+            // Stage 6: 'confirmed' (the transaction layer every fulfillment-
+            // active order sits at) plus the canonical fulfillment states.
+            // 'pending' excluded — only confirmed orders reach the kitchen.
+            // The backend maps these onto the canonical fulfillment join.
+            status: 'confirmed,queued,in_progress,ready,handed_off',
             moduleId: moduleId,
           },
         });
@@ -442,7 +501,16 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
       });
       setOrders((prev) =>
         prev.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus } : order
+          order.id === orderId
+            ? {
+                ...order,
+                // Stage 6: fulfillment-layer moves update fulfillmentStatus
+                // (the board's key); transaction-layer moves update status.
+                ...(FULFILLMENT_LAYER_STATES.has(newStatus)
+                  ? { fulfillmentStatus: newStatus }
+                  : { status: newStatus }),
+              }
+            : order
         )
       );
       toast.success(`Order updated to ${newStatus}`);
@@ -452,7 +520,14 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
         await createOfflineOrderStatusUpdate(orderId, newStatus);
         setOrders((prev) =>
           prev.map((order) =>
-            order.id === orderId ? { ...order, status: newStatus } : order
+            order.id === orderId
+              ? {
+                  ...order,
+                  ...(FULFILLMENT_LAYER_STATES.has(newStatus)
+                    ? { fulfillmentStatus: newStatus }
+                    : { status: newStatus }),
+                }
+              : order
           )
         );
         toast.info('Order updated offline', { icon: '⏳' });
@@ -576,22 +651,16 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
         </div>
       </header>
 
-      {/* Kanban Board */}
+      {/* Kanban Board — columns key off the CANONICAL fulfillment state
+          (Stage 6). The engine's fulfillment machine owns
+          queued → in_progress → ready → handed_off; the transaction layer
+          owns pending/confirmed/completed/cancelled. transactions.status is
+          never used for column placement anymore. */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto">
-        {statusFlow.map((status) => {
-          const columnOrders = orders.filter((o) => o.status === status);
-          const columnColors: Record<string, { bg: string; border: string; text: string; action: string | null; actionBg: string; label: string }> = {
-            confirmed: { bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-300 dark:border-blue-700', text: 'text-blue-700 dark:text-blue-300', action: 'Start Prep', actionBg: 'bg-blue-600 hover:bg-blue-700', label: 'Confirmed' },
-            preparing: { bg: 'bg-orange-50 dark:bg-orange-900/10', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-orange-300', action: 'Mark Ready', actionBg: 'bg-orange-500 hover:bg-orange-600', label: 'Preparing' },
-            ready: { bg: 'bg-green-50 dark:bg-green-900/10', border: 'border-green-300 dark:border-green-700', text: 'text-green-700 dark:text-green-300', action: 'Served', actionBg: 'bg-emerald-600 hover:bg-emerald-700', label: 'Ready' },
-            // Key is 'delivered' to match the engine's real status name — label
-            // stays 'Served' since that's the term staff actually use.
-            delivered: { bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-300 dark:border-purple-700', text: 'text-purple-700 dark:text-purple-300', action: 'Complete', actionBg: 'bg-gray-600 hover:bg-gray-700', label: 'Served' },
-            completed: { bg: 'bg-gray-50 dark:bg-gray-900/10', border: 'border-gray-300 dark:border-gray-700', text: 'text-gray-700 dark:text-gray-300', action: null, actionBg: '', label: 'Completed' },
-          };
-          const col = columnColors[status];
+        {BOARD_COLUMNS.map((status) => {
+          const columnOrders = orders.filter((o) => boardColumn(o) === status);
+          const col = BOARD_COLUMN_STYLE[status];
           if (!col) return null;
-          const nextStatus = statusFlow[statusFlow.indexOf(status) + 1];
 
           return (
             <div key={status} className={`rounded-xl border ${col.border} ${col.bg} min-h-[400px] flex flex-col`}>
@@ -667,34 +736,43 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                         </div>
                       </div>
 
-                      {/* Quick Action — order-level. Still needed for the
-                          pending→confirmed→preparing steps, since order_items
-                          has no 'confirmed' equivalent; items only drive
+                      {/* Quick Action — order-level, canonical target states
+                          (Stage 6). pending→confirmed is a transaction-layer
+                          move; queued→in_progress→ready and handed_off→completed
+                          are fulfillment-layer moves. Items only drive
                           auto-derivation once everything hits ready/served. */}
-                      {(nextStatus || ['confirmed', 'preparing', 'ready', 'delivered'].includes(order.status)) && (
-                        <div className="px-2 pb-2 flex gap-2">
-                          {order.status === 'ready' ? (
-                            // No quick-action here on purpose: bumping straight
-                            // from ready to delivered from the kitchen board
-                            // skips Dispatch entirely. That handoff now only
-                            // happens from DispatchBoard.
-                            <span className="w-full text-center text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 py-1.5">
-                              Waiting on Dispatch
-                            </span>
-                          ) : (
-                            <Button
-                              className={`w-full text-white text-xs ${col.actionBg}`}
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateOrderStatus(order.id, nextStatus);
-                              }}
-                            >
-                              {col.action}
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                      {(() => {
+                        const nextTarget = nextCanonicalTarget(order);
+                        const isWaitingOnDispatch = boardColumn(order) === 'ready';
+                        if (!nextTarget && !isWaitingOnDispatch) return null;
+                        return (
+                          <div className="px-2 pb-2 flex gap-2">
+                            {isWaitingOnDispatch ? (
+                              // No quick-action here on purpose: bumping straight
+                              // from ready to handed_off from the kitchen board
+                              // skips Dispatch entirely. That handoff now only
+                              // happens from DispatchBoard.
+                              <span className="w-full text-center text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 py-1.5">
+                                Waiting on Dispatch
+                              </span>
+                            ) : (
+                              <Button
+                                className={`w-full text-white text-xs ${col.actionBg}`}
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // nextTarget is non-null here: the guard
+                                  // above returned early when both it and
+                                  // isWaitingOnDispatch were falsy.
+                                  updateOrderStatus(order.id, nextTarget!);
+                                }}
+                              >
+                                {col.action}
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))
                 )}
@@ -752,7 +830,9 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
               <div className="mt-6 bg-gray-50 dark:bg-gray-700/30 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Status</span>
-                  <span className="font-medium capitalize">{selectedOrder.status}</span>
+                  <span className="font-medium capitalize">
+                    {canonicalFulfillmentState(selectedOrder) ?? selectedOrder.status}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Table</span>
@@ -829,25 +909,32 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
 
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col gap-3">
               <div className="flex gap-3">
-                {selectedOrder.status !== 'completed' && selectedOrder.status !== 'ready' && (
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      const nextStatus = statusFlow[statusFlow.indexOf(selectedOrder.status) + 1];
-                      if (nextStatus) {
-                        updateOrderStatus(selectedOrder.id, nextStatus);
-                        setSelectedOrder(null);
-                      }
-                    }}
-                  >
-                    Advance Status
-                  </Button>
-                )}
-                {selectedOrder.status === 'ready' && (
-                  <div className="flex-1 flex items-center justify-center text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                    Waiting on Dispatch
-                  </div>
-                )}
+                {(() => {
+                  const nextTarget = nextCanonicalTarget(selectedOrder);
+                  const selCol = boardColumn(selectedOrder);
+                  const isTerminal = selectedOrder.status === 'completed' || selectedOrder.status === 'cancelled';
+                  if (!isTerminal && nextTarget && selCol !== 'ready') {
+                    return (
+                      <Button
+                        className="flex-1"
+                        onClick={() => {
+                          updateOrderStatus(selectedOrder.id, nextTarget);
+                          setSelectedOrder(null);
+                        }}
+                      >
+                        Advance Status
+                      </Button>
+                    );
+                  }
+                  if (selCol === 'ready' && !isTerminal) {
+                    return (
+                      <div className="flex-1 flex items-center justify-center text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                        Waiting on Dispatch
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <Button
                 variant="outline"

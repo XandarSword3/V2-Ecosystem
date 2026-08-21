@@ -55,6 +55,8 @@ export async function getManagerSummary(req: Request, res: Response) {
       return ts >= todayStart.getTime() && ts <= todayEnd.getTime();
     };
     const sumAmount = (rows: any[]) => rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    // Stage 6: fulfillment-active instant_transactions stay 'confirmed' on the
+    // transaction layer; 'preparing'/'ready' retained for historical rows.
     const activeStatuses = new Set(['pending', 'confirmed', 'preparing', 'ready', 'checked_in', 'valid', 'active']);
 
     const modules = [

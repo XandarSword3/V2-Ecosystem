@@ -24,7 +24,6 @@
 
 import type {
   AutoHandoffPolicy,
-  LegacyStatusBridge,
   StateMachineDefinition,
 } from '../../engines/types.js';
 
@@ -60,6 +59,7 @@ export const hospitalityFulfillmentStateMachine: StateMachineDefinition<Hospital
     { from: 'queued', to: 'in_progress', action: 'start_preparation', allowedActors: ['staff', 'system'], guardDescription: 'Work center starts the queued item' },
     { from: 'in_progress', to: 'ready', action: 'mark_ready', allowedActors: ['staff'], guardDescription: 'All items are prepared' },
     { from: 'confirmed', to: 'ready', action: 'mark_ready', allowedActors: ['staff'], guardDescription: 'Direct to ready without preparation tracking' },
+    { from: 'queued', to: 'ready', action: 'mark_ready', allowedActors: ['staff'], guardDescription: 'Direct to ready without preparation tracking (e.g. item-level auto-derivation from a fresh row)' },
     // Handoff.
     { from: 'ready', to: 'handed_off', action: 'deliver', allowedActors: ['staff'], guardDescription: 'Handed to the customer or placed at the destination' },
     // Completion (cross-layer: fulfillment done → transaction completed).
@@ -88,21 +88,4 @@ export const HOSPITALITY_AUTO_HANDOFF: AutoHandoffPolicy<HospitalityFulfillmentM
   allowedActors: ['staff', 'system'],
 };
 
-/**
- * TRANSITIONAL (Stage 6 removes this): legacy composite values on
- * transactions.status → canonical fulfillment states and back. Declared by
- * the adapter that needs the bridge; generic code applies it mechanically.
- */
-export const HOSPITALITY_LEGACY_STATUS_BRIDGE: LegacyStatusBridge = {
-  legacyToCanonical: {
-    preparing: 'in_progress',
-    delivered: 'handed_off',
-    ready: 'ready',
-  },
-  canonicalToLegacy: {
-    queued: 'preparing',
-    in_progress: 'preparing',
-    ready: 'ready',
-    handed_off: 'delivered',
-  },
-};
+

@@ -144,11 +144,11 @@ describe('Engine A: Instant Transaction Full Lifecycle', () => {
     it('should allow start_preparation from confirmed (staff)', async () => {
       const result = await service.transitionState('menu_service', 'confirmed', 'start_preparation', 'staff');
       expect(result.allowed).toBe(true);
-      expect(result.targetState).toBe('preparing');
+      expect(result.targetState).toBe('in_progress'); // Stage 6 canonical
     });
 
-    it('should allow mark_ready from preparing (staff)', async () => {
-      const result = await service.transitionState('menu_service', 'preparing', 'mark_ready', 'staff');
+    it('should allow mark_ready from in_progress (staff)', async () => {
+      const result = await service.transitionState('menu_service', 'in_progress', 'mark_ready', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('ready');
     });
@@ -156,11 +156,11 @@ describe('Engine A: Instant Transaction Full Lifecycle', () => {
     it('should allow deliver from ready (staff)', async () => {
       const result = await service.transitionState('menu_service', 'ready', 'deliver', 'staff');
       expect(result.allowed).toBe(true);
-      expect(result.targetState).toBe('delivered');
+      expect(result.targetState).toBe('handed_off');
     });
 
-    it('should allow complete from delivered (staff)', async () => {
-      const result = await service.transitionState('menu_service', 'delivered', 'complete', 'staff');
+    it('should allow complete from handed_off (staff)', async () => {
+      const result = await service.transitionState('menu_service', 'handed_off', 'complete', 'staff');
       expect(result.allowed).toBe(true);
       expect(result.targetState).toBe('completed');
     });
@@ -189,11 +189,11 @@ describe('Engine A: Instant Transaction Full Lifecycle', () => {
       expect(result.targetState).toBe('cancelled');
     });
 
-    it('only admin can cancel from preparing', async () => {
-      const staffResult = await service.transitionState('menu_service', 'preparing', 'cancel', 'staff');
+    it('only admin can cancel from in_progress', async () => {
+      const staffResult = await service.transitionState('menu_service', 'in_progress', 'cancel', 'staff');
       expect(staffResult.allowed).toBe(false);
 
-      const adminResult = await service.transitionState('menu_service', 'preparing', 'cancel', 'admin');
+      const adminResult = await service.transitionState('menu_service', 'in_progress', 'cancel', 'admin');
       expect(adminResult.allowed).toBe(true);
       expect(adminResult.targetState).toBe('cancelled');
     });
@@ -823,10 +823,10 @@ describe('Observability Integration', () => {
   it('should track full order lifecycle in metrics', () => {
     // Simulate full Engine A lifecycle
     observer.onStateTransition('instant_transaction', 'o-1', 'pending', 'confirmed', 'confirm', 'staff');
-    observer.onStateTransition('instant_transaction', 'o-1', 'confirmed', 'preparing', 'start_preparation', 'staff');
-    observer.onStateTransition('instant_transaction', 'o-1', 'preparing', 'ready', 'mark_ready', 'staff');
-    observer.onStateTransition('instant_transaction', 'o-1', 'ready', 'delivered', 'deliver', 'staff');
-    observer.onStateTransition('instant_transaction', 'o-1', 'delivered', 'completed', 'complete', 'staff');
+    observer.onStateTransition('instant_transaction', 'o-1', 'confirmed', 'in_progress', 'start_preparation', 'staff');
+    observer.onStateTransition('instant_transaction', 'o-1', 'in_progress', 'ready', 'mark_ready', 'staff');
+    observer.onStateTransition('instant_transaction', 'o-1', 'ready', 'handed_off', 'deliver', 'staff');
+    observer.onStateTransition('instant_transaction', 'o-1', 'handed_off', 'completed', 'complete', 'staff');
 
     expect(metrics.get('state_transition.instant_transaction')!.count).toBe(5);
     expect(metrics.get('state_transition.instant_transaction.confirm')!.count).toBe(1);

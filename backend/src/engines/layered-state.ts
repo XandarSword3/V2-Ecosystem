@@ -13,13 +13,13 @@
  *     complete the transaction (capability-driven, not convention);
  *   - executes fulfillment-layer transitions and ALSO fires the transaction
  *     layer's side effects for the action (compensation must run exactly
- *     once regardless of which layer performed the move);
- *   - applies the adapter's TRANSITIONAL legacy-status bridge mechanically
- *     (Stage 6 removes it — nothing here treats the legacy value as
- *     canonical fulfillment state).
+ *     once regardless of which layer performed the move).
+ *
+ * No legacy bridge exists here (Stage 6): canonical fulfillment state lives
+ * in its own persistence (fulfillments rows) and is passed in directly.
  */
 
-import type { FulfillmentDefinition, LegacyStatusBridge } from './types.js';
+import type { FulfillmentDefinition } from './types.js';
 import type { StateMachine } from './state-machine.js';
 import {
   assertTransactionCompletionAllowed,
@@ -31,9 +31,9 @@ export type TransitionLayer = 'transaction' | 'fulfillment';
 export interface LayeredCheckResult {
   allowed: boolean;
   error?: string;
-  /** Persisted-state view of the target (legacy-bridged while the bridge exists). */
+  /** Canonical target state (the fulfillment meaning when layer === 'fulfillment'). */
   targetState?: string;
-  /** Canonical target state (unbridged) — the fulfillment meaning when layer === 'fulfillment'. */
+  /** Canonical target state (same as targetState — no bridge exists). */
   canonicalTarget?: string;
   layer?: TransitionLayer;
   /** True when this move was granted by the EXPLICIT auto-handoff policy. */
@@ -41,25 +41,11 @@ export interface LayeredCheckResult {
 }
 
 export class LayeredStateMachine {
-  private readonly bridge: LegacyStatusBridge | undefined;
-
   constructor(
     private readonly txMachine: StateMachine,
     private readonly fulfillmentMachine: StateMachine | null,
     private readonly fulfillment: FulfillmentDefinition,
-  ) {
-    this.bridge = fulfillment.legacyStatusBridge;
-  }
-
-  /** Canonical fulfillment state → persisted composite (TRANSITIONAL bridge). */
-  private bridgeOut(state: string): string {
-    return this.bridge?.canonicalToLegacy[state] ?? state;
-  }
-
-  /** Persisted composite → canonical fulfillment state (TRANSITIONAL bridge). */
-  private bridgeIn(state: string): string {
-    return this.bridge?.legacyToCanonical[state] ?? state;
-  }
+  ) {}
 
   /** Validate a move across both layers (never executes). */
   canTransition(
@@ -79,20 +65,19 @@ export class LayeredStateMachine {
       }
       return {
         allowed: true,
-        targetState: this.bridgeOut(txCheck.targetState),
+        targetState: txCheck.targetState,
         canonicalTarget: txCheck.targetState,
         layer: 'transaction',
       };
     }
 
-    // 2. Fulfillment layer (canonical current state).
+    // 2. Fulfillment layer (current state is canonical — no bridge).
     if (this.fulfillmentMachine) {
-      const canonicalCurrent = this.bridgeIn(currentState);
-      const fmCheck = this.fulfillmentMachine.canTransition(canonicalCurrent, action, actor, context);
+      const fmCheck = this.fulfillmentMachine.canTransition(currentState, action, actor, context);
       if (fmCheck.allowed && fmCheck.targetState !== undefined) {
         return {
           allowed: true,
-          targetState: this.bridgeOut(fmCheck.targetState),
+          targetState: fmCheck.targetState,
           canonicalTarget: fmCheck.targetState,
           layer: 'fulfillment',
         };
@@ -104,11 +89,11 @@ export class LayeredStateMachine {
       //    is DERIVED from the fulfillment machine's own transition to
       //    `completed` — never hardcoded by the core.
       const autoHandoff = this.fulfillment.autoHandoff;
-      if (autoHandoff && canonicalCurrent === autoHandoff.atState && action === this.completionAction) {
+      if (autoHandoff && currentState === autoHandoff.atState && action === this.completionAction) {
         if (autoHandoff.allowedActors.includes(actor)) {
           return {
             allowed: true,
-            targetState: this.bridgeOut(COMPLETION_STATE),
+            targetState: COMPLETION_STATE,
             canonicalTarget: COMPLETION_STATE,
             layer: 'fulfillment',
             autoHandoff: true,
@@ -116,7 +101,7 @@ export class LayeredStateMachine {
         }
         return {
           allowed: false,
-          error: `Actor '${actor}' cannot complete from auto-handoff state '${canonicalCurrent}'. Allowed: ${autoHandoff.allowedActors.join(', ')}`,
+          error: `Actor '${actor}' cannot complete from auto-handoff state '${currentState}'. Allowed: ${autoHandoff.allowedActors.join(', ')}`,
         };
       }
     }
@@ -167,8 +152,7 @@ export class LayeredStateMachine {
     // machine transition of its own (the policy IS the move), so only the
     // transaction-layer effects run.
     if (!check.autoHandoff) {
-      const canonicalCurrent = this.bridgeIn(currentState);
-      await this.fulfillmentMachine!.transition(canonicalCurrent, action, actor, context);
+      await this.fulfillmentMachine!.transition(currentState, action, actor, context);
     }
     await this.txMachine.runSideEffects(action, context);
     return check;
@@ -187,13 +171,12 @@ export class LayeredStateMachine {
       if (assertTransactionCompletionAllowed(this.fulfillment, a.targetState)) {
         continue;
       }
-      merged.set(a.action, { action: a.action, targetState: this.bridgeOut(a.targetState), layer: 'transaction' });
+      merged.set(a.action, { action: a.action, targetState: a.targetState, layer: 'transaction' });
     }
     if (this.fulfillmentMachine) {
-      const canonicalCurrent = this.bridgeIn(currentState);
-      for (const a of this.fulfillmentMachine.getAvailableActions(canonicalCurrent, actor)) {
+      for (const a of this.fulfillmentMachine.getAvailableActions(currentState, actor)) {
         if (!merged.has(a.action)) {
-          merged.set(a.action, { action: a.action, targetState: this.bridgeOut(a.targetState), layer: 'fulfillment' });
+          merged.set(a.action, { action: a.action, targetState: a.targetState, layer: 'fulfillment' });
         }
       }
       // Auto-handoff completion is offered at the policy state (derived
@@ -201,14 +184,14 @@ export class LayeredStateMachine {
       const autoHandoff = this.fulfillment.autoHandoff;
       if (
         autoHandoff &&
-        canonicalCurrent === autoHandoff.atState &&
+        currentState === autoHandoff.atState &&
         this.completionAction &&
         autoHandoff.allowedActors.includes(actor) &&
         !merged.has(this.completionAction!)
       ) {
         merged.set(this.completionAction!, {
           action: this.completionAction!,
-          targetState: this.bridgeOut(COMPLETION_STATE),
+          targetState: COMPLETION_STATE,
           layer: 'fulfillment',
         });
       }

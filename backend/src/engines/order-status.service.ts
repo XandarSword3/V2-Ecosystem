@@ -18,6 +18,7 @@ import type { Request } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getEngineService } from './engine-service.js';
 import { TEMPLATE_TO_ENGINE } from './types.js';
+import { getFulfillmentService } from '../modules/fulfillment/index.js';
 import { reverseDiscounts } from './discount-reversal.js';
 import { emitToUnit, emitToOrder } from '../socket/index.js';
 import { logger } from '../utils/logger.js';
@@ -57,24 +58,39 @@ export function resolveAction(
   const stateMatch = available.find((a) => a.targetState === targetStateOrAction);
   if (stateMatch) return stateMatch.action;
 
-  // 3. Legacy action name aliases (old API surface → new action names)
-  const ACTION_ALIASES: Record<string, string> = {
+  // 3. Legacy action name aliases (old API surface → new action names). This
+  // includes the pre-Stage-6 fulfillment composite statuses (preparing /
+  // delivered), which the KDS/frontend may still send as target states. The
+  // canonical actions come from the fulfillment machine.
+  //
+  // Each alias maps to CANDIDATE actions; the first one that exists on THIS
+  // engine wins. This keeps engine-specific legacy names working — e.g.
+  // 'complete' means the 'complete' action on instant_transaction (its
+  // fulfillment machine's completion) but 'record_exit' on
+  // shared_capacity_access, whose machine names its own exit differently.
+  const ACTION_ALIASES: Record<string, string[]> = {
+    // instant_transaction — legacy fulfillment composites → canonical actions
+    'preparing':       ['start_preparation'],
+    'delivered':       ['deliver'],
+    'served':          ['deliver'],
+    'ready':           ['mark_ready'],
+    'complete':        ['complete', 'record_exit'],
+    'completed':       ['complete', 'record_exit'],
+    'cancel':          ['cancel'],
+    'cancelled':       ['cancel'],
+    'confirm':         ['confirm'],
+    'confirmed':       ['confirm'],
     // shared_capacity_access
-    'validate':        'validate_entry',
-    'complete':        'record_exit',
-    // time_exclusive_reservation (old status names used as actions)
-    'active':          'check_in',
-    'used':            'check_out',
-    'check_in':        'check_in',
-    'check_out':       'check_out',
-    'cancel':          'cancel',
-    'cancelled':       'cancel',
-    'confirm':         'confirm',
-    'confirmed':       'confirm',
-    'no_show':         'mark_no_show',
+    'validate':        ['validate_entry'],
+    'active':          ['check_in'],
+    'used':            ['check_out'],
+    'check_in':        ['check_in'],
+    'check_out':       ['check_out'],
+    'no_show':         ['mark_no_show'],
   };
-  const aliasedAction = ACTION_ALIASES[targetStateOrAction];
-  if (aliasedAction && available.find((a) => a.action === aliasedAction)) return aliasedAction;
+  const aliasedAction = (ACTION_ALIASES[targetStateOrAction] ?? [])
+    .find((a) => available.some((av) => av.action === a));
+  if (aliasedAction) return aliasedAction;
 
   // Fall through: return as-is (will fail gracefully in transitionState)
   return targetStateOrAction;
@@ -103,6 +119,7 @@ export async function changeInstantTransactionOrderStatus(
 ): Promise<OrderStatusChangeResult> {
   const { orderId, moduleId, moduleSlug, moduleEngineTypeRaw, requestedStatus, actor, userId, tenantId } = params;
   const engineService = getEngineService();
+  const fulfillmentService = getFulfillmentService();
   const engineType = TEMPLATE_TO_ENGINE[moduleEngineTypeRaw] || 'instant_transaction';
 
   // Scoped to both order AND module in one query — a staff member (or a
@@ -110,7 +127,7 @@ export async function changeInstantTransactionOrderStatus(
   // supplying its id. This was previously missing on the KDS endpoint.
   const { data: current, error: fetchError } = await supabase
     .from('transactions')
-    .select('id, status, customer_id, metadata')
+    .select('id, status, customer_id, metadata, tenant_id, property_id')
     .eq('engine_type', 'instant_transaction')
     .eq('id', orderId)
     .eq('module_id', moduleId)
@@ -119,8 +136,14 @@ export async function changeInstantTransactionOrderStatus(
   if (fetchError) return { ok: false, status: 500, error: fetchError.message };
   if (!current) return { ok: false, status: 404, error: 'Order not found for this module' };
 
-  const action = resolveAction(engineType, current.status, requestedStatus, actor);
-  const transition = await engineService.transitionState(engineType, current.status, action, actor, {
+  // Stage 6: the canonical fulfillment state lives in the fulfillments table.
+  // Determine which layer this order is on — a transaction-layer state means
+  // the move is a transaction move; a fulfillment row means fulfillment moves.
+  let fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
+  const currentState = fulfillment?.status ?? current.status;
+
+  const action = resolveAction(engineType, currentState, requestedStatus, actor);
+  const transition = await engineService.transitionState(engineType, currentState, action, actor, {
     orderId,
     moduleId,
     staffId: userId,
@@ -130,8 +153,28 @@ export async function changeInstantTransactionOrderStatus(
     return {
       ok: false,
       status: 400,
-      error: transition.error || `Cannot transition order from '${current.status}' to '${requestedStatus}'`,
+      error: transition.error || `Cannot transition order from '${currentState}' to '${requestedStatus}'`,
     };
+  }
+
+  // Stage 6: create the canonical fulfillment row the moment the transaction
+  // is confirmed (idempotent — the RPC is ON CONFLICT DO NOTHING). This is
+  // what gives the fulfillment layer its own persistence: from here on,
+  // transactions.status only ever carries transaction-layer meaning. Non-fatal
+  // here because the fulfillment branch below self-heals by ensuring again.
+  if (transition.targetState === 'confirmed') {
+    const ensured = await fulfillmentService.ensure(supabase, {
+      transactionId: orderId,
+      engineType,
+      moduleId,
+      propertyId: current.property_id ?? null,
+      tenantId: current.tenant_id ?? null,
+    });
+    if (!ensured.ok) {
+      logger.warn('[OrderStatus] ensure_fulfillment failed after confirm', { orderId, error: ensured.error });
+    } else {
+      fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
+    }
   }
 
   const currentMetadata = (current.metadata ?? {}) as Record<string, unknown>;
@@ -142,30 +185,73 @@ export async function changeInstantTransactionOrderStatus(
   // whichever happens first sets discountsReversedAt.
   const alreadyReversed = Boolean(currentMetadata.discountsReversedAt);
 
-  // Keyed off transition.targetState (the engine's actual resulting state),
-  // not the raw requestedStatus — resolveAction may have mapped an alias.
+  // ── Stage 6 persistence ──────────────────────────────────────────────────
+  // Fulfillment-layer moves write the canonical state to the fulfillments
+  // table (the fulfillment machine's states ARE the canonical states).
+  // Transaction-layer moves (confirm / cancel from the transaction layer)
+  // write transactions.status. transactions.status never carries fulfillment
+  // meaning anymore.
+  let persistedState = transition.targetState;
+  if (transition.layer === 'fulfillment' && transition.canonicalState) {
+    // Self-heal: pre-Stage-6 rows (or orders confirmed before the ensure
+    // above landed) may lack a fulfillment row. Create it, then transition.
+    if (!fulfillment) {
+      const ensured = await fulfillmentService.ensure(supabase, {
+        transactionId: orderId,
+        engineType,
+        moduleId,
+        propertyId: current.property_id ?? null,
+        tenantId: current.tenant_id ?? null,
+      });
+      if (!ensured.ok) {
+        return { ok: false, status: 500, error: ensured.error ?? 'Failed to create fulfillment row' };
+      }
+      fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
+      if (!fulfillment) {
+        return { ok: false, status: 500, error: 'Fulfillment row could not be created' };
+      }
+    }
+    const fulfillmentResult = await fulfillmentService.transition(supabase, {
+      transactionId: orderId,
+      action,
+      actor,
+      actorId: userId ?? null,
+      expectedFrom: fulfillment.status,
+      context: { orderId, moduleId },
+    });
+    if (!fulfillmentResult.ok) {
+      return { ok: false, status: 500, error: fulfillmentResult.error ?? 'Fulfillment transition failed' };
+    }
+    persistedState = fulfillmentResult.canonicalState ?? transition.targetState;
+  }
+
+  // Keyed off the canonical resulting state — resolveAction may have mapped
+  // an alias, and fulfillment states are canonical now.
   const timestampFields: Record<string, unknown> = {
-    ...(transition.targetState === 'preparing' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
-    ...(transition.targetState === 'ready' ? { actual_ready_time: now } : {}),
-    ...(transition.targetState === 'delivered' ? { served_at: now } : {}),
-    ...(transition.targetState === 'completed' ? { completed_at: now } : {}),
+    ...(transition.canonicalState === 'in_progress' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
+    ...(transition.canonicalState === 'ready' ? { actual_ready_time: now } : {}),
+    ...(transition.canonicalState === 'handed_off' ? { served_at: now } : {}),
+    ...(transition.canonicalState === 'completed' || transition.targetState === 'completed' ? { completed_at: now } : {}),
     ...(isCancelling ? { cancelled_at: now } : {}),
     ...(isCancelling && !alreadyReversed ? { discountsReversedAt: now } : {}),
-    // Canonical FULFILLMENT-layer state (plan Phase 3). transactions.status
-    // keeps the legacy composite for the operational surface until the
-    // fulfillment table exists (Stage 6); this field carries the canonical
-    // value (in_progress/ready/handed_off) for Stage 6 to consume. The
-    // canonical value comes from the layered validator (which bridges it), so
-    // this service never re-implements the bridge.
+    // Canonical FULFILLMENT-layer state for consumers that haven't migrated
+    // to reading the fulfillments table yet (Stage 6 transitional).
     ...(transition.layer === 'fulfillment' && transition.canonicalState
       ? { fulfillment_state: transition.canonicalState }
       : {}),
   };
 
+  // Transaction-layer status: only update it for transaction-layer moves or
+  // cross-layer outcomes (complete/cancel). Fulfillment moves leave it at the
+  // confirmed/completed/cancelled transaction state.
+  const txStatusUpdate = transition.layer === 'transaction' || transition.targetState === 'completed' || isCancelling
+    ? { status: transition.targetState === 'completed' || isCancelling ? transition.targetState : persistedState }
+    : {};
+
   const { data: order, error: updateError } = await supabase
     .from('transactions')
     .update({
-      status: transition.targetState,
+      ...txStatusUpdate,
       updated_at: now,
       metadata: { ...currentMetadata, ...timestampFields },
     })
@@ -201,6 +287,10 @@ export async function changeInstantTransactionOrderStatus(
     const payload = {
       id: order.id,
       status: order.status,
+      // Canonical fulfillment state (Stage 6) — the KDS consumes this.
+      // Prefer the in-scope transition result; fall back to the transitional
+      // metadata mirror written in the same update above.
+      fulfillmentStatus: transition.canonicalState ?? orderMeta.fulfillment_state ?? null,
       tableNumber: orderMeta.table_number ?? orderMeta.table_id ?? null,
     };
     emitToUnit(tenantId || 'default', moduleSlug, 'order:status', payload);
@@ -231,9 +321,9 @@ export async function changeInstantTransactionOrderStatus(
   // the explicit retry paths. Dynamic import keeps the engine layer free of a
   // static dependency on the fiscal module.
   // "Economically committed" = transaction confirmed/completed OR fulfillment
-  // in progress (the legacy composite states preparing/ready/delivered).
-  const FISCALLY_COMMITTED = new Set(['confirmed', 'preparing', 'ready', 'delivered', 'completed']);
-  if (FISCALLY_COMMITTED.has(transition.targetState)) {
+  // in progress (canonical fulfillment states in_progress/ready/handed_off).
+  const FISCALLY_COMMITTED = new Set(['confirmed', 'in_progress', 'ready', 'handed_off', 'completed']);
+  if (FISCALLY_COMMITTED.has(persistedState) || FISCALLY_COMMITTED.has(transition.canonicalState ?? '')) {
     try {
       const { fiscalDocumentService } = await import('../modules/fiscal/fiscal-document.service.js');
       await fiscalDocumentService.issueForTransaction(orderId, {
@@ -243,7 +333,7 @@ export async function changeInstantTransactionOrderStatus(
       });
       logger.info('[OrderStatus] Fiscal document issued after status transition', {
         orderId,
-        state: transition.targetState,
+        state: transition.canonicalState ?? persistedState,
       });
     } catch (fiscalErr: any) {
       logger.warn('[OrderStatus] Fiscal document issuance deferred (retry via fiscal API)', {

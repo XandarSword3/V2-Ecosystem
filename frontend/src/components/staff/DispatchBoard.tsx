@@ -78,7 +78,9 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
         params: {
           // Dispatch only cares about orders that have cleared the kitchen
           // and are waiting for hand-off. Anything earlier isn't its job;
-          // anything later (delivered/completed) has already left the board.
+          // anything later (handed_off/completed) has already left the board.
+          // Stage 6: 'ready' is the canonical fulfillment state — the backend
+          // filters it on the fulfillments join.
           status: 'ready',
           moduleId,
         },
@@ -104,6 +106,7 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
       interface StatusUpdate {
         id: string;
         status: string;
+        fulfillmentStatus?: string | null;
       }
 
       // An order can arrive at 'ready' from the kitchen board's own
@@ -113,13 +116,19 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
       // currently in 'ready' — so just refetch on any status touch rather
       // than trying to patch state incrementally for a list that's this
       // small and this order-sensitive.
+      // Stage 6: the payload's fulfillmentStatus is the board's key —
+      // transactions.status stays 'confirmed' for every order this board
+      // cares about, so it can't be used for the arrival/leaving decision.
       // FIX: real payload key from order-status.service.ts is `id`, not
       // `orderId` — the cleanup branch below was filtering against
       // `undefined` and silently never removing anything.
       const handleStatusUpdate = (update: StatusUpdate) => {
-        if (update.status === 'ready') {
+        const fm = update.fulfillmentStatus ?? null;
+        if (fm === 'ready') {
           loadOrders();
-        } else {
+        } else if (fm) {
+          // Any other canonical fulfillment state (in_progress, handed_off,
+          // completed, cancelled) means the order left 'ready'.
           setOrders((prev) => prev.filter((order) => order.id !== update.id));
         }
       };
@@ -133,13 +142,15 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
   }, [socket, moduleId, slug]);
 
   // Marks every item on the order 'served'. By the time an order shows up
-  // here its status is already 'ready', which the backend only derives once
-  // every item independently hit 'ready' (see the auto-derivation in
-  // updateModuleOrderItemStatus) — so all items are safe to bump together
-  // in one action. This is deliberately still item-level PATCHes rather than
-  // a new order-level endpoint: it's the exact mechanism KitchenView already
-  // used before being capped at 'ready', so 'served' continues to mean the
-  // same thing everywhere it's set, and no new backend surface is needed.
+  // here its canonical fulfillment state is already 'ready', which the
+  // backend only derives once every item independently hit 'ready' (see the
+  // auto-derivation in updateModuleOrderItemStatus) — so all items are safe
+  // to bump together in one action. This is deliberately still item-level
+  // PATCHes rather than a new order-level endpoint: it's the exact mechanism
+  // KitchenView already used before being capped at 'ready', so 'served'
+  // continues to mean the same thing everywhere it's set, and no new backend
+  // surface is needed. The item milestone triggers the order-level
+  // derivation to the canonical 'handed_off' fulfillment state.
   const markDelivered = async (order: Order) => {
     if (pendingOrderIds.has(order.id)) return;
 

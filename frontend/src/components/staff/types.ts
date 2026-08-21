@@ -21,6 +21,8 @@ export interface Order {
   staffName?: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery';
   status: string;
+  /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
+  fulfillmentStatus?: string | null;
   items: OrderItem[];
   totalAmount: number;
   createdAt: string;
@@ -35,10 +37,28 @@ export interface Order {
   serviceLocationId?: string | null;
 }
 
-// Order-level flow — must match the real instant_transaction engine states
-// (instant-transaction.ts). The engine calls this step 'delivered', not
-// 'served' — don't rename it back without renaming it in the engine too.
-export const statusFlow = ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed'];
+// Order-level flow — canonical fulfillment states (Stage 6). The engine's
+// fulfillment machine owns queued → in_progress → ready → handed_off; the
+// transaction layer owns pending/confirmed/completed/cancelled. The KDS
+// columns key off the CANONICAL fulfillment state, never the legacy
+// composites (preparing/delivered) that pre-Stage-6 rows carried.
+export const statusFlow = ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed'];
+
+/**
+ * Resolve the canonical fulfillment state for an order. Stage 6: the backend
+ * returns fulfillmentStatus (canonical). For historical rows / socket events
+ * that may still carry legacy composites on status, map them here.
+ */
+export function canonicalFulfillmentState(order: { fulfillmentStatus?: string | null; status?: string }): string | null {
+  if (order.fulfillmentStatus) return order.fulfillmentStatus;
+  switch (order.status) {
+    case 'preparing': return 'in_progress';
+    case 'delivered':
+    case 'served':    return 'handed_off';
+    case 'ready':     return 'ready';
+    default:          return order.status ?? null;
+  }
+}
 
 // Mirrors backend ITEM_STATUS_FLOW in module-staff.controller.ts — forward-only,
 // one step at a time. Kept as a separate flow because order_items isn't a

@@ -112,7 +112,10 @@ export const createTransactionSchema = z.object({
 });
 
 export const updateTransactionStatusSchema = z.object({
-  status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivered', 'completed', 'cancelled']),
+  // Stage 6: canonical fulfillment states (in_progress/handed_off) are the
+  // real values; legacy composites (preparing/served/delivered) are still
+  // accepted from older clients and translated by resolveAction.
+  status: z.enum(['pending', 'confirmed', 'preparing', 'ready', 'served', 'delivered', 'in_progress', 'handed_off', 'completed', 'cancelled']),
   notes: sanitizedString(500).optional(),
 });
 

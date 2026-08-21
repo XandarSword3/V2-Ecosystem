@@ -34,7 +34,6 @@ import {
 import { StateMachine } from '../../../src/engines/state-machine.js';
 import {
   hospitalityFulfillmentStateMachine,
-  HOSPITALITY_LEGACY_STATUS_BRIDGE,
   HOSPITALITY_FULFILLMENT_STATES,
   type HospitalityFulfillmentMachineStatus,
 } from '../../../src/adapters/hospitality/fulfillment.js';
@@ -202,11 +201,12 @@ describe('Fulfillment handoff drives transaction completion', () => {
 
     r = await service.transitionState('instant_transaction', 'confirmed', 'start_preparation', 'staff');
     expect(r.allowed).toBe(true);
-    expect(r.targetState).toBe('preparing'); // transitional legacy composite
+    // Stage 6: target IS the canonical state — no legacy composite.
+    expect(r.targetState).toBe('in_progress');
     expect(r.canonicalState).toBe('in_progress');
     expect(r.layer).toBe('fulfillment');
 
-    r = await service.transitionState('instant_transaction', 'preparing', 'mark_ready', 'staff');
+    r = await service.transitionState('instant_transaction', 'in_progress', 'mark_ready', 'staff');
     expect(r.allowed).toBe(true);
     expect(r.canonicalState).toBe('ready');
 
@@ -215,7 +215,7 @@ describe('Fulfillment handoff drives transaction completion', () => {
     expect(r.canonicalState).toBe('handed_off');
 
     // Only now may the transaction complete.
-    r = await service.transitionState('instant_transaction', 'delivered', 'complete', 'staff');
+    r = await service.transitionState('instant_transaction', 'handed_off', 'complete', 'staff');
     expect(r.allowed).toBe(true);
     expect(r.targetState).toBe('completed');
     expect(r.canonicalState).toBe('completed');
@@ -638,29 +638,31 @@ describe('Explicit auto-handoff policy replaces the implicit shortcut', () => {
 });
 
 // ============================================================
-// 8. The legacy bridge is transitional and adapter-declared
+// 8. Stage 6 — no legacy bridge exists anywhere
 // ============================================================
 
-describe('Legacy status bridge is transitional', () => {
-  it('is declared by the hospitality adapter, not the generic core', () => {
-    expect(HOSPITALITY_LEGACY_STATUS_BRIDGE.legacyToCanonical).toEqual({
-      preparing: 'in_progress',
-      delivered: 'handed_off',
-      ready: 'ready',
-    });
-    expect(HOSPITALITY_LEGACY_STATUS_BRIDGE.canonicalToLegacy).toEqual({
-      queued: 'preparing',
-      in_progress: 'preparing',
-      ready: 'ready',
-      handed_off: 'delivered',
-    });
+describe('Stage 6: the legacy fulfillment bridge is gone', () => {
+  it('the engine definition declares no legacyStatusBridge', () => {
+    const engine = getEngine('instant_transaction');
+    expect(engine.capabilities.fulfillment.legacyStatusBridge).toBeUndefined();
   });
 
-  it('generic engines without the bridge are unaffected (B–E pass through)', () => {
+  it('the generic layered validator is bridge-free (no bridgeIn/bridgeOut)', () => {
+    // The validator's public surface exposes only canonical state — no
+    // legacy composite is ever produced or consumed. (Compile-time proof:
+    // the type has no legacy field; runtime proof: transitionState returns
+    // canonical targetState directly.)
+    const service = new EngineService();
+    const r = service.canTransition('instant_transaction', 'in_progress', 'mark_ready', 'staff');
+    expect(r.allowed).toBe(true);
+    expect(r.targetState).toBe('ready'); // canonical, not a legacy composite
+  });
+
+  it('generic engines without fulfillment are unaffected (B–E pass through)', () => {
     const service = new EngineService();
     // Engine B: booking lifecycle is entirely on the transaction machine.
     const r = service.canTransition('multi_day_booking', 'confirmed', 'check_in', 'staff');
     expect(r.allowed).toBe(true);
-    expect(r.targetState).toBe('checked_in'); // no bridge — passthrough
+    expect(r.targetState).toBe('checked_in');
   });
 });

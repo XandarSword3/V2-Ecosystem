@@ -238,20 +238,6 @@ export type TransactionState =
   | 'completed'
   | 'cancelled';
 
-/**
- * TRANSITIONAL (Stage 6 removes this): legacy composite status persisted on
- * transactions.status until real fulfillment persistence exists. The maps
- * are declared by the ADAPTER that needs the bridge — the generic core only
- * applies whatever is declared. Production code must treat this as a
- * migration mechanism, never as the canonical fulfillment state.
- */
-export interface LegacyStatusBridge {
-  /** canonical fulfillment state → legacy composite value (persisted output). */
-  canonicalToLegacy: Readonly<Record<string, string>>;
-  /** legacy composite value → canonical fulfillment state (current-state input). */
-  legacyToCanonical: Readonly<Record<string, string>>;
-}
-
 export type FulfillmentMode =
   | 'none'
   | 'pickup'
@@ -315,13 +301,6 @@ export interface FulfillmentDefinition<TFulfillmentStatus extends string = strin
    * never hardcodes a vertical state.
    */
   autoHandoff?: AutoHandoffPolicy<TFulfillmentStatus>;
-  /**
-   * TRANSITIONAL — declared ONLY by adapters still writing legacy composite
-   * statuses until Stage 6 gives fulfillment its own persistence. Generic
-   * code applies it mechanically; nothing may read fulfillment meaning from
-   * the legacy column once fulfillment rows exist.
-   */
-  legacyStatusBridge?: LegacyStatusBridge;
 }
 
 /**

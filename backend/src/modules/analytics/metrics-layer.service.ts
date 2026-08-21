@@ -667,6 +667,10 @@ export class MetricsLayerService {
           .eq('property_id', propertyId)
           .gte('created_at', dateRange.start.toISOString())
           .lte('created_at', dateRange.end.toISOString())
+          // Stage 6: fulfillment meaning no longer lives on transactions.status.
+          // An instant_transaction in fulfillment keeps status 'confirmed' (only
+          // complete/cancel change it), so 'confirmed' covers fulfillment-active
+          // orders; 'preparing'/'ready' are retained for historical rows.
           .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'checked_in', 'CHECKED_IN', 'CONFIRMED', 'active', 'valid']);
         value = count || 0;
         break;
@@ -1008,6 +1012,9 @@ export class MetricsLayerService {
       .eq('property_id', propertyId)
       .gte('created_at', sparklineStart);
 
+    // Stage 6: an instant_transaction in fulfillment stays 'confirmed' on the
+    // transaction layer — fulfillment-active orders ARE 'confirmed'. Legacy
+    // 'preparing'/'ready' retained only for historical rows.
     const ACTIVE_STATES = ['pending', 'confirmed', 'preparing', 'ready', 'checked_in', 'active', 'valid'];
     const CANCELLED_STATES = ['cancelled', 'refunded'];
 

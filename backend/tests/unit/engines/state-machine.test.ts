@@ -194,8 +194,19 @@ describe('StateMachine - Instant Transaction (Engine A) — FULFILLMENT layer (h
   });
 
   describe('invalid fulfillment transitions', () => {
-    it('rejects skipping (queued → ready)', async () => {
-      await expect(fm.transition('queued', 'mark_ready', 'staff')).rejects.toThrow();
+    it('allows the declared direct path (queued → ready via mark_ready)', async () => {
+      // Stage 6: item-level auto-derivation (all items ready) can complete
+      // an order from a fresh 'queued' row without a separate start_preparation
+      // move — same declared direct-to-ready path as confirmed → ready.
+      expect((await fm.transition('queued', 'mark_ready', 'staff')).newState).toBe('ready');
+    });
+
+    it('rejects skipping (in_progress → handed_off without ready)', async () => {
+      await expect(fm.transition('in_progress', 'deliver', 'staff')).rejects.toThrow();
+    });
+
+    it('rejects non-staff actors on mark_ready', async () => {
+      await expect(fm.transition('queued', 'mark_ready', 'customer')).rejects.toThrow();
     });
 
     it('rejects backwards transitions (ready → in_progress)', async () => {

@@ -199,11 +199,22 @@ export function buildDocumentFromSnapshot(params: {
 // Service
 // ============================================================
 
+/**
+ * Transaction-layer statuses that are economically committed. Fulfillment
+ * meaning no longer lives on transactions.status (Stage 6) — the in-progress
+ * fulfillment states come from the fulfillments table (see
+ * issueForTransaction's fulfillment lookup below).
+ */
 const ISSUABLE_TRANSACTION_STATUSES = new Set([
   'confirmed',
-  'preparing',
+  'completed',
+]);
+
+/** Canonical fulfillment states that also make a transaction economically committed. */
+const ISSUABLE_FULFILLMENT_STATUSES = new Set([
+  'in_progress',
   'ready',
-  'delivered',
+  'handed_off',
   'completed',
 ]);
 
@@ -301,11 +312,23 @@ export class FiscalDocumentService {
       completedAt: txRow.completed_at ? String(txRow.completed_at) : null,
     };
 
-    // 2. Only economically committed transactions get documents.
-    if (!ISSUABLE_TRANSACTION_STATUSES.has(transaction.status)) {
+    // 2. Only economically committed transactions get documents. The
+    // transaction layer (confirmed/completed) is issuable directly; the
+    // fulfillment layer (in_progress/ready/handed_off) is issuable via the
+    // canonical fulfillment row — never from transactions.status (Stage 6).
+    const { data: fulfillmentRow } = await supabase
+      .from('fulfillments')
+      .select('status')
+      .eq('transaction_id', transactionId)
+      .maybeSingle();
+    const fulfillmentStatus = fulfillmentRow?.status ? String(fulfillmentRow.status) : null;
+    const committed =
+      ISSUABLE_TRANSACTION_STATUSES.has(transaction.status) ||
+      (fulfillmentStatus !== null && ISSUABLE_FULFILLMENT_STATUSES.has(fulfillmentStatus));
+    if (!committed) {
       throw new FiscalDocumentError(
         'TRANSACTION_NOT_ISSUABLE',
-        `Transaction status '${transaction.status}' is not issuable (expected confirmed/completed)`,
+        `Transaction is not economically committed (transaction status '${transaction.status}', fulfillment '${fulfillmentStatus ?? 'none'}') — expected confirmed/completed or fulfillment in progress`,
       );
     }
 

@@ -52,6 +52,10 @@ export interface AuthTokens {
 // ============================================
 
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled';
+// Stage 6: canonical fulfillment-layer states. The KDS consumes
+// fulfillmentStatus (in_progress/ready/handed_off), NOT the transaction-layer
+// status, for kitchen/dispatch columns.
+export type FulfillmentStatus = 'queued' | 'in_progress' | 'ready' | 'handed_off' | 'completed' | 'cancelled';
 export type PaymentStatus = 'pending' | 'partial' | 'paid' | 'refunded';
 export type PaymentMethod = 'cash' | 'card' | 'whish' | 'online';
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery' | 'room_service';
@@ -76,6 +80,8 @@ export interface Order {
   orderType: OrderType;
   order_type?: string;
   status: OrderStatus;
+  /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
+  fulfillmentStatus?: FulfillmentStatus | null;
   tableNumber?: string;
   table_number?: string;
   totalAmount: number;
