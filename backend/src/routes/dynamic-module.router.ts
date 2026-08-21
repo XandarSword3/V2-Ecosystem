@@ -1684,17 +1684,15 @@ function buildInstantTransactionRouter(router: Router): void {
       const flattened = (data ?? []).map((tx: any) => {
         const meta = (tx.metadata ?? {}) as Record<string, unknown>;
         const items = (meta.items as Array<any>) || [];
-        // Canonical fulfillment state from the fulfillments join; fall back
-        // to metadata.fulfillment_state (transitional) then the legacy
-        // composite map (historical rows). Same resolution the staff KDS
+        // Canonical fulfillment state from the fulfillments join; the only
+        // fallback is the legacy composite map for pre-Stage-6 rows with no
+        // fulfillment row (historical data). Same resolution the staff KDS
         // endpoint uses — the admin surface must show the same state.
         const fulfillmentRel = tx.fulfillments as Array<{ status?: string | null }> | { status?: string | null } | null | undefined;
         const fulfillmentStatus = Array.isArray(fulfillmentRel)
           ? (fulfillmentRel[0]?.status ?? null)
           : (fulfillmentRel?.status ?? null);
-        const canonicalFulfillmentState = fulfillmentStatus
-          ?? (meta.fulfillment_state as string | undefined)
-          ?? legacyFulfillmentToCanonical(tx.status as string | null);
+        const canonicalFulfillmentState = fulfillmentStatus ?? legacyFulfillmentToCanonical(tx.status as string | null);
         return {
           id: tx.id,
           order_number: getOrderNumber(tx.id, meta),
@@ -1756,7 +1754,9 @@ function buildInstantTransactionRouter(router: Router): void {
         .maybeSingle();
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Order not found' });
-      // Canonical fulfillment state (same resolution as GET /orders).
+      // Canonical fulfillment state (same resolution as GET /orders). No
+      // transitional metadata mirror exists anymore — only the legacy
+      // composite map for pre-Stage-6 rows.
       const fulfillmentRel = (data as { fulfillments?: Array<{ status?: string | null }> | { status?: string | null } | null }).fulfillments ?? null;
       const fulfillmentStatus = Array.isArray(fulfillmentRel)
         ? (fulfillmentRel[0]?.status ?? null)
@@ -1842,9 +1842,7 @@ function buildInstantTransactionRouter(router: Router): void {
           total_amount: data.amount,
           tax_amount: data.tax_amount,
           discount_amount: data.discount_amount,
-          fulfillment_status: fulfillmentStatus
-            ?? (meta.fulfillment_state as string | undefined)
-            ?? legacyFulfillmentToCanonical(data.status as string | null),
+          fulfillment_status: fulfillmentStatus ?? legacyFulfillmentToCanonical(data.status as string | null),
           order_type: meta.order_type ?? 'dine_in',
           customer_name: meta.customer_name ?? null,
           customer_phone: meta.customer_phone ?? null,

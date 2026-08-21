@@ -528,6 +528,29 @@ describe('Engine A inventory authority (plan Phase 5 proof)', () => {
     expect(add).not.toMatch(/\.update\(\{\s*status:/);
   });
 
+  it('Stage 6: the choke point no longer writes a transitional fulfillment_state mirror', () => {
+    const src = readFileSync(join(__dirname, '../../../src/engines/order-status.service.ts'), 'utf8');
+    // No metadata write of fulfillment_state (the transitional mirror is
+    // gone — the fulfillments table is canonical).
+    expect(src).not.toMatch(/fulfillment_state:/);
+    // No read fallback to a metadata mirror either.
+    expect(src).not.toMatch(/\.fulfillment_state/);
+    // The socket payload carries the in-scope canonical state directly.
+    expect(src).toMatch(/fulfillmentStatus: transition\.canonicalState/);
+  });
+
+  it('Stage 6: order-read surfaces resolve canonical fulfillment from the fulfillments join only', () => {
+    // No metadata.fulfillment_state fallbacks anywhere in production code.
+    const staff = readFileSync(join(__dirname, '../../../src/modules/staff/module-staff.controller.ts'), 'utf8');
+    const router = readFileSync(join(__dirname, '../../../src/routes/dynamic-module.router.ts'), 'utf8');
+    expect(staff).not.toMatch(/\.fulfillment_state/);
+    expect(router).not.toMatch(/\.fulfillment_state/);
+    // The join is the source: both the staff KDS endpoint and the order
+    // read endpoints select fulfillments(status).
+    expect(staff).toMatch(/fulfillments \( status \)/);
+    expect(router).toMatch(/fulfillments \( status \)/);
+  });
+
   it('the order-status choke point allocates resources BEFORE it writes confirmation', () => {
     const src = readFileSync(join(__dirname, '../../../src/engines/order-status.service.ts'), 'utf8');
     // Pre-flight allocation is invoked before the transactions update in

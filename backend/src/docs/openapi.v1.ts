@@ -766,7 +766,7 @@ Authorization: Bearer <access_token>
         summary: 'Get orders (staff only)',
         security: [{ bearerAuth: [] as string[] }],
         parameters: [
-          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'] } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'] } },
           { name: 'date', in: 'query', schema: { type: 'string', format: 'date' } },
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 20, maximum: 100 } },
@@ -811,7 +811,7 @@ Authorization: Bearer <access_token>
                 properties: {
                   status: {
                     type: 'string',
-                    enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'],
+                    enum: ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'],
                   },
                 },
               },
@@ -1817,7 +1817,10 @@ Authorization: Bearer <access_token>
         properties: {
           id: { type: 'string', format: 'uuid' },
           orderNumber: { type: 'string' },
-          status: { type: 'string', enum: ['pending', 'confirmed', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'] },
+          status: { type: 'string', enum: ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'] },
+          // Stage 6: canonical fulfillment-layer state — fulfillment is
+          // NEVER inferred from status.
+          fulfillmentStatus: { type: 'string', nullable: true, enum: ['queued', 'in_progress', 'ready', 'handed_off'] },
           orderType: { type: 'string', enum: ['dine_in', 'takeaway', 'delivery'] },
           customerName: { type: 'string' },
           customerPhone: { type: 'string' },

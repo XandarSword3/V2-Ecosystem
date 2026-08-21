@@ -266,7 +266,7 @@ Error responses:
         summary: 'Get orders (staff/admin)',
         security: [{ bearerAuth: [] as string[] }],
         parameters: [
-          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'] } },
           { name: 'page', in: 'query', schema: { type: 'integer', default: 1 } },
           { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } },
         ],
@@ -293,7 +293,7 @@ Error responses:
                 type: 'object',
                 required: ['status'],
                 properties: {
-                  status: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] },
+                  status: { type: 'string', enum: ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'] },
                 },
               },
             },
@@ -604,7 +604,7 @@ Error responses:
         properties: {
           id: { type: 'string', format: 'uuid' },
           orderNumber: { type: 'string' },
-          status: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] },
+          status: { type: 'string', enum: ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'] },
           customerName: { type: 'string' },
           total: { type: 'number' },
           createdAt: { type: 'string', format: 'date-time' },

@@ -11,6 +11,10 @@ import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import { useSocket } from '@/lib/socket';
+// Canonical Engine A domain helpers (plan F1): the page keys off the
+// canonical fulfillment state — never legacy composites and never
+// fulfillment inferred from transactions.status.
+import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState } from '@/types';
 import {
   UtensilsCrossed,
   Search,
@@ -39,7 +43,10 @@ interface Order {
   order_number: string;
   module_slug: string;
   module_name: string;
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled';
+  // Transaction layer only — fulfillment is NEVER inferred from status.
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
+  fulfillmentStatus?: string | null;
   total_amount: number;
   items: OrderItem[];
   table_number?: string;
@@ -49,15 +56,26 @@ interface Order {
   updated_at: string;
 }
 
+// Canonical state presentation — neutral labels, no vertical vocabulary.
 const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
   pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock, label: 'Pending' },
   confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2, label: 'Confirmed' },
-  preparing: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: ChefHat, label: 'Preparing' },
+  queued: { color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Clock, label: 'Queued' },
+  in_progress: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: ChefHat, label: 'In Progress' },
   ready: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: Package, label: 'Ready' },
-  delivered: { color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400', icon: Truck, label: 'Delivered' },
+  handed_off: { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', icon: Truck, label: 'Handed Off' },
   completed: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: CheckCircle2, label: 'Completed' },
   cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, label: 'Cancelled' },
 };
+
+/** Canonical state for display/action purposes — a confirmed transaction
+ * whose fulfillment is queued (or not yet created) displays as 'queued'. */
+function effectiveState(order: Order): string {
+  const c = canonicalFulfillmentState(order);
+  return c === 'confirmed' ? 'queued' : (c ?? order.status);
+}
+
+const FILTER_STATES = ['all', 'pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'];
 
 export default function AdminOrdersPage() {
   const t = useTranslations('admin');
@@ -126,9 +144,19 @@ export default function AdminOrdersPage() {
         );
       });
 
-      socket.on('order:statusChanged', ({ orderId, status }: { orderId: string; status: string }) => {
+      socket.on('order:statusChanged', ({ orderId, status, fulfillmentStatus }: { orderId: string; status: string; fulfillmentStatus?: string | null }) => {
         setOrders((prev) =>
-          prev.map((o) => (o.id === orderId ? { ...o, status: status as Order['status'] } : o))
+          prev.map((o) =>
+            o.id === orderId
+              ? {
+                  ...o,
+                  ...(FULFILLMENT_LAYER_STATES.includes(status as never)
+                    ? { fulfillmentStatus: status }
+                    : { status: status as Order['status'] }),
+                  ...(fulfillmentStatus ? { fulfillmentStatus } : {}),
+                }
+              : o
+          )
         );
       });
 
@@ -140,12 +168,20 @@ export default function AdminOrdersPage() {
     }
   }, [socket]);
 
-  const updateOrderStatus = async (orderId: string, moduleSlug: string, newStatus: string) => {
+  // Canonical transitions only. Fulfillment-layer targets update the
+  // canonical fulfillment state; transaction-layer targets update status.
+  const updateOrderStatus = async (orderId: string, moduleSlug: string, target: CanonicalOrderState) => {
     try {
-      await api.put(`/staff/modules/${moduleSlug}/orders/${orderId}/status`, { status: newStatus });
+      await api.put(`/staff/modules/${moduleSlug}/orders/${orderId}/status`, { status: target });
 
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus as Order['status'] } : o))
+        prev.map((o) =>
+          o.id === orderId
+            ? FULFILLMENT_LAYER_STATES.includes(target as never)
+              ? { ...o, fulfillmentStatus: target }
+              : { ...o, status: target as Order['status'] }
+            : o
+        )
       );
 
       toast.success('Order status updated');
@@ -155,7 +191,7 @@ export default function AdminOrdersPage() {
   };
 
   const filteredOrders = orders.filter((o) => {
-    if (statusFilter !== 'all' && o.status !== statusFilter) return false;
+    if (statusFilter !== 'all' && effectiveState(o) !== statusFilter) return false;
     if (sourceFilter !== 'all' && o.module_slug !== sourceFilter) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -171,8 +207,8 @@ export default function AdminOrdersPage() {
 
   const activeOrders = orders.filter((o) => !['completed', 'cancelled'].includes(o.status));
   const pendingCount = orders.filter((o) => o.status === 'pending').length;
-  const preparingCount = orders.filter((o) => o.status === 'preparing').length;
-  const readyCount = orders.filter((o) => o.status === 'ready').length;
+  const inProgressCount = orders.filter((o) => effectiveState(o) === 'in_progress').length;
+  const readyCount = orders.filter((o) => effectiveState(o) === 'ready').length;
 
   if (loading) {
     return (
@@ -247,8 +283,8 @@ export default function AdminOrdersPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm">Preparing</p>
-                  <p className="text-2xl font-bold mt-1">{preparingCount}</p>
+                  <p className="text-orange-100 text-sm">In Progress</p>
+                  <p className="text-2xl font-bold mt-1">{inProgressCount}</p>
                 </div>
                 <ChefHat className="w-10 h-10 text-orange-200" />
               </div>
@@ -306,13 +342,9 @@ export default function AdminOrdersPage() {
               className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
             >
               <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="preparing">Preparing</option>
-              <option value="ready">Ready</option>
-              <option value="delivered">Delivered</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
+              {FILTER_STATES.filter((s) => s !== 'all').map((s) => (
+                <option key={s} value={s}>{s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())}</option>
+              ))}
             </select>
           </div>
         </CardContent>
@@ -331,7 +363,8 @@ export default function AdminOrdersPage() {
             </motion.div>
           ) : (
             filteredOrders.map((order, index) => {
-              const StatusIcon = statusConfig[order.status]?.icon || Clock;
+              const st = effectiveState(order);
+              const StatusIcon = statusConfig[st]?.icon || Clock;
               return (
                 <motion.div
                   key={order.id}
@@ -352,11 +385,11 @@ export default function AdminOrdersPage() {
                         </div>
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            statusConfig[order.status]?.color
+                            statusConfig[st]?.color
                           }`}
                         >
                           <StatusIcon className="w-3 h-3" />
-                          {statusConfig[order.status]?.label || order.status}
+                          {statusConfig[st]?.label || st}
                         </span>
                       </div>
                     </CardHeader>
@@ -398,9 +431,12 @@ export default function AdminOrdersPage() {
                         </span>
                       </div>
 
-                      {/* Actions */}
+                      {/* Actions — canonical transitions, one step at a time.
+                          pending→confirmed is a transaction-layer move;
+                          queued→in_progress→ready→handed_off→completed are
+                          fulfillment-layer moves. */}
                       <div className="flex gap-2 pt-2">
-                        {order.status === 'pending' && (
+                        {st === 'pending' && (
                           <Button
                             size="sm"
                             className="flex-1"
@@ -410,17 +446,17 @@ export default function AdminOrdersPage() {
                             Confirm
                           </Button>
                         )}
-                        {order.status === 'confirmed' && (
+                        {st === 'queued' && (
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'preparing')}
+                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'in_progress')}
                           >
                             <ChefHat className="w-4 h-4 mr-1" />
                             Start
                           </Button>
                         )}
-                        {order.status === 'preparing' && (
+                        {st === 'in_progress' && (
                           <Button
                             size="sm"
                             className="flex-1"
@@ -430,17 +466,17 @@ export default function AdminOrdersPage() {
                             Ready
                           </Button>
                         )}
-                        {order.status === 'ready' && (
+                        {st === 'ready' && (
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'delivered')}
+                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'handed_off')}
                           >
                             <Truck className="w-4 h-4 mr-1" />
-                            Deliver
+                            Hand Off
                           </Button>
                         )}
-                        {order.status === 'delivered' && (
+                        {st === 'handed_off' && (
                           <Button
                             size="sm"
                             className="flex-1"
@@ -509,7 +545,7 @@ export default function AdminOrdersPage() {
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">Status</span>
                     <p className="font-medium text-slate-900 dark:text-white capitalize">
-                      {selectedOrder.status}
+                      {effectiveState(selectedOrder)}
                     </p>
                   </div>
                   {selectedOrder.customer_name && (

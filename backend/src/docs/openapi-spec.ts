@@ -778,7 +778,7 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
         properties: {
           id: { type: 'string', format: 'uuid' },
           orderNumber: { type: 'string' },
-          status: { type: 'string', enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'] },
+          status: { type: 'string', enum: ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'] },
           customerName: { type: 'string' },
           total: { type: 'number' },
           createdAt: { type: 'string', format: 'date-time' },

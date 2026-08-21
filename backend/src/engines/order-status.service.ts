@@ -290,11 +290,11 @@ export async function changeInstantTransactionOrderStatus(
     ...(transition.canonicalState === 'completed' || transition.targetState === 'completed' ? { completed_at: now } : {}),
     ...(isCancelling ? { cancelled_at: now } : {}),
     ...(isCancelling && !alreadyReversed ? { discountsReversedAt: now } : {}),
-    // Canonical FULFILLMENT-layer state for consumers that haven't migrated
-    // to reading the fulfillments table yet (Stage 6 transitional).
-    ...(transition.layer === 'fulfillment' && transition.canonicalState
-      ? { fulfillment_state: transition.canonicalState }
-      : {}),
+    // Stage 6: NO transitional fulfillment_state mirror is written anymore.
+    // The fulfillments table is the canonical fulfillment layer; every
+    // consumer reads it directly (the join in getModuleOrders / the order
+    // read endpoints). transactions.metadata carries only transaction-
+    // layer and settlement facts.
   };
 
   // Transaction-layer status: only update it for transaction-layer moves or
@@ -417,9 +417,9 @@ export async function changeInstantTransactionOrderStatus(
       id: order.id,
       status: order.status,
       // Canonical fulfillment state (Stage 6) — the KDS consumes this.
-      // Prefer the in-scope transition result; fall back to the transitional
-      // metadata mirror written in the same update above.
-      fulfillmentStatus: transition.canonicalState ?? orderMeta.fulfillment_state ?? null,
+      // The in-scope transition result IS the canonical state; there is no
+      // transitional metadata mirror anymore.
+      fulfillmentStatus: transition.canonicalState ?? null,
       tableNumber: orderMeta.table_number ?? orderMeta.table_id ?? null,
     };
     emitToUnit(tenantId || 'default', moduleSlug, 'order:status', payload);

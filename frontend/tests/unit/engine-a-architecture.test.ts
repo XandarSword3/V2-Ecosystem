@@ -52,6 +52,7 @@ describe('Engine A frontend architecture (plan F1)', () => {
     // an engine entity).
     const migrated = [
       'src/app/[property]/admin/[slug]/orders/page.tsx',
+      'src/app/[property]/admin/orders/page.tsx',
       'src/app/[property]/[slug]/confirmation/page.tsx',
       'src/components/staff/KitchenView.tsx',
       'src/components/staff/types.ts',

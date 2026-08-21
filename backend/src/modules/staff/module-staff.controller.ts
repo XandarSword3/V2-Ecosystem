@@ -275,16 +275,14 @@ export async function getModuleOrders(req: Request, res: Response) {
       const staffId = (order as { staff_id?: string | null }).staff_id ?? null;
       const staffName = staffId ? (staffNameById.get(staffId) ?? null) : null;
       // Stage 6: canonical fulfillment state from the fulfillments join.
-      // Fall back to metadata.fulfillment_state (transitional) then to a
-      // legacy-composite mapping (historical rows) so the KDS keeps working
-      // for pre-Stage-6 data.
+      // No transitional metadata mirror exists anymore — the only fallback
+      // is the legacy-composite map for pre-Stage-6 rows that have no
+      // fulfillment row (historical data on live instances).
       const fulfillmentRel = (order as { fulfillments?: Array<{ status?: string | null }> | { status?: string | null } | null }).fulfillments ?? null;
       const fulfillmentStatus = Array.isArray(fulfillmentRel)
         ? (fulfillmentRel[0]?.status ?? null)
         : (fulfillmentRel?.status ?? null);
-      const canonicalFulfillmentState = fulfillmentStatus
-        ?? (meta.fulfillment_state as string | undefined)
-        ?? legacyFulfillmentToCanonical(order.status);
+      const canonicalFulfillmentState = fulfillmentStatus ?? legacyFulfillmentToCanonical(order.status);
       return {
         id: order.id,
         orderNumber: getOrderNumber(order.id, meta),
