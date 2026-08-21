@@ -122,6 +122,9 @@ export function assertValidFulfillmentCapabilities(
  * engine's OWN declared capability options (plan Stage 6 fix). Typed domain
  * values only — arbitrary strings are rejected before they can reach the DB.
  *
+ *   - the MODE IS MANDATORY: a null selection is a contract violation, not a
+ *     "not decided yet". For a required-fulfillment engine the selection is
+ *     snapshotted before confirmation and never left ambiguous;
  *   - the mode must be one of the engine's declared options;
  *   - if a destination type is given, it must be legal for THAT mode on
  *     THIS engine (not just the global registry).
@@ -134,9 +137,9 @@ export function assertValidFulfillmentSelection(
   destinationType: DestinationType | null,
 ): void {
   if (!mode) {
-    // No selection yet — nothing to validate. (A fulfillment row may be
-    // created queued without a mode; the mode is resolved at dispatch.)
-    return;
+    throw new FulfillmentContractError(
+      'Fulfillment mode is mandatory — a selection must be snapshotted before confirmation, never left null',
+    );
   }
   const option = fulfillment.options.find((o) => o.mode === mode);
   if (!option) {

@@ -25,6 +25,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { FulfillmentService } from '../../../src/modules/fulfillment/fulfillment.service.js';
+import { getAllEngines } from '../../../src/engines/registry.js';
 
 // The service uses the REAL engine service singleton (pure, registry-backed)
 // to validate moves through the layered validator — no DB involved there.
@@ -141,6 +142,8 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
       transactionId: 't1',
       engineType: 'instant_transaction',
       moduleId: 'm1',
+      mode: 'on_premise',
+      destinationType: 'on_premise_location',
     });
     expect(first.ok).toBe(true);
     expect(first.status).toBe('queued');
@@ -151,7 +154,12 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
 
     // Idempotent second call — the row now exists, RPC is ON CONFLICT DO NOTHING.
     supabase.setRow(queuedRow());
-    const second = await service.ensure(supabase, { transactionId: 't1', engineType: 'instant_transaction' });
+    const second = await service.ensure(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'on_premise',
+      destinationType: 'on_premise_location',
+    });
     expect(second.ok).toBe(true);
     expect(second.status).toBe('existing');
   });
@@ -271,6 +279,21 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     await expect(service.getForTransaction(supabase, 't1')).rejects.toThrow(/connection reset/);
   });
 
+  it('rejects a null mode at creation — selection is mandatory', async () => {
+    const service = new FulfillmentService();
+    const supabase = createSupabaseMock(null);
+
+    const result = await service.ensure(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      // No mode — this is exactly what the invariant forbids.
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/mode is mandatory/);
+    // The RPC was never called.
+    expect(supabase.calls.rpc.some((c) => c.name === 'ensure_fulfillment')).toBe(false);
+  });
+
   it('rejects an unknown engine type at creation (fail closed)', async () => {
     const service = new FulfillmentService();
     const supabase = createSupabaseMock(null);
@@ -351,5 +374,42 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     // The service must not contain the "create the row after the confirm
     // already happened" pattern — the trigger owns creation.
     expect(src).not.toMatch(/ensure\(/);
+  });
+
+  it('source: the confirm trigger is capability-driven, never engine-hardcoded', () => {
+    const migrationsDir = join(__dirname, '../../../../supabase/migrations');
+    const triggerFile = readFileSync(join(migrationsDir, '20260821140000_engine_a_fulfillment_capabilities.sql'), 'utf8');
+    const triggerFunction = triggerFile.split('CREATE OR REPLACE FUNCTION "public"."_ensure_fulfillment_on_confirm"')[1] ?? '';
+    // The trigger body must not contain a hardcoded engine_type LITERAL —
+    // required-fulfillment intent comes from the capability table. (The
+    // `WHERE engine_type = NEW.engine_type` lookup against the table is the
+    // point; only quoted literals are forbidden.)
+    expect(triggerFunction).not.toMatch(/engine_type\s*=\s*'[a-z_]+'/);
+    expect(triggerFunction).not.toMatch(/engine_type\s*=\s*"[a-z_]+"/);
+    // ...and it reads the capability table instead.
+    expect(triggerFunction).toMatch(/engine_fulfillment_capabilities/);
+    // It fires on INSERT too (staff create orders directly as 'confirmed').
+    expect(triggerFile).toMatch(/AFTER INSERT OR UPDATE OF "?status"?/);
+  });
+
+  it('source: the capability registry seed matches the TypeScript engine registry', () => {
+    const migrationsDir = join(__dirname, '../../../../supabase/migrations');
+    const triggerFile = readFileSync(join(migrationsDir, '20260821140000_engine_a_fulfillment_capabilities.sql'), 'utf8');
+    for (const engine of getAllEngines()) {
+      // Every registered engine has a capability row with the same required flag.
+      const row = new RegExp(`\\('${engine.type}',\\s*(true|false),\\s*(true|false)\\)`).exec(triggerFile);
+      expect(row, `seed row for engine '${engine.type}'`).toBeTruthy();
+      expect(row![1]).toBe(String(engine.capabilities.fulfillment.required));
+    }
+  });
+
+  it('source: order creation snapshots the typed selection (mode is never null at confirm)', () => {
+    const routerPath = join(__dirname, '../../../src/routes/dynamic-module.router.ts');
+    const router = readFileSync(routerPath, 'utf8');
+    const staffPath = join(__dirname, '../../../src/modules/staff/module-staff.controller.ts');
+    const staff = readFileSync(staffPath, 'utf8');
+    // Both creation paths resolve + snapshot the selection into metadata.
+    expect(router).toMatch(/fulfillment_mode: fulfillmentSelection\.mode/);
+    expect(staff).toMatch(/fulfillment_mode: fulfillmentSelection\.mode/);
   });
 });

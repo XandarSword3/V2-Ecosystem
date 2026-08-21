@@ -17,6 +17,7 @@ import { getOrderNumber } from '../utils/order-number.js';
 import { customizationService } from '../modules/customization/services/customization.service.js';
 import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reversal.js';
 import { actorForUser, resolveAction, changeInstantTransactionOrderStatus } from '../engines/order-status.service.js';
+import { resolveFulfillmentSelection } from '../modules/fulfillment/fulfillment-selection.js';
 import { emitToUnit } from '../socket/index.js';
 import { resolveAndPriceCatalogItems, type CatalogItemRequest } from '../services/catalog-pricing.service.js';
 import {
@@ -1005,6 +1006,20 @@ function buildInstantTransactionRouter(router: Router): void {
       const staffId = isStaffUser ? (req.user?.userId ?? null) : null;
       const customerId = isStaffUser ? null : (req.user?.userId ?? null);
 
+      // Stage 6 fix: the fulfillment selection is MANDATORY before
+      // confirmation and is snapshotted at creation — it is part of the
+      // immutable commercial record, never left NULL to be decided later.
+      // The confirm trigger copies it into the fulfillment row verbatim and
+      // refuses to confirm an order without it. Capability-validated here
+      // (typed domain values against the engine's declared options); an
+      // unresolvable selection fails the order creation.
+      const fulfillmentSelection = resolveFulfillmentSelection('instant_transaction', {
+        orderType: resolvedOrderType,
+        serviceLocationId,
+        tableNumber: resolvedTableNumber,
+        address: req.body?.address ?? req.body?.deliveryAddress ?? req.body?.metadata?.address ?? null,
+      });
+
       const { data: created, error: createError } = await supabase
         .from('transactions')
         .insert({
@@ -1035,6 +1050,10 @@ function buildInstantTransactionRouter(router: Router): void {
             table_number: resolvedTableNumber,
             customer_name: resolvedCustomerName,
             customer_phone: resolvedCustomerPhone,
+            // Typed fulfillment selection snapshot (see resolver above).
+            fulfillment_mode: fulfillmentSelection.mode,
+            fulfillment_destination_type: fulfillmentSelection.destinationType,
+            fulfillment_destination_ref: fulfillmentSelection.destinationRef,
           },
         })
         .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')

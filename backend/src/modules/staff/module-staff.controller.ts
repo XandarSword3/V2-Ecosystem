@@ -10,6 +10,7 @@ import { resolveModuleCurrency } from '../../engines/currency-resolver.js';
 import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
 import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
 import { getFulfillmentService } from '../fulfillment/index.js';
+import { resolveFulfillmentSelection } from '../fulfillment/fulfillment-selection.js';
 import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
 import { getOrderNumber } from '../../utils/order-number.js';
 import { awardLoyaltyPointsForPayment } from '../payments/loyalty-integration.js';
@@ -2012,6 +2013,17 @@ export async function createModuleOrder(req: Request, res: Response) {
       }
     }
 
+    // Stage 6 fix: staff-created orders are inserted directly as 'confirmed',
+    // so the fulfillment selection must be snapshotted HERE — the confirm
+    // trigger copies it into the fulfillment row and refuses to confirm an
+    // order without it. Resolved + capability-validated (typed domain values).
+    const fulfillmentSelection = resolveFulfillmentSelection('instant_transaction', {
+      orderType: resolvedOrderType,
+      serviceLocationId: locationId,
+      tableNumber: locationName,
+      address: req.body?.address ?? req.body?.deliveryAddress ?? null,
+    });
+
     const orderItemsInput = Array.isArray(items) ? items : [];
 
     // Staff orders price through the SAME pipeline the customer path uses,
@@ -2111,6 +2123,10 @@ export async function createModuleOrder(req: Request, res: Response) {
           table_id: locationId || null,
           order_type: resolvedOrderType,
           notes: notes || null,
+          // Typed fulfillment selection snapshot (see resolver above).
+          fulfillment_mode: fulfillmentSelection.mode,
+          fulfillment_destination_type: fulfillmentSelection.destinationType,
+          fulfillment_destination_ref: fulfillmentSelection.destinationRef,
           payment_status: 'unpaid',
           // No payment-method default: an unpaid order has no method until
           // payModuleOrder settles it. Passing paymentMethod here is only

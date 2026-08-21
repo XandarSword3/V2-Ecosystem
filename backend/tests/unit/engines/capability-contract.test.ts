@@ -700,15 +700,20 @@ describe('Fulfillment selection validation (Stage 6 fix)', () => {
     ).toThrow(/not valid for mode 'on_premise'/);
   });
 
-  it('allows a null selection (queued without a mode — resolved at dispatch)', () => {
+  it('REJECTS a null mode — selection is mandatory before confirmation', () => {
+    // The invariant: NULL mode never means "not decided yet". A selection
+    // without a mode is a contract violation.
     expect(() =>
       assertValidFulfillmentSelection(engine.capabilities.fulfillment, null, null)
-    ).not.toThrow();
+    ).toThrow(/mode is mandatory/);
+    expect(() =>
+      assertValidFulfillmentSelection(engine.capabilities.fulfillment, null, 'address')
+    ).toThrow(/mode is mandatory/);
   });
 
-  it('the empty options case rejects every non-null mode', () => {
+  it('the empty options case rejects every mode', () => {
     const noOptions = { ...engine.capabilities.fulfillment, options: [] };
     expect(() => assertValidFulfillmentSelection(noOptions, 'pickup', null)).toThrow(/not offered/);
-    expect(() => assertValidFulfillmentSelection(noOptions, null, null)).not.toThrow();
+    expect(() => assertValidFulfillmentSelection(noOptions, null, null)).toThrow(/mode is mandatory/);
   });
 });
