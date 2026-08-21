@@ -160,6 +160,15 @@ export const sharedCapacityAccessEngine: EngineDefinition<SharedCapacityAccessSt
       commitmentTrigger: 'on_fulfillment_start',
       reversalOnCancel: true,
     },
+    resources: {
+      // Session access consumes live capacity slots (no reservation — the
+      // capacity is held from fulfillment start, not purchase).
+      type: 'capacity',
+      kinds: ['capacity_slot'],
+      allocation: 'on_fulfillment_start',
+      consumption: 'on_transaction_complete',
+      reversalOnCancel: true,
+    },
     fulfillment: {
       required: false,
       options: [

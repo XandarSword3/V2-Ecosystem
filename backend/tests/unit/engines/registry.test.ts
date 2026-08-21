@@ -104,9 +104,9 @@ describe('Engine Registry', () => {
   });
 
   describe('getAllEngineTypes', () => {
-    it('should return all five engine types', () => {
+    it('should return all registered engine types (incl. the digital second vertical)', () => {
       const types = getAllEngineTypes();
-      expect(types).toHaveLength(5);
+      expect(types).toHaveLength(6);
       expect(types).toContain('instant_transaction');
       expect(types).toContain('time_exclusive_reservation');
       expect(types).toContain('shared_capacity_access');
@@ -116,9 +116,10 @@ describe('Engine Registry', () => {
   });
 
   describe('getAllEngines', () => {
-    it('should return all five engine definitions', () => {
+    it('should return all registered engine definitions', () => {
       const engines = getAllEngines();
-      expect(engines).toHaveLength(5);
+      expect(engines).toHaveLength(6);
+      expect(engines.map(e => e.type)).toContain('digital_delivery');
     });
 
     it('should have complete definitions (state machine + pricing + interactions)', () => {

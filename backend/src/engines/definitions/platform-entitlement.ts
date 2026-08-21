@@ -203,6 +203,9 @@ export const platformEntitlementEngine: EngineDefinition<PlatformEntitlementStat
     commitment: {
       type: 'none',
     },
+    resources: {
+      type: 'none',
+    },
     fulfillment: {
       required: false,
       options: [

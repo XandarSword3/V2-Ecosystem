@@ -149,6 +149,16 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Hospit
       commitmentTrigger: 'on_purchase',
       reversalOnCancel: true,
     },
+    resources: {
+      // Engine A consumes inventory via the hospitality BOM (order items →
+      // recipe ingredients). The generic service allocates/consumes/releases;
+      // the hospitality adapter resolves the requirements (plan Phase 5).
+      type: 'inventory',
+      kinds: ['inventory_item'],
+      allocation: 'on_purchase',
+      consumption: 'on_fulfillment_handoff',
+      reversalOnCancel: true,
+    },
     fulfillment: {
       required: true,
       options: [

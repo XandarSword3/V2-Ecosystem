@@ -33,6 +33,8 @@ export default defineConfig({
       'tests/unit/engines/**/*.test.ts',
       // Fulfillment persistence
       'tests/unit/fulfillment/**/*.test.ts',
+      // Generic resource consumption (plan Phase 5)
+      'tests/unit/resource/**/*.test.ts',
       // Money / payment / POS on Engine A orders
       'tests/unit/payment.module.test.ts',
       'tests/unit/modules/staff/module-staff-payment.test.ts',

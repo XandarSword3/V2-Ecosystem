@@ -197,6 +197,9 @@ export const ongoingEntitlementEngine: EngineDefinition<OngoingEntitlementStatus
     commitment: {
       type: 'none',
     },
+    resources: {
+      type: 'none',
+    },
     fulfillment: {
       required: false,
       options: [

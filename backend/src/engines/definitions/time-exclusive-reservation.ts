@@ -178,6 +178,14 @@ export const timeExclusiveReservationEngine: EngineDefinition<TimeExclusiveReser
       commitmentTrigger: 'on_purchase',
       reversalOnCancel: true,
     },
+    resources: {
+      // Time-exclusive reservations consume time-boxed capacity slots.
+      type: 'capacity',
+      kinds: ['capacity_slot'],
+      allocation: 'on_purchase',
+      consumption: 'on_transaction_complete',
+      reversalOnCancel: true,
+    },
     fulfillment: {
       required: false,
       options: [

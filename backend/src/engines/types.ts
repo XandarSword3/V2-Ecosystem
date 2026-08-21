@@ -5,7 +5,8 @@ export type EngineType =
   | 'time_exclusive_reservation'
   | 'shared_capacity_access'
   | 'ongoing_entitlement'
-  | 'platform_entitlement';
+  | 'platform_entitlement'
+  | 'digital_delivery';
 
 /**
  * Literal template → engine map (the type-level source of truth). Kept as a
@@ -20,6 +21,7 @@ export const ENGINE_TEMPLATES = {
   shared_capacity_access:    'shared_capacity_access',
   ongoing_entitlement:       'ongoing_entitlement',
   platform_entitlement:      'platform_entitlement',
+  digital_delivery:          'digital_delivery',
   // ── Legacy alias names — kept for backwards compat with existing DB rows ──
   menu_service:              'instant_transaction',
   multi_day_booking:         'time_exclusive_reservation',
@@ -42,6 +44,7 @@ export const ENGINE_TO_TEMPLATE: Record<EngineType, string> = {
   shared_capacity_access:     'shared_capacity_access',
   ongoing_entitlement:        'ongoing_entitlement',
   platform_entitlement:       'platform_entitlement',
+  digital_delivery:           'digital_delivery',
 };
 
 /** Maps canonical engine_type → legacy modules.template_type enum value (deprecated column). */
@@ -337,6 +340,55 @@ export type CommitmentModel =
       reversalOnCancel: boolean;
     };
 
+// ============================================================
+// Resource consumption (plan Phase 5 — generic resource system)
+//
+// The generic core declares WHAT an engine consumes and WHEN, without ever
+// naming a vertical resource (the hospitality BOM — menu_item_ingredients —
+// lives in the hospitality adapter, never here). Adapters resolve a
+// transaction's commercial lines into typed ResourceRequirement[] (the
+// generic BOM line); the generic service allocates/reserves, consumes on
+// fulfillment, and releases on cancellation — driven by this declaration.
+// ============================================================
+
+/** The generic resource kinds an engine may consume. */
+export type ResourceKind =
+  | 'inventory_item' // consumable stock (hospitality: recipe ingredients)
+  | 'capacity_slot' // time-boxed capacity (reservations, sessions)
+  | 'staff_time' // labor allocation
+  | 'equipment'; // reusable equipment
+
+/**
+ * One line of a transaction's resource requirement (the generic BOM line).
+ * `ref` is the domain reference to the concrete resource the ADAPTER resolved
+ * (inventory_item_id, capacity slot id, …) — the core never interprets it.
+ */
+export interface ResourceRequirement {
+  kind: ResourceKind;
+  ref: string;
+  quantity: number;
+  unit?: string;
+}
+
+/**
+ * Declarative resource-consumption model (discriminated — an engine either
+ * consumes resources or it doesn't; a non-consuming engine cannot declare a
+ * consumption timing). Validated by engines/resource-contract.ts.
+ */
+export type ResourceConsumptionModel =
+  | { type: 'none' }
+  | {
+      type: 'inventory' | 'capacity' | 'resource' | 'inventory_and_capacity';
+      /** Which generic resource kinds this engine consumes. */
+      kinds: ResourceKind[];
+      /** When allocation (reservation) happens in the transaction lifecycle. */
+      allocation: 'on_purchase' | 'on_confirm' | 'on_fulfillment_start';
+      /** When consumption (deduction) happens. */
+      consumption: 'on_purchase' | 'on_fulfillment_handoff' | 'on_transaction_complete';
+      /** Whether cancellation reverses allocation/consumption (compensation). */
+      reversalOnCancel: boolean;
+    };
+
 export interface EconomicCapabilities {
   multiTender: boolean;
   refunds: boolean;
@@ -382,6 +434,8 @@ export interface EngineCapabilities<TFulfillmentStatus extends string = string> 
   commitment: CommitmentModel;
   fulfillment: FulfillmentDefinition<TFulfillmentStatus>;
   execution: ExecutionDefinition;
+  /** Generic resource-consumption declaration (plan Phase 5). */
+  resources: ResourceConsumptionModel;
   economics: EconomicCapabilities;
   customer: CustomerCapabilities;
   fiscal: FiscalCapabilities;
@@ -417,3 +471,5 @@ export type PlatformEntitlementStatus =
   | 'past_due'
   | 'suspended'
   | 'cancelled';
+
+export type DigitalDeliveryStatus = TransactionState;

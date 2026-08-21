@@ -253,6 +253,58 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     expect(result.canonicalState).toBe('ready');
   });
 
+  it('drives the REAL digital machine through the same service (Phase 4 second vertical)', async () => {
+    // The generic service hosts the second fulfillment adapter too: the row's
+    // engine_type is digital_delivery, so the layered validator routes every
+    // move through the DIGITAL machine (provisioning → provisioned →
+    // delivered → completed). Zero changes to the service; the machine comes
+    // from the registry via the row.
+    const service = new FulfillmentService();
+    const provisioningRow = queuedRow({
+      engine_type: 'digital_delivery',
+      status: 'provisioning',
+      mode: 'digital_delivery',
+      destination_type: 'digital_account',
+    });
+    const supabase = createSupabaseMock(provisioningRow);
+
+    const provisioned = await service.transition(supabase, {
+      transactionId: 't1',
+      action: 'finish_provisioning',
+      actor: 'system',
+      expectedFrom: 'provisioning',
+    });
+    expect(provisioned.ok).toBe(true);
+    expect(provisioned.canonicalState).toBe('provisioned');
+
+    supabase.setRow({ ...provisioningRow, status: 'provisioned' });
+    const delivered = await service.transition(supabase, {
+      transactionId: 't1',
+      action: 'deliver_digital',
+      actor: 'system',
+      expectedFrom: 'provisioned',
+    });
+    expect(delivered.ok).toBe(true);
+    expect(delivered.canonicalState).toBe('delivered');
+
+    // Cross-layer completion: the fulfillment layer's terminal → completed.
+    supabase.setRow({ ...provisioningRow, status: 'delivered' });
+    const completed = await service.transition(supabase, {
+      transactionId: 't1',
+      action: 'complete',
+      actor: 'system',
+      expectedFrom: 'delivered',
+    });
+    expect(completed.ok).toBe(true);
+    expect(completed.canonicalState).toBe('completed');
+
+    // The RPCs were all persisted against the fulfillments row with the
+    // digital engine type — the same persistence path as hospitality.
+    const rpcs = supabase.calls.rpc.filter((c) => c.name === 'transition_fulfillment');
+    expect(rpcs.map((r) => r.args.p_to_status)).toEqual(['provisioned', 'delivered', 'completed']);
+    expect(supabase.calls.updated.some((u) => u.table === 'transactions')).toBe(false);
+  });
+
   it('FAILS CLOSED on a fulfillment read error — never falls back to "no row"', async () => {
     const service = new FulfillmentService();
     const supabase = createSupabaseMock(queuedRow(), { failFulfillmentRead: true });
@@ -378,7 +430,9 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
 
   it('source: the confirm trigger is capability-driven, never engine-hardcoded', () => {
     const migrationsDir = join(__dirname, '../../../../supabase/migrations');
-    const triggerFile = readFileSync(join(migrationsDir, '20260821140000_engine_a_fulfillment_capabilities.sql'), 'utf8');
+    // The trigger was re-created when the capability table gained
+    // initial_status (20260821170000) — the LATEST definition is the law.
+    const triggerFile = readFileSync(join(migrationsDir, '20260821170000_engine_a_fulfillment_initial_status.sql'), 'utf8');
     const triggerFunction = triggerFile.split('CREATE OR REPLACE FUNCTION "public"."_ensure_fulfillment_on_confirm"')[1] ?? '';
     // The trigger body must not contain a hardcoded engine_type LITERAL —
     // required-fulfillment intent comes from the capability table. (The
@@ -386,20 +440,44 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     // point; only quoted literals are forbidden.)
     expect(triggerFunction).not.toMatch(/engine_type\s*=\s*'[a-z_]+'/);
     expect(triggerFunction).not.toMatch(/engine_type\s*=\s*"[a-z_]+"/);
-    // ...and it reads the capability table instead.
+    // ...and it reads the capability table instead — including the initial
+    // status, so a second vertical (digital → 'provisioning') is created in
+    // ITS OWN declared initial state, never a hardcoded 'queued'.
     expect(triggerFunction).toMatch(/engine_fulfillment_capabilities/);
+    expect(triggerFunction).toMatch(/initial_status/);
+    // No vertical status literal may be hardcoded in the trigger body.
+    expect(triggerFunction).not.toMatch(/status\s*=\s*'queued'/);
+    expect(triggerFunction).not.toMatch(/'queued',/);
     // It fires on INSERT too (staff create orders directly as 'confirmed').
     expect(triggerFile).toMatch(/AFTER INSERT OR UPDATE OF "?status"?/);
   });
 
   it('source: the capability registry seed matches the TypeScript engine registry', () => {
     const migrationsDir = join(__dirname, '../../../../supabase/migrations');
-    const triggerFile = readFileSync(join(migrationsDir, '20260821140000_engine_a_fulfillment_capabilities.sql'), 'utf8');
+    // The seed is split across the capability migrations (original five
+    // engines + digital second vertical + initial_status reseed). The
+    // LATEST file wins for each engine (ON CONFLICT DO UPDATE), so the
+    // initial_status reseed is the law for required engines.
+    const seedSql = [
+      '20260821140000_engine_a_fulfillment_capabilities.sql',
+      '20260821160000_engine_a_digital_vertical.sql',
+      '20260821170000_engine_a_fulfillment_initial_status.sql',
+    ].map(f => readFileSync(join(migrationsDir, f), 'utf8')).join('\n');
     for (const engine of getAllEngines()) {
       // Every registered engine has a capability row with the same required flag.
-      const row = new RegExp(`\\('${engine.type}',\\s*(true|false),\\s*(true|false)\\)`).exec(triggerFile);
+      const row = new RegExp(`\\('${engine.type}',\\s*(true|false),\\s*(true|false)\\)`).exec(seedSql);
       expect(row, `seed row for engine '${engine.type}'`).toBeTruthy();
       expect(row![1]).toBe(String(engine.capabilities.fulfillment.required));
+      // For engines with a fulfillment machine, the seeded initial_status
+      // must equal the machine's declared initialState — the persistence
+      // layer creates rows in the machine's own initial state, never a
+      // hardcoded 'queued'.
+      const machine = engine.capabilities.fulfillment.stateMachine;
+      if (machine) {
+        const initRow = new RegExp(`\\('${engine.type}',\\s*(true|false),\\s*(true|false),\\s*'([a-z_]+)'\\)`).exec(seedSql);
+        expect(initRow, `initial_status seed row for engine '${engine.type}'`).toBeTruthy();
+        expect(initRow![3]).toBe(machine.initialState);
+      }
     }
   });
 
@@ -448,5 +526,27 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     expect(verify).toMatch(/visible_rows = 0/);
     expect(verify).toMatch(/has_function_privilege/);
     expect(verify).toMatch(/transition_fulfillment/);
+  });
+
+  it('source: resource persistence (Phase 5) is RLS-hardened from day one', () => {
+    const migrationsDir = join(__dirname, '../../../../supabase/migrations');
+    const resource = readFileSync(join(migrationsDir, '20260821180000_engine_a_resource_consumption.sql'), 'utf8');
+    // RLS enabled on both tables with tenant/property-scoped policies — no
+    // USING (true), learned from the fiscal review.
+    expect(resource.match(/ENABLE ROW LEVEL SECURITY/g)!.length).toBeGreaterThanOrEqual(2);
+    expect(resource).toMatch(/resource_allocations_isolation/);
+    expect(resource).toMatch(/resource_allocation_events_isolation/);
+    expect(resource).toMatch(/user_has_tenant_access/);
+    // The policies are tenant/property-scoped — never the wide-open pattern.
+    // (Scan only policy bodies: the header comment may describe the lesson.)
+    const policyBodies = resource.split('CREATE POLICY').slice(1).join('\nCREATE POLICY');
+    expect(policyBodies).not.toMatch(/USING \(true\)/);
+    // anon revoked; events are append-only; SECURITY DEFINER RPCs are
+    // service_role-only (the same pattern as fulfillment).
+    expect(resource).toMatch(/REVOKE SELECT ON "public"."resource_allocations" FROM "anon"/);
+    expect(resource).toMatch(/_resource_allocation_events_immutability/);
+    expect(resource).toMatch(/GRANT EXECUTE ON FUNCTION "public"."allocate_resources"/);
+    expect(resource).toMatch(/GRANT EXECUTE ON FUNCTION "public"."consume_resources"/);
+    expect(resource).toMatch(/GRANT EXECUTE ON FUNCTION "public"."release_resources"/);
   });
 });

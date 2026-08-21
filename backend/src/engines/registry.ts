@@ -22,8 +22,10 @@ import type {
 import { TEMPLATE_TO_ENGINE, ENGINE_TEMPLATES, type TemplateKey } from './types.js';
 import { StateMachine } from './state-machine.js';
 import { assertValidFulfillmentCapabilities } from './fulfillment-contract.js';
+import { assertValidResourceConsumption } from './resource-contract.js';
 import { deductInventorySideEffect, restoreInventorySideEffect } from './inventory-side-effects.js';
 import type { HospitalityFulfillmentMachineStatus } from '../adapters/hospitality/fulfillment.js';
+import type { DigitalFulfillmentMachineStatus } from '../adapters/digital/fulfillment.js';
 
 // Import all engine definitions
 import { instantTransactionEngine } from './definitions/instant-transaction.js';
@@ -31,6 +33,7 @@ import { timeExclusiveReservationEngine } from './definitions/time-exclusive-res
 import { sharedCapacityAccessEngine } from './definitions/shared-capacity-access.js';
 import { ongoingEntitlementEngine } from './definitions/ongoing-entitlement.js';
 import { platformEntitlementEngine } from './definitions/platform-entitlement.js';
+import { digitalDeliveryEngine } from './definitions/digital-delivery.js';
 
 // ============================================
 // Engine Registry
@@ -51,6 +54,7 @@ export interface EngineRegistry {
   shared_capacity_access: EngineDefinition<SharedCapacityAccessStatus>;
   ongoing_entitlement: EngineDefinition<OngoingEntitlementStatus>;
   platform_entitlement: EngineDefinition<PlatformEntitlementStatus>;
+  digital_delivery: EngineDefinition<TransactionState, DigitalFulfillmentMachineStatus>;
 }
 
 const ENGINE_REGISTRY: EngineRegistry = {
@@ -59,6 +63,7 @@ const ENGINE_REGISTRY: EngineRegistry = {
   shared_capacity_access: sharedCapacityAccessEngine,
   ongoing_entitlement: ongoingEntitlementEngine,
   platform_entitlement: platformEntitlementEngine,
+  digital_delivery: digitalDeliveryEngine,
 };
 
 /**
@@ -70,6 +75,14 @@ const ENGINE_REGISTRY: EngineRegistry = {
 function validateRegistry(): void {
   for (const engine of Object.values(ENGINE_REGISTRY)) {
     assertValidFulfillmentCapabilities(engine.capabilities.fulfillment);
+    // Generic resource-consumption contract (plan Phase 5): an impossible
+    // resource model (consumption on a handoff that never happens, kinds
+    // declared but no timing, …) fails STARTUP, not runtime.
+    assertValidResourceConsumption(
+      engine.capabilities.resources,
+      engine.capabilities.fulfillment,
+      engine.capabilities.execution,
+    );
     const commitment = engine.capabilities.commitment;
     if (commitment.type !== 'none' && !commitment.commitmentTrigger) {
       throw new Error(
@@ -184,3 +197,4 @@ export { timeExclusiveReservationEngine } from './definitions/time-exclusive-res
 export { sharedCapacityAccessEngine } from './definitions/shared-capacity-access.js';
 export { ongoingEntitlementEngine } from './definitions/ongoing-entitlement.js';
 export { platformEntitlementEngine } from './definitions/platform-entitlement.js';
+export { digitalDeliveryEngine } from './definitions/digital-delivery.js';

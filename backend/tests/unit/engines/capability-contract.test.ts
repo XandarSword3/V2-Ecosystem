@@ -38,19 +38,26 @@ import {
   HOSPITALITY_FULFILLMENT_STATES,
   type HospitalityFulfillmentMachineStatus,
 } from '../../../src/adapters/hospitality/fulfillment.js';
+import type { DigitalFulfillmentMachineStatus } from '../../../src/adapters/digital/fulfillment.js';
 import type {
   CommitmentModel,
   EngineDefinition,
   FulfillmentDefinition,
   StateMachineDefinition,
+  TransactionState,
 } from '../../../src/engines/types.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
+// Machine-STATE vocabulary that must live only in adapters. Mode/destination
+// TYPE values (digital_delivery, digital_account) are generic contract values
+// — they belong in the core's legal-combination registry — so they are NOT
+// forbidden here; only the adapter's lifecycle states are.
 const FORBIDDEN_CORE_VOCABULARY = [
   'restaurant', 'kitchen', 'menu', 'table', 'snack', 'chalet', 'waiter',
   'burger', 'recipe', 'preparation', 'takeaway', 'counter', 'delivered',
+  'provisioning', 'provisioned',
 ];
 
 // ============================================================
@@ -272,40 +279,17 @@ describe('Cancellation compensation — exactly once', () => {
 // ============================================================
 
 describe('A non-hospitality adapter plugs into the generic contract', () => {
-  const digitalTx: StateMachineDefinition = {
-    states: ['pending', 'confirmed', 'completed', 'cancelled'],
-    initialState: 'pending',
-    terminalStates: ['completed', 'cancelled'],
-    transitions: [
-      { from: 'pending', to: 'confirmed', action: 'confirm', allowedActors: ['staff', 'system'] },
-      { from: 'pending', to: 'cancelled', action: 'cancel', allowedActors: ['customer', 'staff', 'admin'] },
-      { from: 'confirmed', to: 'cancelled', action: 'cancel', allowedActors: ['staff', 'admin'] },
-    ],
-  };
-  const digitalMachine: StateMachineDefinition = {
-    states: ['confirmed', 'provisioning', 'provisioned', 'delivered', 'accessed', 'completed', 'cancelled'],
-    initialState: 'provisioning',
-    terminalStates: ['completed', 'cancelled'],
-    transitions: [
-      { from: 'confirmed', to: 'provisioning', action: 'provision', allowedActors: ['system'] },
-      { from: 'provisioning', to: 'provisioned', action: 'finish_provisioning', allowedActors: ['system'] },
-      { from: 'provisioned', to: 'delivered', action: 'deliver_digital', allowedActors: ['system'] },
-      { from: 'delivered', to: 'completed', action: 'complete', allowedActors: ['system'] },
-      { from: 'provisioning', to: 'cancelled', action: 'cancel', allowedActors: ['admin'] },
-    ],
-  };
-  const digitalFulfillment: FulfillmentDefinition = {
-    required: true,
-    options: [{ mode: 'digital_delivery', destinations: ['digital_account'] }],
-    groups: false,
-    tracking: false,
-    handoff: false,
-    stateMachine: digitalMachine,
-  };
+  // The REAL registered second vertical — the digital delivery adapter
+  // (adapters/digital/fulfillment.ts) — proven through the REGISTRY, not an
+  // inline fixture. This is the Phase 4 completion: only the hospitality
+  // adapter existed before; now the runtime path hosts a second machine.
+  const digitalEngine = getEngine('digital_delivery');
+  const digitalMachine = digitalEngine.capabilities.fulfillment.stateMachine!;
+  const digitalFulfillment = digitalEngine.capabilities.fulfillment;
 
   it('runs a complete digital-delivery lifecycle through the generic validator', async () => {
     const layered = new LayeredStateMachine(
-      new StateMachine(digitalTx),
+      new StateMachine(digitalEngine.stateMachine),
       new StateMachine(digitalMachine),
       digitalFulfillment,
     );
@@ -319,6 +303,20 @@ describe('A non-hospitality adapter plugs into the generic contract', () => {
     expect(layered.canTransition('delivered', 'complete', 'system').allowed).toBe(true);
     // …and never before it.
     expect(layered.canTransition('confirmed', 'complete', 'system').allowed).toBe(false);
+  });
+
+  it('the digital engine is a REAL registered engine with its own fulfillment generic preserved', () => {
+    // Compile-time: getEngine('digital_delivery') returns the definition
+    // typed with DigitalFulfillmentMachineStatus, not a widened string.
+    const engine: EngineDefinition<TransactionState, DigitalFulfillmentMachineStatus> = digitalEngine;
+    expect(engine.type).toBe('digital_delivery');
+    expect(engine.capabilities.fulfillment.required).toBe(true);
+    expect(engine.capabilities.fulfillment.options[0].mode).toBe('digital_delivery');
+    expect(engine.capabilities.fulfillment.options[0].destinations).toEqual(['digital_account']);
+    // Its machine states are the digital adapter's own, never hospitality's.
+    expect(digitalMachine.states).toContain('provisioning');
+    expect(digitalMachine.states).toContain('delivered');
+    expect(digitalMachine.states).not.toContain('queued');
   });
 });
 
@@ -335,6 +333,10 @@ describe('Generic core vocabulary guard', () => {
       'layered-state.ts',
       'state-machine.ts',
       'engine-service.ts',
+      // Plan Phase 5: the generic resource layer is scanned too — the
+      // hospitality BOM (menu_item_ingredients / recipe) must live only in
+      // adapters/hospitality/resources.ts.
+      'resource-contract.ts',
     ];
     const pattern = new RegExp(`\\b(${FORBIDDEN_CORE_VOCABULARY.join('|')})\\b`, 'i');
     for (const file of files) {
@@ -475,13 +477,14 @@ describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
     };
   });
 
-  it('the registry record type is exactly the five engines', () => {
+  it('the registry record type is exactly the registered engines (incl. the digital second vertical)', () => {
     // Runtime proof the interface keys match the registered engines.
     const record: Record<string, unknown> = {};
     for (const engine of getAllEngines()) {
       record[engine.type] = engine;
     }
     expect(Object.keys(record).sort()).toEqual([
+      'digital_delivery',
       'instant_transaction',
       'ongoing_entitlement',
       'platform_entitlement',
