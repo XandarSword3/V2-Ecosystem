@@ -22,7 +22,11 @@
  * transactions.status once fulfillment has its own persistence.
  */
 
-import type { StateMachineDefinition, LegacyStatusBridge } from '../../engines/types.js';
+import type {
+  AutoHandoffPolicy,
+  LegacyStatusBridge,
+  StateMachineDefinition,
+} from '../../engines/types.js';
 
 export const HOSPITALITY_FULFILLMENT_STATES = [
   'queued',
@@ -60,12 +64,28 @@ export const hospitalityFulfillmentStateMachine: StateMachineDefinition<Hospital
     { from: 'ready', to: 'handed_off', action: 'deliver', allowedActors: ['staff'], guardDescription: 'Handed to the customer or placed at the destination' },
     // Completion (cross-layer: fulfillment done → transaction completed).
     { from: 'handed_off', to: 'completed', action: 'complete', allowedActors: ['staff', 'system'], guardDescription: 'Customer acknowledged receipt / auto-complete' },
-    { from: 'ready', to: 'completed', action: 'complete', allowedActors: ['staff', 'system'], guardDescription: 'Counter/takeaway orders complete at handoff without a separate delivered step' },
+    // NOTE: there is NO implicit ready → completed shortcut here. Counter /
+    // takeaway orders complete via the EXPLICIT auto-handoff policy below,
+    // which the generic core applies — completion at 'ready' is a declared
+    // capability, not a hidden machine transition.
     // Cancellation from any fulfillment stage (cross-layer → transaction cancelled).
     { from: 'in_progress', to: 'cancelled', action: 'cancel', allowedActors: ['admin'], guardDescription: 'Admin-only comp/void in preparation — requires refund + inventory reversal' },
     { from: 'ready', to: 'cancelled', action: 'cancel', allowedActors: ['admin'], guardDescription: 'Admin-only comp/void when ready — requires refund + inventory reversal' },
     { from: 'handed_off', to: 'cancelled', action: 'cancel', allowedActors: ['admin'], guardDescription: 'Admin-only comp/void after handoff — requires refund + inventory reversal' },
   ],
+};
+
+/**
+ * EXPLICIT auto-handoff policy: an order that reaches `ready` is deemed
+ * handed off (counter/takeaway) — the transaction may complete directly
+ * from 'ready' via the machine's own completion action ('complete'). This
+ * replaces the former implicit `ready → completed` machine shortcut: the
+ * policy is declared here, validated at registration, and applied by the
+ * generic core. No hidden transition exists on the machine.
+ */
+export const HOSPITALITY_AUTO_HANDOFF: AutoHandoffPolicy<HospitalityFulfillmentMachineStatus> = {
+  atState: 'ready',
+  allowedActors: ['staff', 'system'],
 };
 
 /**

@@ -7,7 +7,13 @@ export type EngineType =
   | 'ongoing_entitlement'
   | 'platform_entitlement';
 
-export const TEMPLATE_TO_ENGINE: Record<string, EngineType> = {
+/**
+ * Literal template → engine map (the type-level source of truth). Kept as a
+ * const so `getEngineByTemplate('menu_service')` resolves to the engine's
+ * FULL definition type — including its fulfillment-status generic — instead
+ * of erasing it to `string`.
+ */
+export const ENGINE_TEMPLATES = {
   // ── Real engine type names (1:1) — new modules use these ──────────────────
   instant_transaction:       'instant_transaction',
   time_exclusive_reservation:'time_exclusive_reservation',
@@ -23,7 +29,12 @@ export const TEMPLATE_TO_ENGINE: Record<string, EngineType> = {
   class_scheduling:          'shared_capacity_access',
   appointment_booking:       'time_exclusive_reservation',
   saas_subscription:         'platform_entitlement',
-};
+} as const;
+
+export type TemplateKey = keyof typeof ENGINE_TEMPLATES;
+
+/** Dynamic (string-keyed) lookup for DB-driven call sites. */
+export const TEMPLATE_TO_ENGINE: Record<string, EngineType> = ENGINE_TEMPLATES;
 
 export const ENGINE_TO_TEMPLATE: Record<EngineType, string> = {
   instant_transaction:        'instant_transaction',
@@ -296,12 +307,32 @@ export interface FulfillmentDefinition<TFulfillmentStatus extends string = strin
   /** The fulfillment lifecycle — adapter-shaped state machine (absent when the engine has no fulfillment layer). */
   stateMachine?: StateMachineDefinition<TFulfillmentStatus>;
   /**
+   * EXPLICIT auto-handoff policy (replaces implicit machine shortcuts): when
+   * the fulfillment layer reaches `atState`, handoff is deemed complete and
+   * the transaction may complete directly from there via the fulfillment
+   * machine's own completion action. Declared by the ADAPTER that owns the
+   * state name — the generic core derives the action from the machine and
+   * never hardcodes a vertical state.
+   */
+  autoHandoff?: AutoHandoffPolicy<TFulfillmentStatus>;
+  /**
    * TRANSITIONAL — declared ONLY by adapters still writing legacy composite
    * statuses until Stage 6 gives fulfillment its own persistence. Generic
    * code applies it mechanically; nothing may read fulfillment meaning from
    * the legacy column once fulfillment rows exist.
    */
   legacyStatusBridge?: LegacyStatusBridge;
+}
+
+/**
+ * Explicit auto-handoff declaration: fulfillment reaching `atState` implies
+ * handoff, so the transaction may complete without a separate handoff step.
+ */
+export interface AutoHandoffPolicy<TFulfillmentStatus extends string = string> {
+  /** Fulfillment state at which handoff is deemed automatic. */
+  atState: TFulfillmentStatus;
+  /** Who may complete the transaction from the auto-handoff state. */
+  allowedActors: ('system' | 'staff' | 'customer' | 'admin')[];
 }
 
 export interface ExecutionDefinition {

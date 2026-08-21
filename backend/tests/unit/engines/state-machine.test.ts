@@ -171,9 +171,11 @@ describe('StateMachine - Instant Transaction (Engine A) — FULFILLMENT layer (h
       expect(result.newState).toBe('completed');
     });
 
-    it('ready → completed (takeaway/counter shortcut)', async () => {
-      const result = await fm.transition('ready', 'complete', 'staff');
-      expect(result.newState).toBe('completed');
+    it('NO implicit ready → completed machine shortcut — completion from ready is the explicit auto-handoff policy', async () => {
+      // The raw machine must reject it: the adapter removed the hidden
+      // shortcut; completion at 'ready' is now the declared auto-handoff
+      // policy, applied by the layered validator, not a machine transition.
+      await expect(fm.transition('ready', 'complete', 'staff')).rejects.toThrow();
     });
   });
 

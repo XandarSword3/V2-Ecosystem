@@ -16,7 +16,12 @@
  *   8. the legacy status bridge is adapter-declared and transitional.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { getAllEngines, getEngineByTemplate } from '../../../src/engines/registry.js';
+import {
+  getAllEngines,
+  getEngine,
+  getEngineByTemplate,
+  type EngineRegistry,
+} from '../../../src/engines/registry.js';
 import { EngineService } from '../../../src/engines/engine-service.js';
 import { LayeredStateMachine } from '../../../src/engines/layered-state.js';
 import {
@@ -31,9 +36,11 @@ import {
   hospitalityFulfillmentStateMachine,
   HOSPITALITY_LEGACY_STATUS_BRIDGE,
   HOSPITALITY_FULFILLMENT_STATES,
+  type HospitalityFulfillmentMachineStatus,
 } from '../../../src/adapters/hospitality/fulfillment.js';
 import type {
   CommitmentModel,
+  EngineDefinition,
   FulfillmentDefinition,
   StateMachineDefinition,
 } from '../../../src/engines/types.js';
@@ -399,6 +406,234 @@ describe('Impossible configurations are rejected', () => {
     for (const mode of ['pickup', 'on_premise', 'local_delivery', 'shipment', 'digital_delivery', 'service_execution']) {
       expect(LEGAL_FULFILLMENT_COMBINATIONS[mode as keyof typeof LEGAL_FULFILLMENT_COMBINATIONS].length).toBeGreaterThan(0);
     }
+  });
+});
+
+// ============================================================
+// 9. Registry preserves the fulfillment generic (fix #1)
+// ============================================================
+
+describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
+  it('getEngine("instant_transaction") is typed with the hospitality fulfillment states', () => {
+    // Compile-time proof: assigning the machine's states to the hospitality
+    // union only compiles if the registry kept the generic. If it had been
+    // erased to string, this assignment would fail typecheck.
+    const machine: StateMachineDefinition<HospitalityFulfillmentMachineStatus> | undefined =
+      getEngine('instant_transaction').capabilities.fulfillment.stateMachine;
+    expect(machine).toBeDefined();
+    // The machine also carries cross-layer states (confirmed/completed/
+    // cancelled) — the CANONICAL fulfillment lifecycle must be present.
+    for (const s of HOSPITALITY_FULFILLMENT_STATES) {
+      expect(machine!.states).toContain(s);
+    }
+  });
+
+  it('getEngineByTemplate("menu_service") preserves the same generic through the alias', () => {
+    const machine: StateMachineDefinition<HospitalityFulfillmentMachineStatus> | undefined =
+      getEngineByTemplate('menu_service').capabilities.fulfillment.stateMachine;
+    expect(machine).toBeDefined();
+    expect(machine!.states).toContain('handed_off');
+  });
+
+  it('getEngine returns exactly the registry record type — not a widened definition', () => {
+    // If the registry erased generics, this exact-type check would fail.
+    const typed: EngineRegistry['instant_transaction'] = getEngine('instant_transaction');
+    expect(typed.type).toBe('instant_transaction');
+    expect(typed.capabilities.fulfillment.stateMachine).toBeDefined();
+  });
+
+  it('a string-erased fulfillment machine cannot satisfy the registry type (compile-time)', () => {
+    // @ts-expect-error — StateMachineDefinition<string> is NOT assignable to
+    // StateMachineDefinition<HospitalityFulfillmentMachineStatus>; only the
+    // preserved generic satisfies the registry slot.
+    const erased: EngineRegistry['instant_transaction'] = {
+      type: 'instant_transaction',
+      name: 'x',
+      description: 'x',
+      commercialEntity: 'x',
+      stateMachine: { states: ['pending'], initialState: 'pending', terminalStates: [], transitions: [] },
+      pricing: { applyTax: false, applyFees: false, supportsCoupons: false, supportsGiftCards: false, supportsLoyaltyRedemption: false, earnsLoyaltyPoints: false, deductsInventory: false, rounding: 'round', decimalPlaces: 2 },
+      interactions: [],
+      capabilities: {
+        transactionModel: { supportsDraft: false, autoComplete: true, states: ['pending'] },
+        commitment: { type: 'none' },
+        fulfillment: {
+          required: true,
+          options: [],
+          groups: false,
+          tracking: false,
+          handoff: true,
+          stateMachine: { states: ['string-state'], initialState: 'string-state', terminalStates: [], transitions: [] },
+        },
+        execution: { enabled: true, workCenters: true, operators: true, states: [], notificationTrigger: 'on_confirm' },
+        economics: { multiTender: false, refunds: false, voids: false, ledger: true, loyalty: 'none', coupons: false, giftCards: false, pos: false, currencyRequired: true },
+        customer: { guests: true, accounts: false, staffAssisted: true, reviews: true, serviceRecovery: true },
+        fiscal: { documents: [], eInvoicing: false, controlledNumbering: false },
+        returns: { refund: 'none', physicalReturn: false, exchange: false, replacement: false, cancellation: true },
+      },
+    };
+  });
+
+  it('the registry record type is exactly the five engines', () => {
+    // Runtime proof the interface keys match the registered engines.
+    const record: Record<string, unknown> = {};
+    for (const engine of getAllEngines()) {
+      record[engine.type] = engine;
+    }
+    expect(Object.keys(record).sort()).toEqual([
+      'instant_transaction',
+      'ongoing_entitlement',
+      'platform_entitlement',
+      'shared_capacity_access',
+      'time_exclusive_reservation',
+    ]);
+  });
+});
+
+// ============================================================
+// 10. Completion gate applies to getAvailableActions (fix #2)
+// ============================================================
+
+describe('Completion gate applies to available actions', () => {
+  // A "naive" transaction machine that WRONGLY declares confirmed → completed
+  // while fulfillment is required. The gate must hide completion from the
+  // offered actions even though the machine declares it.
+  const naiveTxMachine: StateMachineDefinition = {
+    states: ['pending', 'confirmed', 'completed', 'cancelled'],
+    initialState: 'pending',
+    terminalStates: ['completed', 'cancelled'],
+    transitions: [
+      { from: 'pending', to: 'confirmed', action: 'confirm', allowedActors: ['staff', 'system'] },
+      { from: 'confirmed', to: 'completed', action: 'complete', allowedActors: ['staff', 'system'] },
+      { from: 'pending', to: 'cancelled', action: 'cancel', allowedActors: ['customer', 'staff', 'admin'] },
+      { from: 'confirmed', to: 'cancelled', action: 'cancel', allowedActors: ['staff', 'admin'] },
+    ],
+  };
+  const fulfillmentMachine: StateMachineDefinition = {
+    states: ['confirmed', 'provisioning', 'provisioned', 'completed', 'cancelled'],
+    initialState: 'provisioning',
+    terminalStates: ['completed', 'cancelled'],
+    transitions: [
+      { from: 'confirmed', to: 'provisioning', action: 'provision', allowedActors: ['system'] },
+      { from: 'provisioning', to: 'provisioned', action: 'finish_provisioning', allowedActors: ['system'] },
+      { from: 'provisioned', to: 'completed', action: 'complete', allowedActors: ['system'] },
+      { from: 'provisioning', to: 'cancelled', action: 'cancel', allowedActors: ['admin'] },
+    ],
+  };
+  const requiredFulfillment: FulfillmentDefinition = {
+    required: true,
+    options: [{ mode: 'digital_delivery', destinations: ['digital_account'] }],
+    groups: false,
+    tracking: false,
+    handoff: false,
+    stateMachine: fulfillmentMachine,
+  };
+
+  it('never OFFERS transaction-layer completion when fulfillment is required', () => {
+    const layered = new LayeredStateMachine(
+      new StateMachine(naiveTxMachine),
+      new StateMachine(fulfillmentMachine),
+      requiredFulfillment,
+    );
+    const actions = layered.getAvailableActions('confirmed', 'staff');
+    expect(actions.map(a => a.action)).not.toContain('complete');
+    // …but the fulfillment layer's own completion IS offered from its handoff state.
+    const fmActions = layered.getAvailableActions('provisioned', 'system');
+    expect(fmActions.map(a => a.action)).toContain('complete');
+  });
+
+  it('offers transaction-layer completion when fulfillment is NOT required', () => {
+    const noFulfillment: FulfillmentDefinition = {
+      required: false,
+      options: [],
+      groups: false,
+      tracking: false,
+      handoff: false,
+    };
+    const layered = new LayeredStateMachine(
+      new StateMachine(naiveTxMachine),
+      null,
+      noFulfillment,
+    );
+    const actions = layered.getAvailableActions('confirmed', 'staff');
+    expect(actions.map(a => a.action)).toContain('complete');
+  });
+
+  it('the real Engine A does not offer completion from confirmed', () => {
+    const service = new EngineService();
+    const actions = service.getAvailableActions('instant_transaction', 'confirmed', 'staff');
+    expect(actions.map(a => a.action)).not.toContain('complete');
+  });
+});
+
+// ============================================================
+// 11. Explicit auto-handoff policy (fix #3)
+// ============================================================
+
+describe('Explicit auto-handoff policy replaces the implicit shortcut', () => {
+  it('the hospitality machine has NO ready → completed transition', () => {
+    const shortcut = hospitalityFulfillmentStateMachine.transitions.find(
+      t => t.from === 'ready' && t.to === 'completed',
+    );
+    expect(shortcut).toBeUndefined();
+  });
+
+  it('completion from ready works through the layered validator via the policy', async () => {
+    const service = new EngineService();
+    const r = await service.transitionState('instant_transaction', 'ready', 'complete', 'staff');
+    expect(r.allowed).toBe(true);
+    expect(r.targetState).toBe('completed');
+    expect(r.layer).toBe('fulfillment');
+  });
+
+  it('the policy is actor-gated (customer cannot auto-complete)', async () => {
+    const service = new EngineService();
+    const r = await service.transitionState('instant_transaction', 'ready', 'complete', 'customer');
+    expect(r.allowed).toBe(false);
+  });
+
+  it('completion from ready is offered in available actions', () => {
+    const service = new EngineService();
+    const actions = service.getAvailableActions('instant_transaction', 'ready', 'staff');
+    expect(actions.map(a => a.action)).toContain('complete');
+  });
+
+  it('an impossible auto-handoff declaration fails registration validation', () => {
+    expect(() =>
+      assertValidFulfillmentCapabilities({
+        required: true,
+        options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
+        groups: false,
+        tracking: false,
+        handoff: true,
+        // state: 'ready' is not in the machine's states below
+        autoHandoff: { atState: 'ready', allowedActors: ['staff'] },
+        stateMachine: {
+          states: ['queued', 'in_progress', 'handed_off', 'completed', 'cancelled'],
+          initialState: 'queued',
+          terminalStates: ['completed', 'cancelled'],
+          transitions: [{ from: 'handed_off', to: 'completed', action: 'complete', allowedActors: ['staff'] }],
+        },
+      }),
+    ).toThrow(FulfillmentContractError);
+
+    // auto-handoff with no completion transition to derive the action from
+    expect(() =>
+      assertValidFulfillmentCapabilities({
+        required: true,
+        options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
+        groups: false,
+        tracking: false,
+        handoff: true,
+        autoHandoff: { atState: 'ready', allowedActors: ['staff'] },
+        stateMachine: {
+          states: ['queued', 'ready', 'handed_off', 'cancelled'],
+          initialState: 'queued',
+          terminalStates: ['cancelled'],
+          transitions: [{ from: 'ready', to: 'handed_off', action: 'deliver', allowedActors: ['staff'] }],
+        },
+      }),
+    ).toThrow(FulfillmentContractError);
   });
 });
 

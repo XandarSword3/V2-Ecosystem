@@ -73,6 +73,27 @@ export function assertValidFulfillmentCapabilities(
     // Allowed: a machine may exist for tracking even when completion is not
     // gated on it — but it must be consistent (see options below).
   }
+  if (fulfillment.autoHandoff) {
+    if (!fulfillment.stateMachine) {
+      throw new FulfillmentContractError(
+        'Auto-handoff declared but no fulfillment state machine exists to derive the completion action from',
+      );
+    }
+    if (!fulfillment.stateMachine.states.includes(fulfillment.autoHandoff.atState)) {
+      throw new FulfillmentContractError(
+        `Auto-handoff state '${fulfillment.autoHandoff.atState}' is not in the fulfillment machine's states`,
+      );
+    }
+    if (fulfillment.autoHandoff.allowedActors.length === 0) {
+      throw new FulfillmentContractError('Auto-handoff must declare at least one allowed actor');
+    }
+    const hasCompletion = fulfillment.stateMachine.transitions.some(t => t.to === COMPLETION_STATE);
+    if (!hasCompletion) {
+      throw new FulfillmentContractError(
+        'Auto-handoff declared but the fulfillment machine has no transition to the completion state to derive the completion action from',
+      );
+    }
+  }
   if (fulfillment.options.length === 0) {
     if (fulfillment.required) {
       throw new FulfillmentContractError(

@@ -28,6 +28,7 @@ import type {
 import {
   hospitalityFulfillmentStateMachine,
   HOSPITALITY_LEGACY_STATUS_BRIDGE,
+  HOSPITALITY_AUTO_HANDOFF,
   type HospitalityFulfillmentMachineStatus,
 } from '../../adapters/hospitality/fulfillment.js';
 
@@ -160,6 +161,7 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Hospit
       tracking: false,
       handoff: true,
       stateMachine: hospitalityFulfillmentStateMachine,
+      autoHandoff: HOSPITALITY_AUTO_HANDOFF,
       legacyStatusBridge: HOSPITALITY_LEGACY_STATUS_BRIDGE,
     },
     execution: {

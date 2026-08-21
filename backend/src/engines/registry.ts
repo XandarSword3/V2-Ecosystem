@@ -10,11 +10,20 @@
  *   const stateMachine = createStateMachine('instant_transaction');
  */
 
-import type { EngineType, EngineDefinition } from './types.js';
-import { TEMPLATE_TO_ENGINE } from './types.js';
+import type {
+  EngineType,
+  EngineDefinition,
+  TransactionState,
+  TimeExclusiveReservationStatus,
+  SharedCapacityAccessStatus,
+  OngoingEntitlementStatus,
+  PlatformEntitlementStatus,
+} from './types.js';
+import { TEMPLATE_TO_ENGINE, ENGINE_TEMPLATES, type TemplateKey } from './types.js';
 import { StateMachine } from './state-machine.js';
 import { assertValidFulfillmentCapabilities } from './fulfillment-contract.js';
 import { deductInventorySideEffect, restoreInventorySideEffect } from './inventory-side-effects.js';
+import type { HospitalityFulfillmentMachineStatus } from '../adapters/hospitality/fulfillment.js';
 
 // Import all engine definitions
 import { instantTransactionEngine } from './definitions/instant-transaction.js';
@@ -27,7 +36,24 @@ import { platformEntitlementEngine } from './definitions/platform-entitlement.js
 // Engine Registry
 // ============================================
 
-const ENGINE_REGISTRY: Record<EngineType, EngineDefinition> = {
+/**
+ * The registry preserves each engine's generic parameters — an engine's
+ * fulfillment-status type is NOT erased to `string` by lookup. This is the
+ * compile-time guarantee that an engine's declared fulfillment machine uses
+ * the engine's own fulfillment-state type all the way through the registry.
+ */
+export interface EngineRegistry {
+  // Engine A has a real fulfillment layer — its fulfillment-status generic
+  // is preserved through every lookup. Engines B–E declare no fulfillment
+  // machine, so their second generic is the honest default (string).
+  instant_transaction: EngineDefinition<TransactionState, HospitalityFulfillmentMachineStatus>;
+  time_exclusive_reservation: EngineDefinition<TimeExclusiveReservationStatus>;
+  shared_capacity_access: EngineDefinition<SharedCapacityAccessStatus>;
+  ongoing_entitlement: EngineDefinition<OngoingEntitlementStatus>;
+  platform_entitlement: EngineDefinition<PlatformEntitlementStatus>;
+}
+
+const ENGINE_REGISTRY: EngineRegistry = {
   instant_transaction: instantTransactionEngine,
   time_exclusive_reservation: timeExclusiveReservationEngine,
   shared_capacity_access: sharedCapacityAccessEngine,
@@ -55,10 +81,12 @@ function validateRegistry(): void {
 validateRegistry();
 
 /**
- * Get an engine definition by engine type.
+ * Get an engine definition by engine type — the generic parameters survive
+ * the lookup, so `getEngine('instant_transaction')` returns the definition
+ * typed with `HospitalityFulfillmentMachineStatus`, not `string`.
  * @throws Error if engine type is unknown.
  */
-export function getEngine(engineType: EngineType): EngineDefinition {
+export function getEngine<K extends keyof EngineRegistry>(engineType: K): EngineRegistry[K] {
   const engine = ENGINE_REGISTRY[engineType];
   if (!engine) {
     throw new Error(`Unknown engine type: '${engineType}'. Valid types: ${Object.keys(ENGINE_REGISTRY).join(', ')}`);
@@ -69,10 +97,14 @@ export function getEngine(engineType: EngineType): EngineDefinition {
 /**
  * Get an engine definition by database template_type.
  * This is the primary lookup used by controllers/services.
+ * Literal template keys resolve to the engine's full definition type
+ * (fulfillment generic preserved); dynamic strings widen to EngineDefinition.
  * 
  * @param templateType - The database module_template_type value (e.g., 'menu_service')
  * @throws Error if template type has no mapped engine.
  */
+export function getEngineByTemplate<K extends TemplateKey>(templateType: K): EngineRegistry[typeof ENGINE_TEMPLATES[K]];
+export function getEngineByTemplate(templateType: string): EngineDefinition;
 export function getEngineByTemplate(templateType: string): EngineDefinition {
   const engineType = TEMPLATE_TO_ENGINE[templateType];
   if (!engineType) {
@@ -125,9 +157,10 @@ export function getAllEngineTypes(): EngineType[] {
 }
 
 /**
- * Get all registered engine definitions.
+ * Get all registered engine definitions — each keeps its own generic
+ * parameters (no erasure to `EngineDefinition<string, string>`).
  */
-export function getAllEngines(): EngineDefinition[] {
+export function getAllEngines(): EngineRegistry[keyof EngineRegistry][] {
   return Object.values(ENGINE_REGISTRY);
 }
 
