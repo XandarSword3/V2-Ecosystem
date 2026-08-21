@@ -422,17 +422,32 @@ export class ResourceConsumptionService {
       return { ok: release.ok, op: 'released', error: release.error, released: release.released };
     }
 
-    // 2. Economic confirmation → allocation.
-    if (
+    // 2. Allocation timing — capability-declared, never assumed. Two legal
+    // triggers with runtime paths (plan Phase 5 closure):
+    //   - on_purchase / on_confirm → allocate at economic confirmation;
+    //   - on_fulfillment_start → allocate when the fulfillment layer
+    //     ENTERS execution (the first move that leaves the machine's
+    //     initial state). This closes the declared-capability gap where
+    //     on_fulfillment_start was legal in the contract and validated at
+    //     registration, but no runtime path ever allocated.
+    const allocationAtConfirmation =
+      (model.allocation === 'on_purchase' || model.allocation === 'on_confirm') &&
       params.layer === 'transaction' &&
-      params.targetState === 'confirmed' &&
-      (model.allocation === 'on_purchase' || model.allocation === 'on_confirm')
-    ) {
+      params.targetState === 'confirmed';
+    const allocationAtFulfillmentStart =
+      model.allocation === 'on_fulfillment_start' &&
+      params.layer === 'fulfillment' &&
+      isFulfillmentStartMove(
+        this.getFulfillmentInitialState(params.engineType, params.mode),
+        params.currentState,
+        params.targetState,
+      );
+    if (allocationAtConfirmation || allocationAtFulfillmentStart) {
       if (!this.resolver) {
         return {
           ok: false,
           op: 'none',
-          error: 'Resource model allocates at confirmation but no requirement resolver is wired for this lifecycle move',
+          error: 'Resource model allocates but no requirement resolver is wired for this lifecycle move',
         };
       }
       try {
@@ -507,6 +522,21 @@ export class ResourceConsumptionService {
   }
 
   /**
+   * The selected mode binding's machine initial state — "fulfillment start"
+   * is the first fulfillment-layer move that LEAVES this state. Derived
+   * from the machine; the generic core never names a vertical start state.
+   */
+  private getFulfillmentInitialState(
+    engineType: string,
+    mode: FulfillmentMode | undefined,
+  ): string | undefined {
+    if (!mode) return undefined;
+    const binding = (getEngine(engineType as keyof EngineRegistry).capabilities.fulfillment.modeMachines ?? [])
+      .find(b => b.modes.includes(mode));
+    return binding?.machine.initialState;
+  }
+
+  /**
    * Read the current allocation state for a transaction. FAIL-CLOSED: a read
    * error THROWS — it is never confused with "no allocations". Null is
    * returned ONLY when no allocation rows exist.
@@ -526,6 +556,21 @@ export class ResourceConsumptionService {
     return (data as ResourceAllocationRow[]) ?? null;
   }
 
+}
+
+/**
+ * Whether a move starts fulfillment execution: the first fulfillment-layer
+ * move that LEAVES the machine's initial state (hospitality queued →
+ * in_progress). Pure and exported so the decision is unit-testable without
+ * a registry seam; the driver supplies the initial state from the mode
+ * binding's machine.
+ */
+export function isFulfillmentStartMove(
+  initialState: string | undefined,
+  currentState: string,
+  targetState: string,
+): boolean {
+  return initialState !== undefined && currentState === initialState && targetState !== initialState;
 }
 
 let _resourceConsumptionService: ResourceConsumptionService | null = null;

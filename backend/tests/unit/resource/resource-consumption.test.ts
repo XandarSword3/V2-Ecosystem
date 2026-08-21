@@ -26,7 +26,10 @@ import {
   ResourceContractError,
 } from '../../../src/engines/resource-contract.js';
 import { getAllEngines, getEngine } from '../../../src/engines/registry.js';
-import { ResourceConsumptionService } from '../../../src/modules/resource/resource-consumption.service.js';
+import {
+  ResourceConsumptionService,
+  isFulfillmentStartMove,
+} from '../../../src/modules/resource/resource-consumption.service.js';
 import { hospitalityResourceResolver } from '../../../src/adapters/hospitality/resources.js';
 import type { FulfillmentDefinition, ResourceRequirement } from '../../../src/engines/types.js';
 
@@ -109,6 +112,67 @@ describe('Generic resource consumption contract (plan Phase 5)', () => {
           reversalOnCancel: true,
         },
         noFulfillment,
+      ),
+    ).not.toThrow();
+  });
+
+  it('on_fulfillment_start allocation is legal ONLY with a fulfillment machine (declaration side)', () => {
+    // The declaration is validated at registration — it must be able to
+    // determine when fulfillment starts.
+    const noFulfillment: FulfillmentDefinition = {
+      required: false,
+      options: [],
+      groups: false,
+      tracking: false,
+    };
+    expect(() =>
+      assertValidResourceConsumption(
+        {
+          type: 'inventory',
+          kinds: ['inventory_item'],
+          allocation: 'on_fulfillment_start',
+          consumption: 'on_fulfillment_handoff',
+          reversalOnCancel: true,
+        },
+        noFulfillment,
+      ),
+    ).toThrow(ResourceContractError);
+
+    // ...and valid when the engine has a fulfillment machine to derive the
+    // start state from.
+    const withMachine: FulfillmentDefinition = {
+      required: true,
+      options: [{ mode: 'on_premise', destinations: ['on_premise_location'] }],
+      modeMachines: [
+        {
+          modes: ['on_premise'],
+          handoff: true,
+          machine: {
+            states: ['queued', 'in_progress', 'ready', 'handed_off', 'completed'],
+            initialState: 'queued',
+            terminalStates: ['completed'],
+            transitions: [
+              { from: 'queued', to: 'in_progress', action: 'start_preparation' },
+              { from: 'in_progress', to: 'ready', action: 'mark_ready' },
+              { from: 'ready', to: 'handed_off', action: 'deliver' },
+              { from: 'handed_off', to: 'completed', action: 'complete' },
+            ],
+          },
+        },
+      ],
+      groups: false,
+      tracking: false,
+    };
+    expect(() =>
+      assertValidResourceConsumption(
+        {
+          type: 'inventory',
+          kinds: ['inventory_item'],
+          allocation: 'on_fulfillment_start',
+          consumption: 'on_fulfillment_handoff',
+          reversalOnCancel: true,
+        },
+        withMachine,
       ),
     ).not.toThrow();
   });
@@ -535,6 +599,35 @@ describe('ResourceConsumptionService (generic)', () => {
     });
     expect(cancel).toMatchObject({ ok: true, op: 'released' });
     expect(supabase.rpcCalls.map((c: any) => c.name)).toEqual(['release_resources']);
+  });
+
+  it('FULFILLMENT-START: the start move is the first move that leaves the machine initial state (pure decision)', () => {
+    // Hospitality machine: initialState 'queued'. "Fulfillment start" is
+    // queued → in_progress — exactly once, never again, never a transaction
+    // move, never without a machine to derive the start state from.
+    expect(isFulfillmentStartMove('queued', 'queued', 'in_progress')).toBe(true);
+    expect(isFulfillmentStartMove('queued', 'in_progress', 'ready')).toBe(false);
+    expect(isFulfillmentStartMove('queued', 'ready', 'handed_off')).toBe(false);
+    expect(isFulfillmentStartMove('queued', 'queued', 'queued')).toBe(false);
+    // No machine (no initial state) → never a start move.
+    expect(isFulfillmentStartMove(undefined, 'queued', 'in_progress')).toBe(false);
+  });
+
+  it('the lifecycle driver implements EVERY allocation trigger the contract declares (no declared-capability gaps)', () => {
+    // Regression guard for the Phase 5 closure: the resource model declares
+    // three legal allocation triggers — on_purchase, on_confirm,
+    // on_fulfillment_start — and the driver must implement all three. This
+    // catches the gap where on_fulfillment_start was legal and validated at
+    // registration but no runtime path ever allocated.
+    const src = readFileSync(join(__dirname, '../../../src/modules/resource/resource-consumption.service.ts'), 'utf8');
+    expect(src).toMatch(/model\.allocation === 'on_fulfillment_start'/);
+    expect(src).toMatch(/isFulfillmentStartMove\(/);
+    expect(src).toMatch(/model\.allocation === 'on_purchase' \|\| model\.allocation === 'on_confirm'/);
+    // The declaration side validates on_fulfillment_start requires a
+    // fulfillment machine (the start state must be derivable).
+    const contract = readFileSync(join(__dirname, '../../../src/engines/resource-contract.ts'), 'utf8');
+    expect(contract).toMatch(/on_fulfillment_start/);
+    expect(contract).toMatch(/fulfillment machine OR an execution model/);
   });
 
   it('LIFECYCLE: a digital-delivery mode drives no resource RPCs at all (model none)', async () => {
