@@ -175,12 +175,14 @@ export const timeExclusiveReservationEngine: EngineDefinition<TimeExclusiveReser
     commitment: {
       type: 'capacity',
       reservation: true,
-      deductionTrigger: 'on_purchase',
+      commitmentTrigger: 'on_purchase',
       reversalOnCancel: true,
     },
     fulfillment: {
-      modes: ['on_premise'],
-      destinations: ['on_premise_location'],
+      required: false,
+      options: [
+        { mode: 'on_premise', destinations: ['on_premise_location'] },
+      ],
       groups: false,
       tracking: false,
       handoff: false,

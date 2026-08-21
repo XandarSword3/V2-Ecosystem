@@ -8,7 +8,7 @@
 
 import { StateMachine, StateMachineError } from '../../../src/engines/state-machine.js';
 import { instantTransactionStateMachine } from '../../../src/engines/definitions/instant-transaction.js';
-import { instantTransactionFulfillmentStateMachine } from '../../../src/engines/fulfillment-states.js';
+import { hospitalityFulfillmentStateMachine } from '../../../src/adapters/hospitality/fulfillment.js';
 import { timeExclusiveReservationStateMachine } from '../../../src/engines/definitions/time-exclusive-reservation.js';
 import { sharedCapacityAccessStateMachine } from '../../../src/engines/definitions/shared-capacity-access.js';
 import { ongoingEntitlementStateMachine } from '../../../src/engines/definitions/ongoing-entitlement.js';
@@ -48,15 +48,17 @@ describe('StateMachine - Instant Transaction (Engine A) — TRANSACTION layer', 
     });
   });
 
-  describe('transaction lifecycle: pending → confirmed → completed', () => {
-    it('should confirm then complete at the transaction layer', async () => {
-      let result = await sm.transition('pending', 'confirm', 'staff');
+  describe('transaction lifecycle', () => {
+    it('confirms at the transaction layer', async () => {
+      const result = await sm.transition('pending', 'confirm', 'staff');
       expect(result.success).toBe(true);
       expect(result.newState).toBe('confirmed');
+    });
 
-      result = await sm.transition('confirmed', 'complete', 'staff');
-      expect(result.success).toBe(true);
-      expect(result.newState).toBe('completed');
+    it('CANNOT complete directly at the transaction layer — completion is capability-gated on required fulfillment', async () => {
+      // The transaction machine no longer declares confirmed → completed;
+      // completion must originate from the fulfillment layer (handed_off → completed).
+      await expect(sm.transition('confirmed', 'complete', 'staff')).rejects.toThrow();
     });
   });
 
@@ -130,11 +132,11 @@ describe('StateMachine - Instant Transaction (Engine A) — TRANSACTION layer', 
 // Engine A FULFILLMENT layer (adapter-shaped lifecycle)
 // ============================================
 
-describe('StateMachine - Instant Transaction (Engine A) — FULFILLMENT layer', () => {
+describe('StateMachine - Instant Transaction (Engine A) — FULFILLMENT layer (hospitality adapter)', () => {
   let fm: StateMachine;
 
   beforeEach(() => {
-    fm = new StateMachine(instantTransactionFulfillmentStateMachine);
+    fm = new StateMachine(hospitalityFulfillmentStateMachine);
   });
 
   describe('canonical fulfillment lifecycle', () => {

@@ -157,12 +157,14 @@ export const sharedCapacityAccessEngine: EngineDefinition<SharedCapacityAccessSt
     commitment: {
       type: 'capacity',
       reservation: false,
-      deductionTrigger: 'on_fulfillment_start',
+      commitmentTrigger: 'on_fulfillment_start',
       reversalOnCancel: true,
     },
     fulfillment: {
-      modes: ['service_execution'],
-      destinations: ['service_location'],
+      required: false,
+      options: [
+        { mode: 'service_execution', destinations: ['service_location'] },
+      ],
       groups: false,
       tracking: false,
       handoff: false,

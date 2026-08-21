@@ -13,6 +13,7 @@
 import type { EngineType, EngineDefinition } from './types.js';
 import { TEMPLATE_TO_ENGINE } from './types.js';
 import { StateMachine } from './state-machine.js';
+import { assertValidFulfillmentCapabilities } from './fulfillment-contract.js';
 import { deductInventorySideEffect, restoreInventorySideEffect } from './inventory-side-effects.js';
 
 // Import all engine definitions
@@ -33,6 +34,25 @@ const ENGINE_REGISTRY: Record<EngineType, EngineDefinition> = {
   ongoing_entitlement: ongoingEntitlementEngine,
   platform_entitlement: platformEntitlementEngine,
 };
+
+/**
+ * Validate every registered definition against the capability contract.
+ * Runs ONCE at module load — an impossible configuration (required
+ * fulfillment without a machine, illegal mode/destination pairing, or an
+ * inconsistent commitment model) fails startup, not runtime.
+ */
+function validateRegistry(): void {
+  for (const engine of Object.values(ENGINE_REGISTRY)) {
+    assertValidFulfillmentCapabilities(engine.capabilities.fulfillment);
+    const commitment = engine.capabilities.commitment;
+    if (commitment.type !== 'none' && !commitment.commitmentTrigger) {
+      throw new Error(
+        `Engine '${engine.type}' declares commitment type '${commitment.type}' without a commitmentTrigger — impossible configuration`,
+      );
+    }
+  }
+}
+validateRegistry();
 
 /**
  * Get an engine definition by engine type.

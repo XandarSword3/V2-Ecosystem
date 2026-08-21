@@ -4,17 +4,18 @@
  * Economic Pattern: one-time commercial transaction with downstream fulfillment.
  * Commercial Entity: Order
  *
- * GENERIC CORE — no vertical vocabulary. "Menu", "kitchen", "table", "waiter"
- * are hospitality ADAPTER concepts (Stages 24/43); this definition declares
- * capabilities and lets adapters implement them.
+ * GENERIC CORE — the definition declares capabilities and wires the FIRST
+ * implementation (the hospitality adapter) into them. "Kitchen", "table",
+ * "preparation" and "takeaway" live in adapters/hospitality — never here.
  *
  * LAYERED STATE MODEL (plan Phase 3):
- *   - `stateMachine`            = TRANSACTION layer: pending → confirmed →
- *                                 completed / cancelled
- *   - `capabilities.fulfillment`= FULFILLMENT layer: confirmed → queued →
- *                                 in_progress → ready → handed_off
- * Until the fulfillment table exists (Stage 6), fulfillment state is bridged
- * onto transactions.status via legacy composite values (engines/fulfillment-states.ts).
+ *   - `stateMachine` = TRANSACTION layer: pending → confirmed → completed /
+ *     cancelled. NOTE: with required fulfillment, there is NO direct
+ *     confirmed → completed transition — completion is capability-gated and
+ *     must originate from the fulfillment layer (the layered validator
+ *     enforces this even if a future edit adds such a transition).
+ *   - `capabilities.fulfillment` = FULFILLMENT layer (hospitality adapter):
+ *     confirmed → queued → in_progress → ready → handed_off.
  */
 
 import type {
@@ -24,7 +25,11 @@ import type {
   InteractionContract,
   TransactionState,
 } from '../types.js';
-import { instantTransactionFulfillmentStateMachine } from '../fulfillment-states.js';
+import {
+  hospitalityFulfillmentStateMachine,
+  HOSPITALITY_LEGACY_STATUS_BRIDGE,
+  type HospitalityFulfillmentMachineStatus,
+} from '../../adapters/hospitality/fulfillment.js';
 
 // ============================================
 // Transaction-layer state machine
@@ -46,15 +51,9 @@ export const instantTransactionStateMachine: StateMachineDefinition<TransactionS
       allowedActors: ['staff', 'system'],
       guardDescription: 'Payment validated or pay-at-counter accepted',
     },
-    // Completion — the transaction can complete once its fulfillment layer
-    // reports handoff (fulfillment machine carries the fulfillment moves).
-    {
-      from: 'confirmed',
-      to: 'completed',
-      action: 'complete',
-      allowedActors: ['staff', 'system'],
-      guardDescription: 'Fulfillment handed off and acknowledged (or no fulfillment required)',
-    },
+    // NO confirmed → completed here: fulfillment is required, so completion
+    // is capability-gated and originates from the fulfillment layer
+    // (handed_off → completed in the hospitality adapter machine).
     // Cancellation
     {
       from: 'pending',
@@ -116,7 +115,7 @@ export const instantTransactionInteractions: InteractionContract[] = [
   },
   {
     // Generic execution notification — the hospitality adapter implements this
-    // as the kitchen display system (KDS) notification (plan Phase 20/43).
+    // as the work-center (KDS) notification.
     name: 'notify_execution_on_confirm',
     applicableEngines: ['instant_transaction'],
     trigger: 'on_purchase',
@@ -130,7 +129,7 @@ export const instantTransactionInteractions: InteractionContract[] = [
 // Complete Engine Definition
 // ============================================
 
-export const instantTransactionEngine: EngineDefinition<TransactionState> = {
+export const instantTransactionEngine: EngineDefinition<TransactionState, HospitalityFulfillmentMachineStatus> = {
   type: 'instant_transaction',
   name: 'Instant Transaction',
   description: 'One-time commercial transaction with downstream fulfillment: commitment → execution → handoff → completion.',
@@ -140,23 +139,28 @@ export const instantTransactionEngine: EngineDefinition<TransactionState> = {
   interactions: instantTransactionInteractions,
   capabilities: {
     transactionModel: {
-      supportsDraft: false, // draft lives in the cart workspace (plan Phase 13)
+      supportsDraft: false, // draft lives in the cart workspace (plan Phase 13 / CartState)
       autoComplete: true,
-      states: ['draft', 'pending', 'confirmed', 'completed', 'cancelled'],
+      states: ['pending', 'confirmed', 'completed', 'cancelled'],
     },
     commitment: {
       type: 'inventory',
       reservation: false,
-      deductionTrigger: 'on_purchase',
+      commitmentTrigger: 'on_purchase',
       reversalOnCancel: true,
     },
     fulfillment: {
-      modes: ['on_premise', 'pickup', 'local_delivery'],
-      destinations: ['on_premise_location', 'pickup_location', 'room', 'address'],
+      required: true,
+      options: [
+        { mode: 'on_premise', destinations: ['on_premise_location', 'room'] },
+        { mode: 'pickup', destinations: ['pickup_location'] },
+        { mode: 'local_delivery', destinations: ['address'] },
+      ],
       groups: false,
       tracking: false,
       handoff: true,
-      stateMachine: instantTransactionFulfillmentStateMachine,
+      stateMachine: hospitalityFulfillmentStateMachine,
+      legacyStatusBridge: HOSPITALITY_LEGACY_STATUS_BRIDGE,
     },
     execution: {
       enabled: true,

@@ -1,27 +1,63 @@
 /**
- * Capability contract + layered state separation (plan Phase 2/3).
+ * Capability contract + layered state separation (plan Phase 2/3) — ADVERSARIAL.
  *
- * Proves:
- *   - every engine declares its capabilities (declarative, not ad-hoc);
- *   - Engine A's core state machine is the GENERIC transaction layer
- *     (pending/confirmed/completed/cancelled) — no hospitality states in it;
- *   - the fulfillment layer is adapter-shaped and separate;
- *   - engine-service validates against BOTH layers, bridging the legacy
- *     composite statuses (preparing/ready/delivered) until Stage 6;
- *   - the generic core carries no vertical vocabulary (menu/kitchen/table…).
+ * Proves the corrected boundary, enforced by runtime code and the compiler:
+ *   1. required fulfillment gates transaction completion (no premature
+ *      confirmed → completed, even if the machine naively declares it);
+ *   2. fulfillment handoff drives transaction completion correctly;
+ *   3. cancellation from fulfillment states fires the transaction-layer
+ *      compensation EXACTLY ONCE;
+ *   4. a non-hospitality fulfillment adapter plugs into the generic contract
+ *      without modifying the core;
+ *   5. the generic core carries no vertical vocabulary (mechanics scanned);
+ *   6. impossible commitment configurations fail COMPILATION (discriminated
+ *      union) — proven with @ts-expect-error;
+ *   7. invalid fulfillment mode/destination combinations are rejected;
+ *   8. the legacy status bridge is adapter-declared and transitional.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getAllEngines, getEngineByTemplate } from '../../../src/engines/registry.js';
 import { EngineService } from '../../../src/engines/engine-service.js';
+import { LayeredStateMachine } from '../../../src/engines/layered-state.js';
 import {
-  CANONICAL_TO_LEGACY_FULFILLMENT,
-  LEGACY_TO_CANONICAL_FULFILLMENT,
-  canonicalizeFulfillmentState,
-  legacyFulfillmentState,
-  instantTransactionFulfillmentStateMachine,
-} from '../../../src/engines/fulfillment-states.js';
+  COMPLETION_STATE,
+  LEGAL_FULFILLMENT_COMBINATIONS,
+  assertTransactionCompletionAllowed,
+  assertValidFulfillmentCapabilities,
+  FulfillmentContractError,
+} from '../../../src/engines/fulfillment-contract.js';
+import { StateMachine } from '../../../src/engines/state-machine.js';
+import {
+  hospitalityFulfillmentStateMachine,
+  HOSPITALITY_LEGACY_STATUS_BRIDGE,
+  HOSPITALITY_FULFILLMENT_STATES,
+} from '../../../src/adapters/hospitality/fulfillment.js';
+import type {
+  CommitmentModel,
+  FulfillmentDefinition,
+  StateMachineDefinition,
+} from '../../../src/engines/types.js';
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
-const FORBIDDEN_CORE_VOCABULARY = ['restaurant', 'kitchen', 'menu', 'table', 'snack', 'chalet', 'room service', 'waiter', 'burger', 'recipe'];
+const FORBIDDEN_CORE_VOCABULARY = [
+  'restaurant', 'kitchen', 'menu', 'table', 'snack', 'chalet', 'waiter',
+  'burger', 'recipe', 'preparation', 'takeaway', 'counter', 'delivered',
+];
+
+// ============================================================
+// Mock DB for the exactly-once compensation test
+// ============================================================
+
+const rpcMock = vi.fn();
+vi.mock('../../../src/database/connection.js', () => ({
+  getSupabase: () => ({ rpc: rpcMock }),
+}));
+
+// ============================================================
+// 1. Capability declarations
+// ============================================================
 
 describe('Capability contract (plan Phase 2)', () => {
   it('every registered engine declares capabilities', () => {
@@ -32,112 +68,364 @@ describe('Capability contract (plan Phase 2)', () => {
     }
   });
 
-  it('the generic Engine A core carries no vertical vocabulary', () => {
+  it('Engine A declares the hospitality fulfillment layer via explicit options', () => {
+    const engine = getEngineByTemplate('instant_transaction');
+    const f = engine.capabilities.fulfillment;
+    expect(f.required).toBe(true);
+    expect(f.handoff).toBe(true);
+    // Explicit mode → destination combinations (no flat lists).
+    expect(f.options).toEqual([
+      { mode: 'on_premise', destinations: ['on_premise_location', 'room'] },
+      { mode: 'pickup', destinations: ['pickup_location'] },
+      { mode: 'local_delivery', destinations: ['address'] },
+    ]);
+    expect(f.stateMachine!.states).toContain('queued');
+    expect(engine.capabilities.execution.notificationTrigger).toBe('on_confirm');
+    expect(engine.capabilities.commitment.type).toBe('inventory');
+  });
+
+  it('the transaction machine is generic — no fulfillment states, no direct completion', () => {
+    const engine = getEngineByTemplate('instant_transaction');
+    expect(engine.stateMachine.states).toEqual(['pending', 'confirmed', 'completed', 'cancelled']);
+    const hasDirectCompletion = engine.stateMachine.transitions.some(
+      t => t.from === 'confirmed' && t.to === 'completed',
+    );
+    expect(hasDirectCompletion).toBe(false);
+  });
+
+  it('the generic description carries no vertical vocabulary', () => {
     const engine = getEngineByTemplate('instant_transaction');
     const text = `${engine.name} ${engine.description}`.toLowerCase();
     for (const word of FORBIDDEN_CORE_VOCABULARY) {
       expect(text, `core must not mention '${word}'`).not.toContain(word);
     }
   });
+});
 
-  it('Engine A declares a hospitality fulfillment layer with canonical states', () => {
-    const engine = getEngineByTemplate('instant_transaction');
-    const states = engine.capabilities.fulfillment.stateMachine!.states;
-    expect(states).toContain('queued');
-    expect(states).toContain('in_progress');
-    expect(states).toContain('ready');
-    expect(states).toContain('handed_off');
-    expect(engine.capabilities.fulfillment.handoff).toBe(true);
-    expect(engine.capabilities.execution.notificationTrigger).toBe('on_confirm');
-    expect(engine.capabilities.commitment.type).toBe('inventory');
+// ============================================================
+// 2. Completion gating (requirement 1) — runtime enforcement
+// ============================================================
+
+describe('Completion gate — capability-driven enforcement', () => {
+  // A "naive" engine that WRONGLY declares confirmed → completed on its
+  // transaction machine while also requiring fulfillment. The gate must
+  // reject it even though the machine allows it.
+  const naiveTxMachine: StateMachineDefinition = {
+    states: ['pending', 'confirmed', 'completed', 'cancelled'],
+    initialState: 'pending',
+    terminalStates: ['completed', 'cancelled'],
+    transitions: [
+      { from: 'pending', to: 'confirmed', action: 'confirm', allowedActors: ['staff', 'system'] },
+      { from: 'confirmed', to: 'completed', action: 'complete', allowedActors: ['staff', 'system'] },
+      { from: 'pending', to: 'cancelled', action: 'cancel', allowedActors: ['customer', 'staff', 'admin'] },
+      { from: 'confirmed', to: 'cancelled', action: 'cancel', allowedActors: ['staff', 'admin'] },
+    ],
+  };
+  const digitalMachine: StateMachineDefinition = {
+    states: ['confirmed', 'provisioning', 'provisioned', 'delivered', 'accessed', 'completed', 'cancelled'],
+    initialState: 'provisioning',
+    terminalStates: ['completed', 'cancelled'],
+    transitions: [
+      { from: 'confirmed', to: 'provisioning', action: 'provision', allowedActors: ['system'] },
+      { from: 'provisioning', to: 'provisioned', action: 'finish_provisioning', allowedActors: ['system'] },
+      { from: 'provisioned', to: 'delivered', action: 'deliver_digital', allowedActors: ['system'] },
+      { from: 'delivered', to: 'completed', action: 'complete', allowedActors: ['system'] },
+      { from: 'delivered', to: 'accessed', action: 'open', allowedActors: ['customer'] },
+      { from: 'provisioning', to: 'cancelled', action: 'cancel', allowedActors: ['admin'] },
+    ],
+  };
+  const digitalFulfillment: FulfillmentDefinition = {
+    required: true,
+    options: [{ mode: 'digital_delivery', destinations: ['digital_account'] }],
+    groups: false,
+    tracking: false,
+    handoff: false,
+    stateMachine: digitalMachine,
+  };
+
+  it('blocks transaction-layer completion when fulfillment is required — even if the machine declares it', () => {
+    const layered = new LayeredStateMachine(
+      new StateMachine(naiveTxMachine),
+      new StateMachine(digitalMachine),
+      digitalFulfillment,
+    );
+    const check = layered.canTransition('confirmed', 'complete', 'staff');
+    expect(check.allowed).toBe(false);
+    expect(check.error).toMatch(/fulfillment/i);
+    // The pure gate agrees.
+    expect(assertTransactionCompletionAllowed(digitalFulfillment, COMPLETION_STATE)).toMatch(/fulfillment/i);
+    expect(assertTransactionCompletionAllowed(digitalFulfillment, 'cancelled')).toBeNull(); // cancellation unaffected
+  });
+
+  it('allows direct completion when fulfillment is NOT required', () => {
+    const noFulfillment: FulfillmentDefinition = {
+      required: false,
+      options: [],
+      groups: false,
+      tracking: false,
+      handoff: false,
+    };
+    const layered = new LayeredStateMachine(new StateMachine(naiveTxMachine), null, noFulfillment);
+    expect(layered.canTransition('confirmed', 'complete', 'staff').allowed).toBe(true);
+    expect(assertTransactionCompletionAllowed(noFulfillment, COMPLETION_STATE)).toBeNull();
+  });
+
+  it('Engine A (hospitality) rejects confirmed → completed through the real service', async () => {
+    const service = new EngineService();
+    const r = await service.transitionState('instant_transaction', 'confirmed', 'complete', 'staff');
+    expect(r.allowed).toBe(false);
+    expect(r.error).toMatch(/complete/i);
+    // 'complete' is not even offered to staff from 'confirmed'.
+    const actions = service.getAvailableActions('instant_transaction', 'confirmed', 'staff');
+    expect(actions.map(a => a.action)).not.toContain('complete');
   });
 });
 
-describe('Layered state separation (plan Phase 3)', () => {
-  it('the transaction machine is generic — no fulfillment states inside', () => {
-    const engine = getEngineByTemplate('instant_transaction');
-    expect(engine.stateMachine.states).toEqual(['pending', 'confirmed', 'completed', 'cancelled']);
-    expect(engine.stateMachine.states).not.toContain('preparing');
-    expect(engine.stateMachine.states).not.toContain('delivered');
-    expect(engine.stateMachine.states).not.toContain('in_progress');
-  });
+// ============================================================
+// 3. Handoff drives transaction completion (requirement 1/8)
+// ============================================================
 
-  it('the bridge maps legacy composites to canonical fulfillment states and back', () => {
-    expect(canonicalizeFulfillmentState('preparing')).toBe('in_progress');
-    expect(canonicalizeFulfillmentState('delivered')).toBe('handed_off');
-    expect(canonicalizeFulfillmentState('ready')).toBe('ready');
-    expect(canonicalizeFulfillmentState('confirmed')).toBe('confirmed');
-    expect(legacyFulfillmentState('in_progress')).toBe('preparing');
-    expect(legacyFulfillmentState('handed_off')).toBe('delivered');
-    expect(legacyFulfillmentState('queued')).toBe('preparing');
-    expect(legacyFulfillmentState('completed')).toBe('completed');
-    expect(LEGACY_TO_CANONICAL_FULFILLMENT.delivered).toBe('handed_off');
-    expect(CANONICAL_TO_LEGACY_FULFILLMENT.handed_off).toBe('delivered');
-  });
-
-  it('the fulfillment machine validates its own canonical lifecycle', () => {
-    expect(instantTransactionFulfillmentStateMachine.initialState).toBe('queued');
-    expect(instantTransactionFulfillmentStateMachine.terminalStates).toEqual(['completed', 'cancelled']);
-  });
-});
-
-describe('EngineService — layered transitions', () => {
-  const service = new EngineService();
-
-  it('transaction-layer moves work unchanged (pending → confirmed)', async () => {
-    const r = await service.transitionState('instant_transaction', 'pending', 'confirm', 'staff');
+describe('Fulfillment handoff drives transaction completion', () => {
+  it('the full hospitality journey completes only through the fulfillment layer', async () => {
+    const service = new EngineService();
+    let r = await service.transitionState('instant_transaction', 'pending', 'confirm', 'staff');
     expect(r.allowed).toBe(true);
     expect(r.targetState).toBe('confirmed');
-  });
+    expect(r.layer).toBe('transaction');
 
-  it('fulfillment-layer moves work and bridge to legacy composites', async () => {
-    let r = await service.transitionState('instant_transaction', 'confirmed', 'start_preparation', 'staff');
+    r = await service.transitionState('instant_transaction', 'confirmed', 'start_preparation', 'staff');
     expect(r.allowed).toBe(true);
-    expect(r.targetState).toBe('preparing'); // legacy bridge
+    expect(r.targetState).toBe('preparing'); // transitional legacy composite
+    expect(r.canonicalState).toBe('in_progress');
+    expect(r.layer).toBe('fulfillment');
 
     r = await service.transitionState('instant_transaction', 'preparing', 'mark_ready', 'staff');
     expect(r.allowed).toBe(true);
-    expect(r.targetState).toBe('ready');
+    expect(r.canonicalState).toBe('ready');
 
     r = await service.transitionState('instant_transaction', 'ready', 'deliver', 'staff');
     expect(r.allowed).toBe(true);
-    expect(r.targetState).toBe('delivered');
+    expect(r.canonicalState).toBe('handed_off');
 
+    // Only now may the transaction complete.
     r = await service.transitionState('instant_transaction', 'delivered', 'complete', 'staff');
     expect(r.allowed).toBe(true);
     expect(r.targetState).toBe('completed');
+    expect(r.canonicalState).toBe('completed');
   });
+});
 
-  it('takeaway shortcut: ready → completed', async () => {
-    const r = await service.transitionState('instant_transaction', 'ready', 'complete', 'staff');
+// ============================================================
+// 4. Exactly-once compensation (requirement 8)
+// ============================================================
+
+describe('Cancellation compensation — exactly once', () => {
+  beforeEach(() => rpcMock.mockReset());
+
+  it('cancel from a fulfillment state fires the transaction-layer restore exactly once', async () => {
+    rpcMock.mockResolvedValue({ data: [{ success: true, items_restored: 3 }], error: null });
+    const service = new EngineService();
+
+    const r = await service.transitionState('instant_transaction', 'in_progress', 'cancel', 'admin', {
+      orderId: 'order-1',
+      userId: 'user-1',
+    });
     expect(r.allowed).toBe(true);
-    expect(r.targetState).toBe('completed');
+    expect(r.targetState).toBe('cancelled');
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(rpcMock).toHaveBeenCalledWith('restore_inventory_for_order', expect.objectContaining({
+      p_transaction_id: 'order-1',
+    }));
   });
 
-  it('cancellation respects the layers (admin-only from preparation)', async () => {
-    const staff = await service.transitionState('instant_transaction', 'preparing', 'cancel', 'staff');
-    expect(staff.allowed).toBe(false);
-    const admin = await service.transitionState('instant_transaction', 'preparing', 'cancel', 'admin');
-    expect(admin.allowed).toBe(true);
-    expect(admin.targetState).toBe('cancelled');
-  });
-
-  it('legacy template names resolve through the same layered machine', async () => {
-    const r = await service.transitionState('menu_service', 'confirmed', 'start_preparation', 'staff');
+  it('cancel from the transaction layer (confirmed) also compensates exactly once', async () => {
+    rpcMock.mockResolvedValue({ data: [{ success: true, items_restored: 0 }], error: null });
+    const service = new EngineService();
+    const r = await service.transitionState('instant_transaction', 'confirmed', 'cancel', 'staff', {
+      orderId: 'order-2',
+    });
     expect(r.allowed).toBe(true);
-    expect(r.targetState).toBe('preparing');
+    expect(r.targetState).toBe('cancelled');
+    expect(rpcMock).toHaveBeenCalledTimes(1);
   });
 
-  it('getAvailableActions merges both layers from any current state', () => {
-    const fromConfirmed = service.getAvailableActions('instant_transaction', 'confirmed', 'staff');
-    const actions = fromConfirmed.map(a => a.action);
-    expect(actions).toContain('complete');
-    expect(actions).toContain('cancel');
-    expect(actions).toContain('start_preparation');
-    expect(actions).toContain('mark_ready');
+  it('a REJECTED cancel never fires compensation', async () => {
+    const service = new EngineService();
+    const r = await service.transitionState('instant_transaction', 'in_progress', 'cancel', 'staff', {
+      orderId: 'order-3',
+    });
+    expect(r.allowed).toBe(false);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+});
 
-    const fromPreparing = service.getAvailableActions('instant_transaction', 'preparing', 'staff');
-    expect(fromPreparing.map(a => a.action)).toContain('mark_ready');
-    expect(fromPreparing.map(a => a.action)).not.toContain('cancel'); // admin-only
+// ============================================================
+// 5. Non-hospitality adapter plug-in (requirement 8)
+// ============================================================
+
+describe('A non-hospitality adapter plugs into the generic contract', () => {
+  const digitalTx: StateMachineDefinition = {
+    states: ['pending', 'confirmed', 'completed', 'cancelled'],
+    initialState: 'pending',
+    terminalStates: ['completed', 'cancelled'],
+    transitions: [
+      { from: 'pending', to: 'confirmed', action: 'confirm', allowedActors: ['staff', 'system'] },
+      { from: 'pending', to: 'cancelled', action: 'cancel', allowedActors: ['customer', 'staff', 'admin'] },
+      { from: 'confirmed', to: 'cancelled', action: 'cancel', allowedActors: ['staff', 'admin'] },
+    ],
+  };
+  const digitalMachine: StateMachineDefinition = {
+    states: ['confirmed', 'provisioning', 'provisioned', 'delivered', 'accessed', 'completed', 'cancelled'],
+    initialState: 'provisioning',
+    terminalStates: ['completed', 'cancelled'],
+    transitions: [
+      { from: 'confirmed', to: 'provisioning', action: 'provision', allowedActors: ['system'] },
+      { from: 'provisioning', to: 'provisioned', action: 'finish_provisioning', allowedActors: ['system'] },
+      { from: 'provisioned', to: 'delivered', action: 'deliver_digital', allowedActors: ['system'] },
+      { from: 'delivered', to: 'completed', action: 'complete', allowedActors: ['system'] },
+      { from: 'provisioning', to: 'cancelled', action: 'cancel', allowedActors: ['admin'] },
+    ],
+  };
+  const digitalFulfillment: FulfillmentDefinition = {
+    required: true,
+    options: [{ mode: 'digital_delivery', destinations: ['digital_account'] }],
+    groups: false,
+    tracking: false,
+    handoff: false,
+    stateMachine: digitalMachine,
+  };
+
+  it('runs a complete digital-delivery lifecycle through the generic validator', async () => {
+    const layered = new LayeredStateMachine(
+      new StateMachine(digitalTx),
+      new StateMachine(digitalMachine),
+      digitalFulfillment,
+    );
+
+    expect(layered.canTransition('pending', 'confirm', 'system').allowed).toBe(true);
+    // Provisioning happens without touching the transaction layer.
+    expect(layered.canTransition('confirmed', 'provision', 'system').allowed).toBe(true);
+    expect(layered.canTransition('provisioning', 'finish_provisioning', 'system').allowed).toBe(true);
+    expect(layered.canTransition('provisioned', 'deliver_digital', 'system').allowed).toBe(true);
+    // Completion only after digital delivery.
+    expect(layered.canTransition('delivered', 'complete', 'system').allowed).toBe(true);
+    // …and never before it.
+    expect(layered.canTransition('confirmed', 'complete', 'system').allowed).toBe(false);
+  });
+});
+
+// ============================================================
+// 6. Generic core vocabulary guard (requirement 8)
+// ============================================================
+
+describe('Generic core vocabulary guard', () => {
+  it('the generic mechanics contain no vertical vocabulary', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const enginesDir = join(here, '..', '..', '..', 'src', 'engines');
+    const files = [
+      'fulfillment-contract.ts',
+      'layered-state.ts',
+      'state-machine.ts',
+      'engine-service.ts',
+    ];
+    const pattern = new RegExp(`\\b(${FORBIDDEN_CORE_VOCABULARY.join('|')})\\b`, 'i');
+    for (const file of files) {
+      const content = readFileSync(join(enginesDir, file), 'utf8');
+      const lines = content.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        expect(pattern.test(lines[i]), `${file}:${i + 1} introduces vertical vocabulary: "${lines[i].trim()}"`).toBe(false);
+      }
+    }
+  });
+
+  it('the hospitality fulfillment vocabulary lives only in the adapter namespace', () => {
+    expect(HOSPITALITY_FULFILLMENT_STATES).toEqual(['queued', 'in_progress', 'ready', 'handed_off']);
+    expect(hospitalityFulfillmentStateMachine.states).toContain('handed_off');
+  });
+});
+
+// ============================================================
+// 7. Impossible configurations fail compilation (requirement 4/8)
+// ============================================================
+
+describe('Impossible configurations are rejected', () => {
+  it('a "none" commitment cannot declare a commitmentTrigger (discriminated union)', () => {
+    // @ts-expect-error — type: 'none' cannot carry commitmentTrigger
+    const impossible: CommitmentModel = { type: 'none', commitmentTrigger: 'on_purchase' };
+    expect(impossible).toBeDefined();
+  });
+
+  it('a committed model cannot omit the trigger', () => {
+    // @ts-expect-error — type: 'inventory' requires commitmentTrigger
+    const incomplete: CommitmentModel = { type: 'inventory', reservation: true, reversalOnCancel: true };
+    expect(incomplete).toBeDefined();
+  });
+
+  it('invalid mode/destination combinations are rejected at registration validation', () => {
+    expect(() =>
+      assertValidFulfillmentCapabilities({
+        required: true,
+        options: [{ mode: 'pickup', destinations: ['address'] }], // pickup cannot serve an address
+        groups: false,
+        tracking: false,
+        handoff: true,
+      }),
+    ).toThrow(FulfillmentContractError);
+
+    // required without a state machine → the transaction could never complete.
+    expect(() =>
+      assertValidFulfillmentCapabilities({
+        required: true,
+        options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
+        groups: false,
+        tracking: false,
+        handoff: true,
+      }),
+    ).toThrow(FulfillmentContractError);
+
+    // Unknown mode.
+    expect(() =>
+      assertValidFulfillmentCapabilities({
+        required: false,
+        options: [{ mode: 'teleport' as never, destinations: ['none'] }],
+        groups: false,
+        tracking: false,
+        handoff: false,
+      }),
+    ).toThrow(FulfillmentContractError);
+  });
+
+  it('the legal registry covers every future mode the plan names', () => {
+    for (const mode of ['pickup', 'on_premise', 'local_delivery', 'shipment', 'digital_delivery', 'service_execution']) {
+      expect(LEGAL_FULFILLMENT_COMBINATIONS[mode as keyof typeof LEGAL_FULFILLMENT_COMBINATIONS].length).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ============================================================
+// 8. The legacy bridge is transitional and adapter-declared
+// ============================================================
+
+describe('Legacy status bridge is transitional', () => {
+  it('is declared by the hospitality adapter, not the generic core', () => {
+    expect(HOSPITALITY_LEGACY_STATUS_BRIDGE.legacyToCanonical).toEqual({
+      preparing: 'in_progress',
+      delivered: 'handed_off',
+      ready: 'ready',
+    });
+    expect(HOSPITALITY_LEGACY_STATUS_BRIDGE.canonicalToLegacy).toEqual({
+      queued: 'preparing',
+      in_progress: 'preparing',
+      ready: 'ready',
+      handed_off: 'delivered',
+    });
+  });
+
+  it('generic engines without the bridge are unaffected (B–E pass through)', () => {
+    const service = new EngineService();
+    // Engine B: booking lifecycle is entirely on the transaction machine.
+    const r = service.canTransition('multi_day_booking', 'confirmed', 'check_in', 'staff');
+    expect(r.allowed).toBe(true);
+    expect(r.targetState).toBe('checked_in'); // no bridge — passthrough
   });
 });

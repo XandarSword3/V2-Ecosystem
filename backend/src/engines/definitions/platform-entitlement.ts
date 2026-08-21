@@ -202,13 +202,12 @@ export const platformEntitlementEngine: EngineDefinition<PlatformEntitlementStat
     },
     commitment: {
       type: 'none',
-      reservation: false,
-      deductionTrigger: 'on_purchase',
-      reversalOnCancel: false,
     },
     fulfillment: {
-      modes: ['digital_delivery'],
-      destinations: ['digital_account'],
+      required: false,
+      options: [
+        { mode: 'digital_delivery', destinations: ['digital_account'] },
+      ],
       groups: false,
       tracking: false,
       handoff: false,

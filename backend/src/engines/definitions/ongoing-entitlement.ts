@@ -196,13 +196,12 @@ export const ongoingEntitlementEngine: EngineDefinition<OngoingEntitlementStatus
     },
     commitment: {
       type: 'none',
-      reservation: false,
-      deductionTrigger: 'on_purchase',
-      reversalOnCancel: false,
     },
     fulfillment: {
-      modes: ['service_execution'],
-      destinations: ['service_location'],
+      required: false,
+      options: [
+        { mode: 'service_execution', destinations: ['service_location'] },
+      ],
       groups: false,
       tracking: false,
       handoff: false,
