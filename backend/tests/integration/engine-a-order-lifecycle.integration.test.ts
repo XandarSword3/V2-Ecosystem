@@ -15,23 +15,22 @@
  * pass, which is the whole point.
  *
  * Covers, in order:
- *   1. Order creation actually writes order_items.
- *   2. Confirming an order actually deducts inventory. This previously
- *      always failed silently: the app called deduct_inventory_for_order_v2,
- *      which does not exist in this database, and its fallback called
- *      deduct_stock_fifo with parameters neither live overload accepts.
- *      Fixed in this same change (inventory-side-effects.ts now calls the
- *      real deduct_inventory_for_order); this test is what would have
- *      caught that regression.
+ *   1. Order creation writes order_items AND deducts inventory at creation
+ *      time (the ONE stock authority: deduct_inventory_for_order_items,
+ *      via deduct_stock_fifo). No allocation or fulfillment rows exist yet.
+ *   2. Confirmation does NOT deduct stock again (single authority). It
+ *      allocates resources PRE-FLIGHT (no confirmed-without-resources
+ *      window) and the trigger seeds the fulfillment row with the
+ *      snapshotted selection + the mode's declared initial status.
  *   3. Item status is forward-only — skipping a step is rejected.
- *   4. Bumping every item to 'ready' auto-advances the order to 'ready'.
- *   5. Bumping every item to 'served' auto-advances the order to
- *      'delivered' — the engine's real state name, not 'served'.
- *   6. Cancelling a confirmed (already-deducted) order restores inventory.
- *      Previously also broken: restoration called a nonexistent 'adjust_stock'
- *      RPC, filtered on reference_type='order' when deduction actually wrote
- *      reference_type='transaction'. Fixed via the new
- *      restore_inventory_for_order function (migration 20260805072810).
+ *   4. Bumping every item to 'ready' advances the FULFILLMENT row to
+ *      'ready' — transactions.status stays 'confirmed' (canonical
+ *      fulfillment state lives in the fulfillments table).
+ *   5. Bumping every item to 'served' advances the fulfillment row to
+ *      'handed_off' (the engine's canonical state, not the legacy
+ *      'delivered') and consumes the allocated resources exactly once.
+ *   6. Cancelling a confirmed order restores the creation-time stock
+ *      deduction AND releases its resource allocation (compensation).
  *   7. Isolation — a staff member scoped to a different tenant/module
  *      cannot act on this order via its id. Confirmed against the real
  *      handler that the module_id-scoped fetch in changeInstantTransactionOrderStatus
@@ -231,6 +230,10 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     // don't silently swallow them either.
     try {
       await supabase.from('order_items').delete().eq('tenant_id', tenantId);
+      if (createdOrderId) {
+        await supabase.from('fulfillments').delete().eq('transaction_id', createdOrderId);
+        await supabase.from('resource_allocations').delete().eq('transaction_id', createdOrderId);
+      }
       await supabase.from('transactions').delete().eq('module_id', moduleId);
       await supabase.from('menu_item_ingredients').delete().eq('tenant_id', tenantId);
       await supabase.from('inventory_transactions').delete().eq('reference_id', createdOrderId || '');
@@ -280,9 +283,31 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     expect(items![0].quantity).toBe(ORDER_QTY);
     expect(items![0].status).toBe('pending');
     createdItemIds = items!.map((i) => i.id);
+
+    // ONE stock authority: creation already deducted stock (atomic, via
+    // deduct_stock_fifo) — the customer cannot even create an order against
+    // unavailable stock.
+    const { data: stockAfterCreate } = await supabase
+      .from('inventory_items')
+      .select('current_stock')
+      .eq('id', inventoryItemId)
+      .single();
+    expect(stockAfterCreate!.current_stock).toBe(STARTING_STOCK - RECIPE_QTY_PER_ITEM * ORDER_QTY);
+
+    // Nothing allocated or fulfilled yet — both arrive at confirmation.
+    const { data: allocsBefore } = await supabase
+      .from('resource_allocations')
+      .select('id')
+      .eq('transaction_id', createdOrderId);
+    expect(allocsBefore ?? []).toHaveLength(0);
+    const { data: fulfillmentsBefore } = await supabase
+      .from('fulfillments')
+      .select('id')
+      .eq('transaction_id', createdOrderId);
+    expect(fulfillmentsBefore ?? []).toHaveLength(0);
   });
 
-  it('2. confirming the order actually deducts inventory', async () => {
+  it('2. confirmation does NOT deduct stock again — it allocates resources pre-flight and seeds the fulfillment row', async () => {
     const res = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${createdOrderId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
@@ -292,25 +317,40 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('confirmed');
 
-    const { data: invItem, error } = await supabase
+    // No-window invariant: allocation ran PRE-FLIGHT — the confirm write
+    // only happened because the resources were reserved. The BOM-derived
+    // requirement row is the proof.
+    const { data: allocs, error: allocErr } = await supabase
+      .from('resource_allocations')
+      .select('kind, resource_ref, quantity, unit, status')
+      .eq('transaction_id', createdOrderId);
+    expect(allocErr).toBeNull();
+    expect(allocs).toHaveLength(1);
+    expect(allocs![0].kind).toBe('inventory_item');
+    expect(allocs![0].resource_ref).toBe(inventoryItemId);
+    expect(allocs![0].quantity).toBe(RECIPE_QTY_PER_ITEM * ORDER_QTY);
+    expect(allocs![0].status).toBe('allocated');
+
+    // The confirm trigger seeded the fulfillment row with the SNAPSHOTTED
+    // selection and the mode's declared initial status.
+    const { data: fulfillment } = await supabase
+      .from('fulfillments')
+      .select('status, mode, destination_type, destination_ref')
+      .eq('transaction_id', createdOrderId)
+      .single();
+    expect(fulfillment!.status).toBe('queued');
+    expect(fulfillment!.mode).toBe('on_premise');
+    expect(fulfillment!.destination_type).toBe('on_premise_location');
+    expect(fulfillment!.destination_ref).toBe('T-1');
+
+    // ONE stock authority: stock is UNCHANGED by confirmation — it was
+    // deducted exactly once, at creation.
+    const { data: invItem } = await supabase
       .from('inventory_items')
       .select('current_stock')
       .eq('id', inventoryItemId)
       .single();
-
-    expect(error).toBeNull();
-    const expectedDeduction = RECIPE_QTY_PER_ITEM * ORDER_QTY;
-    expect(invItem!.current_stock).toBe(STARTING_STOCK - expectedDeduction);
-
-    // The audit trail deduct_inventory_for_order should have written —
-    // this is also what restoration reads in test 6.
-    const { data: deductionRows } = await supabase
-      .from('inventory_transactions')
-      .select('id, reference_type, transaction_type')
-      .eq('reference_id', createdOrderId)
-      .eq('transaction_type', 'sale');
-    expect(deductionRows).toHaveLength(1);
-    expect(deductionRows![0].reference_type).toBe('transaction');
+    expect(invItem!.current_stock).toBe(STARTING_STOCK - RECIPE_QTY_PER_ITEM * ORDER_QTY);
   });
 
   it('3. item status is forward-only — skipping a step is rejected', async () => {
@@ -342,16 +382,25 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
       .send({ status: 'ready' });
     expect(toReady.status).toBe(200);
 
+    // Canonical fulfillment state lives in the fulfillments table — the
+    // transaction layer is untouched until completion/cancellation.
+    const { data: fulfillment } = await supabase
+      .from('fulfillments')
+      .select('status')
+      .eq('transaction_id', createdOrderId)
+      .single();
+    expect(fulfillment!.status).toBe('ready');
+
     const { data: order, error } = await supabase
       .from('transactions')
       .select('status')
       .eq('id', createdOrderId)
       .single();
     expect(error).toBeNull();
-    expect(order!.status).toBe('ready');
+    expect(order!.status).toBe('confirmed');
   });
 
-  it("5. bumping the item to served auto-advances the order to the engine's real 'delivered' state", async () => {
+  it("5. bumping the item to served advances the fulfillment row to the engine's canonical 'handed_off' and consumes resources", async () => {
     const itemId = createdItemIds[0];
     const res = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${createdOrderId}/items/${itemId}/status`)
@@ -360,17 +409,35 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
       .send({ status: 'served' });
     expect(res.status).toBe(200);
 
+    // Canonical fulfillment state — the engine's real state name.
+    const { data: fulfillment } = await supabase
+      .from('fulfillments')
+      .select('status')
+      .eq('transaction_id', createdOrderId)
+      .single();
+    expect(fulfillment!.status).toBe('handed_off');
+
+    // transactions.status stays at its transaction-layer value.
     const { data: order, error } = await supabase
       .from('transactions')
       .select('status')
       .eq('id', createdOrderId)
       .single();
     expect(error).toBeNull();
-    expect(order!.status).toBe('delivered');
+    expect(order!.status).toBe('confirmed');
+
+    // Resource consumption at handoff: the item-derived deliver move drove
+    // the resource lifecycle — the allocation is now consumed.
+    const { data: allocs } = await supabase
+      .from('resource_allocations')
+      .select('status')
+      .eq('transaction_id', createdOrderId);
+    expect(allocs).toHaveLength(1);
+    expect(allocs![0].status).toBe('consumed');
   });
 
-  it('6. cancelling a second, separately-confirmed order restores the inventory it deducted', async () => {
-    // Fresh order for this test — the first one is already 'delivered'.
+  it('6. cancelling a second, separately-confirmed order restores the stock it reserved and releases its allocation', async () => {
+    // Fresh order for this test — the first one is already handed off.
     const createRes = await request(app)
       .post(`/api/v1/${moduleSlug}/orders`)
       .set('Authorization', `Bearer ${staffToken}`)
@@ -393,6 +460,14 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
       .single();
     const stockAfterSecondDeduction = afterDeduction!.current_stock;
 
+    // Its pre-flight allocation exists.
+    const { data: allocsBefore } = await supabase
+      .from('resource_allocations')
+      .select('status')
+      .eq('transaction_id', secondOrderId);
+    expect(allocsBefore).toHaveLength(1);
+    expect(allocsBefore![0].status).toBe('allocated');
+
     const cancelRes = await request(app)
       .patch(`/api/v1/staff/modules/${moduleSlug}/orders/${secondOrderId}/status`)
       .set('Authorization', `Bearer ${staffToken}`)
@@ -408,12 +483,22 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     expect(error).toBeNull();
 
     // Back to first order's post-deduction level — the second order's
-    // deduction should be fully reversed.
+    // creation-time deduction is fully reversed.
     const expectedAfterRestore = STARTING_STOCK - RECIPE_QTY_PER_ITEM * ORDER_QTY; // first order's deduction only
     expect(afterRestore!.current_stock).toBe(expectedAfterRestore);
     expect(afterRestore!.current_stock).not.toBe(stockAfterSecondDeduction);
 
+    // Its allocation was released (compensation).
+    const { data: allocsAfter } = await supabase
+      .from('resource_allocations')
+      .select('status')
+      .eq('transaction_id', secondOrderId);
+    expect(allocsAfter).toHaveLength(1);
+    expect(allocsAfter![0].status).toBe('released');
+
     await supabase.from('order_items').delete().eq('transaction_id', secondOrderId);
+    await supabase.from('fulfillments').delete().eq('transaction_id', secondOrderId);
+    await supabase.from('resource_allocations').delete().eq('transaction_id', secondOrderId);
     await supabase.from('transactions').delete().eq('id', secondOrderId);
   });
 

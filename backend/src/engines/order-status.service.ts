@@ -121,7 +121,7 @@ export interface OrderStatusChangeParams {
 
 export type OrderStatusChangeResult =
   | { ok: true; status: 200; order: Record<string, unknown> }
-  | { ok: false; status: 400 | 404 | 500; error: string };
+  | { ok: false; status: 400 | 404 | 409 | 500; error: string };
 
 export async function changeInstantTransactionOrderStatus(
   supabase: SupabaseClient,
@@ -180,6 +180,47 @@ export async function changeInstantTransactionOrderStatus(
       status: 400,
       error: transition.error || `Cannot transition order from '${currentState}' to '${requestedStatus}'`,
     };
+  }
+
+  // The fulfillment MODE is the runtime authority for the resource layer
+  // too. Pre-trigger (confirm not yet written) the row does not exist, so
+  // the mode comes from the immutable snapshot POST /orders stored in
+  // transactions.metadata — the exact choice the customer made at checkout.
+  const orderMetadata = (current.metadata ?? {}) as Record<string, unknown>;
+  const selectedMode =
+    (fulfillment?.mode as FulfillmentMode | undefined) ??
+    (orderMetadata.fulfillment_mode as FulfillmentMode | undefined);
+  const isConfirmation = transition.layer === 'transaction' && transition.targetState === 'confirmed';
+
+  // ── No-window invariant (plan Phase 5) ──────────────────────────────────
+  // The customer must NEVER be told "confirmed" while mandatory resources
+  // are unavailable. Resource allocation therefore runs PRE-FLIGHT, before
+  // the confirm write: if it fails, the request fails and the order stays
+  // pending — the confirm UPDATE (and its fulfillment trigger) never runs.
+  // Post-commit side effects (consume on handoff, release on cancel) stay
+  // best-effort below; allocation is the one move that gates confirmation.
+  if (isConfirmation) {
+    const allocation = await resourceConsumption.allocateForConfirmation(supabase, {
+      transactionId: orderId,
+      engineType,
+      mode: selectedMode,
+      propertyId: String(current.property_id ?? ''),
+      tenantId: tenantId ?? String(current.tenant_id),
+      context: { orderId, moduleId },
+    });
+    if (!allocation.ok) {
+      logger.error('[OrderStatus] Refusing to confirm — resource allocation failed', {
+        orderId,
+        mode: selectedMode,
+        reason: allocation.reason,
+        error: allocation.error,
+      });
+      return {
+        ok: false,
+        status: allocation.reason === 'unavailable' ? 409 : 500,
+        error: allocation.error,
+      };
+    }
   }
 
   // Stage 6: the canonical fulfillment row is created ATOMICALLY with the
@@ -275,7 +316,33 @@ export async function changeInstantTransactionOrderStatus(
     .select('*')
     .single();
 
-  if (updateError) return { ok: false, status: 500, error: updateError.message };
+  if (updateError) {
+    // Compensation for the pre-flight path: the allocation succeeded but
+    // the confirm write failed — release the just-allocated rows so the
+    // benign orphan (resources reserved, transaction still pending) does
+    // not linger. Best-effort: release is idempotent; the rows are inert
+    // for a non-confirmed transaction either way.
+    if (isConfirmation) {
+      try {
+        await resourceConsumption.release(supabase, {
+          transactionId: orderId,
+          engineType,
+          mode: selectedMode,
+          action: 'cancel',
+          actor,
+          actorId: userId ?? null,
+          currentState: 'pending',
+          context: { orderId, moduleId },
+        });
+      } catch (releaseErr) {
+        logger.error(
+          '[OrderStatus] Failed to release pre-flight allocation after confirm write failed',
+          releaseErr instanceof Error ? releaseErr.message : String(releaseErr),
+        );
+      }
+    }
+    return { ok: false, status: 500, error: updateError.message };
+  }
 
   // Give back whatever coupon/gift card this order consumed at creation.
   // Previously only the dynamic-module.router.ts path did this — cancelling
@@ -306,33 +373,38 @@ export async function changeInstantTransactionOrderStatus(
   // hiccup. The RPCs are idempotent (20260821210000 — events record only
   // rows actually transitioned), and the resolver validates fail-closed
   // before any write, so a failed move is retryable and never corrupts state.
-  try {
-    const lifecycle = await resourceConsumption.handleLifecycleMove(supabase, {
-      transactionId: orderId,
-      engineType,
-      mode: (fulfillment?.mode as FulfillmentMode | undefined) ?? undefined,
-      action,
-      actor,
-      actorId: userId ?? null,
-      currentState,
-      targetState: transition.targetState ?? persistedState,
-      layer: transition.layer ?? (isCancelling ? 'transaction' : 'fulfillment'),
-      propertyId: String(order.property_id ?? ''),
-      tenantId: tenantId ?? String(order.tenant_id),
-      context: { orderId, moduleId },
-    });
-    if (!lifecycle.ok) {
-      logger.error('[OrderStatus] Resource lifecycle move failed', {
-        orderId,
-        op: lifecycle.op,
-        error: lifecycle.error,
+  // Confirmation allocated pre-flight above; the post-update lifecycle
+  // driver handles ONLY the compensating moves (release on cancel, consume
+  // at the mode's handoff) — never a second allocation.
+  if (!isConfirmation) {
+    try {
+      const lifecycle = await resourceConsumption.handleLifecycleMove(supabase, {
+        transactionId: orderId,
+        engineType,
+        mode: selectedMode,
+        action,
+        actor,
+        actorId: userId ?? null,
+        currentState,
+        targetState: transition.targetState ?? persistedState,
+        layer: transition.layer ?? (isCancelling ? 'transaction' : 'fulfillment'),
+        propertyId: String(order.property_id ?? ''),
+        tenantId: tenantId ?? String(order.tenant_id),
+        context: { orderId, moduleId },
       });
+      if (!lifecycle.ok) {
+        logger.error('[OrderStatus] Resource lifecycle move failed', {
+          orderId,
+          op: lifecycle.op,
+          error: lifecycle.error,
+        });
+      }
+    } catch (lifecycleErr) {
+      logger.error(
+        '[OrderStatus] Resource lifecycle move threw',
+        lifecycleErr instanceof Error ? lifecycleErr.message : String(lifecycleErr),
+      );
     }
-  } catch (lifecycleErr) {
-    logger.error(
-      '[OrderStatus] Resource lifecycle move threw',
-      lifecycleErr instanceof Error ? lifecycleErr.message : String(lifecycleErr),
-    );
   }
 
   // Real-time notify the KDS. Previously only the staff-controller path did

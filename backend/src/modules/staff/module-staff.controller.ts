@@ -7,10 +7,19 @@ import { autoAssignStaffToLocation, reassignStaffToLocation } from '../reservati
 import { resolveAndPriceCatalogItems } from '../../services/catalog-pricing.service.js';
 import { getEngineService } from '../../engines/engine-service.js';
 import { resolveModuleCurrency } from '../../engines/currency-resolver.js';
-import { TEMPLATE_TO_ENGINE } from '../../engines/types.js';
+import { TEMPLATE_TO_ENGINE, type FulfillmentMode } from '../../engines/types.js';
 import { changeInstantTransactionOrderStatus } from '../../engines/order-status.service.js';
 import { getFulfillmentService } from '../fulfillment/index.js';
+import { ResourceConsumptionService } from '../resource/index.js';
+import { hospitalityResourceResolver } from '../../adapters/hospitality/resources.js';
 import { resolveFulfillmentSelection } from '../fulfillment/fulfillment-selection.js';
+
+// Resource lifecycle driver for item-derived fulfillment moves (plan Phase
+// 5): KDS item bumps advance the fulfillment row through a DIFFERENT path
+// than the order-status choke point, so consumption must be driven here
+// too — the generic service is wired with the hospitality BOM resolver at
+// this operational call site, never in the generic core.
+const itemPathResourceConsumption = new ResourceConsumptionService(hospitalityResourceResolver);
 import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
 import { getOrderNumber } from '../../utils/order-number.js';
 import { awardLoyaltyPointsForPayment } from '../payments/loyalty-integration.js';
@@ -884,6 +893,40 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
           };
           emitToUnit(req.user?.tenantId || 'default', slug, 'order:status', derivedPayload);
           emitToUnit(req.user?.tenantId || 'default', module.id, 'order:status', derivedPayload);
+
+          // Resource lifecycle (plan Phase 5): the item-derived move is a
+          // REAL fulfillment move — consumption at the mode's handoff must
+          // fire here too, not only on the order-status choke-point path.
+          // Non-fatal by design (same boundary as the choke point): the
+          // move already persisted; the RPCs are idempotent.
+          try {
+            const lifecycle = await itemPathResourceConsumption.handleLifecycleMove(supabase, {
+              transactionId: orderId,
+              engineType: 'instant_transaction',
+              mode: (fulfillment?.mode as FulfillmentMode | undefined) ?? undefined,
+              action: engineAction,
+              actor: 'staff',
+              actorId: req.user?.userId ?? null,
+              currentState: fulfillment!.status,
+              targetState: result.canonicalState,
+              layer: 'fulfillment',
+              propertyId: String(parentOrder.property_id ?? ''),
+              tenantId: String(parentOrder.tenant_id ?? ''),
+              context: { orderId, derivedFromItems: true },
+            });
+            if (!lifecycle.ok) {
+              logger.error('[OrderItems] Resource lifecycle move failed', {
+                orderId,
+                op: lifecycle.op,
+                error: lifecycle.error,
+              });
+            }
+          } catch (lifecycleErr) {
+            logger.error(
+              '[OrderItems] Resource lifecycle move threw',
+              lifecycleErr instanceof Error ? lifecycleErr.message : String(lifecycleErr),
+            );
+          }
         }
         // Not allowed just means the order won't auto-advance this time —
         // the item update above already succeeded and is not rolled back.

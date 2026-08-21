@@ -306,6 +306,76 @@ export class ResourceConsumptionService {
   }
 
   /**
+   * PRE-FLIGHT allocation for economic confirmation — closes the
+   * "customer told confirmed while mandatory resources are unavailable"
+   * window. Resolves the transaction's requirements through the resolver,
+   * validates them against the (engine, mode) model fail-closed, and
+   * persists the allocation rows. Returns ok:false on ANY failure — the
+   * caller must NOT proceed to persist the confirmation.
+   *
+   * The reverse orphan (allocated here, but the confirm write then fails)
+   * is the caller's to compensate via release() — it is the benign
+   * direction (resources reserved, transaction still pending), unlike a
+   * confirmed transaction with no allocation.
+   */
+  async allocateForConfirmation(
+    supabase: SupabaseClient,
+    params: {
+      transactionId: string;
+      engineType: string;
+      /** The transaction's fulfillment MODE — selects the mode's resource model. */
+      mode?: FulfillmentMode;
+      propertyId?: string | null;
+      tenantId?: string | null;
+      context?: Record<string, unknown>;
+    },
+  ): Promise<{ ok: true; allocated: number } | { ok: false; error: string; reason: 'unavailable' | 'internal' }> {
+    const model = this.getResourceModel(params.engineType, params.mode);
+    // A mode whose model is 'none' (digital_delivery) has no mandatory
+    // resources — nothing to pre-flight.
+    if (model.type === 'none') {
+      return { ok: true, allocated: 0 };
+    }
+    if (!this.resolver) {
+      return {
+        ok: false,
+        reason: 'internal',
+        error: 'No resource requirement resolver is wired for this service instance',
+      };
+    }
+    let requirements: ResourceRequirement[];
+    try {
+      requirements = await this.resolver.resolveRequirements(supabase, params.transactionId, params.context);
+      this.validate(params.engineType, requirements, params.mode);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error('[Resource] Pre-flight allocation rejected before confirmation', {
+        transactionId: params.transactionId,
+        engineType: params.engineType,
+        error: message,
+      });
+      return { ok: false, reason: 'internal', error: message };
+    }
+    const allocated = await this.allocate(supabase, {
+      transactionId: params.transactionId,
+      engineType: params.engineType,
+      mode: params.mode,
+      requirements,
+      propertyId: params.propertyId,
+      tenantId: params.tenantId,
+    });
+    if (!allocated.ok) {
+      logger.error('[Resource] Pre-flight allocation failed before confirmation', {
+        transactionId: params.transactionId,
+        engineType: params.engineType,
+        error: allocated.error,
+      });
+      return { ok: false, reason: 'unavailable', error: allocated.error ?? 'Resource allocation failed' };
+    }
+    return { ok: true, allocated: allocated.allocated ?? requirements.length };
+  }
+
+  /**
    * MODE-AWARE lifecycle driver (plan Phase 5 — resume: wire resources into
    * the order lifecycle). Given the canonical move facts of a persisted state
    * change, performs the resource operation the (engine, mode) model
