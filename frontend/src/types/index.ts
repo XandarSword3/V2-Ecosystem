@@ -56,7 +56,11 @@ export interface AuthTokens {
 // Order Types
 // ============================================
 
-export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'completed' | 'cancelled';
+// Canonical transaction-layer states only (plan F1). Fulfillment is never
+// part of this union — it lives in FulfillmentStatus. Pre-Stage-6 legacy
+// composites (preparing/delivered) are mapped by canonicalFulfillmentState
+// at the boundary; they must not re-enter this type.
+export type OrderStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
 // Stage 6: canonical fulfillment-layer states. The KDS consumes
 // fulfillmentStatus (in_progress/ready/handed_off), NOT the transaction-layer
 // status, for kitchen/dispatch columns. Derived from the canonical domain

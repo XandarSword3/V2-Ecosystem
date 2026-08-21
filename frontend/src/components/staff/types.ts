@@ -1,4 +1,7 @@
-import type { FulfillmentState, FulfillmentStatus } from '@/types';
+import type { FulfillmentStatus } from '@/types';
+// Canonical helpers live in the domain layer (plan F1) — re-exported here
+// so existing staff components keep their import surface.
+export { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from '@/types';
 
 export type ItemStatus = 'pending' | 'preparing' | 'ready' | 'served';
 
@@ -45,23 +48,6 @@ export interface Order {
 // columns key off the CANONICAL fulfillment state, never the legacy
 // composites (preparing/delivered) that pre-Stage-6 rows carried.
 export const statusFlow = ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed'] as const;
-export const FULFILLMENT_LAYER_STATES: readonly FulfillmentState[] = ['queued', 'in_progress', 'ready', 'handed_off'];
-
-/**
- * Resolve the canonical fulfillment state for an order. Stage 6: the backend
- * returns fulfillmentStatus (canonical). For historical rows / socket events
- * that may still carry legacy composites on status, map them here.
- */
-export function canonicalFulfillmentState(order: { fulfillmentStatus?: string | null; status?: string }): string | null {
-  if (order.fulfillmentStatus) return order.fulfillmentStatus;
-  switch (order.status) {
-    case 'preparing': return 'in_progress';
-    case 'delivered':
-    case 'served':    return 'handed_off';
-    case 'ready':     return 'ready';
-    default:          return order.status ?? null;
-  }
-}
 
 // Mirrors backend ITEM_STATUS_FLOW in module-staff.controller.ts — forward-only,
 // one step at a time. Kept as a separate flow because order_items isn't a

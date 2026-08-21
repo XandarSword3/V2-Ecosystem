@@ -9,6 +9,9 @@ import { api } from '@/lib/api';
 import { useSocket } from '@/lib/socket';
 import { toast } from 'sonner';
 import { formatCurrency, formatDate } from '@/lib/utils';
+// Canonical fulfillment state (plan F1) — the status pill and the
+// rate-your-server gate key off it, never legacy composites.
+import { canonicalFulfillmentState } from '@/types';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -96,6 +99,8 @@ interface OrderConfirmation {
   staff_name?: string | null;
   notes?: string;
   status: string;
+  /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
+  fulfillment_status?: string | null;
   order_type: string;
   total_amount: number;
   tax_amount?: number;
@@ -176,14 +181,16 @@ function discountIcon(type?: string) {
 // Status pills use the CMS's own success/warning/primary/destructive
 // tokens (see tailwind.config.js) rather than hardcoded green/amber/blue,
 // so an order's status reads correctly no matter which theme is active.
+// Canonical states only — the caller canonicalizes before styling (plan F1).
 function orderStatusStyle(status?: string) {
   switch (status) {
     case 'ready':
-    case 'delivered':
+    case 'handed_off':
     case 'completed':
       return 'bg-success/10 text-success';
     case 'confirmed':
-    case 'preparing':
+    case 'queued':
+    case 'in_progress':
       return 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400';
     case 'cancelled':
       return 'bg-destructive/10 text-destructive';
@@ -245,11 +252,21 @@ function ConfirmationContent() {
     if (socket && itemId && confirmationType === 'order') {
       socket.emit('order:join', { orderId: itemId });
 
-      const handleOrderUpdate = (update: { orderId?: string; id?: string; status: string }) => {
+      const handleOrderUpdate = (update: { orderId?: string; id?: string; status: string; fulfillmentStatus?: string | null; fulfillment_status?: string | null }) => {
         const targetId = update.orderId || update.id;
         if (!targetId || targetId === itemId) {
-          setOrder((prev) => (prev ? { ...prev, status: update.status } : prev));
-          toast.info(`Order status: ${update.status.replace('_', ' ')}`);
+          // Stage 6: fulfillment moves carry the canonical state — prefer it
+          // over the transaction-layer status for the status pill.
+          setOrder((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: update.status,
+                  fulfillment_status: update.fulfillmentStatus ?? update.fulfillment_status ?? prev.fulfillment_status,
+                }
+              : prev
+          );
+          toast.info(`Order status: ${(update.fulfillmentStatus ?? update.fulfillment_status ?? update.status).replace('_', ' ')}`);
         }
       };
 
@@ -673,8 +690,8 @@ function ConfirmationContent() {
                   )}
 
                   <div className="pt-2">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${orderStatusStyle(order.status)}`}>
-                      {order.status?.toUpperCase() || 'PENDING'}
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${orderStatusStyle(canonicalFulfillmentState(order) ?? order.status)}`}>
+                      {(canonicalFulfillmentState(order) ?? order.status ?? 'pending').toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -698,7 +715,7 @@ function ConfirmationContent() {
             the backend now routes table orders through
             service_locations.assigned_staff_id, so staff_name is the single
             source of truth for whether this order has someone to rate. */}
-        {order && order.staff_name && ['ready', 'delivered', 'completed'].includes(order.status) && (
+        {order && order.staff_name && ['ready', 'handed_off', 'completed'].includes(canonicalFulfillmentState(order) ?? order.status) && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

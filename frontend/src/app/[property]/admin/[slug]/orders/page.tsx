@@ -12,6 +12,10 @@ import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
 import { useSocket } from '@/lib/socket';
+// Canonical Engine A domain helpers (plan F1): the page keys off the
+// canonical fulfillment state — never legacy composites (preparing /
+// delivered) and never fulfillment inferred from transactions.status.
+import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState } from '@/types';
 import {
   Clock,
   CheckCircle2,
@@ -53,7 +57,11 @@ interface Order {
   id: string;
   order_number: string;
   orderNumber?: string;
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+  // Transaction layer only — fulfillment is NEVER inferred from status.
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
+  fulfillment_status?: string | null;
+  fulfillmentStatus?: string | null;
   total_amount: number;
   totalAmount?: number;
   table_number?: number;
@@ -72,14 +80,27 @@ interface Order {
   customerName?: string;
 }
 
+// Canonical state presentation — neutral labels, no vertical vocabulary.
 const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
   pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock, label: 'Pending' },
   confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2, label: 'Confirmed' },
-  preparing: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: ChefHat, label: 'Preparing' },
+  queued: { color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Clock, label: 'Queued' },
+  in_progress: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: ChefHat, label: 'In Progress' },
   ready: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2, label: 'Ready' },
-  delivered: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: CheckCircle2, label: 'Delivered' },
+  handed_off: { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', icon: CheckCircle2, label: 'Handed Off' },
+  completed: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: CheckCircle2, label: 'Completed' },
   cancelled: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, label: 'Cancelled' },
 };
+
+/** Canonical state for board/action purposes — a confirmed transaction
+ * whose fulfillment is queued (or not yet created) displays as 'queued'. */
+function effectiveState(order: Order): string {
+  const c = canonicalFulfillmentState(order);
+  return c === 'confirmed' ? 'queued' : (c ?? order.status);
+}
+
+/** Canonical filter list — transaction states + fulfillment states. */
+const FILTER_STATES = ['all', 'pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'];
 
 export default function DynamicOrdersPage() {
   const params = useParams();
@@ -138,13 +159,21 @@ export default function DynamicOrdersPage() {
     };
   }, [socket, fetchOrders, currentModule]);
 
-  const updateStatus = async (orderId: string, status: string) => {
+  // Canonical transitions only. Fulfillment-layer targets update the
+  // canonical fulfillment state; transaction-layer targets update status.
+  const updateStatus = async (orderId: string, target: CanonicalOrderState) => {
     try {
-      await api.put(`/staff/modules/${slug}/orders/${orderId}/status`, { status });
-      toast.success(`Order status updated to ${status}`);
+      await api.put(`/staff/modules/${slug}/orders/${orderId}/status`, { status: target });
+      toast.success(`Order updated to ${target}`);
       fetchOrders();
       if (selectedOrder?.id === orderId) {
-        setSelectedOrder(prev => prev ? { ...prev, status: status as Order['status'] } : null);
+        setSelectedOrder((prev) =>
+          prev
+            ? FULFILLMENT_LAYER_STATES.includes(target as never)
+              ? { ...prev, fulfillment_status: target }
+              : { ...prev, status: target as Order['status'] }
+            : null
+        );
       }
     } catch (error) {
       toast.error('Failed to update order status');
@@ -152,7 +181,7 @@ export default function DynamicOrdersPage() {
   };
 
   const filteredOrders = orders.filter((order) => {
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    const matchesStatus = statusFilter === 'all' || effectiveState(order) === statusFilter;
     const matchesSearch =
       (order.order_number || order.orderNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (order.customer?.full_name || order.customerName || '').toLowerCase().includes(searchQuery.toLowerCase());
@@ -196,7 +225,7 @@ export default function DynamicOrdersPage() {
               />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-              {['all', 'pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'].map((status) => (
+              {FILTER_STATES.map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
@@ -236,7 +265,8 @@ export default function DynamicOrdersPage() {
             </div>
           ) : (
             filteredOrders.map((order) => {
-              const StatusIcon = statusConfig[order.status]?.icon || Clock;
+              const st = effectiveState(order);
+              const StatusIcon = statusConfig[st]?.icon || Clock;
               const items = order.items || order.order_items || [];
 
               return (
@@ -248,7 +278,7 @@ export default function DynamicOrdersPage() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Card className="h-full hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: order.status === 'pending' ? '#eab308' : order.status === 'ready' ? '#22c55e' : 'transparent' }}>
+                  <Card className="h-full hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: st === 'pending' ? '#eab308' : st === 'ready' ? '#22c55e' : 'transparent' }}>
                     <CardContent className="p-5 space-y-4">
                       {/* Header */}
                       <div className="flex justify-between items-start">
@@ -257,9 +287,9 @@ export default function DynamicOrdersPage() {
                             <span className="font-mono font-bold text-lg">
                               #{order.order_number || order.orderNumber}
                             </span>
-                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${statusConfig[order.status]?.color}`}>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${statusConfig[st]?.color}`}>
                               <StatusIcon className="w-3 h-3" />
-                              {statusConfig[order.status]?.label}
+                              {statusConfig[st]?.label}
                             </span>
                           </div>
                           <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -302,9 +332,12 @@ export default function DynamicOrdersPage() {
                         )}
                       </div>
 
-                      {/* Actions */}
+                      {/* Actions — canonical transitions, one step at a time.
+                          pending→confirmed is a transaction-layer move;
+                          queued→in_progress→ready→handed_off→completed are
+                          fulfillment-layer moves. */}
                       <div className="grid grid-cols-2 gap-2 pt-2">
-                        {order.status === 'pending' && (
+                        {st === 'pending' && (
                           <>
                             <Button
                               variant="outline"
@@ -321,15 +354,15 @@ export default function DynamicOrdersPage() {
                             </Button>
                           </>
                         )}
-                        {order.status === 'confirmed' && (
+                        {st === 'queued' && (
                           <Button
                             className="col-span-2 bg-orange-500 hover:bg-orange-600 text-white"
-                            onClick={() => updateStatus(order.id, 'preparing')}
+                            onClick={() => updateStatus(order.id, 'in_progress')}
                           >
-                            Start Preparing
+                            Start Preparation
                           </Button>
                         )}
-                        {order.status === 'preparing' && (
+                        {st === 'in_progress' && (
                           <Button
                             className="col-span-2 bg-green-600 hover:bg-green-700 text-white"
                             onClick={() => updateStatus(order.id, 'ready')}
@@ -337,12 +370,20 @@ export default function DynamicOrdersPage() {
                             Mark Ready
                           </Button>
                         )}
-                        {order.status === 'ready' && (
+                        {st === 'ready' && (
                           <Button
                             className="col-span-2 bg-slate-800 hover:bg-slate-900 text-white"
-                            onClick={() => updateStatus(order.id, 'delivered')}
+                            onClick={() => updateStatus(order.id, 'handed_off')}
                           >
-                            Mark Delivered
+                            Mark Handed Off
+                          </Button>
+                        )}
+                        {st === 'handed_off' && (
+                          <Button
+                            className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => updateStatus(order.id, 'completed')}
+                          >
+                            Mark Completed
                           </Button>
                         )}
                       </div>

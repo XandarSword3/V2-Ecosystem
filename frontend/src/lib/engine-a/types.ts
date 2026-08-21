@@ -55,6 +55,34 @@ export function isFulfillmentState(value: string): value is FulfillmentState {
   return value === 'queued' || value === 'in_progress' || value === 'ready' || value === 'handed_off';
 }
 
+/** Canonical fulfillment-layer states (vs transaction-layer statuses). */
+export const FULFILLMENT_LAYER_STATES: readonly FulfillmentState[] = ['queued', 'in_progress', 'ready', 'handed_off'];
+
+/**
+ * Resolve the canonical state for an order payload. Stage 6: prefer the
+ * canonical field (fulfillmentStatus / fulfillment_status), fall back to
+ * the transitional metadata value, then map legacy composite statuses
+ * (pre-Stage-6 rows / old socket events). The ONLY place legacy composites
+ * ('preparing'/'delivered'/'served') may appear outside the adapter.
+ */
+export function canonicalFulfillmentState(order: {
+  fulfillmentStatus?: string | null;
+  fulfillment_status?: string | null;
+  status?: string;
+}): CanonicalOrderState | null {
+  const canonical = order.fulfillmentStatus ?? order.fulfillment_status ?? null;
+  if (canonical && (isTransactionState(canonical) || isFulfillmentState(canonical))) {
+    return canonical as CanonicalOrderState;
+  }
+  switch (order.status) {
+    case 'preparing': return 'in_progress';
+    case 'delivered':
+    case 'served':    return 'handed_off';
+    case 'ready':     return 'ready';
+    default:          return (order.status as CanonicalOrderState) ?? null;
+  }
+}
+
 // ============================================
 // Fulfillment capability
 // ============================================

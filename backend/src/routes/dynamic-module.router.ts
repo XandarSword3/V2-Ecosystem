@@ -213,6 +213,25 @@ function asNumber(input: unknown, fallback = 0): number {
 // A location counts as occupied when it has any order NOT in one of these.
 const INSTANT_TRANSACTION_TERMINAL_STATES = ['completed', 'cancelled'];
 
+/**
+ * Legacy fulfillment composites (pre-Stage-6 transactions.status values) →
+ * canonical fulfillment states. The ONLY remaining read of legacy
+ * composites, kept in the API surface (never the engine core) so
+ * historical rows display correctly until they have fulfillment rows.
+ * Mirrors module-staff.controller.ts's map of the same name.
+ */
+function legacyFulfillmentToCanonical(status: string | null): string | null {
+  switch (status) {
+    case 'preparing': return 'in_progress';
+    case 'delivered':
+    case 'served':    return 'handed_off';
+    case 'ready':     return 'ready';
+    case 'completed': return 'completed';
+    case 'cancelled': return 'cancelled';
+    default:          return null;
+  }
+}
+
 // Resource lifecycle driver for the customer-router item path (plan Phase
 // 5): adding items to a confirmed order must refresh the generic
 // allocation through the same idempotent allocate the choke point uses.
@@ -1646,9 +1665,16 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'Mounted module context missing' });
       }
       const supabase = getSupabase();
+      // Stage 6: canonical fulfillment meaning lives in the fulfillments
+      // table — join it so this list returns fulfillment_status instead of
+      // leaving the admin page to infer fulfillment from transactions.status
+      // (which sits at 'confirmed' for the entire fulfillment lifecycle).
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, customer_id, status, amount, created_at, metadata')
+        .select(`
+          id, customer_id, status, amount, created_at, metadata,
+          fulfillments ( status )
+        `)
         .eq('engine_type', 'instant_transaction')
         .eq('module_id', mounted.id)
         .order('created_at', { ascending: false })
@@ -1658,10 +1684,22 @@ function buildInstantTransactionRouter(router: Router): void {
       const flattened = (data ?? []).map((tx: any) => {
         const meta = (tx.metadata ?? {}) as Record<string, unknown>;
         const items = (meta.items as Array<any>) || [];
+        // Canonical fulfillment state from the fulfillments join; fall back
+        // to metadata.fulfillment_state (transitional) then the legacy
+        // composite map (historical rows). Same resolution the staff KDS
+        // endpoint uses — the admin surface must show the same state.
+        const fulfillmentRel = tx.fulfillments as Array<{ status?: string | null }> | { status?: string | null } | null | undefined;
+        const fulfillmentStatus = Array.isArray(fulfillmentRel)
+          ? (fulfillmentRel[0]?.status ?? null)
+          : (fulfillmentRel?.status ?? null);
+        const canonicalFulfillmentState = fulfillmentStatus
+          ?? (meta.fulfillment_state as string | undefined)
+          ?? legacyFulfillmentToCanonical(tx.status as string | null);
         return {
           id: tx.id,
           order_number: getOrderNumber(tx.id, meta),
           status: tx.status,
+          fulfillment_status: canonicalFulfillmentState,
           total_amount: tx.amount,
           table_number: meta.table_number || meta.tableNumber || null,
           customer: meta.customer_name ? { full_name: meta.customer_name as string } : null,
@@ -1703,14 +1741,26 @@ function buildInstantTransactionRouter(router: Router): void {
         // tax_amount/discount_amount are written at order creation (see
         // POST /orders below) but were previously never selected here, so
         // the confirmation page had no way to show a subtotal/discount/tax
-        // breakdown even though the data existed on the row.
-        .select('id, customer_id, staff_id, service_location_id, status, amount, tax_amount, discount_amount, created_at, metadata')
+        // breakdown even though the data existed on the row. Stage 6: the
+        // canonical fulfillment state is joined in so the customer sees
+        // fulfillment progress, never a transactions.status stuck at
+        // 'confirmed' for the whole lifecycle.
+        .select(`
+          id, customer_id, staff_id, service_location_id, status, amount, tax_amount,
+          discount_amount, created_at, metadata,
+          fulfillments ( status )
+        `)
         .eq('engine_type', 'instant_transaction')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
       if (error) throw error;
       if (!data) return res.status(404).json({ success: false, error: 'Order not found' });
+      // Canonical fulfillment state (same resolution as GET /orders).
+      const fulfillmentRel = (data as { fulfillments?: Array<{ status?: string | null }> | { status?: string | null } | null }).fulfillments ?? null;
+      const fulfillmentStatus = Array.isArray(fulfillmentRel)
+        ? (fulfillmentRel[0]?.status ?? null)
+        : (fulfillmentRel?.status ?? null);
       // IDOR protection: customers can only view their own orders
       const isStaff = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
       if (!isStaff && data.customer_id !== req.user?.userId) {
@@ -1776,10 +1826,13 @@ function buildInstantTransactionRouter(router: Router): void {
         });
       }
       const ledgerMeta = (ledgerBreakdown?.metadata ?? {}) as Record<string, unknown>;
+      // Strip the raw fulfillments join — the flattened fulfillment_status
+      // below is the canonical value the client should consume.
+      const { fulfillments: _rawFulfillments, ...txFields } = data;
       res.json({
         success: true,
         data: {
-          ...data,
+          ...txFields,
           // FIX: this used to always derive the number from the raw
           // transaction id (data.id.slice(0,8).toUpperCase()), ignoring
           // the real order_number written into metadata at creation.
@@ -1789,6 +1842,9 @@ function buildInstantTransactionRouter(router: Router): void {
           total_amount: data.amount,
           tax_amount: data.tax_amount,
           discount_amount: data.discount_amount,
+          fulfillment_status: fulfillmentStatus
+            ?? (meta.fulfillment_state as string | undefined)
+            ?? legacyFulfillmentToCanonical(data.status as string | null),
           order_type: meta.order_type ?? 'dine_in',
           customer_name: meta.customer_name ?? null,
           customer_phone: meta.customer_phone ?? null,
