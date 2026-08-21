@@ -207,7 +207,6 @@ export const ongoingEntitlementEngine: EngineDefinition<OngoingEntitlementStatus
       ],
       groups: false,
       tracking: false,
-      handoff: false,
     },
     execution: {
       enabled: true,

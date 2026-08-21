@@ -45,13 +45,13 @@ export class LayeredStateMachine {
   constructor(
     private readonly txMachine: StateMachine,
     /**
-     * Every fulfillment machine bound by the engine's capability contract
-     * (one per adapter binding). A single engine can fulfill through several
-     * radically different adapters — Engine A binds the hospitality machine
-     * AND the digital machine as MODES of the same engine. The validator
-     * tries each; the adapters own disjoint state vocabularies, so there is
-     * never ambiguity in practice, and the contract rejects a mode claimed
-     * by two bindings.
+     * The fulfillment machines for the move being validated. For a
+     * mode-scoped call (the row's mode is known) EngineService resolves the
+     * SELECTED binding's machine only — the mode is the runtime authority, so
+     * a digital_delivery row is never validated against the hospitality
+     * machine even if adapters ever share a state name. For engine-wide
+     * (mode-less) surfaces every bound machine is passed. The contract
+     * rejects a mode claimed by two bindings, so routing is never ambiguous.
      */
     private readonly fulfillmentMachines: StateMachine[],
     private readonly fulfillment: FulfillmentDefinition,
@@ -81,8 +81,10 @@ export class LayeredStateMachine {
       };
     }
 
-    // 2. Fulfillment layer (current state is canonical — no bridge). Every
-    //    bound machine is tried; the adapters own disjoint state vocabularies.
+    // 2. Fulfillment layer (current state is canonical — no bridge). The
+    //    machines here were resolved from the mode binding by EngineService:
+    //    exactly ONE machine for mode-scoped calls (the selected binding is
+    //    the authority), or every bound machine on engine-wide surfaces.
     for (const fm of this.fulfillmentMachines) {
       const fmCheck = fm.canTransition(currentState, action, actor, context);
       if (fmCheck.allowed && fmCheck.targetState !== undefined) {

@@ -185,17 +185,21 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
       ],
       groups: false,
       tracking: false,
-      handoff: true,
       // Per-mode machine routing: hospitality modes → the hospitality
       // adapter's machine; digital_delivery → the digital adapter's machine.
+      // Handoff semantics are per MODE, never engine-wide: hospitality
+      // models a separate handoff step (handed_off state), digital delivery
+      // has none — delivery to the digital account IS the handoff.
       modeMachines: [
         {
           modes: ['on_premise', 'pickup', 'local_delivery'],
+          handoff: true,
           machine: hospitalityFulfillmentStateMachine,
           autoHandoff: HOSPITALITY_AUTO_HANDOFF,
         },
         {
           modes: ['digital_delivery'],
+          handoff: false,
           machine: digitalFulfillmentStateMachine,
         },
       ],
@@ -204,7 +208,11 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
       enabled: true,
       workCenters: true,
       operators: true,
-      states: ['queued', 'in_progress', 'ready', 'handed_off'],
+      // Generic execution declaration only — the WORK-CENTER STATES are
+      // adapter-owned (the hospitality binding's fulfillment machine
+      // declares queued/in_progress/ready/handed_off per mode). The generic
+      // Engine A definition never carries vertical states.
+      states: [],
       notificationTrigger: 'on_confirm',
     },
     economics: {

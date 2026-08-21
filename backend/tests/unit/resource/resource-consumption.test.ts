@@ -70,7 +70,6 @@ describe('Generic resource consumption contract (plan Phase 5)', () => {
       options: [],
       groups: false,
       tracking: false,
-      handoff: false,
     };
     expect(() =>
       assertValidResourceConsumption(
@@ -104,7 +103,7 @@ describe('Generic resource consumption contract (plan Phase 5)', () => {
     expect(() =>
       assertValidResourceConsumption(
         { type: 'inventory', kinds: [], allocation: 'on_purchase', consumption: 'on_purchase', reversalOnCancel: true },
-        { required: false, options: [], groups: false, tracking: false, handoff: false },
+        { required: false, options: [], groups: false, tracking: false },
       ),
     ).toThrow(ResourceContractError);
   });

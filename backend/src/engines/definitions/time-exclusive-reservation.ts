@@ -193,7 +193,6 @@ export const timeExclusiveReservationEngine: EngineDefinition<TimeExclusiveReser
       ],
       groups: false,
       tracking: false,
-      handoff: false,
     },
     execution: {
       enabled: false,

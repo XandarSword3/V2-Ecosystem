@@ -87,7 +87,6 @@ describe('Capability contract (plan Phase 2)', () => {
     const engine = getEngineByTemplate('instant_transaction');
     const f = engine.capabilities.fulfillment;
     expect(f.required).toBe(true);
-    expect(f.handoff).toBe(true);
     // Explicit mode → destination combinations (no flat lists) — digital
     // delivery is a MODE of Engine A, not a sixth engine.
     expect(f.options).toEqual([
@@ -103,7 +102,15 @@ describe('Capability contract (plan Phase 2)', () => {
     expect(hospitality.machine.states).toContain('queued');
     const digital = f.modeMachines!.find(b => b.modes.includes('digital_delivery'))!;
     expect(digital.machine.states).toContain('provisioning');
+    // Handoff semantics are per MODE, never engine-wide: hospitality models a
+    // separate handoff step, digital delivery does not (delivery IS handoff).
+    expect(f.modeMachines!.find(b => b.modes.includes('on_premise'))!.handoff).toBe(true);
+    expect(digital.handoff).toBe(false);
     expect(engine.capabilities.execution.notificationTrigger).toBe('on_confirm');
+    // The generic Engine A execution declaration carries NO vertical states —
+    // work-center states are adapter-owned (the hospitality binding's
+    // machine), never hospitality vocabulary in the generic definition.
+    expect(engine.capabilities.execution.states).toEqual([]);
     expect(engine.capabilities.commitment.type).toBe('inventory');
   });
 
@@ -162,8 +169,7 @@ describe('Completion gate — capability-driven enforcement', () => {
     options: [{ mode: 'digital_delivery', destinations: ['digital_account'] }],
     groups: false,
     tracking: false,
-    handoff: false,
-    modeMachines: [{ modes: ['digital_delivery'], machine: digitalMachine }],
+    modeMachines: [{ modes: ['digital_delivery'], handoff: false, machine: digitalMachine }],
   };
 
   it('blocks transaction-layer completion when fulfillment is required — even if the machine declares it', () => {
@@ -186,7 +192,6 @@ describe('Completion gate — capability-driven enforcement', () => {
       options: [],
       groups: false,
       tracking: false,
-      handoff: false,
     };
     const layered = new LayeredStateMachine(new StateMachine(naiveTxMachine), [], noFulfillment);
     expect(layered.canTransition('confirmed', 'complete', 'staff').allowed).toBe(true);
@@ -490,7 +495,6 @@ describe('Impossible configurations are rejected', () => {
         options: [{ mode: 'pickup', destinations: ['address'] }], // pickup cannot serve an address
         groups: false,
         tracking: false,
-        handoff: true,
       }),
     ).toThrow(FulfillmentContractError);
 
@@ -501,7 +505,6 @@ describe('Impossible configurations are rejected', () => {
         options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
         groups: false,
         tracking: false,
-        handoff: true,
       }),
     ).toThrow(FulfillmentContractError);
 
@@ -512,7 +515,6 @@ describe('Impossible configurations are rejected', () => {
         options: [{ mode: 'teleport' as never, destinations: ['none'] }],
         groups: false,
         tracking: false,
-        handoff: false,
       }),
     ).toThrow(FulfillmentContractError);
   });
@@ -587,8 +589,7 @@ describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
           options: [],
           groups: false,
           tracking: false,
-          handoff: true,
-          modeMachines: [{ modes: ['digital_delivery'], machine: { states: ['string-state'], initialState: 'string-state', terminalStates: [], transitions: [] } }],
+          modeMachines: [{ modes: ['digital_delivery'], handoff: false, machine: { states: ['string-state'], initialState: 'string-state', terminalStates: [], transitions: [] } }],
         },
         execution: { enabled: true, workCenters: true, operators: true, states: [], notificationTrigger: 'on_confirm' },
         economics: { multiTender: false, refunds: false, voids: false, ledger: true, loyalty: 'none', coupons: false, giftCards: false, pos: false, currencyRequired: true },
@@ -652,8 +653,7 @@ describe('Completion gate applies to available actions', () => {
     options: [{ mode: 'digital_delivery', destinations: ['digital_account'] }],
     groups: false,
     tracking: false,
-    handoff: false,
-    modeMachines: [{ modes: ['digital_delivery'], machine: fulfillmentMachine }],
+    modeMachines: [{ modes: ['digital_delivery'], handoff: false, machine: fulfillmentMachine }],
   };
 
   it('never OFFERS transaction-layer completion when fulfillment is required', () => {
@@ -675,7 +675,6 @@ describe('Completion gate applies to available actions', () => {
       options: [],
       groups: false,
       tracking: false,
-      handoff: false,
     };
     const layered = new LayeredStateMachine(
       new StateMachine(naiveTxMachine),
@@ -732,10 +731,10 @@ describe('Explicit auto-handoff policy replaces the implicit shortcut', () => {
         options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
         groups: false,
         tracking: false,
-        handoff: true,
         // state: 'ready' is not in the machine's states below
         modeMachines: [{
           modes: ['pickup'],
+          handoff: true,
           autoHandoff: { atState: 'ready', allowedActors: ['staff'] },
           machine: {
             states: ['queued', 'in_progress', 'handed_off', 'completed', 'cancelled'],
@@ -754,9 +753,9 @@ describe('Explicit auto-handoff policy replaces the implicit shortcut', () => {
         options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
         groups: false,
         tracking: false,
-        handoff: true,
         modeMachines: [{
           modes: ['pickup'],
+          handoff: true,
           autoHandoff: { atState: 'ready', allowedActors: ['staff'] },
           machine: {
             states: ['queued', 'ready', 'handed_off', 'cancelled'],
@@ -776,10 +775,9 @@ describe('Explicit auto-handoff policy replaces the implicit shortcut', () => {
         options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
         groups: false,
         tracking: false,
-        handoff: true,
         modeMachines: [
-          { modes: ['pickup'], machine: hospitalityFulfillmentStateMachine },
-          { modes: ['pickup'], machine: hospitalityFulfillmentStateMachine },
+          { modes: ['pickup'], handoff: true, machine: hospitalityFulfillmentStateMachine },
+          { modes: ['pickup'], handoff: true, machine: hospitalityFulfillmentStateMachine },
         ],
       }),
     ).toThrow(/ambiguous/);
@@ -792,7 +790,6 @@ describe('Explicit auto-handoff policy replaces the implicit shortcut', () => {
         options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
         groups: false,
         tracking: false,
-        handoff: true,
         // no modeMachines at all
       }),
     ).toThrow(/no fulfillment machine binding/);

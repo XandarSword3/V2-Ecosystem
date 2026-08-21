@@ -176,7 +176,6 @@ export const sharedCapacityAccessEngine: EngineDefinition<SharedCapacityAccessSt
       ],
       groups: false,
       tracking: false,
-      handoff: false,
     },
     execution: {
       enabled: true,

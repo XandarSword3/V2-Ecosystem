@@ -480,6 +480,10 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
         const row = new RegExp(`\\('${engine.type}',\\s*'${option.mode}',\\s*(true|false),\\s*(true|false),\\s*'([a-z_]+)'\\)`).exec(seedSql);
         expect(row, `capability row for engine '${engine.type}' mode '${option.mode}'`).toBeTruthy();
         expect(row![1]).toBe(String(fulfillment.required));
+        // The seeded handoff flag is MODE-SPECIFIC — it mirrors the binding's
+        // own handoff declaration (hospitality modes model a handoff step,
+        // digital_delivery does not), never an engine-wide flag.
+        expect(row![2]).toBe(String(binding!.handoff));
         // The seeded initial status must equal THAT MODE's machine initial
         // state — the persistence layer creates rows in the machine's own
         // declared initial state (queued for hospitality modes, provisioning

@@ -213,7 +213,6 @@ export const platformEntitlementEngine: EngineDefinition<PlatformEntitlementStat
       ],
       groups: false,
       tracking: false,
-      handoff: false,
     },
     execution: {
       enabled: true,

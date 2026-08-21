@@ -284,10 +284,22 @@ export interface FulfillmentOption {
  * semantics. The compiler enforces each binding's machine uses the engine's
  * own fulfillment-status type (the generic is preserved through the
  * registry).
+ *
+ * At RUNTIME the selected mode is the authority: EngineService resolves the
+ * mode's binding and validates fulfillment moves against THIS machine only
+ * (a digital_delivery row can never be moved with a hospitality action,
+ * even if adapters ever share a state name).
  */
 export interface FulfillmentModeBinding<TFulfillmentStatus extends string = string> {
   /** The fulfillment modes this adapter machine handles. */
   modes: readonly FulfillmentMode[];
+  /**
+   * Whether handoff (who/what/when/where/proof) is modeled for THESE modes.
+   * Mode-specific, never engine-wide: hospitality models a separate handoff
+   * step (handed_off state), while digital delivery has no separate handoff
+   * step — delivery to the digital account IS the handoff.
+   */
+  handoff: boolean;
   /** The adapter's fulfillment lifecycle — adapter-shaped state machine. */
   machine: StateMachineDefinition<TFulfillmentStatus>;
   /**
@@ -314,16 +326,16 @@ export interface FulfillmentDefinition<TFulfillmentStatus extends string = strin
   groups: boolean;
   /** Whether fulfillment carries carrier/execution tracking. */
   tracking: boolean;
-  /** Whether handoff (who/what/when/where/proof) is modeled. */
-  handoff: boolean;
   /**
    * Per-mode machine routing (plan Phase: digital as a MODE of Engine A).
    * Each binding maps the modes it handles to the adapter's state machine;
-   * the layered validator tries every bound machine, so a single engine can
-   * fulfill through radically different adapters (hospitality work flow,
-   * digital provisioning, …) without new engine semantics. Absent when the
-   * engine has no fulfillment machine (its lifecycle is purely declarative
-   * or lives on the transaction machine).
+   * handoff semantics are per binding (handoff is NEVER an engine-wide
+   * flag). At RUNTIME the selected mode is the authority: EngineService
+   * resolves the mode's binding and validates fulfillment moves against
+   * that machine only; all bound machines are consulted only for
+   * engine-wide (mode-less) surfaces. Absent when the engine has no
+   * fulfillment machine (its lifecycle is purely declarative or lives on
+   * the transaction machine).
    */
   modeMachines?: ReadonlyArray<FulfillmentModeBinding<TFulfillmentStatus>>;
 }
