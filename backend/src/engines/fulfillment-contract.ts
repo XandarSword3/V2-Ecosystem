@@ -18,9 +18,11 @@
  */
 
 import type {
+  AutoHandoffPolicy,
   DestinationType,
   FulfillmentDefinition,
   FulfillmentMode,
+  StateMachineDefinition,
 } from './types.js';
 
 /** The canonical transaction terminal that required fulfillment gates. */
@@ -57,42 +59,23 @@ export function isFulfillmentRequired(fulfillment: FulfillmentDefinition): boole
 /**
  * Validate a fulfillment capability declaration. Throws on any impossible
  * configuration — the boundary is enforced by code, not documentation:
- *   - required fulfillment must declare a fulfillment state machine;
+ *   - required fulfillment must declare a machine binding for EVERY option
+ *     mode (an unbound required mode could never complete);
+ *   - a binding may only cover modes the engine declares as options;
+ *   - no mode may be claimed by two bindings (ambiguous routing);
+ *   - each binding's auto-handoff state must be a real state of ITS machine,
+ *     and the machine must carry a transition to the completion state;
  *   - every declared option's destinations must be legal for its mode;
  *   - an engine cannot declare both required fulfillment AND zero options.
  */
 export function assertValidFulfillmentCapabilities(
   fulfillment: FulfillmentDefinition,
 ): void {
-  if (fulfillment.required && !fulfillment.stateMachine) {
+  const bindings = fulfillment.modeMachines ?? [];
+  if (fulfillment.required && bindings.length === 0) {
     throw new FulfillmentContractError(
-      'Fulfillment is required but no fulfillment state machine is declared — the transaction could never complete',
+      'Fulfillment is required but no fulfillment machine binding is declared — the transaction could never complete',
     );
-  }
-  if (!fulfillment.required && fulfillment.stateMachine) {
-    // Allowed: a machine may exist for tracking even when completion is not
-    // gated on it — but it must be consistent (see options below).
-  }
-  if (fulfillment.autoHandoff) {
-    if (!fulfillment.stateMachine) {
-      throw new FulfillmentContractError(
-        'Auto-handoff declared but no fulfillment state machine exists to derive the completion action from',
-      );
-    }
-    if (!fulfillment.stateMachine.states.includes(fulfillment.autoHandoff.atState)) {
-      throw new FulfillmentContractError(
-        `Auto-handoff state '${fulfillment.autoHandoff.atState}' is not in the fulfillment machine's states`,
-      );
-    }
-    if (fulfillment.autoHandoff.allowedActors.length === 0) {
-      throw new FulfillmentContractError('Auto-handoff must declare at least one allowed actor');
-    }
-    const hasCompletion = fulfillment.stateMachine.transitions.some(t => t.to === COMPLETION_STATE);
-    if (!hasCompletion) {
-      throw new FulfillmentContractError(
-        'Auto-handoff declared but the fulfillment machine has no transition to the completion state to derive the completion action from',
-      );
-    }
   }
   if (fulfillment.options.length === 0) {
     if (fulfillment.required) {
@@ -100,7 +83,58 @@ export function assertValidFulfillmentCapabilities(
         'Fulfillment is required but no mode/destination options are declared',
       );
     }
+    if (bindings.length > 0) {
+      throw new FulfillmentContractError(
+        'Fulfillment machine bindings declared but no mode/destination options exist to bind',
+      );
+    }
     return;
+  }
+
+  const claimedModes = new Set<FulfillmentMode>();
+  for (const binding of bindings) {
+    if (binding.modes.length === 0) {
+      throw new FulfillmentContractError('A fulfillment machine binding must cover at least one mode');
+    }
+    for (const mode of binding.modes) {
+      const option = fulfillment.options.find(o => o.mode === mode);
+      if (!option) {
+        throw new FulfillmentContractError(
+          `Fulfillment machine binding covers mode '${mode}' but the engine does not declare it as an option`,
+        );
+      }
+      if (claimedModes.has(mode)) {
+        throw new FulfillmentContractError(
+          `Fulfillment mode '${mode}' is bound by more than one machine — ambiguous routing`,
+        );
+      }
+      claimedModes.add(mode);
+    }
+    if (binding.autoHandoff) {
+      if (!binding.machine.states.includes(binding.autoHandoff.atState)) {
+        throw new FulfillmentContractError(
+          `Auto-handoff state '${binding.autoHandoff.atState}' is not in this binding's fulfillment machine states`,
+        );
+      }
+      if (binding.autoHandoff.allowedActors.length === 0) {
+        throw new FulfillmentContractError('Auto-handoff must declare at least one allowed actor');
+      }
+      const hasCompletion = binding.machine.transitions.some(t => t.to === COMPLETION_STATE);
+      if (!hasCompletion) {
+        throw new FulfillmentContractError(
+          'Auto-handoff declared but this binding\'s machine has no transition to the completion state to derive the completion action from',
+        );
+      }
+    }
+  }
+  if (fulfillment.required) {
+    for (const option of fulfillment.options) {
+      if (!claimedModes.has(option.mode)) {
+        throw new FulfillmentContractError(
+          `Fulfillment mode '${option.mode}' is required but has no machine binding — the transaction could never complete for it`,
+        );
+      }
+    }
   }
   for (const option of fulfillment.options) {
     const legal = LEGAL_FULFILLMENT_COMBINATIONS[option.mode];
@@ -115,6 +149,29 @@ export function assertValidFulfillmentCapabilities(
       }
     }
   }
+}
+
+/**
+ * Resolve the fulfillment machine bound to a mode (per-mode routing).
+ * Returns undefined when the engine declares no fulfillment machine for the
+ * mode. The generic core never names a vertical state — it reads the binding.
+ */
+export function resolveFulfillmentMachine<TFulfillmentStatus extends string = string>(
+  fulfillment: FulfillmentDefinition<TFulfillmentStatus>,
+  mode: FulfillmentMode,
+): StateMachineDefinition<TFulfillmentStatus> | undefined {
+  return (fulfillment.modeMachines ?? []).find(b => b.modes.includes(mode))?.machine;
+}
+
+/**
+ * Resolve the auto-handoff policy bound to a mode (per-mode routing).
+ * Returns undefined when that mode's binding declares no policy.
+ */
+export function resolveAutoHandoffPolicy<TFulfillmentStatus extends string = string>(
+  fulfillment: FulfillmentDefinition<TFulfillmentStatus>,
+  mode: FulfillmentMode,
+): AutoHandoffPolicy<TFulfillmentStatus> | undefined {
+  return (fulfillment.modeMachines ?? []).find(b => b.modes.includes(mode))?.autoHandoff;
 }
 
 /**

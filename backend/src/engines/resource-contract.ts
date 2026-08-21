@@ -53,7 +53,7 @@ export function assertValidResourceConsumption(
         "Resource consumption on 'on_fulfillment_handoff' requires a required fulfillment layer — the engine cannot consume on a handoff it never performs",
       );
     }
-    if (!fulfillment.stateMachine) {
+    if (!fulfillment.modeMachines || fulfillment.modeMachines.length === 0) {
       throw new ResourceContractError(
         "Resource consumption on 'on_fulfillment_handoff' requires a fulfillment state machine to determine when handoff occurs",
       );
@@ -64,7 +64,7 @@ export function assertValidResourceConsumption(
   // shared_capacity_access model fulfillment start in the transaction machine
   // — valid → active on entry — and declare it via execution.states).
   if (resources.allocation === 'on_fulfillment_start') {
-    const hasFulfillmentMachine = Boolean(fulfillment.stateMachine);
+    const hasFulfillmentMachine = Boolean(fulfillment.modeMachines && fulfillment.modeMachines.length > 0);
     const hasExecutionModel = Boolean(execution?.enabled && execution.states.length > 0);
     if (!hasFulfillmentMachine && !hasExecutionModel) {
       throw new ResourceContractError(

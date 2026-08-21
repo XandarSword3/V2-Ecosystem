@@ -30,6 +30,7 @@ import {
   assertTransactionCompletionAllowed,
   assertValidFulfillmentCapabilities,
   assertValidFulfillmentSelection,
+  resolveFulfillmentMachine,
   FulfillmentContractError,
 } from '../../../src/engines/fulfillment-contract.js';
 import { StateMachine } from '../../../src/engines/state-machine.js';
@@ -82,18 +83,26 @@ describe('Capability contract (plan Phase 2)', () => {
     }
   });
 
-  it('Engine A declares the hospitality fulfillment layer via explicit options', () => {
+  it('Engine A declares the fulfillment layer via explicit options + per-mode machine bindings', () => {
     const engine = getEngineByTemplate('instant_transaction');
     const f = engine.capabilities.fulfillment;
     expect(f.required).toBe(true);
     expect(f.handoff).toBe(true);
-    // Explicit mode → destination combinations (no flat lists).
+    // Explicit mode → destination combinations (no flat lists) — digital
+    // delivery is a MODE of Engine A, not a sixth engine.
     expect(f.options).toEqual([
       { mode: 'on_premise', destinations: ['on_premise_location', 'room'] },
       { mode: 'pickup', destinations: ['pickup_location'] },
       { mode: 'local_delivery', destinations: ['address'] },
+      { mode: 'digital_delivery', destinations: ['digital_account'] },
     ]);
-    expect(f.stateMachine!.states).toContain('queued');
+    // Per-mode machine routing: hospitality modes → hospitality machine,
+    // digital_delivery → the digital adapter's machine.
+    expect(f.modeMachines!.length).toBe(2);
+    const hospitality = f.modeMachines!.find(b => b.modes.includes('on_premise'))!;
+    expect(hospitality.machine.states).toContain('queued');
+    const digital = f.modeMachines!.find(b => b.modes.includes('digital_delivery'))!;
+    expect(digital.machine.states).toContain('provisioning');
     expect(engine.capabilities.execution.notificationTrigger).toBe('on_confirm');
     expect(engine.capabilities.commitment.type).toBe('inventory');
   });
@@ -154,13 +163,13 @@ describe('Completion gate — capability-driven enforcement', () => {
     groups: false,
     tracking: false,
     handoff: false,
-    stateMachine: digitalMachine,
+    modeMachines: [{ modes: ['digital_delivery'], machine: digitalMachine }],
   };
 
   it('blocks transaction-layer completion when fulfillment is required — even if the machine declares it', () => {
     const layered = new LayeredStateMachine(
       new StateMachine(naiveTxMachine),
-      new StateMachine(digitalMachine),
+      [new StateMachine(digitalMachine)],
       digitalFulfillment,
     );
     const check = layered.canTransition('confirmed', 'complete', 'staff');
@@ -179,7 +188,7 @@ describe('Completion gate — capability-driven enforcement', () => {
       tracking: false,
       handoff: false,
     };
-    const layered = new LayeredStateMachine(new StateMachine(naiveTxMachine), null, noFulfillment);
+    const layered = new LayeredStateMachine(new StateMachine(naiveTxMachine), [], noFulfillment);
     expect(layered.canTransition('confirmed', 'complete', 'staff').allowed).toBe(true);
     expect(assertTransactionCompletionAllowed(noFulfillment, COMPLETION_STATE)).toBeNull();
   });
@@ -278,19 +287,20 @@ describe('Cancellation compensation — exactly once', () => {
 // 5. Non-hospitality adapter plug-in (requirement 8)
 // ============================================================
 
-describe('A non-hospitality adapter plugs into the generic contract', () => {
-  // The REAL registered second vertical — the digital delivery adapter
-  // (adapters/digital/fulfillment.ts) — proven through the REGISTRY, not an
-  // inline fixture. This is the Phase 4 completion: only the hospitality
-  // adapter existed before; now the runtime path hosts a second machine.
-  const digitalEngine = getEngine('digital_delivery');
-  const digitalMachine = digitalEngine.capabilities.fulfillment.stateMachine!;
-  const digitalFulfillment = digitalEngine.capabilities.fulfillment;
+describe('A non-hospitality fulfillment adapter rides on Engine A as a MODE', () => {
+  // The digital delivery ADAPTER (adapters/digital/fulfillment.ts) plugs into
+  // the generic contract — but through ENGINE A's capability contract, as
+  // one more fulfillment mode. No sixth engine exists: digital_delivery is a
+  // mode/destination option of instant_transaction with its own machine
+  // binding. The registry is untouched by the adapter.
+  const engine = getEngine('instant_transaction');
+  const digitalFulfillment = engine.capabilities.fulfillment;
+  const digitalMachine = resolveFulfillmentMachine(digitalFulfillment, 'digital_delivery')!;
 
-  it('runs a complete digital-delivery lifecycle through the generic validator', async () => {
+  it('runs a complete digital-delivery lifecycle through Engine A\'s layered validator', async () => {
     const layered = new LayeredStateMachine(
-      new StateMachine(digitalEngine.stateMachine),
-      new StateMachine(digitalMachine),
+      new StateMachine(engine.stateMachine),
+      digitalFulfillment.modeMachines!.map(b => new StateMachine(b.machine)),
       digitalFulfillment,
     );
 
@@ -305,18 +315,27 @@ describe('A non-hospitality adapter plugs into the generic contract', () => {
     expect(layered.canTransition('confirmed', 'complete', 'system').allowed).toBe(false);
   });
 
-  it('the digital engine is a REAL registered engine with its own fulfillment generic preserved', () => {
-    // Compile-time: getEngine('digital_delivery') returns the definition
-    // typed with DigitalFulfillmentMachineStatus, not a widened string.
-    const engine: EngineDefinition<TransactionState, DigitalFulfillmentMachineStatus> = digitalEngine;
-    expect(engine.type).toBe('digital_delivery');
-    expect(engine.capabilities.fulfillment.required).toBe(true);
-    expect(engine.capabilities.fulfillment.options[0].mode).toBe('digital_delivery');
-    expect(engine.capabilities.fulfillment.options[0].destinations).toEqual(['digital_account']);
-    // Its machine states are the digital adapter's own, never hospitality's.
+  it('digital delivery is a MODE of Engine A — not a sixth engine type', () => {
+    // Compile-time: the registry preserves Engine A's fulfillment-status
+    // generic — the UNION of its bound adapters' machines (hospitality +
+    // digital), never a widened string.
+    const engineTyped: EngineDefinition<
+      TransactionState,
+      HospitalityFulfillmentMachineStatus | DigitalFulfillmentMachineStatus
+    > = engine;
+    expect(engineTyped.type).toBe('instant_transaction');
+    // The option exists on Engine A's capability contract…
+    expect(engineTyped.capabilities.fulfillment.options).toContainEqual({
+      mode: 'digital_delivery',
+      destinations: ['digital_account'],
+    });
+    // …routed to the digital adapter's machine by the binding.
     expect(digitalMachine.states).toContain('provisioning');
     expect(digitalMachine.states).toContain('delivered');
     expect(digitalMachine.states).not.toContain('queued');
+    // And the engine registry holds exactly the canonical FIVE engines —
+    // digital_delivery is a mode, never an engine key.
+    expect(getAllEngines().map(e => e.type)).not.toContain('digital_delivery');
   });
 });
 
@@ -417,23 +436,31 @@ describe('Impossible configurations are rejected', () => {
 // ============================================================
 
 describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
-  it('getEngine("instant_transaction") is typed with the hospitality fulfillment states', () => {
-    // Compile-time proof: assigning the machine's states to the hospitality
-    // union only compiles if the registry kept the generic. If it had been
-    // erased to string, this assignment would fail typecheck.
-    const machine: StateMachineDefinition<HospitalityFulfillmentMachineStatus> | undefined =
-      getEngine('instant_transaction').capabilities.fulfillment.stateMachine;
+  it('getEngine("instant_transaction") preserves the union of its bound fulfillment machines', () => {
+    // Compile-time proof: assigning the machine to the engine's fulfillment
+    // union (hospitality | digital) only compiles if the registry kept the
+    // generic. If it had been erased to string, this assignment would fail
+    // typecheck.
+    const machine: StateMachineDefinition<
+      HospitalityFulfillmentMachineStatus | DigitalFulfillmentMachineStatus
+    > | undefined = resolveFulfillmentMachine(
+      getEngine('instant_transaction').capabilities.fulfillment,
+      'on_premise',
+    );
     expect(machine).toBeDefined();
-    // The machine also carries cross-layer states (confirmed/completed/
-    // cancelled) — the CANONICAL fulfillment lifecycle must be present.
+    // The hospitality machine carries the canonical lifecycle states.
     for (const s of HOSPITALITY_FULFILLMENT_STATES) {
       expect(machine!.states).toContain(s);
     }
   });
 
   it('getEngineByTemplate("menu_service") preserves the same generic through the alias', () => {
-    const machine: StateMachineDefinition<HospitalityFulfillmentMachineStatus> | undefined =
-      getEngineByTemplate('menu_service').capabilities.fulfillment.stateMachine;
+    const machine: StateMachineDefinition<
+      HospitalityFulfillmentMachineStatus | DigitalFulfillmentMachineStatus
+    > | undefined = resolveFulfillmentMachine(
+      getEngineByTemplate('menu_service').capabilities.fulfillment,
+      'local_delivery',
+    );
     expect(machine).toBeDefined();
     expect(machine!.states).toContain('handed_off');
   });
@@ -442,13 +469,15 @@ describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
     // If the registry erased generics, this exact-type check would fail.
     const typed: EngineRegistry['instant_transaction'] = getEngine('instant_transaction');
     expect(typed.type).toBe('instant_transaction');
-    expect(typed.capabilities.fulfillment.stateMachine).toBeDefined();
+    expect(typed.capabilities.fulfillment.modeMachines!.length).toBe(2);
+    expect(resolveFulfillmentMachine(typed.capabilities.fulfillment, 'digital_delivery')).toBeDefined();
   });
 
   it('a string-erased fulfillment machine cannot satisfy the registry type (compile-time)', () => {
     // @ts-expect-error — StateMachineDefinition<string> is NOT assignable to
-    // StateMachineDefinition<HospitalityFulfillmentMachineStatus>; only the
-    // preserved generic satisfies the registry slot.
+    // StateMachineDefinition<HospitalityFulfillmentMachineStatus |
+    // DigitalFulfillmentMachineStatus>; only the preserved generic satisfies
+    // the registry slot.
     const erased: EngineRegistry['instant_transaction'] = {
       type: 'instant_transaction',
       name: 'x',
@@ -466,7 +495,7 @@ describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
           groups: false,
           tracking: false,
           handoff: true,
-          stateMachine: { states: ['string-state'], initialState: 'string-state', terminalStates: [], transitions: [] },
+          modeMachines: [{ modes: ['digital_delivery'], machine: { states: ['string-state'], initialState: 'string-state', terminalStates: [], transitions: [] } }],
         },
         execution: { enabled: true, workCenters: true, operators: true, states: [], notificationTrigger: 'on_confirm' },
         economics: { multiTender: false, refunds: false, voids: false, ledger: true, loyalty: 'none', coupons: false, giftCards: false, pos: false, currencyRequired: true },
@@ -477,14 +506,15 @@ describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
     };
   });
 
-  it('the registry record type is exactly the registered engines (incl. the digital second vertical)', () => {
-    // Runtime proof the interface keys match the registered engines.
+  it('the registry record type is exactly the canonical FIVE registered engines', () => {
+    // Runtime proof the interface keys match the registered engines — and
+    // that digital_delivery is NOT among them (it is a fulfillment mode of
+    // Engine A, not an engine).
     const record: Record<string, unknown> = {};
     for (const engine of getAllEngines()) {
       record[engine.type] = engine;
     }
     expect(Object.keys(record).sort()).toEqual([
-      'digital_delivery',
       'instant_transaction',
       'ongoing_entitlement',
       'platform_entitlement',
@@ -530,13 +560,13 @@ describe('Completion gate applies to available actions', () => {
     groups: false,
     tracking: false,
     handoff: false,
-    stateMachine: fulfillmentMachine,
+    modeMachines: [{ modes: ['digital_delivery'], machine: fulfillmentMachine }],
   };
 
   it('never OFFERS transaction-layer completion when fulfillment is required', () => {
     const layered = new LayeredStateMachine(
       new StateMachine(naiveTxMachine),
-      new StateMachine(fulfillmentMachine),
+      [new StateMachine(fulfillmentMachine)],
       requiredFulfillment,
     );
     const actions = layered.getAvailableActions('confirmed', 'staff');
@@ -556,7 +586,7 @@ describe('Completion gate applies to available actions', () => {
     };
     const layered = new LayeredStateMachine(
       new StateMachine(naiveTxMachine),
-      null,
+      [],
       noFulfillment,
     );
     const actions = layered.getAvailableActions('confirmed', 'staff');
@@ -611,13 +641,16 @@ describe('Explicit auto-handoff policy replaces the implicit shortcut', () => {
         tracking: false,
         handoff: true,
         // state: 'ready' is not in the machine's states below
-        autoHandoff: { atState: 'ready', allowedActors: ['staff'] },
-        stateMachine: {
-          states: ['queued', 'in_progress', 'handed_off', 'completed', 'cancelled'],
-          initialState: 'queued',
-          terminalStates: ['completed', 'cancelled'],
-          transitions: [{ from: 'handed_off', to: 'completed', action: 'complete', allowedActors: ['staff'] }],
-        },
+        modeMachines: [{
+          modes: ['pickup'],
+          autoHandoff: { atState: 'ready', allowedActors: ['staff'] },
+          machine: {
+            states: ['queued', 'in_progress', 'handed_off', 'completed', 'cancelled'],
+            initialState: 'queued',
+            terminalStates: ['completed', 'cancelled'],
+            transitions: [{ from: 'handed_off', to: 'completed', action: 'complete', allowedActors: ['staff'] }],
+          },
+        }],
       }),
     ).toThrow(FulfillmentContractError);
 
@@ -629,15 +662,47 @@ describe('Explicit auto-handoff policy replaces the implicit shortcut', () => {
         groups: false,
         tracking: false,
         handoff: true,
-        autoHandoff: { atState: 'ready', allowedActors: ['staff'] },
-        stateMachine: {
-          states: ['queued', 'ready', 'handed_off', 'cancelled'],
-          initialState: 'queued',
-          terminalStates: ['cancelled'],
-          transitions: [{ from: 'ready', to: 'handed_off', action: 'deliver', allowedActors: ['staff'] }],
-        },
+        modeMachines: [{
+          modes: ['pickup'],
+          autoHandoff: { atState: 'ready', allowedActors: ['staff'] },
+          machine: {
+            states: ['queued', 'ready', 'handed_off', 'cancelled'],
+            initialState: 'queued',
+            terminalStates: ['cancelled'],
+            transitions: [{ from: 'ready', to: 'handed_off', action: 'deliver', allowedActors: ['staff'] }],
+          },
+        }],
       }),
     ).toThrow(FulfillmentContractError);
+  });
+
+  it('a mode claimed by two machine bindings is ambiguous — rejected', () => {
+    expect(() =>
+      assertValidFulfillmentCapabilities({
+        required: true,
+        options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
+        groups: false,
+        tracking: false,
+        handoff: true,
+        modeMachines: [
+          { modes: ['pickup'], machine: hospitalityFulfillmentStateMachine },
+          { modes: ['pickup'], machine: hospitalityFulfillmentStateMachine },
+        ],
+      }),
+    ).toThrow(/ambiguous/);
+  });
+
+  it('a required mode with no machine binding is rejected (could never complete)', () => {
+    expect(() =>
+      assertValidFulfillmentCapabilities({
+        required: true,
+        options: [{ mode: 'pickup', destinations: ['pickup_location'] }],
+        groups: false,
+        tracking: false,
+        handoff: true,
+        // no modeMachines at all
+      }),
+    ).toThrow(/no fulfillment machine binding/);
   });
 });
 

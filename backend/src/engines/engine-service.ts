@@ -46,7 +46,7 @@ import { logger } from '../utils/logger.js';
 export class EngineService {
   private pricingPipeline: PricingPipeline;
   private stateMachines: Map<EngineType, StateMachine> = new Map();
-  private fulfillmentMachines: Map<EngineType, StateMachine | null> = new Map();
+  private fulfillmentMachines: Map<EngineType, StateMachine[]> = new Map();
 
   constructor(deps?: Partial<PricingPipelineDeps>) {
     // Create pricing pipeline with default or injected dependencies
@@ -140,29 +140,30 @@ export class EngineService {
   }
 
   /**
-   * Get or create the FULFILLMENT-layer state machine declared by the engine's
-   * capabilities (plan Phase 2/3). Returns null when the engine has none — its
+   * Get or create the FULFILLMENT-layer state machines declared by the
+   * engine's capability contract (plan Phase 2/3, per-mode bindings). One per
+   * adapter binding — Engine A binds the hospitality machine AND the digital
+   * machine as MODES of the same engine. Empty when the engine has none — its
    * whole lifecycle lives on the transaction machine.
    */
-  private getFulfillmentMachine(engineType: EngineType): StateMachine | null {
+  private getFulfillmentMachines(engineType: EngineType): StateMachine[] {
     if (this.fulfillmentMachines.has(engineType)) {
       return this.fulfillmentMachines.get(engineType)!;
     }
-    const definition = getEngine(engineType).capabilities?.fulfillment?.stateMachine;
-    const fm = definition ? new StateMachine(definition) : null;
-    this.fulfillmentMachines.set(engineType, fm);
-    return fm;
+    const bindings = getEngine(engineType).capabilities?.fulfillment?.modeMachines ?? [];
+    const machines = bindings.map(binding => new StateMachine(binding.machine));
+    this.fulfillmentMachines.set(engineType, machines);
+    return machines;
   }
 
   /**
-   * Build the layered validator for an engine: transaction machine + the
-   * fulfillment machine declared in its capability contract (if any). The
-   * completion gate and the TRANSITIONAL legacy-status bridge are applied
-   * generically inside LayeredStateMachine.
+   * Build the layered validator for an engine: transaction machine + every
+   * fulfillment machine bound in its capability contract (if any). The
+   * completion gate is applied generically inside LayeredStateMachine.
    */
   private buildLayered(engineType: EngineType): LayeredStateMachine {
     const sm = this.getStateMachine(engineType);
-    const fm = this.getFulfillmentMachine(engineType);
+    const fm = this.getFulfillmentMachines(engineType);
     const definition = getEngine(engineType);
     return new LayeredStateMachine(sm, fm, definition.capabilities.fulfillment);
   }

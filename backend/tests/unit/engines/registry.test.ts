@@ -104,22 +104,23 @@ describe('Engine Registry', () => {
   });
 
   describe('getAllEngineTypes', () => {
-    it('should return all registered engine types (incl. the digital second vertical)', () => {
+    it('should return the canonical five registered engine types (digital delivery is a MODE of Engine A, not an engine)', () => {
       const types = getAllEngineTypes();
-      expect(types).toHaveLength(6);
+      expect(types).toHaveLength(5);
       expect(types).toContain('instant_transaction');
       expect(types).toContain('time_exclusive_reservation');
       expect(types).toContain('shared_capacity_access');
       expect(types).toContain('ongoing_entitlement');
       expect(types).toContain('platform_entitlement');
+      expect(types).not.toContain('digital_delivery');
     });
   });
 
   describe('getAllEngines', () => {
     it('should return all registered engine definitions', () => {
       const engines = getAllEngines();
-      expect(engines).toHaveLength(6);
-      expect(engines.map(e => e.type)).toContain('digital_delivery');
+      expect(engines).toHaveLength(5);
+      expect(engines.map(e => e.type)).not.toContain('digital_delivery');
     });
 
     it('should have complete definitions (state machine + pricing + interactions)', () => {

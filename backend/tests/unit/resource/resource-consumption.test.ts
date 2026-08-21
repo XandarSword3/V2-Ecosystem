@@ -43,17 +43,19 @@ describe('Generic resource consumption contract (plan Phase 5)', () => {
     }
   });
 
-  it('Engine A consumes inventory via the hospitality BOM; digital consumes nothing', () => {
+  it('Engine A consumes inventory via the hospitality BOM; non-commerce engines consume nothing', () => {
     const instant = getEngine('instant_transaction');
     expect(instant.capabilities.resources.type).toBe('inventory');
     expect(instant.capabilities.resources.kinds).toContain('inventory_item');
     // Consumption is tied to fulfillment handoff — and the engine HAS a
-    // required fulfillment layer with a machine (validated at startup).
+    // required fulfillment layer with machines (validated at startup).
     expect(instant.capabilities.resources.consumption).toBe('on_fulfillment_handoff');
     expect(instant.capabilities.resources.reversalOnCancel).toBe(true);
 
-    const digital = getEngine('digital_delivery');
-    expect(digital.capabilities.resources.type).toBe('none');
+    // Digital delivery is a fulfillment MODE of Engine A, not an engine —
+    // the non-consuming reference engine is platform_entitlement.
+    const platform = getEngine('platform_entitlement');
+    expect(platform.capabilities.resources.type).toBe('none');
   });
 
   it('capacity engines consume capacity slots', () => {
@@ -131,9 +133,9 @@ describe('Generic resource consumption contract (plan Phase 5)', () => {
   });
 
   it('requirements for a non-consuming engine are a contract violation', () => {
-    const digital = getEngine('digital_delivery');
+    const platform = getEngine('platform_entitlement');
     expect(() =>
-      assertValidResourceRequirements(digital.capabilities.resources, [
+      assertValidResourceRequirements(platform.capabilities.resources, [
         { kind: 'inventory_item', ref: 'item-1', quantity: 1 },
       ]),
     ).toThrow(/no resource consumption/);

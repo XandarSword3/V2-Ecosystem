@@ -253,15 +253,17 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     expect(result.canonicalState).toBe('ready');
   });
 
-  it('drives the REAL digital machine through the same service (Phase 4 second vertical)', async () => {
-    // The generic service hosts the second fulfillment adapter too: the row's
-    // engine_type is digital_delivery, so the layered validator routes every
-    // move through the DIGITAL machine (provisioning → provisioned →
-    // delivered → completed). Zero changes to the service; the machine comes
-    // from the registry via the row.
+  it('drives the REAL digital machine through the same service — as a MODE of Engine A', async () => {
+    // Digital delivery is a fulfillment MODE of instant_transaction (Engine
+    // A), not a sixth engine: the row's engine_type is instant_transaction
+    // with mode digital_delivery, and the layered validator routes the move
+    // through the DIGITAL machine binding (provisioning → provisioned →
+    // delivered → completed) from Engine A's capability contract. Zero
+    // changes to the service; the machine comes from the engine's own
+    // modeMachines via the registry.
     const service = new FulfillmentService();
     const provisioningRow = queuedRow({
-      engine_type: 'digital_delivery',
+      engine_type: 'instant_transaction',
       status: 'provisioning',
       mode: 'digital_delivery',
       destination_type: 'digital_account',
@@ -298,8 +300,8 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     expect(completed.ok).toBe(true);
     expect(completed.canonicalState).toBe('completed');
 
-    // The RPCs were all persisted against the fulfillments row with the
-    // digital engine type — the same persistence path as hospitality.
+    // The RPCs were all persisted against the fulfillments row under Engine
+    // A's engine type — the same persistence path as hospitality.
     const rpcs = supabase.calls.rpc.filter((c) => c.name === 'transition_fulfillment');
     expect(rpcs.map((r) => r.args.p_to_status)).toEqual(['provisioned', 'delivered', 'completed']);
     expect(supabase.calls.updated.some((u) => u.table === 'transactions')).toBe(false);
@@ -430,9 +432,9 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
 
   it('source: the confirm trigger is capability-driven, never engine-hardcoded', () => {
     const migrationsDir = join(__dirname, '../../../../supabase/migrations');
-    // The trigger was re-created when the capability table gained
-    // initial_status (20260821170000) — the LATEST definition is the law.
-    const triggerFile = readFileSync(join(migrationsDir, '20260821170000_engine_a_fulfillment_initial_status.sql'), 'utf8');
+    // The trigger was re-created when the capability registry became
+    // per (engine_type, mode) (20260821190000) — the LATEST definition is the law.
+    const triggerFile = readFileSync(join(migrationsDir, '20260821190000_engine_a_digital_fulfillment_mode.sql'), 'utf8');
     const triggerFunction = triggerFile.split('CREATE OR REPLACE FUNCTION "public"."_ensure_fulfillment_on_confirm"')[1] ?? '';
     // The trigger body must not contain a hardcoded engine_type LITERAL —
     // required-fulfillment intent comes from the capability table. (The
@@ -440,11 +442,15 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     // point; only quoted literals are forbidden.)
     expect(triggerFunction).not.toMatch(/engine_type\s*=\s*'[a-z_]+'/);
     expect(triggerFunction).not.toMatch(/engine_type\s*=\s*"[a-z_]+"/);
-    // ...and it reads the capability table instead — including the initial
-    // status, so a second vertical (digital → 'provisioning') is created in
-    // ITS OWN declared initial state, never a hardcoded 'queued'.
+    // ...and it reads the capability table instead — keyed by
+    // (engine_type, mode) — so digital_delivery (a MODE of Engine A, not an
+    // engine) is created in ITS OWN declared initial state ('provisioning'),
+    // never a hardcoded 'queued'.
     expect(triggerFunction).toMatch(/engine_fulfillment_capabilities/);
     expect(triggerFunction).toMatch(/initial_status/);
+    // The lookup is per-mode: the initial status depends on the snapshotted
+    // selection, not just the engine.
+    expect(triggerFunction).toMatch(/AND mode = v_mode/);
     // No vertical status literal may be hardcoded in the trigger body.
     expect(triggerFunction).not.toMatch(/status\s*=\s*'queued'/);
     expect(triggerFunction).not.toMatch(/'queued',/);
@@ -452,33 +458,37 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     expect(triggerFile).toMatch(/AFTER INSERT OR UPDATE OF "?status"?/);
   });
 
-  it('source: the capability registry seed matches the TypeScript engine registry', () => {
+  it('source: the capability registry seed matches the TypeScript engine registry (per mode)', () => {
     const migrationsDir = join(__dirname, '../../../../supabase/migrations');
-    // The seed is split across the capability migrations (original five
-    // engines + digital second vertical + initial_status reseed). The
-    // LATEST file wins for each engine (ON CONFLICT DO UPDATE), so the
-    // initial_status reseed is the law for required engines.
-    const seedSql = [
-      '20260821140000_engine_a_fulfillment_capabilities.sql',
-      '20260821160000_engine_a_digital_vertical.sql',
-      '20260821170000_engine_a_fulfillment_initial_status.sql',
-    ].map(f => readFileSync(join(migrationsDir, f), 'utf8')).join('\n');
+    // The LATEST capability migration is the law: it reseeds the full
+    // per-(engine_type, mode) registry mirror with ON CONFLICT DO UPDATE.
+    const seedSql = readFileSync(join(migrationsDir, '20260821190000_engine_a_digital_fulfillment_mode.sql'), 'utf8');
     for (const engine of getAllEngines()) {
-      // Every registered engine has a capability row with the same required flag.
-      const row = new RegExp(`\\('${engine.type}',\\s*(true|false),\\s*(true|false)\\)`).exec(seedSql);
-      expect(row, `seed row for engine '${engine.type}'`).toBeTruthy();
-      expect(row![1]).toBe(String(engine.capabilities.fulfillment.required));
-      // For engines with a fulfillment machine, the seeded initial_status
-      // must equal the machine's declared initialState — the persistence
-      // layer creates rows in the machine's own initial state, never a
-      // hardcoded 'queued'.
-      const machine = engine.capabilities.fulfillment.stateMachine;
-      if (machine) {
-        const initRow = new RegExp(`\\('${engine.type}',\\s*(true|false),\\s*(true|false),\\s*'([a-z_]+)'\\)`).exec(seedSql);
-        expect(initRow, `initial_status seed row for engine '${engine.type}'`).toBeTruthy();
-        expect(initRow![3]).toBe(machine.initialState);
+      const fulfillment = engine.capabilities.fulfillment;
+      if (!fulfillment.modeMachines || fulfillment.modeMachines.length === 0) {
+        // Engines without a fulfillment machine carry no capability rows —
+        // the trigger's NOT FOUND path treats them as not requiring
+        // fulfillment (no hardcoded engine list needed).
+        continue;
+      }
+      for (const option of fulfillment.options) {
+        const binding = fulfillment.modeMachines.find(b => b.modes.includes(option.mode));
+        expect(binding, `machine binding for mode '${option.mode}' of engine '${engine.type}'`).toBeDefined();
+        // Row shape: (engine_type, mode, required, handoff, initial_status).
+        const row = new RegExp(`\\('${engine.type}',\\s*'${option.mode}',\\s*(true|false),\\s*(true|false),\\s*'([a-z_]+)'\\)`).exec(seedSql);
+        expect(row, `capability row for engine '${engine.type}' mode '${option.mode}'`).toBeTruthy();
+        expect(row![1]).toBe(String(fulfillment.required));
+        // The seeded initial status must equal THAT MODE's machine initial
+        // state — the persistence layer creates rows in the machine's own
+        // declared initial state (queued for hospitality modes, provisioning
+        // for digital_delivery), never a hardcoded literal.
+        expect(row![3]).toBe(binding!.machine.initialState);
       }
     }
+    // Digital delivery exists as a MODE row of instant_transaction — and
+    // never as an engine row.
+    expect(seedSql).toMatch(/\('instant_transaction',\s*'digital_delivery',\s*true,\s*false,\s*'provisioning'\)/i);
+    expect(getAllEngines().map(e => e.type)).not.toContain('digital_delivery');
   });
 
   it('source: order creation snapshots the typed selection (mode is never null at confirm)', () => {

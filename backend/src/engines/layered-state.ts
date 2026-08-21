@@ -25,6 +25,7 @@ import {
   assertTransactionCompletionAllowed,
   COMPLETION_STATE,
 } from './fulfillment-contract.js';
+import type { FulfillmentModeBinding } from './types.js';
 
 export type TransitionLayer = 'transaction' | 'fulfillment';
 
@@ -43,7 +44,16 @@ export interface LayeredCheckResult {
 export class LayeredStateMachine {
   constructor(
     private readonly txMachine: StateMachine,
-    private readonly fulfillmentMachine: StateMachine | null,
+    /**
+     * Every fulfillment machine bound by the engine's capability contract
+     * (one per adapter binding). A single engine can fulfill through several
+     * radically different adapters — Engine A binds the hospitality machine
+     * AND the digital machine as MODES of the same engine. The validator
+     * tries each; the adapters own disjoint state vocabularies, so there is
+     * never ambiguity in practice, and the contract rejects a mode claimed
+     * by two bindings.
+     */
+    private readonly fulfillmentMachines: StateMachine[],
     private readonly fulfillment: FulfillmentDefinition,
   ) {}
 
@@ -71,9 +81,10 @@ export class LayeredStateMachine {
       };
     }
 
-    // 2. Fulfillment layer (current state is canonical — no bridge).
-    if (this.fulfillmentMachine) {
-      const fmCheck = this.fulfillmentMachine.canTransition(currentState, action, actor, context);
+    // 2. Fulfillment layer (current state is canonical — no bridge). Every
+    //    bound machine is tried; the adapters own disjoint state vocabularies.
+    for (const fm of this.fulfillmentMachines) {
+      const fmCheck = fm.canTransition(currentState, action, actor, context);
       if (fmCheck.allowed && fmCheck.targetState !== undefined) {
         return {
           allowed: true,
@@ -82,14 +93,17 @@ export class LayeredStateMachine {
           layer: 'fulfillment',
         };
       }
+    }
 
-      // 3. EXPLICIT auto-handoff policy (declared by the adapter, applied
-      //    generically): at the policy's state, the transaction may complete
-      //    directly without a separate handoff action. The completion action
-      //    is DERIVED from the fulfillment machine's own transition to
-      //    `completed` — never hardcoded by the core.
-      const autoHandoff = this.fulfillment.autoHandoff;
-      if (autoHandoff && currentState === autoHandoff.atState && action === this.completionAction) {
+    // 3. EXPLICIT auto-handoff policies (declared per binding by the adapter,
+    //    applied generically): at a binding's policy state, the transaction
+    //    may complete directly without a separate handoff action. The
+    //    completion action is DERIVED from THAT binding's machine's own
+    //    transition to `completed` — never hardcoded by the core.
+    for (const binding of this.fulfillment.modeMachines ?? []) {
+      const autoHandoff = binding.autoHandoff;
+      if (!autoHandoff) continue;
+      if (currentState === autoHandoff.atState && action === this.completionActionFor(binding)) {
         if (autoHandoff.allowedActors.includes(actor)) {
           return {
             allowed: true,
@@ -112,16 +126,13 @@ export class LayeredStateMachine {
   }
 
   /**
-   * The fulfillment machine's own completion action (its transition to
-   * `completed`). Derived — the core never hardcodes the action name, so a
-   * non-hospitality adapter naming its completion differently still works.
+   * A binding's machine's own completion action (its transition to
+   * `completed`). Derived straight from the binding's machine definition —
+   * the core never hardcodes the action name, so an adapter naming its
+   * completion differently still works.
    */
-  private get completionAction(): string | undefined {
-    if (!this.fulfillmentMachine) return undefined;
-    const transition = this.fulfillmentMachine
-      .getDefinition()
-      .transitions.find(t => t.to === COMPLETION_STATE);
-    return transition?.action;
+  private completionActionFor(binding: FulfillmentModeBinding): string | undefined {
+    return binding.machine.transitions.find(t => t.to === COMPLETION_STATE)?.action;
   }
 
   /**
@@ -146,13 +157,19 @@ export class LayeredStateMachine {
       return check;
     }
 
-    // Fulfillment layer: execute there, then fire the transaction layer's
-    // side effects for the same action (exactly once — the fulfillment
-    // machine has none of its own registered). An auto-handoff move has no
-    // machine transition of its own (the policy IS the move), so only the
-    // transaction-layer effects run.
+    // Fulfillment layer: execute the move on the machine that granted it,
+    // then fire the transaction layer's side effects for the same action
+    // (exactly once — the fulfillment machines have none of their own
+    // registered). An auto-handoff move has no machine transition of its own
+    // (the policy IS the move), so only the transaction-layer effects run.
     if (!check.autoHandoff) {
-      await this.fulfillmentMachine!.transition(currentState, action, actor, context);
+      const grantingMachine = this.fulfillmentMachines.find(fm => {
+        const fmCheck = fm.canTransition(currentState, action, actor, context);
+        return fmCheck.allowed && fmCheck.targetState !== undefined;
+      });
+      if (grantingMachine) {
+        await grantingMachine.transition(currentState, action, actor, context);
+      }
     }
     await this.txMachine.runSideEffects(action, context);
     return check;
@@ -173,24 +190,28 @@ export class LayeredStateMachine {
       }
       merged.set(a.action, { action: a.action, targetState: a.targetState, layer: 'transaction' });
     }
-    if (this.fulfillmentMachine) {
-      for (const a of this.fulfillmentMachine.getAvailableActions(currentState, actor)) {
+    for (const fm of this.fulfillmentMachines) {
+      for (const a of fm.getAvailableActions(currentState, actor)) {
         if (!merged.has(a.action)) {
           merged.set(a.action, { action: a.action, targetState: a.targetState, layer: 'fulfillment' });
         }
       }
-      // Auto-handoff completion is offered at the policy state (derived
-      // action, actor-gated) — an explicit policy, not a machine shortcut.
-      const autoHandoff = this.fulfillment.autoHandoff;
+    }
+    // Auto-handoff completions are offered at each binding's policy state
+    // (derived action, actor-gated) — explicit policies, not machine
+    // shortcuts.
+    for (const binding of this.fulfillment.modeMachines ?? []) {
+      const autoHandoff = binding.autoHandoff;
+      if (!autoHandoff) continue;
+      const completionAction = this.completionActionFor(binding);
       if (
-        autoHandoff &&
         currentState === autoHandoff.atState &&
-        this.completionAction &&
+        completionAction &&
         autoHandoff.allowedActors.includes(actor) &&
-        !merged.has(this.completionAction!)
+        !merged.has(completionAction)
       ) {
-        merged.set(this.completionAction!, {
-          action: this.completionAction!,
+        merged.set(completionAction, {
+          action: completionAction,
           targetState: COMPLETION_STATE,
           layer: 'fulfillment',
         });

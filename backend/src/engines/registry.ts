@@ -24,8 +24,7 @@ import { StateMachine } from './state-machine.js';
 import { assertValidFulfillmentCapabilities } from './fulfillment-contract.js';
 import { assertValidResourceConsumption } from './resource-contract.js';
 import { deductInventorySideEffect, restoreInventorySideEffect } from './inventory-side-effects.js';
-import type { HospitalityFulfillmentMachineStatus } from '../adapters/hospitality/fulfillment.js';
-import type { DigitalFulfillmentMachineStatus } from '../adapters/digital/fulfillment.js';
+import type { InstantTransactionFulfillmentStatus } from './definitions/instant-transaction.js';
 
 // Import all engine definitions
 import { instantTransactionEngine } from './definitions/instant-transaction.js';
@@ -33,7 +32,6 @@ import { timeExclusiveReservationEngine } from './definitions/time-exclusive-res
 import { sharedCapacityAccessEngine } from './definitions/shared-capacity-access.js';
 import { ongoingEntitlementEngine } from './definitions/ongoing-entitlement.js';
 import { platformEntitlementEngine } from './definitions/platform-entitlement.js';
-import { digitalDeliveryEngine } from './definitions/digital-delivery.js';
 
 // ============================================
 // Engine Registry
@@ -47,14 +45,14 @@ import { digitalDeliveryEngine } from './definitions/digital-delivery.js';
  */
 export interface EngineRegistry {
   // Engine A has a real fulfillment layer — its fulfillment-status generic
-  // is preserved through every lookup. Engines B–E declare no fulfillment
-  // machine, so their second generic is the honest default (string).
-  instant_transaction: EngineDefinition<TransactionState, HospitalityFulfillmentMachineStatus>;
+  // (the union of its bound adapters' machines) is preserved through every
+  // lookup. Engines B–E declare no fulfillment machine, so their second
+  // generic is the honest default (string).
+  instant_transaction: EngineDefinition<TransactionState, InstantTransactionFulfillmentStatus>;
   time_exclusive_reservation: EngineDefinition<TimeExclusiveReservationStatus>;
   shared_capacity_access: EngineDefinition<SharedCapacityAccessStatus>;
   ongoing_entitlement: EngineDefinition<OngoingEntitlementStatus>;
   platform_entitlement: EngineDefinition<PlatformEntitlementStatus>;
-  digital_delivery: EngineDefinition<TransactionState, DigitalFulfillmentMachineStatus>;
 }
 
 const ENGINE_REGISTRY: EngineRegistry = {
@@ -63,7 +61,6 @@ const ENGINE_REGISTRY: EngineRegistry = {
   shared_capacity_access: sharedCapacityAccessEngine,
   ongoing_entitlement: ongoingEntitlementEngine,
   platform_entitlement: platformEntitlementEngine,
-  digital_delivery: digitalDeliveryEngine,
 };
 
 /**
@@ -197,4 +194,3 @@ export { timeExclusiveReservationEngine } from './definitions/time-exclusive-res
 export { sharedCapacityAccessEngine } from './definitions/shared-capacity-access.js';
 export { ongoingEntitlementEngine } from './definitions/ongoing-entitlement.js';
 export { platformEntitlementEngine } from './definitions/platform-entitlement.js';
-export { digitalDeliveryEngine } from './definitions/digital-delivery.js';

@@ -5,8 +5,7 @@ export type EngineType =
   | 'time_exclusive_reservation'
   | 'shared_capacity_access'
   | 'ongoing_entitlement'
-  | 'platform_entitlement'
-  | 'digital_delivery';
+  | 'platform_entitlement';
 
 /**
  * Literal template → engine map (the type-level source of truth). Kept as a
@@ -21,7 +20,6 @@ export const ENGINE_TEMPLATES = {
   shared_capacity_access:    'shared_capacity_access',
   ongoing_entitlement:       'ongoing_entitlement',
   platform_entitlement:      'platform_entitlement',
-  digital_delivery:          'digital_delivery',
   // ── Legacy alias names — kept for backwards compat with existing DB rows ──
   menu_service:              'instant_transaction',
   multi_day_booking:         'time_exclusive_reservation',
@@ -44,7 +42,6 @@ export const ENGINE_TO_TEMPLATE: Record<EngineType, string> = {
   shared_capacity_access:     'shared_capacity_access',
   ongoing_entitlement:        'ongoing_entitlement',
   platform_entitlement:       'platform_entitlement',
-  digital_delivery:           'digital_delivery',
 };
 
 /** Maps canonical engine_type → legacy modules.template_type enum value (deprecated column). */
@@ -278,6 +275,32 @@ export interface FulfillmentOption {
 // implement these capabilities; the core only reads the declarations.
 // ============================================================
 
+/**
+ * One fulfillment ADAPTER binding: a set of modes handled by one adapter's
+ * state machine. An engine may bind several adapters — Engine A binds the
+ * hospitality machine (on_premise/pickup/local_delivery) AND the digital
+ * machine (digital_delivery) — proving radically different fulfillment
+ * modes ride on ONE engine's capability contract without new engine
+ * semantics. The compiler enforces each binding's machine uses the engine's
+ * own fulfillment-status type (the generic is preserved through the
+ * registry).
+ */
+export interface FulfillmentModeBinding<TFulfillmentStatus extends string = string> {
+  /** The fulfillment modes this adapter machine handles. */
+  modes: readonly FulfillmentMode[];
+  /** The adapter's fulfillment lifecycle — adapter-shaped state machine. */
+  machine: StateMachineDefinition<TFulfillmentStatus>;
+  /**
+   * EXPLICIT auto-handoff policy for THIS binding (replaces implicit machine
+   * shortcuts): when the fulfillment layer reaches `atState`, handoff is
+   * deemed complete and the transaction may complete directly from there via
+   * this machine's own completion action. Declared by the ADAPTER that owns
+   * the state name — the generic core derives the action from the machine
+   * and never hardcodes a vertical state.
+   */
+  autoHandoff?: AutoHandoffPolicy<TFulfillmentStatus>;
+}
+
 export interface FulfillmentDefinition<TFulfillmentStatus extends string = string> {
   /**
    * When true, the TRANSACTION cannot complete until the fulfillment layer
@@ -293,17 +316,16 @@ export interface FulfillmentDefinition<TFulfillmentStatus extends string = strin
   tracking: boolean;
   /** Whether handoff (who/what/when/where/proof) is modeled. */
   handoff: boolean;
-  /** The fulfillment lifecycle — adapter-shaped state machine (absent when the engine has no fulfillment layer). */
-  stateMachine?: StateMachineDefinition<TFulfillmentStatus>;
   /**
-   * EXPLICIT auto-handoff policy (replaces implicit machine shortcuts): when
-   * the fulfillment layer reaches `atState`, handoff is deemed complete and
-   * the transaction may complete directly from there via the fulfillment
-   * machine's own completion action. Declared by the ADAPTER that owns the
-   * state name — the generic core derives the action from the machine and
-   * never hardcodes a vertical state.
+   * Per-mode machine routing (plan Phase: digital as a MODE of Engine A).
+   * Each binding maps the modes it handles to the adapter's state machine;
+   * the layered validator tries every bound machine, so a single engine can
+   * fulfill through radically different adapters (hospitality work flow,
+   * digital provisioning, …) without new engine semantics. Absent when the
+   * engine has no fulfillment machine (its lifecycle is purely declarative
+   * or lives on the transaction machine).
    */
-  autoHandoff?: AutoHandoffPolicy<TFulfillmentStatus>;
+  modeMachines?: ReadonlyArray<FulfillmentModeBinding<TFulfillmentStatus>>;
 }
 
 /**
@@ -471,5 +493,3 @@ export type PlatformEntitlementStatus =
   | 'past_due'
   | 'suspended'
   | 'cancelled';
-
-export type DigitalDeliveryStatus = TransactionState;

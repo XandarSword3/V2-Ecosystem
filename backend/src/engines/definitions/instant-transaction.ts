@@ -30,6 +30,10 @@ import {
   HOSPITALITY_AUTO_HANDOFF,
   type HospitalityFulfillmentMachineStatus,
 } from '../../adapters/hospitality/fulfillment.js';
+import {
+  digitalFulfillmentStateMachine,
+  type DigitalFulfillmentMachineStatus,
+} from '../../adapters/digital/fulfillment.js';
 
 // ============================================
 // Transaction-layer state machine
@@ -129,7 +133,16 @@ export const instantTransactionInteractions: InteractionContract[] = [
 // Complete Engine Definition
 // ============================================
 
-export const instantTransactionEngine: EngineDefinition<TransactionState, HospitalityFulfillmentMachineStatus> = {
+/**
+ * Engine A's fulfillment status type: the union of every fulfillment adapter
+ * it binds. The compiler enforces that each mode binding's machine uses THIS
+ * engine's fulfillment-state type (no string erasure through the registry).
+ */
+export type InstantTransactionFulfillmentStatus =
+  | HospitalityFulfillmentMachineStatus
+  | DigitalFulfillmentMachineStatus;
+
+export const instantTransactionEngine: EngineDefinition<TransactionState, InstantTransactionFulfillmentStatus> = {
   type: 'instant_transaction',
   name: 'Instant Transaction',
   description: 'One-time commercial transaction with downstream fulfillment: commitment → execution → handoff → completion.',
@@ -165,12 +178,27 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Hospit
         { mode: 'on_premise', destinations: ['on_premise_location', 'room'] },
         { mode: 'pickup', destinations: ['pickup_location'] },
         { mode: 'local_delivery', destinations: ['address'] },
+        // Digital delivery is a FULFILLMENT MODE of Engine A — not a new
+        // engine. The same capability contract hosts a radically different
+        // adapter (provisioning → delivered) with zero new engine semantics.
+        { mode: 'digital_delivery', destinations: ['digital_account'] },
       ],
       groups: false,
       tracking: false,
       handoff: true,
-      stateMachine: hospitalityFulfillmentStateMachine,
-      autoHandoff: HOSPITALITY_AUTO_HANDOFF,
+      // Per-mode machine routing: hospitality modes → the hospitality
+      // adapter's machine; digital_delivery → the digital adapter's machine.
+      modeMachines: [
+        {
+          modes: ['on_premise', 'pickup', 'local_delivery'],
+          machine: hospitalityFulfillmentStateMachine,
+          autoHandoff: HOSPITALITY_AUTO_HANDOFF,
+        },
+        {
+          modes: ['digital_delivery'],
+          machine: digitalFulfillmentStateMachine,
+        },
+      ],
     },
     execution: {
       enabled: true,
