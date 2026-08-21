@@ -844,18 +844,20 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
 
       if (allAtStatus && parentOrder.status !== 'cancelled' && parentOrder.status !== 'completed') {
         const fulfillmentService = getFulfillmentService();
-        let fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
-        if (!fulfillment) {
-          const ensured = await fulfillmentService.ensure(supabase, {
-            transactionId: orderId,
-            engineType: 'instant_transaction',
-            moduleId: module.id,
-            propertyId: parentOrder.property_id ?? null,
-            tenantId: parentOrder.tenant_id ?? null,
+        // FAIL-CLOSED: the confirm trigger created the row atomically, so the
+        // row must already exist. A read error or a missing row means the
+        // derivation cannot be trusted — skip it (the item update above
+        // already succeeded; the order just won't auto-advance this time)
+        // rather than writing fulfillment state from an assumption.
+        let fulfillment: Awaited<ReturnType<typeof fulfillmentService.getForTransaction>>;
+        try {
+          fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
+        } catch (readErr) {
+          logger.error('Order auto-derivation skipped — fulfillment read failed', {
+            orderId,
+            error: readErr instanceof Error ? readErr.message : String(readErr),
           });
-          if (ensured.ok) {
-            fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
-          }
+          fulfillment = null;
         }
 
         const engineAction = status === 'ready' ? 'mark_ready' : 'deliver';

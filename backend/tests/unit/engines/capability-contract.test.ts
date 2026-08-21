@@ -29,6 +29,7 @@ import {
   LEGAL_FULFILLMENT_COMBINATIONS,
   assertTransactionCompletionAllowed,
   assertValidFulfillmentCapabilities,
+  assertValidFulfillmentSelection,
   FulfillmentContractError,
 } from '../../../src/engines/fulfillment-contract.js';
 import { StateMachine } from '../../../src/engines/state-machine.js';
@@ -664,5 +665,50 @@ describe('Stage 6: the legacy fulfillment bridge is gone', () => {
     const r = service.canTransition('multi_day_booking', 'confirmed', 'check_in', 'staff');
     expect(r.allowed).toBe(true);
     expect(r.targetState).toBe('checked_in');
+  });
+});
+
+// ============================================================
+// 9. Stage 6 fix — typed mode/destination selection validation
+// ============================================================
+
+describe('Fulfillment selection validation (Stage 6 fix)', () => {
+  const engine = getEngine('instant_transaction');
+
+  it('accepts every declared mode/destination pair (declaration is the authority)', () => {
+    for (const option of engine.capabilities.fulfillment.options) {
+      for (const destination of option.destinations) {
+        expect(() =>
+          assertValidFulfillmentSelection(engine.capabilities.fulfillment, option.mode, destination)
+        ).not.toThrow();
+      }
+    }
+  });
+
+  it('rejects a mode the engine does not offer (even if globally registered)', () => {
+    // 'shipment' is in the global LEGAL_FULFILLMENT_COMBINATIONS registry but
+    // instant_transaction does not declare it — the engine's options win.
+    expect(() =>
+      assertValidFulfillmentSelection(engine.capabilities.fulfillment, 'shipment', null)
+    ).toThrow(/not offered by this engine/);
+  });
+
+  it('rejects a destination illegal for the selected mode on this engine', () => {
+    // 'address' is legal for local_delivery but not for on_premise.
+    expect(() =>
+      assertValidFulfillmentSelection(engine.capabilities.fulfillment, 'on_premise', 'address')
+    ).toThrow(/not valid for mode 'on_premise'/);
+  });
+
+  it('allows a null selection (queued without a mode — resolved at dispatch)', () => {
+    expect(() =>
+      assertValidFulfillmentSelection(engine.capabilities.fulfillment, null, null)
+    ).not.toThrow();
+  });
+
+  it('the empty options case rejects every non-null mode', () => {
+    const noOptions = { ...engine.capabilities.fulfillment, options: [] };
+    expect(() => assertValidFulfillmentSelection(noOptions, 'pickup', null)).toThrow(/not offered/);
+    expect(() => assertValidFulfillmentSelection(noOptions, null, null)).not.toThrow();
   });
 });

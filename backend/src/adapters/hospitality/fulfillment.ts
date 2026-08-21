@@ -68,7 +68,14 @@ export const hospitalityFulfillmentStateMachine: StateMachineDefinition<Hospital
     // takeaway orders complete via the EXPLICIT auto-handoff policy below,
     // which the generic core applies — completion at 'ready' is a declared
     // capability, not a hidden machine transition.
-    // Cancellation from any fulfillment stage (cross-layer → transaction cancelled).
+    // Cancellation from any fulfillment stage (cross-layer → transaction
+    // cancelled). Stage 6 fix: once the confirm trigger creates the row at
+    // 'queued', the ORDER sits at 'queued' — so cancellation must be reachable
+    // from 'queued' AND 'confirmed' (a confirmed order whose row is the
+    // pre-trigger state), not just the mid-flight stages. Actors mirror the
+    // transaction machine's confirmed → cancelled (staff/admin).
+    { from: 'confirmed', to: 'cancelled', action: 'cancel', allowedActors: ['staff', 'admin'], guardDescription: 'Staff/admin cancel a confirmed (queued) order — triggers refund + inventory reversal' },
+    { from: 'queued', to: 'cancelled', action: 'cancel', allowedActors: ['staff', 'admin'], guardDescription: 'Staff/admin cancel a queued order — triggers refund + inventory reversal' },
     { from: 'in_progress', to: 'cancelled', action: 'cancel', allowedActors: ['admin'], guardDescription: 'Admin-only comp/void in preparation — requires refund + inventory reversal' },
     { from: 'ready', to: 'cancelled', action: 'cancel', allowedActors: ['admin'], guardDescription: 'Admin-only comp/void when ready — requires refund + inventory reversal' },
     { from: 'handed_off', to: 'cancelled', action: 'cancel', allowedActors: ['admin'], guardDescription: 'Admin-only comp/void after handoff — requires refund + inventory reversal' },

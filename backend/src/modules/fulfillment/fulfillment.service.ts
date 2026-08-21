@@ -19,6 +19,9 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getEngineService } from '../../engines/engine-service.js';
+import { getEngine, type EngineRegistry } from '../../engines/registry.js';
+import { assertValidFulfillmentSelection } from '../../engines/fulfillment-contract.js';
+import type { DestinationType, FulfillmentDefinition, FulfillmentMode } from '../../engines/types.js';
 import { logger } from '../../utils/logger.js';
 
 export type FulfillmentActor = 'system' | 'staff' | 'customer' | 'admin';
@@ -29,8 +32,10 @@ export interface FulfillmentCreateParams {
   moduleId?: string | null;
   propertyId?: string | null;
   tenantId?: string | null;
-  mode?: string | null;
-  destinationType?: string | null;
+  /** Typed domain value — validated against the engine's declared options. */
+  mode?: FulfillmentMode | null;
+  /** Typed domain value — must be legal for the selected mode on this engine. */
+  destinationType?: DestinationType | null;
   destinationRef?: string | null;
 }
 
@@ -67,7 +72,14 @@ export interface FulfillmentRow {
 export class FulfillmentService {
   /**
    * Fetch the canonical fulfillment row for a transaction.
-   * Returns null when the engine has no fulfillment layer or no row exists yet.
+   *
+   * FAIL-CLOSED: a database read error THROWS — it is never confused with
+   * "no row". Callers that treat null as "no fulfillment layer" would
+   * otherwise silently fall back to transactions.status on an error, which
+   * is exactly the pre-Stage-6 behavior this module exists to kill. Null is
+   * returned ONLY when the row genuinely does not exist.
+   *
+   * @throws Error on read failure (callers must surface it, not degrade).
    */
   async getForTransaction(
     supabase: SupabaseClient,
@@ -80,20 +92,40 @@ export class FulfillmentService {
       .maybeSingle();
     if (error) {
       logger.error('[Fulfillment] Failed to read fulfillment row', { transactionId, error: error.message });
-      return null;
+      throw new Error(`Failed to read fulfillment state for transaction ${transactionId}: ${error.message}`);
     }
     return data as FulfillmentRow | null;
   }
 
   /**
-   * Idempotently create the canonical fulfillment row for a confirmed
-   * transaction with a required fulfillment layer. Safe to call on every
-   * confirm — the DB RPC is ON CONFLICT DO NOTHING.
+   * Explicitly create the canonical fulfillment row for a transaction with a
+   * required fulfillment layer (idempotent — the DB RPC is ON CONFLICT DO
+   * NOTHING). In production, confirmation creates the row ATOMICALLY via the
+   * DB trigger (Stage 6 fix); this is the explicit-create API for paths that
+   * initialize fulfillment independently (e.g. dispatch setup) and validates
+   * the selection against the engine's capability contract before writing.
    */
   async ensure(
     supabase: SupabaseClient,
     params: FulfillmentCreateParams,
   ): Promise<{ ok: boolean; error?: string; status?: string }> {
+    // Fail closed on an unknown engine, then validate the mode/destination
+    // selection against THAT engine's declared options (typed domain values).
+    let fulfillment: FulfillmentDefinition;
+    try {
+      const engine = getEngine(params.engineType as keyof EngineRegistry);
+      fulfillment = engine.capabilities.fulfillment;
+      assertValidFulfillmentSelection(fulfillment, params.mode ?? null, params.destinationType ?? null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error('[Fulfillment] ensure rejected by capability validation', {
+        transactionId: params.transactionId,
+        engineType: params.engineType,
+        error: message,
+      });
+      return { ok: false, error: message };
+    }
+
     const { data, error } = await supabase.rpc('ensure_fulfillment', {
       p_transaction_id: params.transactionId,
       p_engine_type: params.engineType,
@@ -127,7 +159,20 @@ export class FulfillmentService {
     params: FulfillmentTransitionParams,
   ): Promise<{ ok: boolean; targetState?: string; canonicalState?: string; layer?: string; error?: string }> {
     const engineService = getEngineService();
-    const fulfillment = await this.getForTransaction(supabase, params.transactionId);
+    // FAIL-CLOSED: a read error throws and is surfaced as a failed result —
+    // it is never treated as "no row" (which would fall back to
+    // transactions.status). Missing row = explicit error, not degradation.
+    let fulfillment: FulfillmentRow | null;
+    try {
+      fulfillment = await this.getForTransaction(supabase, params.transactionId);
+    } catch (readErr) {
+      const message = readErr instanceof Error ? readErr.message : String(readErr);
+      logger.error('[Fulfillment] transition aborted — fulfillment state read failed', {
+        transactionId: params.transactionId,
+        error: message,
+      });
+      return { ok: false, error: message };
+    }
     if (!fulfillment) {
       return { ok: false, error: 'No fulfillment row for this transaction' };
     }

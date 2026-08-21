@@ -118,6 +118,40 @@ export function assertValidFulfillmentCapabilities(
 }
 
 /**
+ * Validate a requested fulfillment mode/destination selection against the
+ * engine's OWN declared capability options (plan Stage 6 fix). Typed domain
+ * values only — arbitrary strings are rejected before they can reach the DB.
+ *
+ *   - the mode must be one of the engine's declared options;
+ *   - if a destination type is given, it must be legal for THAT mode on
+ *     THIS engine (not just the global registry).
+ *
+ * Throws FulfillmentContractError on any impossible selection.
+ */
+export function assertValidFulfillmentSelection(
+  fulfillment: FulfillmentDefinition,
+  mode: FulfillmentMode | null,
+  destinationType: DestinationType | null,
+): void {
+  if (!mode) {
+    // No selection yet — nothing to validate. (A fulfillment row may be
+    // created queued without a mode; the mode is resolved at dispatch.)
+    return;
+  }
+  const option = fulfillment.options.find((o) => o.mode === mode);
+  if (!option) {
+    throw new FulfillmentContractError(
+      `Mode '${mode}' is not offered by this engine's fulfillment capability (offered: ${fulfillment.options.map(o => o.mode).join(', ') || 'none'})`,
+    );
+  }
+  if (destinationType && !option.destinations.includes(destinationType)) {
+    throw new FulfillmentContractError(
+      `Destination '${destinationType}' is not valid for mode '${mode}' on this engine (legal for this mode: ${option.destinations.join(', ')})`,
+    );
+  }
+}
+
+/**
  * The completion gate — capability-driven enforcement (plan Phase 2 fix #1).
  *
  * A move on the TRANSACTION machine whose target is the completion state is

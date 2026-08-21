@@ -316,11 +316,22 @@ export class FiscalDocumentService {
     // transaction layer (confirmed/completed) is issuable directly; the
     // fulfillment layer (in_progress/ready/handed_off) is issuable via the
     // canonical fulfillment row — never from transactions.status (Stage 6).
-    const { data: fulfillmentRow } = await supabase
+    // FAIL-CLOSED (Stage 6 fix): an error reading the canonical fulfillment
+    // row aborts issuance — it is never treated as "no fulfillment", which
+    // would silently fall back to transactions.status. An economically
+    // committed transaction with an unreadable fulfillment state must not
+    // produce a document from an assumption.
+    const { data: fulfillmentRow, error: fulfillmentReadError } = await supabase
       .from('fulfillments')
       .select('status')
       .eq('transaction_id', transactionId)
       .maybeSingle();
+    if (fulfillmentReadError) {
+      throw new FiscalDocumentError(
+        'FULFILLMENT_STATE_READ_FAILED',
+        `Cannot determine fulfillment state for transaction ${transactionId}: ${fulfillmentReadError.message}`,
+      );
+    }
     const fulfillmentStatus = fulfillmentRow?.status ? String(fulfillmentRow.status) : null;
     const committed =
       ISSUABLE_TRANSACTION_STATUSES.has(transaction.status) ||

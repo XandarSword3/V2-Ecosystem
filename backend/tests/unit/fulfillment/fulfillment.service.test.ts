@@ -8,17 +8,29 @@
  *      the canonical state, and records the append-only event;
  *   3. the engine type comes from the ROW, never hardcoded;
  *   4. optimistic concurrency: an expectedFrom mismatch fails the RPC;
- *   5. the service NEVER writes to transactions.status — its mock asserts no
+ *   5. FAIL-CLOSED reads: a fulfillment read ERROR aborts the operation — it
+ *      is never treated as "no row", which would fall back to
+ *      transactions.status;
+ *   6. selection validation: mode/destination are typed domain values
+ *      validated against the engine's declared capability options before any
+ *      write;
+ *   7. the service NEVER writes to transactions.status — its mock asserts no
  *      transactions.update call is ever made;
- *   6. bridge removal: nothing in the generic core carries a legacy bridge
- *      (canonical state is what gets persisted and returned).
+ *   8. source assertions: fulfillment initialization is coupled to
+ *      confirmation (DB trigger) and no production path calls ensure-after-
+ *      confirm ("self-heal later") anymore.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { FulfillmentService } from '../../../src/modules/fulfillment/fulfillment.service.js';
 
 // The service uses the REAL engine service singleton (pure, registry-backed)
 // to validate moves through the layered validator — no DB involved there.
 // Only the supabase argument is faked.
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 interface RpcCall {
   name: string;
@@ -32,19 +44,24 @@ interface UpdateCall {
 
 type Row = Record<string, unknown> | null;
 
-function createSupabaseMock(initialRow: Row) {
+function createSupabaseMock(initialRow: Row, opts: { failFulfillmentRead?: boolean } = {}) {
   const calls: { rpc: RpcCall[]; updated: UpdateCall[] } = { rpc: [], updated: [] };
   let row: Row = initialRow;
+  let failRead = opts.failFulfillmentRead ?? false;
 
   const supabase: any = {
     calls,
     setRow: (r: Row) => { row = r; },
     getRow: () => row,
+    setReadError: (v: boolean) => { failRead = v; },
     from: (table: string) => ({
       select: () => ({
         eq: () => ({
           maybeSingle: async () => {
-            if (table === 'fulfillments') return { data: row, error: null };
+            if (table === 'fulfillments') {
+              if (failRead) return { data: null, error: { message: 'connection reset (simulated)' } };
+              return { data: row, error: null };
+            }
             return { data: null, error: null };
           },
         }),
@@ -226,5 +243,113 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.canonicalState).toBe('ready');
+  });
+
+  it('FAILS CLOSED on a fulfillment read error — never falls back to "no row"', async () => {
+    const service = new FulfillmentService();
+    const supabase = createSupabaseMock(queuedRow(), { failFulfillmentRead: true });
+
+    // The read errors (simulated connection failure). The transition must
+    // surface that failure — NOT treat it as "no fulfillment row" and NOT
+    // proceed with a write from a stale assumption.
+    const result = await service.transition(supabase, {
+      transactionId: 't1',
+      action: 'start_preparation',
+      actor: 'staff',
+      expectedFrom: 'queued',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/connection reset/);
+    expect(result.error).not.toMatch(/No fulfillment row/);
+    // Nothing was persisted — the error aborted the write path.
+    expect(supabase.calls.rpc.some((c) => c.name === 'transition_fulfillment')).toBe(false);
+  });
+
+  it('getForTransaction throws on a read error (null means only "no row")', async () => {
+    const service = new FulfillmentService();
+    const supabase = createSupabaseMock(null, { failFulfillmentRead: true });
+    await expect(service.getForTransaction(supabase, 't1')).rejects.toThrow(/connection reset/);
+  });
+
+  it('rejects an unknown engine type at creation (fail closed)', async () => {
+    const service = new FulfillmentService();
+    const supabase = createSupabaseMock(null);
+
+    const result = await service.ensure(supabase, {
+      transactionId: 't1',
+      engineType: 'not_a_registered_engine',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Unknown engine type/);
+    // The RPC was never called — the capability check ran first.
+    expect(supabase.calls.rpc.some((c) => c.name === 'ensure_fulfillment')).toBe(false);
+  });
+
+  it('rejects a mode not offered by the engine (typed selection validation)', async () => {
+    const service = new FulfillmentService();
+    const supabase = createSupabaseMock(null);
+
+    // 'shipment' exists in the global registry but is NOT declared by
+    // instant_transaction — the engine's own options are the authority.
+    const result = await service.ensure(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'shipment',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not offered by this engine/);
+    expect(supabase.calls.rpc.some((c) => c.name === 'ensure_fulfillment')).toBe(false);
+  });
+
+  it('rejects a destination that is illegal for the selected mode', async () => {
+    const service = new FulfillmentService();
+    const supabase = createSupabaseMock(null);
+
+    // 'address' is legal for local_delivery, but NOT for on_premise.
+    const result = await service.ensure(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'on_premise',
+      destinationType: 'address',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/not valid for mode 'on_premise'/);
+    expect(supabase.calls.rpc.some((c) => c.name === 'ensure_fulfillment')).toBe(false);
+  });
+
+  it('accepts a legal typed selection and persists it', async () => {
+    const service = new FulfillmentService();
+    const supabase = createSupabaseMock(null);
+
+    const result = await service.ensure(supabase, {
+      transactionId: 't1',
+      engineType: 'instant_transaction',
+      mode: 'pickup',
+      destinationType: 'pickup_location',
+      destinationRef: 'counter-1',
+    });
+    expect(result.ok).toBe(true);
+    const rpc = supabase.calls.rpc.find((c) => c.name === 'ensure_fulfillment');
+    expect(rpc).toBeDefined();
+    expect(rpc!.args.p_mode).toBe('pickup');
+    expect(rpc!.args.p_destination_type).toBe('pickup_location');
+  });
+
+  it('source: fulfillment initialization is coupled to confirmation via the DB trigger', () => {
+    const migrationsDir = join(__dirname, '../../../../supabase/migrations');
+    const files = readdirSync(migrationsDir).filter((f) => f.endsWith('.sql'));
+    const all = files.map((f) => readFileSync(join(migrationsDir, f), 'utf8')).join('\n');
+    // The trigger must exist so the confirm UPDATE and the fulfillment row
+    // creation are one atomic statement (no "confirm first, self-heal later").
+    expect(all).toMatch(/ensure_fulfillment_on_confirm/);
+    expect(all).toMatch(/AFTER UPDATE OF "?status"? ON "?public"?"?\.?"?transactions"?/);
+  });
+
+  it('source: no production path calls ensure-after-confirm (no self-heal)', () => {
+    const orderStatusPath = join(__dirname, '../../../src/engines/order-status.service.ts');
+    const src = readFileSync(orderStatusPath, 'utf8');
+    // The service must not contain the "create the row after the confirm
+    // already happened" pattern — the trigger owns creation.
+    expect(src).not.toMatch(/ensure\(/);
   });
 });

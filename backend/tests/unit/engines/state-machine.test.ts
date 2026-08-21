@@ -191,6 +191,15 @@ describe('StateMachine - Instant Transaction (Engine A) — FULFILLMENT layer (h
       expect((await fm.transition('handed_off', 'cancel', 'admin')).newState).toBe('cancelled');
       await expect(fm.transition('ready', 'cancel', 'staff')).rejects.toThrow();
     });
+
+    it('staff/admin can cancel from queued/confirmed (Stage 6: row exists at confirm)', async () => {
+      // The confirm trigger creates the row at 'queued', so cancellation must
+      // be reachable from the entry states — not just mid-flight stages.
+      expect((await fm.transition('queued', 'cancel', 'staff')).newState).toBe('cancelled');
+      expect((await fm.transition('confirmed', 'cancel', 'admin')).newState).toBe('cancelled');
+      // Actors mirror the transaction machine's confirmed → cancelled gate.
+      await expect(fm.transition('queued', 'cancel', 'customer')).rejects.toThrow();
+    });
   });
 
   describe('invalid fulfillment transitions', () => {
@@ -213,10 +222,11 @@ describe('StateMachine - Instant Transaction (Engine A) — FULFILLMENT layer (h
       await expect(fm.transition('ready', 'start_preparation', 'staff')).rejects.toThrow();
     });
 
-    it('rejects cancellation from the queued state by staff (no admin gate on queued)', async () => {
-      // queued has no direct cancel transition — the transaction layer cancels
-      // confirmed orders; preparation-stage cancels are admin-only.
-      await expect(fm.transition('queued', 'cancel', 'admin')).rejects.toThrow();
+    it('rejects cancellation from the queued state by a CUSTOMER (staff/admin gate on queued)', async () => {
+      // Stage 6: the confirm trigger creates the row at 'queued', so
+      // cancellation is reachable from 'queued' — but only for staff/admin,
+      // mirroring the transaction machine's confirmed → cancelled gate.
+      await expect(fm.transition('queued', 'cancel', 'customer')).rejects.toThrow();
     });
   });
 });

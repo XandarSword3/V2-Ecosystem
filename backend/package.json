@@ -13,6 +13,7 @@
     "db:reset": "tsx src/database/reset.ts",
     "test": "vitest run",
     "test:unit": "vitest run",
+    "test:engine-a": "vitest run --config vitest.enginea.config.ts",
     "test:ci": "vitest run --coverage",
     "test:coverage": "vitest run --coverage",
     "test:integration": "npm run check:no-mock-integration && vitest run --config vitest.integration.config.ts",

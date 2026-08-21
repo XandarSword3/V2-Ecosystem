@@ -139,7 +139,22 @@ export async function changeInstantTransactionOrderStatus(
   // Stage 6: the canonical fulfillment state lives in the fulfillments table.
   // Determine which layer this order is on — a transaction-layer state means
   // the move is a transaction move; a fulfillment row means fulfillment moves.
-  let fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
+  //
+  // FAIL-CLOSED read: a fulfillment read error aborts the transition (500)
+  // rather than falling back to transactions.status. This function WRITES
+  // state; a write must never be based on a stale/meaningless read. With the
+  // confirm trigger, a confirmed order always has a row; null here means the
+  // row genuinely does not exist.
+  let fulfillment: Awaited<ReturnType<typeof fulfillmentService.getForTransaction>>;
+  try {
+    fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
+  } catch (readErr) {
+    return {
+      ok: false,
+      status: 500,
+      error: readErr instanceof Error ? readErr.message : 'Failed to read fulfillment state',
+    };
+  }
   const currentState = fulfillment?.status ?? current.status;
 
   const action = resolveAction(engineType, currentState, requestedStatus, actor);
@@ -157,25 +172,13 @@ export async function changeInstantTransactionOrderStatus(
     };
   }
 
-  // Stage 6: create the canonical fulfillment row the moment the transaction
-  // is confirmed (idempotent — the RPC is ON CONFLICT DO NOTHING). This is
-  // what gives the fulfillment layer its own persistence: from here on,
-  // transactions.status only ever carries transaction-layer meaning. Non-fatal
-  // here because the fulfillment branch below self-heals by ensuring again.
-  if (transition.targetState === 'confirmed') {
-    const ensured = await fulfillmentService.ensure(supabase, {
-      transactionId: orderId,
-      engineType,
-      moduleId,
-      propertyId: current.property_id ?? null,
-      tenantId: current.tenant_id ?? null,
-    });
-    if (!ensured.ok) {
-      logger.warn('[OrderStatus] ensure_fulfillment failed after confirm', { orderId, error: ensured.error });
-    } else {
-      fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
-    }
-  }
+  // Stage 6: the canonical fulfillment row is created ATOMICALLY with the
+  // confirmation itself — the ensure_fulfillment_on_confirm DB trigger fires
+  // on the transactions.status UPDATE to 'confirmed' and inserts the row in
+  // the same statement. If the trigger fails, the confirm UPDATE rolls back
+  // and the order stays pending: economic confirmation and fulfillment
+  // initialization can never diverge. No "confirm first, self-heal later"
+  // path exists here.
 
   const currentMetadata = (current.metadata ?? {}) as Record<string, unknown>;
   const now = new Date().toISOString();
@@ -193,32 +196,34 @@ export async function changeInstantTransactionOrderStatus(
   // meaning anymore.
   let persistedState = transition.targetState;
   if (transition.layer === 'fulfillment' && transition.canonicalState) {
-    // Self-heal: pre-Stage-6 rows (or orders confirmed before the ensure
-    // above landed) may lack a fulfillment row. Create it, then transition.
+    // The confirm trigger created the row atomically, so a fulfillment move
+    // on an order with NO row is a contract violation (pre-trigger data or a
+    // broken trigger) — fail closed rather than silently self-healing. A
+    // write must never proceed from an assumption.
     if (!fulfillment) {
-      const ensured = await fulfillmentService.ensure(supabase, {
-        transactionId: orderId,
-        engineType,
-        moduleId,
-        propertyId: current.property_id ?? null,
-        tenantId: current.tenant_id ?? null,
-      });
-      if (!ensured.ok) {
-        return { ok: false, status: 500, error: ensured.error ?? 'Failed to create fulfillment row' };
-      }
-      fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
-      if (!fulfillment) {
-        return { ok: false, status: 500, error: 'Fulfillment row could not be created' };
-      }
+      return {
+        ok: false,
+        status: 500,
+        error: 'Fulfillment row missing for a required-fulfillment order — confirmation did not initialize fulfillment (check the ensure_fulfillment_on_confirm trigger)',
+      };
     }
-    const fulfillmentResult = await fulfillmentService.transition(supabase, {
-      transactionId: orderId,
-      action,
-      actor,
-      actorId: userId ?? null,
-      expectedFrom: fulfillment.status,
-      context: { orderId, moduleId },
-    });
+    let fulfillmentResult;
+    try {
+      fulfillmentResult = await fulfillmentService.transition(supabase, {
+        transactionId: orderId,
+        action,
+        actor,
+        actorId: userId ?? null,
+        expectedFrom: fulfillment.status,
+        context: { orderId, moduleId },
+      });
+    } catch (transitionErr) {
+      return {
+        ok: false,
+        status: 500,
+        error: transitionErr instanceof Error ? transitionErr.message : 'Fulfillment transition failed',
+      };
+    }
     if (!fulfillmentResult.ok) {
       return { ok: false, status: 500, error: fulfillmentResult.error ?? 'Fulfillment transition failed' };
     }
