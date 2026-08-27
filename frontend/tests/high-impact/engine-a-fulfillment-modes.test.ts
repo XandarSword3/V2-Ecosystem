@@ -445,3 +445,140 @@ describe('FULFILLMENT_LAYER_STATES includes all mode states', () => {
     });
   }
 });
+
+// ============================================
+// getModeStateConfig null/legacy edge cases
+// ============================================
+
+describe('getModeStateConfig null/legacy handling', () => {
+  it('returns null for null mode', () => {
+    expect(getModeStateConfig(null)).toBeNull();
+  });
+
+  it('returns null for undefined mode', () => {
+    expect(getModeStateConfig(undefined)).toBeNull();
+  });
+
+  it('returns null for none mode', () => {
+    expect(getModeStateConfig('none')).toBeNull();
+  });
+
+  it('returns null for unrecognized mode string', () => {
+    expect(getModeStateConfig('unknown_mode' as FulfillmentMode)).toBeNull();
+  });
+
+  it('hospitality modes share the same config shape', () => {
+    const onPremise = getModeStateConfig('on_premise')!;
+    const pickup = getModeStateConfig('pickup')!;
+    const localDelivery = getModeStateConfig('local_delivery')!;
+
+    // Same state list
+    expect(onPremise.states).toEqual(pickup.states);
+    expect(pickup.states).toEqual(localDelivery.states);
+
+    // Same transition targets
+    for (const state of onPremise.states) {
+      expect(pickup.nextTarget(state)).toEqual(onPremise.nextTarget(state));
+      expect(localDelivery.nextTarget(state)).toEqual(onPremise.nextTarget(state));
+    }
+  });
+});
+
+// ============================================
+// Mixed-mode isolation — the core F1 invariant
+// ============================================
+// When orders from different fulfillment modes exist simultaneously,
+// each order's column placement must come from its OWN mode config.
+// A digital order must never be placed in a hospitality column.
+
+describe('Mixed-mode isolation', () => {
+  const hospitalityCfg = getModeStateConfig('on_premise')!;
+  const digitalCfg = getModeStateConfig('digital_delivery')!;
+  const shipmentCfg = getModeStateConfig('shipment')!;
+  const serviceCfg = getModeStateConfig('service_execution')!;
+
+  it('hospitality and digital have no overlapping fulfillment states', () => {
+    const hospStates = new Set(hospitalityCfg.states);
+    for (const state of digitalCfg.states) {
+      expect(hospStates.has(state)).toBe(false);
+    }
+  });
+
+  it('hospitality and shipment have no overlapping fulfillment states', () => {
+    const hospStates = new Set(hospitalityCfg.states);
+    for (const state of shipmentCfg.states) {
+      expect(hospStates.has(state)).toBe(false);
+    }
+  });
+
+  it('hospitality and service share ready but it maps differently', () => {
+    // Both hospitality and service have 'ready' but it means different things
+    // and has different next targets
+    expect(hospitalityCfg.states).toContain('ready');
+    expect(serviceCfg.states).toContain('ready');
+    // In hospitality, ready → null (waiting on dispatch)
+    expect(hospitalityCfg.nextTarget('ready')).toBeNull();
+    // In service, ready → collected
+    expect(serviceCfg.nextTarget('ready')).toBe('collected');
+  });
+
+  it('digital delivered is terminal', () => {
+    expect(digitalCfg.metadata.delivered.terminal).toBe(true);
+    expect(digitalCfg.nextTarget('delivered')).toBeNull();
+  });
+
+  it('shipment delivered is terminal', () => {
+    expect(shipmentCfg.metadata.delivered.terminal).toBe(true);
+    expect(shipmentCfg.nextTarget('delivered')).toBeNull();
+  });
+
+  it('resolveColumnKey resolves to correct mode-specific column', () => {
+    // A 'provisioning' state belongs to digital, not hospitality
+    expect(resolveColumnKey('provisioning', digitalCfg)).toBe('provisioning');
+    // When 'provisioning' is resolved against hospitality config, it falls to first column
+    expect(resolveColumnKey('provisioning', hospitalityCfg)).toBe('queued');
+
+    // An 'allocated' state belongs to shipment
+    expect(resolveColumnKey('allocated', shipmentCfg)).toBe('allocated');
+    // When 'allocated' is resolved against digital config, it falls to first column
+    expect(resolveColumnKey('allocated', digitalCfg)).toBe('provisioning');
+
+    // 'received' belongs to service
+    expect(resolveColumnKey('received', serviceCfg)).toBe('received');
+    // When 'received' is resolved against hospitality, it falls to first column
+    expect(resolveColumnKey('received', hospitalityCfg)).toBe('queued');
+  });
+
+  it('confirmed maps to first column of each mode independently', () => {
+    expect(resolveColumnKey('confirmed', hospitalityCfg)).toBe('queued');
+    expect(resolveColumnKey('confirmed', digitalCfg)).toBe('provisioning');
+    expect(resolveColumnKey('confirmed', shipmentCfg)).toBe('allocated');
+    expect(resolveColumnKey('confirmed', serviceCfg)).toBe('received');
+  });
+
+  it('each mode has a distinct column set for a mixed-mode board', () => {
+    const allColumnSets = [
+      hospitalityCfg.states,
+      digitalCfg.states,
+      shipmentCfg.states,
+      serviceCfg.states,
+    ];
+    // No two modes have the exact same column set
+    for (let i = 0; i < allColumnSets.length; i++) {
+      for (let j = i + 1; j < allColumnSets.length; j++) {
+        // At minimum, the column sets differ in length or content
+        const same = allColumnSets[i].length === allColumnSets[j].length
+          && allColumnSets[i].every((s, k) => s === allColumnSets[j][k]);
+        expect(same).toBe(false);
+      }
+    }
+  });
+
+  it('shipment has the most columns (6 states)', () => {
+    expect(shipmentCfg.states).toHaveLength(6);
+  });
+
+  it('digital has the fewest columns (3 states)', () => {
+    expect(digitalCfg.states).toHaveLength(3);
+  });
+});

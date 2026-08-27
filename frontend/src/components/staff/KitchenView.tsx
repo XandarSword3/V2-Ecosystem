@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { Order, OrderItem, ItemStatus, itemStatusFlow, canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from './types';
 import type { FulfillmentState, FulfillmentStatus, FulfillmentMode, ModeStateConfig } from '@/types';
-import { getModeStateConfig, resolveColumnKey } from '@/lib/engine-a/types';
+import { getModeStateConfig, resolveColumnKey, isFulfillmentMode } from '@/lib/engine-a/types';
 
 import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
 import { createOfflineOrderStatusUpdate, createOfflineOrder } from '@/lib/offline/offline-sync';
@@ -187,42 +187,76 @@ function deriveBoardColumns(
   return cols;
 }
 
-/** Determine the primary fulfillment mode from a set of orders.
- *  Returns the most common mode, falling back to hospitality. */
-function primaryMode(orders: Order[]): FulfillmentMode {
-  const counts = new Map<string, number>();
-  for (const o of orders) {
-    const m = o.fulfillmentMode ?? 'on_premise';
-    counts.set(m, (counts.get(m) ?? 0) + 1);
+// ============================================
+// Per-order mode resolution (F1: mixed-mode board)
+// ============================================
+// Each order carries its own fulfillmentMode. The board must resolve
+// each order against its OWN mode — never a global dominant-mode pick.
+
+const LEGACY_MODE: FulfillmentMode = 'on_premise';
+
+/** Resolve the fulfillment mode for a single order. Null/unknown modes
+ *  use the legacy recovery path (hospitality config) with an explicit
+ *  marker — NOT silent coercion. */
+function resolvedOrderMode(order: Order): { mode: FulfillmentMode; legacy: boolean } {
+  const raw = order.fulfillmentMode;
+  if (raw && isFulfillmentMode(raw) && raw !== 'none') {
+    return { mode: raw, legacy: false };
   }
-  let best = 'on_premise';
-  let bestCount = 0;
-  for (const [m, c] of counts) {
-    if (c > bestCount) { best = m; bestCount = c; }
-  }
-  return best as FulfillmentMode;
+  // Null / unknown / 'none' → legacy recovery: apply hospitality config
+  // so the order still renders, but it's flagged for migration.
+  return { mode: LEGACY_MODE, legacy: true };
 }
 
-/** Which board column an order belongs in (mode-aware). */
+/** Collect the distinct fulfillment modes present in a set of orders,
+ *  ordered by first-seen. Preserves order for tab rendering. */
+function modesFromOrders(orders: Order[]): FulfillmentMode[] {
+  const seen = new Set<FulfillmentMode>();
+  const result: FulfillmentMode[] = [];
+  for (const o of orders) {
+    const { mode } = resolvedOrderMode(o);
+    if (!seen.has(mode)) {
+      seen.add(mode);
+      result.push(mode);
+    }
+  }
+  return result;
+}
+
+/** Human-readable tab label for a fulfillment mode. */
+function modeTabLabel(mode: FulfillmentMode, legacy: boolean): string {
+  const base = mode.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return legacy ? `${base} (legacy)` : base;
+}
+
+/** Grid-cols class for a mode's column count. */
+function modeGridCols(colCount: number): string {
+  if (colCount <= 3) return 'grid-cols-1 md:grid-cols-3';
+  if (colCount <= 4) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4';
+  if (colCount <= 5) return 'grid-cols-1 md:grid-cols-3 lg:grid-cols-5';
+  return 'grid-cols-1 md:grid-cols-3 lg:grid-cols-6';
+}
+
+/** Which board column an order belongs in (per-order mode-aware). */
 function boardColumn(order: Order, modeConfig: ModeStateConfig | null): string {
   const c = canonicalFulfillmentState(order);
   return resolveColumnKey(c, modeConfig);
 }
 
-/** The next canonical target state for a column's quick action. */
-function nextCanonicalTarget(order: Order, modeConfig: ModeStateConfig | null): string | null {
-  const col = boardColumn(order, modeConfig);
+/** Resolve modeConfig for a specific order — never uses a global mode. */
+function orderModeConfig(order: Order): ModeStateConfig | null {
+  const { mode } = resolvedOrderMode(order);
+  return getModeStateConfig(mode);
+}
+
+/** The next canonical target state for a column's quick action.
+ *  Resolves the mode from the order itself, not from a global config. */
+function nextCanonicalTarget(order: Order, _modeConfig: ModeStateConfig | null): string | null {
+  const cfg = orderModeConfig(order);
+  const col = boardColumn(order, cfg);
   if (col === 'pending') return 'confirmed';
-  if (!modeConfig) {
-    // Legacy fallback
-    switch (col) {
-      case 'queued': return 'in_progress';
-      case 'in_progress': return 'ready';
-      case 'handed_off': return 'completed';
-      default: return null;
-    }
-  }
-  return modeConfig.nextTarget(col as FulfillmentState);
+  if (!cfg) return null;
+  return cfg.nextTarget(col as FulfillmentState);
 }
 
 
@@ -287,6 +321,9 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
   // the tapped chip so a slow network doesn't invite a double-tap.
   const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(new Set());
   const { socket } = useSocket();
+  // F1: mode-filtered board. 'all' shows a merged board; any specific mode
+  // shows only that mode's columns and orders.
+  const [activeModeTab, setActiveModeTab] = useState<FulfillmentMode | 'all'>('all');
 
   // ============================================
   // New Order / Add Item — replaces the removed window.prompt() flow.
@@ -513,10 +550,10 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
         const response = await api.get(`/staff/modules/${slug}/orders`, {
           params: {
             // Stage 6: 'confirmed' (the transaction layer every fulfillment-
-            // active order sits at) plus the canonical fulfillment states.
+            // active order sits at) plus ALL canonical fulfillment states.
             // 'pending' excluded — only confirmed orders reach the kitchen.
-            // The backend maps these onto the canonical fulfillment join.
-            status: 'confirmed,queued,in_progress,ready,handed_off',
+            // Includes states from all fulfillment modes (F1: mixed-mode board).
+            status: 'confirmed,queued,in_progress,ready,handed_off,provisioning,provisioned,delivered,allocated,picking,packed,shipped,in_transit,received,working,collected',
             moduleId: moduleId,
           },
         });
@@ -698,143 +735,231 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
         </div>
       </header>
 
-      {/* Kanban Board — columns derived from each order's fulfillmentMode.
-          The engine's fulfillment machine owns mode-specific states;
+      {/* Kanban Board — F1: mode-filtered tabs.
+          Each order is resolved against its OWN fulfillmentMode via
+          resolvedOrderMode(). The board shows mode-specific columns;
           the transaction layer owns pending/confirmed/completed/cancelled.
           transactions.status is never used for column placement. */}
       {(() => {
-        const mode = primaryMode(orders);
-        const modeConfig = getModeStateConfig(mode);
-        const boardColumns = deriveBoardColumns(modeConfig);
+        const modes = modesFromOrders(orders);
+        const showTabs = modes.length > 1 || (modes.length === 1 && modes[0] !== 'on_premise');
+
+        // Determine which modes to render columns for.
+        const renderModes: FulfillmentMode[] =
+          activeModeTab === 'all' ? modes : [activeModeTab];
+
+        // When viewing a single mode, only show orders of that mode.
+        // When viewing 'all', show all orders (each resolved to its own columns).
+        const visibleOrders =
+          activeModeTab === 'all' ? orders : orders.filter((o) => resolvedOrderMode(o).mode === activeModeTab);
+
         return (
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto">
-        {boardColumns.map(({ key: status, style: col }) => {
-          const columnOrders = orders.filter((o) => boardColumn(o, modeConfig) === status);
-
-          return (
-            <div key={status} className={`rounded-xl border ${col.border} ${col.bg} min-h-[400px] flex flex-col`}>
-              {/* Column Header */}
-              <div className="p-3 border-b border-inherit flex items-center justify-between">
-                <h3 className={`font-bold text-sm uppercase tracking-wide ${col.text}`}>
-                  {col.label}
-                </h3>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${col.text} bg-white/60 dark:bg-gray-800/60`}>
-                  {columnOrders.length}
-                </span>
-              </div>
-
-              {/* Column Cards */}
-              <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[calc(100vh-280px)]">
-                {columnOrders.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-600">
-                    <UtensilsCrossed className="h-8 w-8 mb-2 opacity-30" />
-                    <p className="text-xs">No orders</p>
-                  </div>
-                ) : (
-                  columnOrders.map((order) => (
-                    <div
-                      key={order.id}
-                      className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden transition-all hover:shadow-md cursor-pointer ${
-                        selectedOrder?.id === order.id ? 'ring-2 ring-primary' : ''
+          <>
+            {/* Mode Tabs */}
+            {showTabs && (
+              <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
+                <button
+                  type="button"
+                  data-testid="mode-tab-all"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                    activeModeTab === 'all'
+                      ? 'bg-primary text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+                  }`}
+                  onClick={() => setActiveModeTab('all')}
+                >
+                  All ({orders.length})
+                </button>
+                {modes.map((m) => {
+                  const count = orders.filter((o) => resolvedOrderMode(o).mode === m).length;
+                  const { legacy } = resolvedOrderMode(orders.find((o) => resolvedOrderMode(o).mode === m)!);
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      data-testid={`mode-tab-${m}`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                        activeModeTab === m
+                          ? 'bg-primary text-white'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
                       }`}
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={() => setActiveModeTab(m)}
                     >
-                      <div className="p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-sm">#{order.orderNumber}</span>
-                            {order.tableNumber && (
-                              <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                                T-{order.tableNumber}
-                              </span>
-                            )}
-                          </div>
-                          {/* Elapsed timer — the hero element. What matters on a
-                              KDS is time-in-state, not just what was ordered. */}
-                          <ElapsedTimer since={order.createdAt} />
-                        </div>
-
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
-                            order.orderType === 'dine_in' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                            : order.orderType === 'delivery' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                            : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                          }`}>
-                            {order.orderType?.replace('_', ' ') || 'dine in'}
-                          </span>
-                          <span className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
-                            <Clock className="h-3 w-3" />
-                            {formatTime(order.createdAt)}
-                          </span>
-                        </div>
-
-                        <div className="space-y-1 mb-2">
-                          {order.items.map((item) => (
-                            <ItemStatusChip
-                              key={item.id}
-                              item={item}
-                              disabled={pendingItemIds.has(item.id)}
-                              onAdvance={(i) => advanceItem(order.id, i)}
-                            />
-                          ))}
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700 text-xs">
-                          <span className="text-gray-500 truncate max-w-[80px]">{order.customerName}</span>
-                          <span className="font-bold text-primary">{formatCurrency(order.totalAmount)}</span>
-                        </div>
-                      </div>
-
-                      {/* Quick Action — order-level, canonical target states
-                          (Stage 6). pending→confirmed is a transaction-layer
-                          move; queued→in_progress→ready and handed_off→completed
-                          are fulfillment-layer moves. Items only drive
-                          auto-derivation once everything hits ready/served. */}
-                      {(() => {
-                        const nextTarget = nextCanonicalTarget(order, modeConfig);
-                        const isWaitingOnDispatch = boardColumn(order, modeConfig) === 'ready';
-                        if (!nextTarget && !isWaitingOnDispatch) return null;
-                        return (
-                          <div className="px-2 pb-2 flex gap-2">
-                            {isWaitingOnDispatch ? (
-                              // No quick-action here on purpose: bumping straight
-                              // from ready to handed_off from the kitchen board
-                              // skips Dispatch entirely. That handoff now only
-                              // happens from DispatchBoard.
-                              <span className="w-full text-center text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 py-1.5">
-                                Waiting on Dispatch
-                              </span>
-                            ) : (
-                              <Button
-                                className={`w-full text-white text-xs ${col.actionBg}`}
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // nextTarget is non-null here: the guard
-                                  // above returned early when both it and
-                                  // isWaitingOnDispatch were falsy.
-                                  updateOrderStatus(order.id, nextTarget!);
-                                }}
-                              >
-                                {col.action}
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  ))
-                )}
+                      {modeTabLabel(m, legacy)} ({count})
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            )}
+
+            {/* Board columns — one set per rendered mode. */}
+            {renderModes.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 dark:text-gray-600">
+                <UtensilsCrossed className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">No active orders</p>
+              </div>
+            ) : renderModes.map((rm) => {
+              const rmConfig = getModeStateConfig(rm);
+              const boardColumns = deriveBoardColumns(rmConfig);
+              // Filter visible orders to this mode's orders
+              const modeOrders = visibleOrders.filter((o) => resolvedOrderMode(o).mode === rm);
+              const { legacy } = resolvedOrderMode(modeOrders[0] ?? { fulfillmentMode: rm });
+
+              return (
+                <div key={rm} className="mb-6">
+                  {/* Mode section header when showing multiple modes */}
+                  {renderModes.length > 1 && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <h2 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                        {modeTabLabel(rm, legacy)}
+                      </h2>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {modeOrders.length} order{modeOrders.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+                  <div className={`grid gap-4 overflow-x-auto ${modeGridCols(boardColumns.length)}`}>
+                    {boardColumns.map(({ key: status, style: col }) => {
+                      const columnOrders = modeOrders.filter((o) => {
+                        const oCfg = orderModeConfig(o);
+                        return boardColumn(o, oCfg) === status;
+                      });
+
+                      return (
+                        <div key={status} className={`rounded-xl border ${col.border} ${col.bg} min-h-[400px] flex flex-col`}>
+                          {/* Column Header */}
+                          <div className="p-3 border-b border-inherit flex items-center justify-between">
+                            <h3 className={`font-bold text-sm uppercase tracking-wide ${col.text}`}>
+                              {col.label}
+                            </h3>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${col.text} bg-white/60 dark:bg-gray-800/60`}>
+                              {columnOrders.length}
+                            </span>
+                          </div>
+
+                          {/* Column Cards */}
+                          <div className="p-2 space-y-2 flex-1 overflow-y-auto max-h-[calc(100vh-280px)]">
+                            {columnOrders.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center py-8 text-gray-400 dark:text-gray-600">
+                                <UtensilsCrossed className="h-8 w-8 mb-2 opacity-30" />
+                                <p className="text-xs">No orders</p>
+                              </div>
+                            ) : (
+                              columnOrders.map((order) => {
+                                const oCfg = orderModeConfig(order);
+                                const oCol = boardColumn(order, oCfg);
+                                return (
+                                  <div
+                                    key={order.id}
+                                    data-testid={`order-card-${order.id}`}
+                                    data-fulfillment-mode={resolvedOrderMode(order).mode}
+                                    data-fulfillment-column={oCol}
+                                    className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden transition-all hover:shadow-md cursor-pointer ${
+                                      selectedOrder?.id === order.id ? 'ring-2 ring-primary' : ''
+                                    }`}
+                                  >
+                                    <div className="p-3">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-bold text-sm">#{order.orderNumber}</span>
+                                          {order.tableNumber && (
+                                            <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                              T-{order.tableNumber}
+                                            </span>
+                                          )}
+                                          {/* Show fulfillment mode badge on the card when multiple modes are visible */}
+                                          {renderModes.length > 1 && (
+                                            <span className="bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded text-[9px] font-medium text-gray-600 dark:text-gray-300">
+                                              {resolvedOrderMode(order).mode.replace(/_/g, ' ')}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {/* Elapsed timer — the hero element. What matters on a
+                                            KDS is time-in-state, not just what was ordered. */}
+                                        <ElapsedTimer since={order.createdAt} />
+                                      </div>
+
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium capitalize ${
+                                          order.orderType === 'dine_in' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                          : order.orderType === 'delivery' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                          : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                                        }`}>
+                                          {order.orderType?.replace('_', ' ') || 'dine in'}
+                                        </span>
+                                        <span className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                                          <Clock className="h-3 w-3" />
+                                          {formatTime(order.createdAt)}
+                                        </span>
+                                      </div>
+
+                                      <div className="space-y-1 mb-2">
+                                        {order.items.map((item) => (
+                                          <ItemStatusChip
+                                            key={item.id}
+                                            item={item}
+                                            disabled={pendingItemIds.has(item.id)}
+                                            onAdvance={(i) => advanceItem(order.id, i)}
+                                          />
+                                        ))}
+                                      </div>
+
+                                      <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700 text-xs">
+                                        <span className="text-gray-500 truncate max-w-[80px]">{order.customerName}</span>
+                                        <span className="font-bold text-primary">{formatCurrency(order.totalAmount)}</span>
+                                      </div>
+                                    </div>
+
+                                    {/* Quick Action — per-order mode-resolved.
+                                        pending→confirmed is a transaction-layer move;
+                                        mode-specific states are fulfillment-layer moves. */}
+                                    {(() => {
+                                      const nextTarget = nextCanonicalTarget(order, oCfg);
+                                      const isWaitingOnDispatch = oCol === 'ready';
+                                      if (!nextTarget && !isWaitingOnDispatch) return null;
+                                      return (
+                                        <div className="px-2 pb-2 flex gap-2">
+                                          {isWaitingOnDispatch ? (
+                                            <span className="w-full text-center text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 py-1.5">
+                                              Waiting on Dispatch
+                                            </span>
+                                          ) : (
+                                            <Button
+                                              className={`w-full text-white text-xs ${col.actionBg}`}
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                updateOrderStatus(order.id, nextTarget!);
+                                              }}
+                                            >
+                                              {col.action}
+                                            </Button>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </>
         );
       })()}
 
       {/* Order Details Modal */}
-      {selectedOrder && (
+      {selectedOrder && (() => {
+        // F1: resolve mode for the detail panel from the order itself.
+        const selModeCfg = orderModeConfig(selectedOrder);
+        const { mode: selMode, legacy: selLegacy } = resolvedOrderMode(selectedOrder);
+        return (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
           role="dialog" // FIX Iter-11: a11y — modal semantics
@@ -849,6 +974,9 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                   Order #{selectedOrder.orderNumber}
                   <span className="text-sm font-normal text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
                     {selectedOrder.orderType}
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                    {selMode}{selLegacy ? ' (legacy)' : ''}
                   </span>
                 </h2>
                 <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
@@ -961,8 +1089,8 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col gap-3">
               <div className="flex gap-3">
                 {(() => {
-                  const selMode = primaryMode([selectedOrder]);
-                  const selModeConfig = getModeStateConfig(selMode);
+                  // F1: resolve mode from the order itself — never from a global pick.
+                  const selModeConfig = orderModeConfig(selectedOrder);
                   const nextTarget = nextCanonicalTarget(selectedOrder, selModeConfig);
                   const selCol = boardColumn(selectedOrder, selModeConfig);
                   const isTerminal = selectedOrder.status === 'completed' || selectedOrder.status === 'cancelled';
@@ -999,7 +1127,8 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
       {/* Order Details Modal ... */}
 
       {/* New Order Modal — replaces the removed window.prompt() flow with a
