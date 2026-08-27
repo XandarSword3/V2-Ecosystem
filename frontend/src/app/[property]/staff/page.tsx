@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
+import { MULTI_ENGINE_LEGACY_STATUSES, MULTI_ENGINE_ACTIVE_STATUSES } from '@/components/staff/types';
 import { useSocket } from '@/lib/socket';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -117,7 +118,7 @@ export default function StaffDashboard() {
       // Fetch live transactions from unified endpoint
       const response = await api.get('/staff/transactions/live', {
         params: {
-          statuses: 'pending,confirmed,preparing,ready,delivered,active',
+          statuses: MULTI_ENGINE_LEGACY_STATUSES,
         }
       });
 
@@ -125,7 +126,7 @@ export default function StaffDashboard() {
 
       // Count by transaction status
       const pending = allTransactions.filter((t: TransactionRecord) => 
-        ['pending', 'confirmed', 'preparing', 'active', 'delivered'].includes(t.status)
+        (MULTI_ENGINE_ACTIVE_STATUSES as readonly string[]).includes(t.status)
       ).length;
 
       const completed = allTransactions.filter((t: TransactionRecord) => 

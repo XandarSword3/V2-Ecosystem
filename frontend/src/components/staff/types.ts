@@ -85,3 +85,21 @@ export function statusFlowForMode(mode: FulfillmentMode | null | undefined): rea
 // one step at a time. Kept as a separate flow because order_items isn't a
 // registered engine entity and doesn't share the order-level state machine.
 export const itemStatusFlow: ItemStatus[] = ['pending', 'preparing', 'ready', 'served'];
+
+// ============================================
+// Multi-engine status adapter (F1 legacy boundary)
+// ============================================
+// The /staff/transactions/live endpoint accepts status values from multiple
+// engine types (instant_transaction, shared_capacity_access, etc.). Some of
+// these are legacy hospitality composites that the backend translates.
+// This adapter isolates that compatibility vocabulary in one place.
+
+/** Legacy status values accepted by /staff/transactions/live.
+ *  These span multiple engine types and include hospitality composites
+ *  (preparing, delivered) that the backend translates to canonical states.
+ *  DO NOT add new Engine A statuses here — use canonical states instead. */
+export const MULTI_ENGINE_LEGACY_STATUSES = 'pending,confirmed,preparing,ready,delivered,active' as const;
+
+/** Status values that count as 'active' on the multi-engine staff dashboard.
+ *  Includes legacy composites (preparing, active) that the backend accepts. */
+export const MULTI_ENGINE_ACTIVE_STATUSES = ['pending', 'confirmed', 'preparing', 'active', 'delivered'] as const;

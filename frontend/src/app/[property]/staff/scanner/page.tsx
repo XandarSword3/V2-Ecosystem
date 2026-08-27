@@ -130,8 +130,12 @@ export default function StaffScannerPage() {
 
   const canTransition = (tx: ValidationResult['transaction']) => {
     if (!tx) return false;
-    // shared_capacity_access: confirmed → active (entry), active → used (exit)
-    // time_exclusive_reservation: confirmed → checked_in
+    // F1 AUDIT: This is a multi-engine scanner, NOT an Engine A fulfillment board.
+    // The statuses below belong to their respective engine types:
+    //   shared_capacity_access: confirmed (transaction) → active (entry) → used (exit)
+    //   time_exclusive_reservation: confirmed (transaction) → checked_in
+    //   instant_transaction: ready (fulfillment) → served (item-level)
+    // 'active' is a shared_capacity_access state, NOT an Engine A fulfillment state.
     const transitionableStatuses = ['confirmed', 'active', 'ready'];
     return transitionableStatuses.includes(tx.status);
   };

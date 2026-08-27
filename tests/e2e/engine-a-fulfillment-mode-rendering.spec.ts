@@ -559,4 +559,211 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
       }
     }
   });
+
+  // ===================================================================
+  // DETERMINISTIC FIXTURE TEST — MUST FAIL if fixtures can't be created
+  // ===================================================================
+  // This test creates controlled orders for all 5 fulfillment modes via API,
+  // then proves through the actual mounted staff UI that each order renders
+  // against its own mode's column. No conditional skip — hard failure if
+  // any fixture can't be created or any mode is absent.
+
+  test.describe('Deterministic mixed-mode fixtures (all 5 modes)', () => {
+
+    /** Create an order via the backend API with a specific fulfillmentMode. */
+    async function createOrderWithMode(
+      request: any,
+      mode: string,
+      status: string = 'confirmed',
+    ): Promise<{ id: string; orderNumber: string }> {
+      // First, get a valid item from the module
+      const itemsRes = await request.get(`${API_URL}/staff/modules/${TEST_MODULE_SLUG}/items`, {
+        headers: { Authorization: `Bearer ${process.env.E2E_ADMIN_TOKEN || ''}` },
+      });
+      const items = (await itemsRes.json())?.data ?? [];
+      if (items.length === 0) throw new Error('No items found for fixture creation');
+      const item = items[0];
+
+      // Create order
+      const orderRes = await request.post(`${API_URL}/${TEST_MODULE_SLUG}/orders`, {
+        headers: { Authorization: `Bearer ${process.env.E2E_ADMIN_TOKEN || ''}` },
+        data: {
+          items: [{ catalog_item_id: item.id, quantity: 1 }],
+          fulfillment_mode: mode,
+        },
+      });
+
+      if (!orderRes.ok()) {
+        throw new Error(`Failed to create ${mode} order: ${orderRes.status()} ${await orderRes.text()}`);
+      }
+
+      const orderBody = await orderRes.json();
+      const orderId = orderBody?.data?.id ?? orderBody?.id;
+      const orderNumber = orderBody?.data?.order_number ?? orderBody?.order_number ?? 'unknown';
+
+      if (status !== 'confirmed') {
+        // Advance to the target status
+        await request.patch(`${API_URL}/staff/modules/${TEST_MODULE_SLUG}/orders/${orderId}/status`, {
+          headers: { Authorization: `Bearer ${process.env.E2E_ADMIN_TOKEN || ''}` },
+          data: { status },
+        });
+      }
+
+      return { id: orderId, orderNumber };
+    }
+
+    test('creates fixtures for all 5 modes and proves correct column placement', async ({
+      page,
+      request,
+    }) => {
+      // ---- Phase 1: Create fixtures (MUST succeed — hard failure if not) ----
+      const modes: Array<{ mode: string; targetStatus: string; expectedColumns: string[] }> = [
+        { mode: 'on_premise', targetStatus: 'confirmed', expectedColumns: ['queued', 'in_progress', 'ready', 'handed_off'] },
+        { mode: 'digital_delivery', targetStatus: 'confirmed', expectedColumns: ['provisioning', 'provisioned', 'delivered'] },
+        { mode: 'shipment', targetStatus: 'confirmed', expectedColumns: ['allocated', 'picking', 'packed', 'shipped', 'in_transit', 'delivered'] },
+        { mode: 'service_execution', targetStatus: 'confirmed', expectedColumns: ['received', 'working', 'ready', 'collected'] },
+        { mode: 'none', targetStatus: 'confirmed', expectedColumns: [] },
+      ];
+
+      const createdOrders: Array<{ mode: string; id: string; orderNumber: string }> = [];
+
+      for (const { mode } of modes) {
+        try {
+          const order = await createOrderWithMode(request, mode, 'confirmed');
+          createdOrders.push({ mode, ...order });
+        } catch (e) {
+          // MUST fail — do not skip
+          throw new Error(
+            `DETERMINISTIC FIXTURE FAILURE: Could not create ${mode} order. ` +
+            `The test environment must support order creation with fulfillment_mode=${mode}. ` +
+            `Error: ${e instanceof Error ? e.message : String(e)}`
+          );
+        }
+      }
+
+      // Verify all 5 fixtures were created
+      expect(createdOrders.length, 'All 5 mode fixtures must be created').toBe(5);
+
+      // ---- Phase 2: Login and navigate to staff KDS ----
+      await loginAsAdmin(page);
+      await page.goto(`${FRONTEND_URL}/staff/${TEST_MODULE_SLUG}`, {
+        waitUntil: 'networkidle',
+        timeout: 30_000,
+      });
+      await page.waitForTimeout(3_000);
+
+      // ---- Phase 3: Verify mode tabs exist for all created modes ----
+      for (const { mode } of modes) {
+        const tab = page.locator(`[data-testid="mode-tab-${mode}"]`);
+        await expect(
+          tab,
+          `Mode tab for ${mode} must exist when orders of that mode are present`
+        ).toBeVisible({ timeout: 5_000 });
+      }
+
+      // ---- Phase 4: Per-mode column verification ----
+      for (const { mode, expectedColumns } of modes) {
+        // Click the mode-specific tab
+        await page.click(`[data-testid="mode-tab-${mode}"]`);
+        await page.waitForTimeout(1_000);
+
+        // Verify order cards have correct data-fulfillment-mode
+        const cards = page.locator(`[data-fulfillment-mode="${mode}"]`);
+        const cardCount = await cards.count();
+
+        expect(
+          cardCount,
+          `At least one order card must have data-fulfillment-mode=${mode}`
+        ).toBeGreaterThanOrEqual(1);
+
+        // Verify each card's column is within the mode's valid column set
+        for (let i = 0; i < cardCount; i++) {
+          const column = await cards.nth(i).getAttribute('data-fulfillment-column');
+          expect(
+            column,
+            `Order card ${i} of mode ${mode} has invalid column ${column}. ` +
+            `Valid columns: ${['pending', ...expectedColumns].join(', ')}`
+          ).toBeOneOf(['pending', ...expectedColumns]);
+        }
+
+        // For modes with fulfillment states, verify the board shows those columns
+        if (expectedColumns.length > 0) {
+          const headers = page.locator('h3.uppercase');
+          const headerTexts: string[] = [];
+          const headerCount = await headers.count();
+          for (let i = 0; i < headerCount; i++) {
+            headerTexts.push((await headers.nth(i).textContent() ?? '').trim());
+          }
+
+          // At least one of the mode's column labels must appear
+          const modeLabels = expectedColumns.map(c => c.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+          const foundLabel = modeLabels.some(label => headerTexts.includes(label));
+          // Also check the raw state names as column keys might be displayed
+          const foundRaw = expectedColumns.some(col => headerTexts.some(h => h.toLowerCase() === col.replace(/_/g, ' ')));
+
+          expect(
+            foundLabel || foundRaw,
+            `Board must show at least one column for mode ${mode}. ` +
+            `Expected labels: ${modeLabels.join(', ')}. ` +
+            `Found headers: ${headerTexts.join(', ')}`
+          ).toBe(true);
+        }
+
+        // For 'none' mode, verify ONLY the 'New' column exists
+        if (mode === 'none') {
+          const headers = page.locator('h3.uppercase');
+          const headerCount = await headers.count();
+          const headerTexts: string[] = [];
+          for (let i = 0; i < headerCount; i++) {
+            headerTexts.push((await headers.nth(i).textContent() ?? '').trim());
+          }
+
+          // Should contain 'New' (pending column)
+          expect(
+            headerTexts.some(h => h === 'New'),
+            'none mode board must show New column'
+          ).toBe(true);
+
+          // Must NOT contain any fulfillment column headers
+          const fulfillmentHeaders = ['Queued', 'In Progress', 'Ready', 'Served',
+            'Provisioning', 'Provisioned', 'Delivered',
+            'Allocated', 'Picking', 'Packed', 'Shipped', 'In Transit',
+            'Received', 'Working', 'Collected'];
+          for (const fh of fulfillmentHeaders) {
+            expect(
+              headerTexts.includes(fh),
+              `none mode board must NOT show fulfillment column '${fh}'`
+            ).toBe(false);
+          }
+        }
+      }
+
+      // ---- Phase 5: Cross-mode isolation proof ----
+      // Click 'All' tab and verify no order appears in another mode's column
+      await page.click('[data-testid="mode-tab-all"]');
+      await page.waitForTimeout(1_000);
+
+      const allCards = page.locator('[data-testid^="order-card-"]');
+      const allCount = await allCards.count();
+
+      const modeValidColumns: Record<string, string[]> = {};
+      for (const { mode, expectedColumns } of modes) {
+        modeValidColumns[mode] = ['pending', ...expectedColumns];
+      }
+
+      for (let i = 0; i < allCount; i++) {
+        const card = allCards.nth(i);
+        const cardMode = await card.getAttribute('data-fulfillment-mode');
+        const cardColumn = await card.getAttribute('data-fulfillment-column');
+
+        if (cardMode && modeValidColumns[cardMode]) {
+          expect(
+            modeValidColumns[cardMode].includes(cardColumn ?? ''),
+            `Order card ${i} (mode=${cardMode}) is in column '${cardColumn}' ` +
+            `which is not valid for its mode. Valid: ${modeValidColumns[cardMode].join(', ')}`
+          ).toBe(true);
+        }
+      }
+    });
+  });
 });

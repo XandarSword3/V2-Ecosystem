@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
 import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
+import { MULTI_ENGINE_LEGACY_STATUSES, MULTI_ENGINE_ACTIVE_STATUSES } from '@/components/staff/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -154,7 +155,7 @@ export default function ManagerDashboard() {
       const [transactionsRes, modulesRes, staffRes, activityRes, weeklyOrdersRes, approvalsRes, todayShiftsRes, managerSummaryRes] = await Promise.all([
         api.get('/staff/transactions/live', { 
           params: { 
-            statuses: 'pending,confirmed,preparing,ready,delivered,active'
+            statuses: MULTI_ENGINE_LEGACY_STATUSES
           },
           signal 
         }).catch(() => ({ data: { data: [] } })),
@@ -186,7 +187,7 @@ export default function ManagerDashboard() {
 
       // Calculate stats from unified transactions data
       const pending = allTransactions.filter((t: any) => 
-        ['pending', 'confirmed', 'preparing', 'active'].includes(t.status)
+        (MULTI_ENGINE_ACTIVE_STATUSES as readonly string[]).includes(t.status)
       ).length;
       
       const completed = allTransactions.filter((t: any) => 

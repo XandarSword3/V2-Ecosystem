@@ -549,14 +549,30 @@ export interface Money {
   currency: string;
 }
 
+/** ISO 4217 currency exponents (number of decimal places).
+ *  Only non-2 exponents are listed; everything else defaults to 2.
+ *  Source: https://en.wikipedia.org/wiki/ISO_4217 */
+const CURRENCY_EXPONENTS: Record<string, number> = {
+  // 0 decimal places (minor unit = 1)
+  'JPY': 0, 'KRW': 0, 'VND': 0, 'KHR': 0, 'LAK': 0, 'MNT': 0,
+  'UGX': 0, 'RWF': 0, 'CLP': 0, 'ISK': 0, 'VUV': 0, 'KMF': 0,
+  // 3 decimal places (minor unit = 1/1000)
+  'BHD': 3, 'KWD': 3, 'OMR': 3, 'TND': 3, 'LYD': 3, 'JOD': 3,
+  'IQD': 3, 'PCL': 3,
+};
+
+/** Get the number of decimal places for a currency code. */
+export function getCurrencyExponent(currency: string): number {
+  return CURRENCY_EXPONENTS[currency.toUpperCase()] ?? 2;
+}
+
 /** Convert minor-unit Money to a display-ready decimal number.
  *  Use this ONLY at the presentation edge (formatCurrency, JSX).
  *  Never use it in business logic or state comparisons. */
 export function toDisplayMoney(money: Money): number {
-  // Safe integer division — avoids floating-point drift for typical amounts.
-  // For currencies with 2 decimal places (USD, EUR, etc.), divide by 100.
-  // Currencies with 0 or 3 decimal places need custom handling.
-  return money.amount / 100;
+  const exponent = getCurrencyExponent(money.currency);
+  const divisor = Math.pow(10, exponent);
+  return money.amount / divisor;
 }
 
 export interface PricingBreakdown {

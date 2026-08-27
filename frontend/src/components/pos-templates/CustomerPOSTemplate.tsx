@@ -22,6 +22,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { useSocket } from '@/lib/socket';
 import { formatCurrency } from '@/lib/utils';
+import { canonicalFulfillmentState } from '@/lib/engine-a/types';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import {
@@ -89,6 +90,10 @@ interface Order {
   id: string;
   order_number: string;
   status: string;
+  /** Stage 6: canonical fulfillment state. */
+  fulfillmentStatus?: string | null;
+  /** Phase F1: fulfillment mode governing this order's states. */
+  fulfillmentMode?: string | null;
   items: any[];
   total_amount: number;
   created_at: string;
@@ -153,7 +158,7 @@ export default function CustomerPOSTemplate({ moduleId, moduleSlug, moduleName }
       const fetchOrders = async () => {
         try {
           const res = await api.get(`/modules/${moduleSlug}/orders/my`, {
-            params: { status: 'pending,confirmed,preparing,ready' }
+            params: { status: 'pending,confirmed,queued,in_progress,ready,handed_off,provisioning,provisioned,delivered,allocated,picking,packed,shipped,in_transit,received,working,collected' }
           });
           setActiveOrders(res.data.data || []);
         } catch (error) {
@@ -560,11 +565,18 @@ export default function CustomerPOSTemplate({ moduleId, moduleSlug, moduleName }
                   #{order.order_number}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                  order.status === 'ready' ? 'bg-green-100 text-green-800' :
-                  order.status === 'preparing' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-blue-100 text-blue-800'
+                  (() => {
+                    const cs = canonicalFulfillmentState(order, order.fulfillmentMode);
+                    // Terminal states: green. Active fulfillment: yellow. Transaction-layer: blue.
+                    if (cs === 'handed_off' || cs === 'delivered' || cs === 'collected' || cs === 'completed') return 'bg-green-100 text-green-800';
+                    if (cs === 'ready' || cs === 'provisioned' || cs === 'packed' || cs === 'shipped') return 'bg-yellow-100 text-yellow-800';
+                    return 'bg-blue-100 text-blue-800';
+                  })()
                 }`}>
-                  {order.status}
+                  {(() => {
+                    const cs = canonicalFulfillmentState(order, order.fulfillmentMode);
+                    return cs ?? order.status;
+                  })()}
                 </span>
               </div>
             ))}
