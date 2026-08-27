@@ -39,17 +39,17 @@ import {
 
 type LifecycleStatus = 'draft' | 'active' | 'temporarily_unavailable' | 'sold_out' | 'archived';
 
-const LIFECYCLE_TRANSITIONS: Record<LifecycleStatus, { action: string; label: string; color: string }[]> = {
-  draft: [{ action: 'activate', label: 'Publish', color: 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' }],
+const LIFECYCLE_TRANSITIONS: Record<LifecycleStatus, { targetState: LifecycleStatus; label: string; color: string }[]> = {
+  draft: [{ targetState: 'active', label: 'Publish', color: 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' }],
   active: [
-    { action: 'temporarily_unavailable', label: 'Pause', color: 'bg-amber-100 text-amber-600 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400' },
-    { action: 'sell_out', label: 'Sell Out', color: 'bg-orange-100 text-orange-600 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
-    { action: 'archive', label: 'Archive', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400' },
+    { targetState: 'temporarily_unavailable', label: 'Pause', color: 'bg-amber-100 text-amber-600 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400' },
+    { targetState: 'sold_out', label: 'Sell Out', color: 'bg-orange-100 text-orange-600 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
+    { targetState: 'archived', label: 'Archive', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400' },
   ],
   temporarily_unavailable: [
-    { action: 'restore', label: 'Restore', color: 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' },
-    { action: 'sell_out', label: 'Sell Out', color: 'bg-orange-100 text-orange-600 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
-    { action: 'archive', label: 'Archive', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400' },
+    { targetState: 'active', label: 'Restore', color: 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' },
+    { targetState: 'sold_out', label: 'Sell Out', color: 'bg-orange-100 text-orange-600 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
+    { targetState: 'archived', label: 'Archive', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400' },
   ],
   sold_out: [],
   archived: [],
@@ -387,13 +387,13 @@ export default function DynamicMenuPage() {
     }
   };
 
-  const transitionLifecycle = async (item: MenuItem, action: string) => {
+  const transitionLifecycle = async (item: MenuItem, targetState: LifecycleStatus) => {
     try {
       await api.put(`/${slug}/admin/items/${item.id}`, {
-        lifecycle_status: action,
+        lifecycle_status: targetState,
       });
       fetchData();
-      const label = LIFECYCLE_TRANSITIONS[item.lifecycle_status]?.find(t => t.action === action)?.label ?? action;
+      const label = LIFECYCLE_TRANSITIONS[item.lifecycle_status]?.find(t => t.targetState === targetState)?.label ?? targetState;
       toast.success(`${item.name}: ${label}`);
     } catch (error: any) {
       const msg = error?.response?.data?.error || 'Failed to update lifecycle';
@@ -660,8 +660,8 @@ export default function DynamicMenuPage() {
                         <div className="flex gap-1.5 mt-2">
                           {LIFECYCLE_TRANSITIONS[item.lifecycle_status].map((t) => (
                             <button
-                              key={t.action}
-                              onClick={() => transitionLifecycle(item, t.action)}
+                              key={t.targetState}
+                              onClick={() => transitionLifecycle(item, t.targetState)}
                               className={`flex-1 py-1.5 rounded text-xs font-medium transition-colors ${t.color}`}
                             >
                               {t.label}
@@ -878,7 +878,7 @@ export default function DynamicMenuPage() {
                       >
                         {(['draft', 'active', 'temporarily_unavailable', 'sold_out', 'archived'] as const).map((s) => {
                           const current = editingItem?.lifecycle_status ?? 'active';
-                          const legal = LIFECYCLE_TRANSITIONS[current]?.some(t => t.action === s);
+                          const legal = LIFECYCLE_TRANSITIONS[current]?.some(t => t.targetState === s);
                           const isCurrent = s === current;
                           return (
                             <option key={s} value={s} disabled={!isCurrent && !legal}>
