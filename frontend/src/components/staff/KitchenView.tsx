@@ -135,6 +135,11 @@ const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
 // ============================================
 // Board columns — canonical fulfillment states (Stage 6)
 // ============================================
+// ⚠  F1 OPEN BLOCKER: These columns are hardcoded to hospitality states.
+// The board MUST derive its columns from the order's fulfillmentMode using
+// statesForMode(mode). Until then, digital/shipment/service orders will
+// not render correctly on this board.
+//
 // The board keys off the CANONICAL fulfillment state (order.fulfillmentStatus),
 // never the transaction-layer status (order.status stays pending/confirmed/
 // completed/cancelled). A confirmed order with no fulfillment row yet is

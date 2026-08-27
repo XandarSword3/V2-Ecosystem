@@ -3,6 +3,21 @@ import { test, expect } from '@playwright/test';
 /**
  * Engine A (instant_transaction) Catalog Lifecycle Spec (Phase 8)
  *
+ * ┌─────────────────────────────────────────────────────────────────────┐
+ * │ ⚠  THIS IS AN API-LEVEL TEST, NOT A BROWSER/UI E2E TEST.          │
+ * │                                                                    │
+ * │ It uses Playwright request-context API calls (request.post/put)     │
+ * │ and therefore does NOT test the actual mounted frontend controls.   │
+ * │ It does NOT log in via a browser, click UI buttons, or assert      │
+ * │ rendered DOM elements.                                              │
+ * │                                                                    │
+ * │ For real browser E2E that clicks actual Publish/Pause/Restore/      │
+ * │ Sell Out/Archive buttons and asserts visible lifecycle badges, see: │
+ * │   engine-a-catalog-lifecycle-browser.spec.ts                        │
+ * │                                                                    │
+ * │ Phase 8 frontend is NOT complete from API-level tests alone.       │
+ * └─────────────────────────────────────────────────────────────────────┘
+ *
  * Proves the frontend → backend lifecycle data flow:
  * 1. Create a catalog item (starts as 'active')
  * 2. Transition through every legal lifecycle state

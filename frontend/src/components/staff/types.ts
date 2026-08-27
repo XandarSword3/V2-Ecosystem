@@ -1,8 +1,10 @@
 import type { FulfillmentStatus } from '@/types';
+import type { FulfillmentMode } from '@/lib/engine-a/types';
 // Canonical helpers live in the domain layer (plan F1) — re-exported here
 // so existing staff components keep their import surface.
-export { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from '@/types';
+export { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, statesForMode } from '@/types';
 export type { FulfillmentState } from '@/types';
+export type { FulfillmentMode };
 
 export type ItemStatus = 'pending' | 'preparing' | 'ready' | 'served';
 
@@ -33,8 +35,10 @@ export interface Order {
   staffName?: string;
   orderType: 'dine_in' | 'takeaway' | 'delivery';
   status: string;
-  /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
+  /** Stage 6 canonical fulfillment state (mode-specific). */
   fulfillmentStatus?: FulfillmentStatus | null;
+  /** Phase F1: which fulfillment mode governs this order's states. */
+  fulfillmentMode?: FulfillmentMode | null;
   items: OrderItem[];
   totalAmount: number;
   createdAt: string;
@@ -49,6 +53,30 @@ export interface Order {
   serviceLocationId?: string | null;
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// ⚠  F1 OPEN BLOCKER: Hospitality-only status flow
+// ──────────────────────────────────────────────────────────────────────────
+// This statusFlow is hardcoded to the HOSPITALITY fulfillment subset:
+//   queued → in_progress → ready → handed_off
+//
+// It does NOT represent Engine A's full FulfillmentState union:
+//   Hospitality:  queued → in_progress → ready → handed_off
+//   Digital:      provisioning → provisioned → delivered
+//   Shipment:     allocated → picking → packed → shipped → in_transit → delivered
+//   Service:      received → working → ready → collected
+//
+// The frontend MUST select the correct flow based on the order's
+// fulfillmentMode, using statesForMode(mode) from @/lib/engine-a/types.
+//
+// Until this is resolved:
+//   - KitchenView.BOARD_COLUMNS is hospitality-only
+//   - StaffPOSTemplate renders hospitality-only column layout
+//   - No component derives columns/actions from fulfillmentMode
+//
+// This is a Phase F1 blocker. Phase 8 frontend is NOT complete until
+// the staff operating surface renders mode-specific states/actions.
+// ──────────────────────────────────────────────────────────────────────────
+//
 // Order-level flow — canonical fulfillment states (Stage 6). The engine's
 // fulfillment machine owns queued → in_progress → ready → handed_off; the
 // transaction layer owns pending/confirmed/completed/cancelled. The KDS
