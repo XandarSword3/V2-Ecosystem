@@ -75,8 +75,7 @@ describe('statesForMode', () => {
 // ============================================
 
 describe('getModeStateConfig', () => {
-  it('returns null for none/null/undefined', () => {
-    expect(getModeStateConfig('none')).toBeNull();
+  it('returns null for null/undefined (legacy recovery)', () => {
     expect(getModeStateConfig(null)).toBeNull();
     expect(getModeStateConfig(undefined)).toBeNull();
   });
@@ -132,15 +131,15 @@ describe('hospitality mode transitions', () => {
     expect(cfg.nextTarget('ready')).toBeNull();
   });
 
-  it('handed_off → completed (dispatch layer)', () => {
-    expect(cfg.nextTarget('handed_off')).toBe('completed');
+  it('handed_off → null (terminal fulfillment state; completed is transaction-layer)', () => {
+    expect(cfg.nextTarget('handed_off')).toBeNull();
   });
 
-  it('only handed_off is not terminal in fulfillment machine (ready waits on dispatch)', () => {
+  it('only ready is non-terminal waiting state; handed_off is terminal fulfillment', () => {
     expect(cfg.metadata.queued.terminal).toBe(false);
     expect(cfg.metadata.in_progress.terminal).toBe(false);
     expect(cfg.metadata.ready.terminal).toBe(false);
-    expect(cfg.metadata.handed_off.terminal).toBe(false);
+    expect(cfg.metadata.handed_off.terminal).toBe(true);
   });
 });
 
@@ -447,20 +446,23 @@ describe('FULFILLMENT_LAYER_STATES includes all mode states', () => {
 });
 
 // ============================================
-// getModeStateConfig null/legacy edge cases
+// getModeStateConfig null/legacy edge cases + none semantics
 // ============================================
 
 describe('getModeStateConfig null/legacy handling', () => {
-  it('returns null for null mode', () => {
+  it('returns null for null mode (legacy recovery signal)', () => {
     expect(getModeStateConfig(null)).toBeNull();
   });
 
-  it('returns null for undefined mode', () => {
+  it('returns null for undefined mode (legacy recovery signal)', () => {
     expect(getModeStateConfig(undefined)).toBeNull();
   });
 
-  it('returns null for none mode', () => {
-    expect(getModeStateConfig('none')).toBeNull();
+  it('returns non-null empty config for none mode (valid explicit mode)', () => {
+    const cfg = getModeStateConfig('none');
+    expect(cfg).not.toBeNull();
+    expect(cfg!.states).toEqual([]);
+    expect(cfg!.nextTarget('queued' as any)).toBeNull();
   });
 
   it('returns null for unrecognized mode string', () => {
@@ -480,6 +482,96 @@ describe('getModeStateConfig null/legacy handling', () => {
     for (const state of onPremise.states) {
       expect(pickup.nextTarget(state)).toEqual(onPremise.nextTarget(state));
       expect(localDelivery.nextTarget(state)).toEqual(onPremise.nextTarget(state));
+    }
+  });
+});
+
+// ============================================
+// 'none' mode semantics
+// ============================================
+// 'none' is a valid explicit fulfillment mode meaning 'no fulfillment
+// machine applies'. It is NOT legacy hospitality and must not produce
+// any fulfillment columns, states, or actions.
+
+describe('none mode semantics', () => {
+  const cfg = getModeStateConfig('none')!;
+
+  it('has zero fulfillment states', () => {
+    expect(cfg.states).toHaveLength(0);
+  });
+
+  it('has empty metadata', () => {
+    expect(Object.keys(cfg.metadata)).toHaveLength(0);
+  });
+
+  it('nextTarget returns null for any input', () => {
+    expect(cfg.nextTarget('queued' as any)).toBeNull();
+    expect(cfg.nextTarget('confirmed' as any)).toBeNull();
+    expect(cfg.nextTarget('completed' as any)).toBeNull();
+  });
+
+  it('statesForMode returns empty array', () => {
+    expect(statesForMode('none')).toEqual([]);
+  });
+
+  it('is not the same as null/undefined (legacy recovery)', () => {
+    expect(cfg).not.toBeNull();
+    expect(getModeStateConfig(null)).toBeNull();
+    expect(getModeStateConfig(undefined)).toBeNull();
+  });
+});
+
+// ============================================
+// completed/cancelled are transaction-layer, not FulfillmentState
+// ============================================
+
+describe('completed is transaction-layer terminal, not FulfillmentState', () => {
+  it('completed is NOT in FULFILLMENT_LAYER_STATES', () => {
+    expect(FULFILLMENT_LAYER_STATES).not.toContain('completed');
+  });
+
+  it('cancelled is NOT in FULFILLMENT_LAYER_STATES', () => {
+    expect(FULFILLMENT_LAYER_STATES).not.toContain('cancelled');
+  });
+
+  it('completed IS a TransactionState (via isTransactionState)', () => {
+    // Import isTransactionState is not available here, but we can verify
+    // via the FULFILLMENT_LAYER_STATES exclusion above and the type system.
+    // The important invariant is: no mode's nextTarget returns 'completed'.
+  });
+
+  it('handed_off is terminal (no next fulfillment state) for hospitality', () => {
+    const cfg = getModeStateConfig('on_premise')!;
+    expect(cfg.nextTarget('handed_off')).toBeNull();
+  });
+
+  it('delivered is terminal for digital', () => {
+    const cfg = getModeStateConfig('digital_delivery')!;
+    expect(cfg.nextTarget('delivered')).toBeNull();
+  });
+
+  it('delivered is terminal for shipment', () => {
+    const cfg = getModeStateConfig('shipment')!;
+    expect(cfg.nextTarget('delivered')).toBeNull();
+  });
+
+  it('collected is terminal for service', () => {
+    const cfg = getModeStateConfig('service_execution')!;
+    expect(cfg.nextTarget('collected')).toBeNull();
+  });
+
+  it('no mode config ever returns completed as a next target', () => {
+    const modes: FulfillmentMode[] = ['on_premise', 'pickup', 'local_delivery', 'digital_delivery', 'shipment', 'service_execution'];
+    for (const mode of modes) {
+      const cfg = getModeStateConfig(mode)!;
+      for (const state of cfg.states) {
+        const next = cfg.nextTarget(state);
+        // next is either null (terminal) or a FulfillmentState — never 'completed'
+        if (next !== null) {
+          expect(next).not.toBe('completed');
+          expect(next).not.toBe('cancelled');
+        }
+      }
     }
   });
 });

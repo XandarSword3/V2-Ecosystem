@@ -200,9 +200,9 @@ function hospitalityMeta(state: FulfillmentState): ModeStateMetadata {
       bg: 'bg-purple-50 dark:bg-purple-900/10',
       border: 'border-purple-300 dark:border-purple-700',
       text: 'text-purple-700 dark:text-purple-300',
-      actionLabel: 'Complete',
-      actionBg: 'bg-gray-600 hover:bg-gray-700',
-      terminal: false,
+      actionLabel: null,         // terminal fulfillment state; 'complete' is a transaction-layer move
+      actionBg: '',
+      terminal: true,
     },
   };
   return map[state];
@@ -346,8 +346,8 @@ function serviceMeta(state: FulfillmentState): ModeStateMetadata {
 const HOSPITALITY_NEXT: Record<string, FulfillmentState | null> = {
   queued: 'in_progress',
   in_progress: 'ready',
-  ready: null,
-  handed_off: 'completed' as FulfillmentState,
+  ready: null,            // waiting on dispatch — not terminal in the fulfillment machine
+  handed_off: null,       // terminal fulfillment state; 'completed' is transaction-layer
 };
 const DIGITAL_NEXT: Record<string, FulfillmentState | null> = {
   provisioning: 'provisioned',
@@ -401,10 +401,19 @@ const MODE_CONFIGS: Record<
  * transitions from this — never from hardcoded hospitality arrays.
  *
  * Modes on_premise/pickup/local_delivery share the same hospitality
- * state machine. 'none' returns an empty config (no fulfillment states).
+ * state machine. 'none' returns an empty config (no fulfillment states,
+ * no fulfillment actions — the transaction layer handles completion).
+ * null/undefined returns null (legacy recovery).
  */
+const NONE_CONFIG: ModeStateConfig = {
+  states: [],
+  metadata: {} as Record<FulfillmentState, ModeStateMetadata>,
+  nextTarget: () => null,
+};
+
 export function getModeStateConfig(mode: FulfillmentMode | null | undefined): ModeStateConfig | null {
-  if (!mode || mode === 'none') return null;
+  if (mode === 'none') return NONE_CONFIG;
+  if (!mode) return null;  // null/undefined → legacy recovery (null signals fallback)
   return MODE_CONFIGS[mode] ?? null;
 }
 
@@ -419,6 +428,8 @@ export function resolveColumnKey(
   modeConfig: ModeStateConfig | null,
 ): string {
   if (!modeConfig) return 'pending';
+  // none mode has empty states — transaction-only, no fulfillment columns
+  if (modeConfig.states.length === 0) return 'pending';
   if (state === 'confirmed' || state === 'pending') return modeConfig.states[0];
   if (state && state in modeConfig.metadata) return state;
   return modeConfig.states[0];

@@ -179,13 +179,14 @@ const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
 // active (non-terminal) portion of its mode's state machine.
 function isKitchenActive(order: Order): boolean {
   const cs = canonicalFulfillmentState(order);
-  const mode = (order.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
+  const mode = (order.fulfillmentMode as FulfillmentMode | null | undefined) ?? null;
   const cfg = getModeStateConfig(mode);
   if (cfg) {
+    // Valid mode (including 'none' — which has empty metadata, so returns false)
     const meta = cfg.metadata[cs as FulfillmentState];
     return !!meta && !meta.terminal;
   }
-  // Legacy fallback for null/unknown modes
+  // Legacy recovery: null/unknown mode falls back to hospitality states
   return ['confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? order.status);
 }
 

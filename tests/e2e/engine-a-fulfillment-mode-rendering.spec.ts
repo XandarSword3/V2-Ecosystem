@@ -13,7 +13,7 @@
  *
  * Test plan:
  *   1. Hospitality (on_premise): board shows Queued/In Progress/Ready/Served columns
- *   2. Hospitality: actions are Start Prep / Mark Ready / Complete
+ *   2. Hospitality: actions are Start Prep / Mark Ready (handed_off is terminal — no action)
  *   3. Digital mode: board would show Provisioning/Provisioned/Delivered
  *   4. Shipment mode: board would show Allocated/Picking/Packed/Shipped/In Transit/Delivered
  *   5. Service mode: board would show Received/Working/Ready for Collection/Collected
@@ -78,7 +78,7 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
   // -----------------------------------------------------------------------
   // 2. Hospitality mode: action labels are mode-specific
   // -----------------------------------------------------------------------
-  test('hospitality mode shows Start Prep / Mark Ready / Complete actions', async ({
+  test('hospitality mode shows Start Prep / Mark Ready actions (handed_off is terminal)', async ({
     page,
   }) => {
     await loginAsAdmin(page);
@@ -369,6 +369,193 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
         const card = visibleCards.nth(i);
         const cardMode = await card.getAttribute('data-fulfillment-mode');
         expect(cardMode).toBe(modeName);
+      }
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // 11. none mode: transaction-only, no fulfillment columns
+  // -----------------------------------------------------------------------
+  test('none mode orders show only New column (no fulfillment states)', async ({
+    page,
+  }) => {
+    // 'none' is a valid explicit mode meaning 'no fulfillment machine'.
+    // Orders with fulfillmentMode=none should appear in the 'New' (pending)
+    // column only — no Queued/In Progress/Ready/Served etc.
+    await loginAsAdmin(page);
+
+    await page.goto(`${FRONTEND_URL}/staff/${TEST_MODULE_SLUG}`, {
+      waitUntil: 'networkidle',
+      timeout: 30_000,
+    });
+
+    await page.waitForTimeout(3_000);
+
+    // Check for none-mode order cards
+    const noneCards = page.locator('[data-fulfillment-mode="none"]');
+    const noneCount = await noneCards.count().catch(() => 0);
+
+    if (noneCount > 0) {
+      // Each none-mode card should have data-fulfillment-column="pending"
+      for (let i = 0; i < noneCount; i++) {
+        const card = noneCards.nth(i);
+        const column = await card.getAttribute('data-fulfillment-column');
+        expect(column).toBe('pending');
+      }
+
+      // The none-mode tab should exist
+      const noneTab = page.locator('[data-testid="mode-tab-none"]');
+      await expect(noneTab).toBeVisible({ timeout: 5_000 });
+
+      // Click the none tab
+      await noneTab.click();
+      await page.waitForTimeout(1_000);
+
+      // The board should show only the 'New' column (pending), no fulfillment columns
+      const columnHeaders = page.locator('h3.uppercase');
+      const headerCount = await columnHeaders.count().catch(() => 0);
+
+      // With none mode, there should be only 1 column: 'New'
+      // (the pending/transaction-layer entry point)
+      const headerTexts = [];
+      for (let i = 0; i < headerCount; i++) {
+        headerTexts.push(await columnHeaders.nth(i).textContent() ?? '');
+      }
+
+      // Should contain 'New' (the pending column)
+      expect(headerTexts.some(t => t.trim() === 'New')).toBe(true);
+
+      // Should NOT contain any fulfillment-specific column headers
+      const fulfillmentHeaders = ['Queued', 'In Progress', 'Ready', 'Served',
+        'Provisioning', 'Provisioned', 'Delivered',
+        'Allocated', 'Picking', 'Packed', 'Shipped', 'In Transit',
+        'Received', 'Working', 'Collected'];
+      for (const fh of fulfillmentHeaders) {
+        expect(headerTexts.some(t => t.trim() === fh)).toBe(false);
+      }
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // 12. Comprehensive 5-mode mixed board: all modes render correctly
+  // -----------------------------------------------------------------------
+  test('5-mode mixed board: on_premise + digital + shipment + service + none orders render against各自的 mode config', async ({
+    page,
+  }) => {
+    // This is the definitive F1 mixed-mode test. When orders from all 5
+    // fulfillment modes exist simultaneously, each must render against
+    // its own mode config. A hospitality order must never appear in a
+    // digital column, a none order must never appear in a fulfillment
+    // column, etc.
+    await loginAsAdmin(page);
+
+    await page.goto(`${FRONTEND_URL}/staff/${TEST_MODULE_SLUG}`, {
+      waitUntil: 'networkidle',
+      timeout: 30_000,
+    });
+
+    await page.waitForTimeout(3_000);
+
+    // Collect all order cards and their modes
+    const orderCards = page.locator('[data-testid^="order-card-"]');
+    const cardCount = await orderCards.count().catch(() => 0);
+
+    const modeCounts: Record<string, number> = {};
+    const modeColumns: Record<string, Set<string>> = {};
+
+    for (let i = 0; i < cardCount; i++) {
+      const card = orderCards.nth(i);
+      const mode = await card.getAttribute('data-fulfillment-mode') ?? 'unknown';
+      const column = await card.getAttribute('data-fulfillment-column') ?? 'unknown';
+
+      modeCounts[mode] = (modeCounts[mode] ?? 0) + 1;
+      if (!modeColumns[mode]) modeColumns[mode] = new Set();
+      modeColumns[mode].add(column);
+    }
+
+    // Log what we found for debugging
+    console.log('Mixed-mode board state:', JSON.stringify(modeCounts));
+    console.log('Mode → columns:', JSON.stringify(
+      Object.fromEntries(Object.entries(modeColumns).map(([k, v]) => [k, [...v]]))
+    ));
+
+    // ---- Validate per-mode column membership ----
+
+    // on_premise orders: columns must be from {queued, in_progress, ready, handed_off}
+    if (modeCounts['on_premise']) {
+      const hospCols = modeColumns['on_premise'] ?? new Set();
+      for (const col of hospCols) {
+        expect(['pending', 'queued', 'in_progress', 'ready', 'handed_off']).toContain(col);
+      }
+    }
+
+    // digital_delivery orders: columns must be from {provisioning, provisioned, delivered}
+    if (modeCounts['digital_delivery']) {
+      const digCols = modeColumns['digital_delivery'] ?? new Set();
+      for (const col of digCols) {
+        expect(['pending', 'provisioning', 'provisioned', 'delivered']).toContain(col);
+      }
+    }
+
+    // shipment orders: columns must be from {allocated, picking, packed, shipped, in_transit, delivered}
+    if (modeCounts['shipment']) {
+      const shipCols = modeColumns['shipment'] ?? new Set();
+      for (const col of shipCols) {
+        expect(['pending', 'allocated', 'picking', 'packed', 'shipped', 'in_transit', 'delivered']).toContain(col);
+      }
+    }
+
+    // service_execution orders: columns must be from {received, working, ready, collected}
+    if (modeCounts['service_execution']) {
+      const svcCols = modeColumns['service_execution'] ?? new Set();
+      for (const col of svcCols) {
+        expect(['pending', 'received', 'working', 'ready', 'collected']).toContain(col);
+      }
+    }
+
+    // none orders: column must be 'pending' only (no fulfillment states)
+    if (modeCounts['none']) {
+      const noneCols = modeColumns['none'] ?? new Set();
+      for (const col of noneCols) {
+        expect(col).toBe('pending');
+      }
+    }
+
+    // ---- Cross-mode isolation: no mode leaks into another's columns ----
+    // A digital order must NEVER be in a hospitality column
+    if (modeCounts['digital_delivery']) {
+      const digCols = modeColumns['digital_delivery'] ?? new Set();
+      expect(digCols.has('queued')).toBe(false);
+      expect(digCols.has('in_progress')).toBe(false);
+      expect(digCols.has('handed_off')).toBe(false);
+    }
+
+    // A hospitality order must NEVER be in a digital column
+    if (modeCounts['on_premise']) {
+      const hospCols = modeColumns['on_premise'] ?? new Set();
+      expect(hospCols.has('provisioning')).toBe(false);
+      expect(hospCols.has('provisioned')).toBe(false);
+    }
+
+    // A none order must NEVER be in any fulfillment column
+    if (modeCounts['none']) {
+      const noneCols = modeColumns['none'] ?? new Set();
+      for (const col of noneCols) {
+        expect(col).not.toBe('queued');
+        expect(col).not.toBe('in_progress');
+        expect(col).not.toBe('ready');
+        expect(col).not.toBe('handed_off');
+        expect(col).not.toBe('provisioning');
+        expect(col).not.toBe('provisioned');
+        expect(col).not.toBe('delivered');
+        expect(col).not.toBe('allocated');
+        expect(col).not.toBe('picking');
+        expect(col).not.toBe('packed');
+        expect(col).not.toBe('shipped');
+        expect(col).not.toBe('in_transit');
+        expect(col).not.toBe('received');
+        expect(col).not.toBe('working');
+        expect(col).not.toBe('collected');
       }
     }
   });

@@ -195,16 +195,19 @@ function deriveBoardColumns(
 
 const LEGACY_MODE: FulfillmentMode = 'on_premise';
 
-/** Resolve the fulfillment mode for a single order. Null/unknown modes
- *  use the legacy recovery path (hospitality config) with an explicit
- *  marker — NOT silent coercion. */
+/** Resolve the fulfillment mode for a single order.
+ *  - Valid known mode (on_premise, pickup, ..., none) → resolved directly.
+ *  - null / undefined / unknown → legacy recovery (hospitality config,
+ *    flagged for migration). 'none' is NOT legacy: it means no fulfillment
+ *    machine applies (transaction-layer only).
+ */
 function resolvedOrderMode(order: Order): { mode: FulfillmentMode; legacy: boolean } {
   const raw = order.fulfillmentMode;
-  if (raw && isFulfillmentMode(raw) && raw !== 'none') {
+  if (raw && isFulfillmentMode(raw)) {
     return { mode: raw, legacy: false };
   }
-  // Null / unknown / 'none' → legacy recovery: apply hospitality config
-  // so the order still renders, but it's flagged for migration.
+  // Null / undefined / unrecognized → legacy recovery: apply hospitality
+  // config so the order still renders, but it's flagged for migration.
   return { mode: LEGACY_MODE, legacy: true };
 }
 
