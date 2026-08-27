@@ -456,7 +456,7 @@ export default function AdminOrdersPage() {
                           fulfillmentMode via getModeStateConfig. */}
                       <div className="flex gap-2 pt-2">
                         {(() => {
-                          const mode = (order.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
+                          const mode = (order.fulfillmentMode as FulfillmentMode | null) ?? null;
                           const cfg = getModeStateConfig(mode);
                           const cs = canonicalFulfillmentState(order, order.fulfillmentMode);
                           // Transaction-layer: pending → confirmed
@@ -489,35 +489,7 @@ export default function AdminOrdersPage() {
                               );
                             }
                           }
-                          // Legacy fallback for hospitality
-                          if (st === 'queued') {
-                            return (
-                              <Button size="sm" className="flex-1" onClick={() => updateOrderStatus(order.id, order.module_slug, 'in_progress')}>
-                                <ChefHat className="w-4 h-4 mr-1" /> Start
-                              </Button>
-                            );
-                          }
-                          if (st === 'in_progress') {
-                            return (
-                              <Button size="sm" className="flex-1" onClick={() => updateOrderStatus(order.id, order.module_slug, 'ready')}>
-                                <Package className="w-4 h-4 mr-1" /> Ready
-                              </Button>
-                            );
-                          }
-                          if (st === 'ready') {
-                            return (
-                              <Button size="sm" className="flex-1" onClick={() => updateOrderStatus(order.id, order.module_slug, 'handed_off')}>
-                                <Truck className="w-4 h-4 mr-1" /> Hand Off
-                              </Button>
-                            );
-                          }
-                          if (st === 'handed_off') {
-                            return (
-                              <Button size="sm" className="flex-1" onClick={() => updateOrderStatus(order.id, order.module_slug, 'completed')}>
-                                <CheckCircle2 className="w-4 h-4 mr-1" /> Complete
-                              </Button>
-                            );
-                          }
+                          // No legacy fallback — mode config above drives all actions.
                           return null;
                         })()}
                         <Button

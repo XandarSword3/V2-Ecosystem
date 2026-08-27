@@ -15,7 +15,7 @@ import { useSocket } from '@/lib/socket';
 // Canonical Engine A domain helpers (plan F1): the page keys off the
 // canonical fulfillment state — never legacy composites (preparing /
 // delivered) and never fulfillment inferred from transactions.status.
-import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState, type FulfillmentMode } from '@/types';
+import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState, type FulfillmentMode, type FulfillmentState } from '@/types';
 import { getModeStateConfig, resolveColumnKey } from '@/lib/engine-a/types';
 import {
   Clock,
@@ -350,56 +350,52 @@ export default function DynamicOrdersPage() {
                           pending→confirmed is a transaction-layer move;
                           queued→in_progress→ready→handed_off→completed are
                           fulfillment-layer moves. */}
+                      {/* Actions — mode-derived transitions from getModeStateConfig.
+                          pending/confirmed → transaction-layer confirm.
+                          fulfillment states → derive next target from mode config.
+                          No hardcoded hospitality action arrays. */}
                       <div className="grid grid-cols-2 gap-2 pt-2">
-                        {st === 'pending' && (
-                          <>
-                            <Button
-                              variant="outline"
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => updateStatus(order.id, 'cancelled')}
-                            >
-                              Reject
-                            </Button>
-                            <Button
-                              className="bg-blue-600 hover:bg-blue-700 text-white"
-                              onClick={() => updateStatus(order.id, 'confirmed')}
-                            >
-                              Accept
-                            </Button>
-                          </>
-                        )}
-                        {st === 'queued' && (
-                          <Button
-                            className="col-span-2 bg-orange-500 hover:bg-orange-600 text-white"
-                            onClick={() => updateStatus(order.id, 'in_progress')}
-                          >
-                            Start Preparation
-                          </Button>
-                        )}
-                        {st === 'in_progress' && (
-                          <Button
-                            className="col-span-2 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => updateStatus(order.id, 'ready')}
-                          >
-                            Mark Ready
-                          </Button>
-                        )}
-                        {st === 'ready' && (
-                          <Button
-                            className="col-span-2 bg-slate-800 hover:bg-slate-900 text-white"
-                            onClick={() => updateStatus(order.id, 'handed_off')}
-                          >
-                            Mark Handed Off
-                          </Button>
-                        )}
-                        {st === 'handed_off' && (
-                          <Button
-                            className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => updateStatus(order.id, 'completed')}
-                          >
-                            Mark Completed
-                          </Button>
-                        )}
+                        {(() => {
+                          const mode = (order.fulfillmentMode as FulfillmentMode | null) ?? null;
+                          const cs = canonicalFulfillmentState(order, mode);
+                          // Transaction-layer: pending → confirmed
+                          if (cs === 'pending') {
+                            return (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => updateStatus(order.id, 'cancelled')}
+                                >
+                                  Reject
+                                </Button>
+                                <Button
+                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  onClick={() => updateStatus(order.id, 'confirmed')}
+                                >
+                                  Accept
+                                </Button>
+                              </>
+                            );
+                          }
+                          // Fulfillment-layer: derive next target from mode config
+                          const cfg = getModeStateConfig(mode);
+                          if (cfg && cs) {
+                            const nextState = cfg.nextTarget(cs as FulfillmentState);
+                            if (nextState) {
+                              const meta = cfg.metadata[cs as FulfillmentState];
+                              return (
+                                <Button
+                                  className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white"
+                                  onClick={() => updateStatus(order.id, nextState)}
+                                >
+                                  {meta?.actionLabel ?? nextState}
+                                </Button>
+                              );
+                            }
+                          }
+                          return null;
+                        })()}
                       </div>
                     </CardContent>
                   </Card>

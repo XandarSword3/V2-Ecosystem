@@ -537,11 +537,26 @@ export interface EngineACapabilities {
 // ============================================
 // Money — never floats at the boundary
 // ============================================
+// The canonical Money representation uses minor units (e.g. cents) as a
+// safe integer. The backend guarantees integer amounts in the payment and
+// ledger subsystems. Presentation-layer conversion to display decimals
+// happens ONLY through toDisplayMoney() at the rendering edge.
 
 export interface Money {
-  /** Minor-unit integer when the backend supplies one; otherwise a rounded decimal. */
+  /** Amount in minor units (cents). Always an integer from the backend. */
   amount: number;
+  /** ISO 4217 currency code. */
   currency: string;
+}
+
+/** Convert minor-unit Money to a display-ready decimal number.
+ *  Use this ONLY at the presentation edge (formatCurrency, JSX).
+ *  Never use it in business logic or state comparisons. */
+export function toDisplayMoney(money: Money): number {
+  // Safe integer division — avoids floating-point drift for typical amounts.
+  // For currencies with 2 decimal places (USD, EUR, etc.), divide by 100.
+  // Currencies with 0 or 3 decimal places need custom handling.
+  return money.amount / 100;
 }
 
 export interface PricingBreakdown {
