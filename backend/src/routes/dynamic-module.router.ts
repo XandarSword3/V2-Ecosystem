@@ -548,6 +548,7 @@ function buildInstantTransactionRouter(router: Router): void {
         .from('catalog_items')
         .select('*')
         .eq('module_id', mounted.id)
+        .order('lifecycle_status', { ascending: true })
         .order('name', { ascending: true });
       if (error) throw error;
       res.json({ success: true, data: data ?? [] });
@@ -579,11 +580,14 @@ function buildInstantTransactionRouter(router: Router): void {
         preparation_time,
         recipe,
         customization_group_ids,
+        lifecycle_status,
         ...otherFields
       } = req.body ?? {};
       if (!name || price == null) {
         return res.status(400).json({ success: false, error: 'Name and price are required' });
       }
+      const validLifecycle = ['draft', 'active', 'temporarily_unavailable', 'sold_out', 'archived'];
+      const lifecycle = validLifecycle.includes(lifecycle_status) ? lifecycle_status : 'active';
       const { data, error } = await supabase
         .from('catalog_items')
         .insert({
@@ -592,6 +596,7 @@ function buildInstantTransactionRouter(router: Router): void {
           description,
           category: category_id,
           is_available: is_available ?? true,
+          lifecycle_status: lifecycle,
           module_id: mounted.id,
           tenant_id,
           property_id: mounted.property_id,
@@ -639,6 +644,7 @@ function buildInstantTransactionRouter(router: Router): void {
         preparation_time,
         recipe,
         customization_group_ids,
+        lifecycle_status,
         ...otherFields
       } = req.body ?? {};
       // First, get the existing item to preserve metadata
@@ -648,6 +654,7 @@ function buildInstantTransactionRouter(router: Router): void {
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
+      const validLifecycle = ['draft', 'active', 'temporarily_unavailable', 'sold_out', 'archived'];
       const { data, error } = await supabase
         .from('catalog_items')
         .update({
@@ -656,6 +663,7 @@ function buildInstantTransactionRouter(router: Router): void {
           ...(description !== undefined && { description }),
           ...(category_id !== undefined && { category: category_id }),
           ...(is_available !== undefined && { is_available }),
+          ...(lifecycle_status !== undefined && validLifecycle.includes(lifecycle_status) && { lifecycle_status }),
           metadata: {
             ...(existingItem?.metadata || {}),
             ...(name_ar !== undefined && { name_ar }),
@@ -828,9 +836,10 @@ function buildInstantTransactionRouter(router: Router): void {
       const supabase = getSupabase();
       const { data, error } = await supabase
         .from('catalog_items')
-        .select('id, name, description, price, category, is_available')
+        .select('id, name, description, price, category, is_available, lifecycle_status')
         .eq('module_id', mounted.id)
         .eq('is_available', true)
+        .eq('lifecycle_status', 'active')
         .order('name', { ascending: true });
       if (error) {
         logger.error('[Dynamic Router] GET /items database error', { error: error.message, moduleId: mounted.id });

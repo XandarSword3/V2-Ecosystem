@@ -3122,9 +3122,10 @@ export async function getModuleMenu(req: Request, res: Response) {
         .order('sort_order', { ascending: true }),
       supabase
         .from('catalog_items')
-        .select('id, category_id, name, description, price, image_url, is_available')
+        .select('id, category_id, name, description, price, image_url, is_available, lifecycle_status')
         .eq('module_id', module.id)
         .eq('is_available', true)
+        .in('lifecycle_status', ['active', 'temporarily_unavailable'])
         .order('name', { ascending: true }),
     ]);
 
