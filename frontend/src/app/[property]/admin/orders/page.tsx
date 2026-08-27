@@ -14,7 +14,8 @@ import { useSocket } from '@/lib/socket';
 // Canonical Engine A domain helpers (plan F1): the page keys off the
 // canonical fulfillment state — never legacy composites and never
 // fulfillment inferred from transactions.status.
-import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState } from '@/types';
+import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState, type FulfillmentMode, type FulfillmentState } from '@/types';
+import { getModeStateConfig, resolveColumnKey } from '@/lib/engine-a/types';
 import {
   UtensilsCrossed,
   Search,
@@ -45,8 +46,10 @@ interface Order {
   module_name: string;
   // Transaction layer only — fulfillment is NEVER inferred from status.
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-  /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
+  /** Stage 6 canonical fulfillment state (mode-specific). */
   fulfillmentStatus?: string | null;
+  /** Which fulfillment mode governs this order's states. */
+  fulfillmentMode?: string | null;
   total_amount: number;
   items: OrderItem[];
   table_number?: string;
@@ -69,10 +72,13 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
 };
 
 /** Canonical state for display/action purposes — a confirmed transaction
- * whose fulfillment is queued (or not yet created) displays as 'queued'. */
+ * whose fulfillment is queued (or not yet created) displays as the mode's
+ * first column state. */
 function effectiveState(order: Order): string {
   const c = canonicalFulfillmentState(order);
-  return c === 'confirmed' ? 'queued' : (c ?? order.status);
+  const mode = (order.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
+  const cfg = getModeStateConfig(mode);
+  return resolveColumnKey(c, cfg);
 }
 
 const FILTER_STATES = ['all', 'pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'];
@@ -431,61 +437,76 @@ export default function AdminOrdersPage() {
                         </span>
                       </div>
 
-                      {/* Actions — canonical transitions, one step at a time.
+                      {/* Actions — mode-derived transitions, one step at a time.
                           pending→confirmed is a transaction-layer move;
-                          queued→in_progress→ready→handed_off→completed are
-                          fulfillment-layer moves. */}
+                          fulfillment-layer moves are derived from the order's
+                          fulfillmentMode via getModeStateConfig. */}
                       <div className="flex gap-2 pt-2">
-                        {st === 'pending' && (
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'confirmed')}
-                          >
-                            <CheckCircle2 className="w-4 h-4 mr-1" />
-                            Confirm
-                          </Button>
-                        )}
-                        {st === 'queued' && (
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'in_progress')}
-                          >
-                            <ChefHat className="w-4 h-4 mr-1" />
-                            Start
-                          </Button>
-                        )}
-                        {st === 'in_progress' && (
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'ready')}
-                          >
-                            <Package className="w-4 h-4 mr-1" />
-                            Ready
-                          </Button>
-                        )}
-                        {st === 'ready' && (
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'handed_off')}
-                          >
-                            <Truck className="w-4 h-4 mr-1" />
-                            Hand Off
-                          </Button>
-                        )}
-                        {st === 'handed_off' && (
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'completed')}
-                          >
-                            <CheckCircle2 className="w-4 h-4 mr-1" />
-                            Complete
-                          </Button>
-                        )}
+                        {(() => {
+                          const mode = (order.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
+                          const cfg = getModeStateConfig(mode);
+                          const cs = canonicalFulfillmentState(order);
+                          // Transaction-layer: pending → confirmed
+                          if (cs === 'pending' || (!cs && st === 'pending')) {
+                            return (
+                              <Button
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => updateOrderStatus(order.id, order.module_slug, 'confirmed')}
+                              >
+                                <CheckCircle2 className="w-4 h-4 mr-1" />
+                                Confirm
+                              </Button>
+                            );
+                          }
+                          // Fulfillment-layer: derive next target from mode config
+                          if (cfg && cs) {
+                            const nextState = cfg.nextTarget(cs as FulfillmentState);
+                            if (nextState) {
+                              const meta = cfg.metadata[cs as FulfillmentState];
+                              return (
+                                <Button
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => updateOrderStatus(order.id, order.module_slug, nextState)}
+                                >
+                                  <Play className="w-4 h-4 mr-1" />
+                                  {meta?.actionLabel ?? nextState}
+                                </Button>
+                              );
+                            }
+                          }
+                          // Legacy fallback for hospitality
+                          if (st === 'queued') {
+                            return (
+                              <Button size="sm" className="flex-1" onClick={() => updateOrderStatus(order.id, order.module_slug, 'in_progress')}>
+                                <ChefHat className="w-4 h-4 mr-1" /> Start
+                              </Button>
+                            );
+                          }
+                          if (st === 'in_progress') {
+                            return (
+                              <Button size="sm" className="flex-1" onClick={() => updateOrderStatus(order.id, order.module_slug, 'ready')}>
+                                <Package className="w-4 h-4 mr-1" /> Ready
+                              </Button>
+                            );
+                          }
+                          if (st === 'ready') {
+                            return (
+                              <Button size="sm" className="flex-1" onClick={() => updateOrderStatus(order.id, order.module_slug, 'handed_off')}>
+                                <Truck className="w-4 h-4 mr-1" /> Hand Off
+                              </Button>
+                            );
+                          }
+                          if (st === 'handed_off') {
+                            return (
+                              <Button size="sm" className="flex-1" onClick={() => updateOrderStatus(order.id, order.module_slug, 'completed')}>
+                                <CheckCircle2 className="w-4 h-4 mr-1" /> Complete
+                              </Button>
+                            );
+                          }
+                          return null;
+                        })()}
                         <Button
                           variant="outline"
                           size="sm"

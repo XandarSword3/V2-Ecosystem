@@ -19,7 +19,8 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 import { Order, OrderItem, ItemStatus, itemStatusFlow, canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from './types';
-import type { FulfillmentState, FulfillmentStatus } from '@/types';
+import type { FulfillmentState, FulfillmentStatus, FulfillmentMode, ModeStateConfig } from '@/types';
+import { getModeStateConfig, resolveColumnKey } from '@/lib/engine-a/types';
 
 import { isOnline, ordersStore, cacheManager } from '@/lib/offline/offline-storage';
 import { createOfflineOrderStatusUpdate, createOfflineOrder } from '@/lib/offline/offline-sync';
@@ -133,18 +134,11 @@ const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
 };
 
 // ============================================
-// Board columns — canonical fulfillment states (Stage 6)
+// Board columns — mode-derived (F1 resolved)
 // ============================================
-// ⚠  F1 OPEN BLOCKER: These columns are hardcoded to hospitality states.
-// The board MUST derive its columns from the order's fulfillmentMode using
-// statesForMode(mode). Until then, digital/shipment/service orders will
-// not render correctly on this board.
-//
-// The board keys off the CANONICAL fulfillment state (order.fulfillmentStatus),
-// never the transaction-layer status (order.status stays pending/confirmed/
-// completed/cancelled). A confirmed order with no fulfillment row yet is
-// queued by definition, so 'confirmed' maps into the 'queued' column.
-const BOARD_COLUMNS = ['pending', 'queued', 'in_progress', 'ready', 'handed_off', 'completed'] as const;
+// Columns are now derived from each order's fulfillmentMode via
+// getModeStateConfig(mode). The pending/confirmed/transaction-layer
+// states are prepended as the first column; fulfillment states follow.
 
 interface BoardColumnStyle {
   bg: string;
@@ -155,33 +149,80 @@ interface BoardColumnStyle {
   label: string;
 }
 
-const BOARD_COLUMN_STYLE: Record<string, BoardColumnStyle> = {
-  pending: { bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-300 dark:border-blue-700', text: 'text-blue-700 dark:text-blue-300', action: 'Confirm', actionBg: 'bg-blue-600 hover:bg-blue-700', label: 'New' },
-  queued: { bg: 'bg-indigo-50 dark:bg-indigo-900/10', border: 'border-indigo-300 dark:border-indigo-700', text: 'text-indigo-700 dark:text-indigo-300', action: 'Start Prep', actionBg: 'bg-indigo-600 hover:bg-indigo-700', label: 'Queued' },
-  in_progress: { bg: 'bg-orange-50 dark:bg-orange-900/10', border: 'border-orange-300 dark:border-orange-700', text: 'text-orange-700 dark:text-orange-300', action: 'Mark Ready', actionBg: 'bg-orange-500 hover:bg-orange-600', label: 'In Progress' },
-  ready: { bg: 'bg-green-50 dark:bg-green-900/10', border: 'border-green-300 dark:border-green-700', text: 'text-green-700 dark:text-green-300', action: null, actionBg: '', label: 'Ready' },
-  // Key is 'handed_off' (the engine's canonical state) — label stays
-  // 'Served' since that's the term staff actually use.
-  handed_off: { bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-300 dark:border-purple-700', text: 'text-purple-700 dark:text-purple-300', action: 'Complete', actionBg: 'bg-gray-600 hover:bg-gray-700', label: 'Served' },
-  completed: { bg: 'bg-gray-50 dark:bg-gray-900/10', border: 'border-gray-300 dark:border-gray-700', text: 'text-gray-700 dark:text-gray-300', action: null, actionBg: '', label: 'Completed' },
+/** Pending/confirmed column style — shared across all modes. */
+const PENDING_COL_STYLE: BoardColumnStyle = {
+  bg: 'bg-blue-50 dark:bg-blue-900/10',
+  border: 'border-blue-300 dark:border-blue-700',
+  text: 'text-blue-700 dark:text-blue-300',
+  action: 'Confirm',
+  actionBg: 'bg-blue-600 hover:bg-blue-700',
+  label: 'New',
 };
 
-/** Which board column an order belongs in (canonical fulfillment state). */
-function boardColumn(order: Order): string {
+/** Derive the full column list and styles from a mode config.
+ *  Prepends 'pending' as the first column (transaction-layer entry point)
+ *  then appends the mode's ordered fulfillment states. */
+function deriveBoardColumns(
+  modeConfig: ModeStateConfig | null,
+): { key: string; style: BoardColumnStyle }[] {
+  const cols: { key: string; style: BoardColumnStyle }[] = [
+    { key: 'pending', style: PENDING_COL_STYLE },
+  ];
+  if (modeConfig) {
+    for (const state of modeConfig.states) {
+      const meta = modeConfig.metadata[state];
+      cols.push({
+        key: state,
+        style: {
+          bg: meta.bg,
+          border: meta.border,
+          text: meta.text,
+          action: meta.actionLabel,
+          actionBg: meta.actionBg,
+          label: meta.label,
+        },
+      });
+    }
+  }
+  return cols;
+}
+
+/** Determine the primary fulfillment mode from a set of orders.
+ *  Returns the most common mode, falling back to hospitality. */
+function primaryMode(orders: Order[]): FulfillmentMode {
+  const counts = new Map<string, number>();
+  for (const o of orders) {
+    const m = o.fulfillmentMode ?? 'on_premise';
+    counts.set(m, (counts.get(m) ?? 0) + 1);
+  }
+  let best = 'on_premise';
+  let bestCount = 0;
+  for (const [m, c] of counts) {
+    if (c > bestCount) { best = m; bestCount = c; }
+  }
+  return best as FulfillmentMode;
+}
+
+/** Which board column an order belongs in (mode-aware). */
+function boardColumn(order: Order, modeConfig: ModeStateConfig | null): string {
   const c = canonicalFulfillmentState(order);
-  if (c === 'confirmed') return 'queued';
-  return c ?? 'queued';
+  return resolveColumnKey(c, modeConfig);
 }
 
 /** The next canonical target state for a column's quick action. */
-function nextCanonicalTarget(order: Order): string | null {
-  switch (boardColumn(order)) {
-    case 'pending': return 'confirmed';
-    case 'queued': return 'in_progress';
-    case 'in_progress': return 'ready';
-    case 'handed_off': return 'completed';
-    default: return null; // ready — waiting on dispatch; terminal states
+function nextCanonicalTarget(order: Order, modeConfig: ModeStateConfig | null): string | null {
+  const col = boardColumn(order, modeConfig);
+  if (col === 'pending') return 'confirmed';
+  if (!modeConfig) {
+    // Legacy fallback
+    switch (col) {
+      case 'queued': return 'in_progress';
+      case 'in_progress': return 'ready';
+      case 'handed_off': return 'completed';
+      default: return null;
+    }
   }
+  return modeConfig.nextTarget(col as FulfillmentState);
 }
 
 
@@ -195,8 +236,8 @@ function ItemStatusChip({
   disabled: boolean;
 }) {
   const status = item.status ?? 'pending';
-  const style = ITEM_STATUS_STYLE[status];
-  const nextLabel = ITEM_NEXT_ACTION_LABEL[status];
+  const style = ITEM_STATUS_STYLE[status] ?? ITEM_STATUS_STYLE.pending;
+  const nextLabel = ITEM_NEXT_ACTION_LABEL[status] ?? null;
   const isServed = status === 'served';
 
   return (
@@ -657,16 +698,18 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
         </div>
       </header>
 
-      {/* Kanban Board — columns key off the CANONICAL fulfillment state
-          (Stage 6). The engine's fulfillment machine owns
-          queued → in_progress → ready → handed_off; the transaction layer
-          owns pending/confirmed/completed/cancelled. transactions.status is
-          never used for column placement anymore. */}
+      {/* Kanban Board — columns derived from each order's fulfillmentMode.
+          The engine's fulfillment machine owns mode-specific states;
+          the transaction layer owns pending/confirmed/completed/cancelled.
+          transactions.status is never used for column placement. */}
+      {(() => {
+        const mode = primaryMode(orders);
+        const modeConfig = getModeStateConfig(mode);
+        const boardColumns = deriveBoardColumns(modeConfig);
+        return (
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto">
-        {BOARD_COLUMNS.map((status) => {
-          const columnOrders = orders.filter((o) => boardColumn(o) === status);
-          const col = BOARD_COLUMN_STYLE[status];
-          if (!col) return null;
+        {boardColumns.map(({ key: status, style: col }) => {
+          const columnOrders = orders.filter((o) => boardColumn(o, modeConfig) === status);
 
           return (
             <div key={status} className={`rounded-xl border ${col.border} ${col.bg} min-h-[400px] flex flex-col`}>
@@ -748,8 +791,8 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                           are fulfillment-layer moves. Items only drive
                           auto-derivation once everything hits ready/served. */}
                       {(() => {
-                        const nextTarget = nextCanonicalTarget(order);
-                        const isWaitingOnDispatch = boardColumn(order) === 'ready';
+                        const nextTarget = nextCanonicalTarget(order, modeConfig);
+                        const isWaitingOnDispatch = boardColumn(order, modeConfig) === 'ready';
                         if (!nextTarget && !isWaitingOnDispatch) return null;
                         return (
                           <div className="px-2 pb-2 flex gap-2">
@@ -787,6 +830,8 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
           );
         })}
       </div>
+        );
+      })()}
 
       {/* Order Details Modal */}
       {selectedOrder && (
@@ -916,8 +961,10 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex flex-col gap-3">
               <div className="flex gap-3">
                 {(() => {
-                  const nextTarget = nextCanonicalTarget(selectedOrder);
-                  const selCol = boardColumn(selectedOrder);
+                  const selMode = primaryMode([selectedOrder]);
+                  const selModeConfig = getModeStateConfig(selMode);
+                  const nextTarget = nextCanonicalTarget(selectedOrder, selModeConfig);
+                  const selCol = boardColumn(selectedOrder, selModeConfig);
                   const isTerminal = selectedOrder.status === 'completed' || selectedOrder.status === 'cancelled';
                   if (!isTerminal && nextTarget && selCol !== 'ready') {
                     return (

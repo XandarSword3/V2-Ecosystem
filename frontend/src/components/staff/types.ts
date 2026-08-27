@@ -53,36 +53,29 @@ export interface Order {
   serviceLocationId?: string | null;
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// ⚠  F1 OPEN BLOCKER: Hospitality-only status flow
-// ──────────────────────────────────────────────────────────────────────────
-// This statusFlow is hardcoded to the HOSPITALITY fulfillment subset:
-//   queued → in_progress → ready → handed_off
+import { getModeStateConfig, type ModeStateConfig } from '@/lib/engine-a/types';
+
+// ============================================
+// Mode-derived order-level flow (F1 resolved)
+// ============================================
+// The staff surface no longer assumes hospitality-only columns.
+// Each fulfillment mode defines its own ordered state machine via
+// getModeStateConfig(mode). Components call that function to derive
+// columns, labels, actions, and transitions.
 //
-// It does NOT represent Engine A's full FulfillmentState union:
-//   Hospitality:  queued → in_progress → ready → handed_off
-//   Digital:      provisioning → provisioned → delivered
-//   Shipment:     allocated → picking → packed → shipped → in_transit → delivered
-//   Service:      received → working → ready → collected
-//
-// The frontend MUST select the correct flow based on the order's
-// fulfillmentMode, using statesForMode(mode) from @/lib/engine-a/types.
-//
-// Until this is resolved:
-//   - KitchenView.BOARD_COLUMNS is hospitality-only
-//   - StaffPOSTemplate renders hospitality-only column layout
-//   - No component derives columns/actions from fulfillmentMode
-//
-// This is a Phase F1 blocker. Phase 8 frontend is NOT complete until
-// the staff operating surface renders mode-specific states/actions.
-// ──────────────────────────────────────────────────────────────────────────
-//
-// Order-level flow — canonical fulfillment states (Stage 6). The engine's
-// fulfillment machine owns queued → in_progress → ready → handed_off; the
-// transaction layer owns pending/confirmed/completed/cancelled. The KDS
-// columns key off the CANONICAL fulfillment state, never the legacy
-// composites (preparing/delivered) that pre-Stage-6 rows carried.
+// `statusFlow` is retained only as a backward-compat fallback for
+// legacy code that hasn't yet migrated to mode-derived rendering.
+// New code MUST use getModeStateConfig(mode).states.
+
+/** @deprecated Use getModeStateConfig(mode).states instead. */
 export const statusFlow = ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed'] as const;
+
+/** Returns the ordered fulfillment states for a mode, or the legacy
+ *  hospitality fallback for null/unknown modes during migration. */
+export function statusFlowForMode(mode: FulfillmentMode | null | undefined): readonly string[] {
+  const cfg = getModeStateConfig(mode);
+  return cfg?.states ?? ['queued', 'in_progress', 'ready', 'handed_off'];
+}
 
 // Mirrors backend ITEM_STATUS_FLOW in module-staff.controller.ts — forward-only,
 // one step at a time. Kept as a separate flow because order_items isn't a

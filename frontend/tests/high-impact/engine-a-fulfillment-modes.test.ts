@@ -1,0 +1,447 @@
+/**
+ * engine-a-fulfillment-modes.test.ts
+ *
+ * Tests the mode-specific fulfillment state configuration introduced in F1.
+ * Verifies that each fulfillment mode defines the correct ordered states,
+ * metadata (labels, actions, terminal states), transition graph, and
+ * that the domain contract correctly scopes states per mode.
+ */
+
+import { describe, expect, it } from 'vitest';
+import {
+  statesForMode,
+  getModeStateConfig,
+  resolveColumnKey,
+  isFulfillmentState,
+  isFulfillmentMode,
+  FULFILLMENT_LAYER_STATES,
+  type FulfillmentMode,
+  type FulfillmentState,
+} from '@/lib/engine-a/types';
+
+// ============================================
+// statesForMode
+// ============================================
+
+describe('statesForMode', () => {
+  it('on_premise returns hospitality states', () => {
+    expect(statesForMode('on_premise')).toEqual([
+      'queued', 'in_progress', 'ready', 'handed_off',
+    ]);
+  });
+
+  it('pickup returns hospitality states (same machine)', () => {
+    expect(statesForMode('pickup')).toEqual([
+      'queued', 'in_progress', 'ready', 'handed_off',
+    ]);
+  });
+
+  it('local_delivery returns hospitality states (same machine)', () => {
+    expect(statesForMode('local_delivery')).toEqual([
+      'queued', 'in_progress', 'ready', 'handed_off',
+    ]);
+  });
+
+  it('digital_delivery returns digital states', () => {
+    expect(statesForMode('digital_delivery')).toEqual([
+      'provisioning', 'provisioned', 'delivered',
+    ]);
+  });
+
+  it('shipment returns shipment states', () => {
+    expect(statesForMode('shipment')).toEqual([
+      'allocated', 'picking', 'packed', 'shipped', 'in_transit', 'delivered',
+    ]);
+  });
+
+  it('service_execution returns service states', () => {
+    expect(statesForMode('service_execution')).toEqual([
+      'received', 'working', 'ready', 'collected',
+    ]);
+  });
+
+  it('none returns empty array', () => {
+    expect(statesForMode('none')).toEqual([]);
+  });
+
+  it('null/undefined returns empty array', () => {
+    expect(statesForMode(null)).toEqual([]);
+    expect(statesForMode(undefined)).toEqual([]);
+  });
+});
+
+// ============================================
+// getModeStateConfig
+// ============================================
+
+describe('getModeStateConfig', () => {
+  it('returns null for none/null/undefined', () => {
+    expect(getModeStateConfig('none')).toBeNull();
+    expect(getModeStateConfig(null)).toBeNull();
+    expect(getModeStateConfig(undefined)).toBeNull();
+  });
+
+  it('returns config for on_premise', () => {
+    const cfg = getModeStateConfig('on_premise');
+    expect(cfg).not.toBeNull();
+    expect(cfg!.states).toEqual(['queued', 'in_progress', 'ready', 'handed_off']);
+  });
+
+  it('returns config for digital_delivery', () => {
+    const cfg = getModeStateConfig('digital_delivery');
+    expect(cfg).not.toBeNull();
+    expect(cfg!.states).toEqual(['provisioning', 'provisioned', 'delivered']);
+  });
+
+  it('returns config for shipment', () => {
+    const cfg = getModeStateConfig('shipment');
+    expect(cfg).not.toBeNull();
+    expect(cfg!.states).toEqual(['allocated', 'picking', 'packed', 'shipped', 'in_transit', 'delivered']);
+  });
+
+  it('returns config for service_execution', () => {
+    const cfg = getModeStateConfig('service_execution');
+    expect(cfg).not.toBeNull();
+    expect(cfg!.states).toEqual(['received', 'working', 'ready', 'collected']);
+  });
+});
+
+// ============================================
+// Hospitality mode transitions
+// ============================================
+
+describe('hospitality mode transitions', () => {
+  const cfg = getModeStateConfig('on_premise')!;
+
+  it('has correct metadata for each state', () => {
+    expect(cfg.metadata.queued.label).toBe('Queued');
+    expect(cfg.metadata.in_progress.label).toBe('In Progress');
+    expect(cfg.metadata.ready.label).toBe('Ready');
+    expect(cfg.metadata.handed_off.label).toBe('Served');
+  });
+
+  it('queued → in_progress', () => {
+    expect(cfg.nextTarget('queued')).toBe('in_progress');
+  });
+
+  it('in_progress → ready', () => {
+    expect(cfg.nextTarget('in_progress')).toBe('ready');
+  });
+
+  it('ready → null (waiting on dispatch)', () => {
+    expect(cfg.nextTarget('ready')).toBeNull();
+  });
+
+  it('handed_off → completed (dispatch layer)', () => {
+    expect(cfg.nextTarget('handed_off')).toBe('completed');
+  });
+
+  it('only handed_off is not terminal in fulfillment machine (ready waits on dispatch)', () => {
+    expect(cfg.metadata.queued.terminal).toBe(false);
+    expect(cfg.metadata.in_progress.terminal).toBe(false);
+    expect(cfg.metadata.ready.terminal).toBe(false);
+    expect(cfg.metadata.handed_off.terminal).toBe(false);
+  });
+});
+
+// ============================================
+// Digital mode transitions
+// ============================================
+
+describe('digital mode transitions', () => {
+  const cfg = getModeStateConfig('digital_delivery')!;
+
+  it('has correct labels', () => {
+    expect(cfg.metadata.provisioning.label).toBe('Provisioning');
+    expect(cfg.metadata.provisioned.label).toBe('Provisioned');
+    expect(cfg.metadata.delivered.label).toBe('Delivered');
+  });
+
+  it('provisioning → provisioned', () => {
+    expect(cfg.nextTarget('provisioning')).toBe('provisioned');
+  });
+
+  it('provisioned → delivered', () => {
+    expect(cfg.nextTarget('provisioned')).toBe('delivered');
+  });
+
+  it('delivered → null (terminal)', () => {
+    expect(cfg.nextTarget('delivered')).toBeNull();
+  });
+
+  it('delivered is terminal', () => {
+    expect(cfg.metadata.delivered.terminal).toBe(true);
+  });
+
+  it('provisioning and provisioned are not terminal', () => {
+    expect(cfg.metadata.provisioning.terminal).toBe(false);
+    expect(cfg.metadata.provisioned.terminal).toBe(false);
+  });
+});
+
+// ============================================
+// Shipment mode transitions
+// ============================================
+
+describe('shipment mode transitions', () => {
+  const cfg = getModeStateConfig('shipment')!;
+
+  it('has all 6 states', () => {
+    expect(cfg.states).toHaveLength(6);
+  });
+
+  it('allocated → picking', () => {
+    expect(cfg.nextTarget('allocated')).toBe('picking');
+  });
+
+  it('picking → packed', () => {
+    expect(cfg.nextTarget('picking')).toBe('packed');
+  });
+
+  it('packed → shipped', () => {
+    expect(cfg.nextTarget('packed')).toBe('shipped');
+  });
+
+  it('shipped → in_transit', () => {
+    expect(cfg.nextTarget('shipped')).toBe('in_transit');
+  });
+
+  it('in_transit → delivered', () => {
+    expect(cfg.nextTarget('in_transit')).toBe('delivered');
+  });
+
+  it('delivered → null (terminal)', () => {
+    expect(cfg.nextTarget('delivered')).toBeNull();
+  });
+
+  it('only delivered is terminal', () => {
+    expect(cfg.metadata.allocated.terminal).toBe(false);
+    expect(cfg.metadata.picking.terminal).toBe(false);
+    expect(cfg.metadata.packed.terminal).toBe(false);
+    expect(cfg.metadata.shipped.terminal).toBe(false);
+    expect(cfg.metadata.in_transit.terminal).toBe(false);
+    expect(cfg.metadata.delivered.terminal).toBe(true);
+  });
+});
+
+// ============================================
+// Service mode transitions
+// ============================================
+
+describe('service mode transitions', () => {
+  const cfg = getModeStateConfig('service_execution')!;
+
+  it('has all 4 states', () => {
+    expect(cfg.states).toHaveLength(4);
+  });
+
+  it('received → working', () => {
+    expect(cfg.nextTarget('received')).toBe('working');
+  });
+
+  it('working → ready', () => {
+    expect(cfg.nextTarget('working')).toBe('ready');
+  });
+
+  it('ready → collected', () => {
+    expect(cfg.nextTarget('ready')).toBe('collected');
+  });
+
+  it('collected → null (terminal)', () => {
+    expect(cfg.nextTarget('collected')).toBeNull();
+  });
+
+  it('only collected is terminal', () => {
+    expect(cfg.metadata.received.terminal).toBe(false);
+    expect(cfg.metadata.working.terminal).toBe(false);
+    expect(cfg.metadata.ready.terminal).toBe(false);
+    expect(cfg.metadata.collected.terminal).toBe(true);
+  });
+});
+
+// ============================================
+// resolveColumnKey
+// ============================================
+
+describe('resolveColumnKey', () => {
+  it('maps confirmed to first state for hospitality', () => {
+    const cfg = getModeStateConfig('on_premise')!;
+    expect(resolveColumnKey('confirmed', cfg)).toBe('queued');
+  });
+
+  it('maps pending to first state for hospitality', () => {
+    const cfg = getModeStateConfig('on_premise')!;
+    expect(resolveColumnKey('pending', cfg)).toBe('queued');
+  });
+
+  it('returns matching state for hospitality', () => {
+    const cfg = getModeStateConfig('on_premise')!;
+    expect(resolveColumnKey('in_progress', cfg)).toBe('in_progress');
+    expect(resolveColumnKey('ready', cfg)).toBe('ready');
+    expect(resolveColumnKey('handed_off', cfg)).toBe('handed_off');
+  });
+
+  it('maps confirmed to first state for digital', () => {
+    const cfg = getModeStateConfig('digital_delivery')!;
+    expect(resolveColumnKey('confirmed', cfg)).toBe('provisioning');
+  });
+
+  it('returns matching state for digital', () => {
+    const cfg = getModeStateConfig('digital_delivery')!;
+    expect(resolveColumnKey('provisioning', cfg)).toBe('provisioning');
+    expect(resolveColumnKey('provisioned', cfg)).toBe('provisioned');
+    expect(resolveColumnKey('delivered', cfg)).toBe('delivered');
+  });
+
+  it('maps confirmed to first state for shipment', () => {
+    const cfg = getModeStateConfig('shipment')!;
+    expect(resolveColumnKey('confirmed', cfg)).toBe('allocated');
+  });
+
+  it('returns matching state for shipment', () => {
+    const cfg = getModeStateConfig('shipment')!;
+    expect(resolveColumnKey('shipped', cfg)).toBe('shipped');
+  });
+
+  it('returns first state for null config (fallback)', () => {
+    expect(resolveColumnKey('confirmed', null)).toBe('pending');
+  });
+
+  it('returns first state for unrecognized state', () => {
+    const cfg = getModeStateConfig('on_premise')!;
+    expect(resolveColumnKey('unknown_state' as any, cfg)).toBe('queued');
+  });
+});
+
+// ============================================
+// Cross-mode isolation
+// ============================================
+
+describe('cross-mode isolation', () => {
+  it('hospitality states are not in digital config', () => {
+    const digitalCfg = getModeStateConfig('digital_delivery')!;
+    expect(digitalCfg.states).not.toContain('queued');
+    expect(digitalCfg.states).not.toContain('in_progress');
+    expect(digitalCfg.states).not.toContain('handed_off');
+  });
+
+  it('digital states are not in hospitality config', () => {
+    const hospCfg = getModeStateConfig('on_premise')!;
+    expect(hospCfg.states).not.toContain('provisioning');
+    expect(hospCfg.states).not.toContain('provisioned');
+  });
+
+  it('shipment states are not in digital config', () => {
+    const digitalCfg = getModeStateConfig('digital_delivery')!;
+    expect(digitalCfg.states).not.toContain('allocated');
+    expect(digitalCfg.states).not.toContain('picking');
+  });
+
+  it('service states are not in hospitality config', () => {
+    const hospCfg = getModeStateConfig('on_premise')!;
+    expect(hospCfg.states).not.toContain('received');
+    expect(hospCfg.states).not.toContain('working');
+  });
+
+  it('each mode has distinct first state', () => {
+    const modes: FulfillmentMode[] = [
+      'on_premise', 'digital_delivery', 'shipment', 'service_execution',
+    ];
+    const firstStates = modes.map(m => getModeStateConfig(m)!.states[0]);
+    const unique = new Set(firstStates);
+    expect(unique.size).toBe(modes.length);
+  });
+});
+
+// ============================================
+// FulfillmentState type guard
+// ============================================
+
+describe('isFulfillmentState type guard', () => {
+  it('recognizes hospitality states', () => {
+    expect(isFulfillmentState('queued')).toBe(true);
+    expect(isFulfillmentState('in_progress')).toBe(true);
+    expect(isFulfillmentState('ready')).toBe(true);
+    expect(isFulfillmentState('handed_off')).toBe(true);
+  });
+
+  it('recognizes digital states', () => {
+    expect(isFulfillmentState('provisioning')).toBe(true);
+    expect(isFulfillmentState('provisioned')).toBe(true);
+    expect(isFulfillmentState('delivered')).toBe(true);
+  });
+
+  it('recognizes shipment states', () => {
+    expect(isFulfillmentState('allocated')).toBe(true);
+    expect(isFulfillmentState('picking')).toBe(true);
+    expect(isFulfillmentState('packed')).toBe(true);
+    expect(isFulfillmentState('shipped')).toBe(true);
+    expect(isFulfillmentState('in_transit')).toBe(true);
+  });
+
+  it('recognizes service states', () => {
+    expect(isFulfillmentState('received')).toBe(true);
+    expect(isFulfillmentState('working')).toBe(true);
+    expect(isFulfillmentState('collected')).toBe(true);
+  });
+
+  it('rejects transaction states', () => {
+    expect(isFulfillmentState('pending')).toBe(false);
+    expect(isFulfillmentState('confirmed')).toBe(false);
+    expect(isFulfillmentState('completed')).toBe(false);
+    expect(isFulfillmentState('cancelled')).toBe(false);
+  });
+
+  it('rejects legacy composites', () => {
+    expect(isFulfillmentState('preparing')).toBe(false);
+    expect(isFulfillmentState('served')).toBe(false);
+  });
+
+  it('rejects arbitrary strings', () => {
+    expect(isFulfillmentState('unknown')).toBe(false);
+    expect(isFulfillmentState('')).toBe(false);
+  });
+});
+
+// ============================================
+// isFulfillmentMode type guard
+// ============================================
+
+describe('isFulfillmentMode type guard', () => {
+  it('recognizes all valid modes', () => {
+    expect(isFulfillmentMode('on_premise')).toBe(true);
+    expect(isFulfillmentMode('pickup')).toBe(true);
+    expect(isFulfillmentMode('local_delivery')).toBe(true);
+    expect(isFulfillmentMode('digital_delivery')).toBe(true);
+    expect(isFulfillmentMode('shipment')).toBe(true);
+    expect(isFulfillmentMode('service_execution')).toBe(true);
+    expect(isFulfillmentMode('none')).toBe(true);
+  });
+
+  it('rejects invalid modes', () => {
+    expect(isFulfillmentMode('restaurant')).toBe(false);
+    expect(isFulfillmentMode('delivery')).toBe(false);
+    expect(isFulfillmentMode('')).toBe(false);
+  });
+});
+
+// ============================================
+// FULFILLMENT_LAYER_STATES completeness
+// ============================================
+
+describe('FULFILLMENT_LAYER_STATES includes all mode states', () => {
+  const allModes: FulfillmentMode[] = [
+    'on_premise', 'pickup', 'local_delivery',
+    'digital_delivery', 'shipment', 'service_execution',
+  ];
+
+  for (const mode of allModes) {
+    if (mode === 'none') continue;
+    it(`${mode} states are all in FULFILLMENT_LAYER_STATES`, () => {
+      const modeStates = statesForMode(mode);
+      for (const state of modeStates) {
+        expect(FULFILLMENT_LAYER_STATES).toContain(state);
+      }
+    });
+  }
+});

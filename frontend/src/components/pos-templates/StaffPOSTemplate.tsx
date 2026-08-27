@@ -53,8 +53,9 @@ import {
 } from 'lucide-react';
 import { ReservationFloorMap } from '@/components/staff/ReservationFloorMap';
 import { DispatchBoard } from '@/components/staff/DispatchBoard';
-import type { ItemStatus, FulfillmentState } from '@/components/staff/types';
+import type { ItemStatus, FulfillmentState, FulfillmentMode } from '@/components/staff/types';
 import { itemStatusFlow, canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from '@/components/staff/types';
+import { getModeStateConfig, resolveColumnKey, type ModeStateConfig } from '@/lib/engine-a/types';
 
 // Types
 interface Table {
@@ -74,6 +75,8 @@ interface Order {
   status: string;
   /** Stage 6 canonical fulfillment state — KDS/board key. */
   fulfillmentStatus?: string | null;
+  /** Phase F1: which fulfillment mode governs this order's states. */
+  fulfillmentMode?: string | null;
   items: OrderItem[];
   totalAmount: number;
   createdAt: string;
@@ -168,6 +171,23 @@ const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
   ready: null,
   served: null,
 };
+
+// ============================================
+// Mode-aware kitchen-active check (F1)
+// ============================================
+// An order is "kitchen-active" if its fulfillment state is in the
+// active (non-terminal) portion of its mode's state machine.
+function isKitchenActive(order: Order): boolean {
+  const cs = canonicalFulfillmentState(order);
+  const mode = (order.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
+  const cfg = getModeStateConfig(mode);
+  if (cfg) {
+    const meta = cfg.metadata[cs as FulfillmentState];
+    return !!meta && !meta.terminal;
+  }
+  // Legacy fallback for null/unknown modes
+  return ['confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? order.status);
+}
 
 function ItemStatusChip({
   item,
@@ -288,10 +308,19 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       setSelectedTable(prev => prev ? (mappedTables.find(t => t.id === prev.id) || prev) : null);
 
       setOrders(ordersRes.data.data || []);
-      // Kitchen tab: orders with a canonical fulfillment state that's kitchen-active
-      // (confirmed = queued, in_progress, ready) or the legacy 'preparing' composite.
+      // Kitchen tab: orders whose fulfillment state is still in the active
+      // (non-terminal) part of the mode's state machine. The mode is derived
+      // from the order's fulfillmentMode; hospitality remains the fallback.
       setKitchenOrders((ordersRes.data.data || []).filter((o: Order) => {
         const cs = canonicalFulfillmentState(o);
+        const mode = (o.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
+        const cfg = getModeStateConfig(mode);
+        if (cfg) {
+          // Mode-aware: active if the state is in the mode's state list and not terminal
+          const meta = cfg.metadata[cs as FulfillmentState];
+          return !!meta && !meta.terminal;
+        }
+        // Legacy fallback
         return ['confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? o.status);
       }));
 
@@ -349,8 +378,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
 
       const handleNewOrder = (order: Order) => {
         setOrders(prev => [order, ...prev]);
-        const cs = canonicalFulfillmentState(order);
-        if (['confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? order.status)) {
+        if (isKitchenActive(order)) {
           setKitchenOrders(prev => [order, ...prev]);
         }
         toast.info(`New order #${order.orderNumber}`, { description: order.customerName });
@@ -371,10 +399,13 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
         ));
         setKitchenOrders(prev => {
           const cs = update.fulfillmentStatus ?? update.status;
-          if (['confirmed', 'queued', 'in_progress', 'ready'].includes(cs)) {
-            const order = orders.find(o => o.id === update.id);
-            if (order && !prev.find(o => o.id === update.id)) {
-              return [{ ...order, status: update.status, ...(update.fulfillmentStatus ? { fulfillmentStatus: update.fulfillmentStatus } : {}) }, ...prev];
+          // Mode-aware check: look up the existing order's mode for the check
+          const existingOrder = orders.find(o => o.id === update.id);
+          const mergedOrder = existingOrder ? { ...existingOrder, ...(update.fulfillmentStatus ? { fulfillmentStatus: update.fulfillmentStatus } : {}) } : null;
+          const isActive = mergedOrder ? isKitchenActive(mergedOrder) : ['confirmed', 'queued', 'in_progress', 'ready'].includes(cs);
+          if (isActive) {
+            if (existingOrder && !prev.find(o => o.id === update.id)) {
+              return [{ ...existingOrder, status: update.status, ...(update.fulfillmentStatus ? { fulfillmentStatus: update.fulfillmentStatus } : {}) }, ...prev];
             }
             return prev.map(o => o.id === update.id ? { ...o, status: update.status, ...(update.fulfillmentStatus ? { fulfillmentStatus: update.fulfillmentStatus } : {}) } : o);
           }
@@ -437,7 +468,18 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       ));
       setKitchenOrders(prev => {
         const cs = isFulfillmentMove ? status : undefined;
-        if (cs && ['queued', 'in_progress', 'ready'].includes(cs)) {
+        // Mode-aware check for whether this state is kitchen-active
+        const order = orders.find(o => o.id === orderId);
+        const isActive = cs ? (() => {
+          const mode = (order?.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
+          const cfg = getModeStateConfig(mode);
+          if (cfg) {
+            const meta = cfg.metadata[cs as FulfillmentState];
+            return !!meta && !meta.terminal;
+          }
+          return ['queued', 'in_progress', 'ready'].includes(cs);
+        })() : false;
+        if (isActive) {
           // Still kitchen-active — update in place or add if not present.
           const existing = prev.find(o => o.id === orderId);
           if (existing) {
@@ -681,8 +723,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       };
       setOrders(prev => [newOrder, ...prev]);
       setKitchenOrders(prev => {
-        const cs = canonicalFulfillmentState(newOrder);
-        return ['confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? newOrder.status) ? [newOrder, ...prev] : prev;
+        return isKitchenActive(newOrder) ? [newOrder, ...prev] : prev;
       });
       setSelectedOrder(newOrder);
       setShowPaymentModal(true);
@@ -1093,8 +1134,9 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                 {orders
                   .filter(o => {
                     if (statusFilter === 'active') {
-                      const cs = canonicalFulfillmentState(o);
-                      return ['pending', 'confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? o.status);
+                      // Mode-aware: active = not terminal and not completed/cancelled
+                      if (o.status === 'completed' || o.status === 'cancelled') return false;
+                      return isKitchenActive(o);
                     }
                     // For named fulfillment states, check fulfillmentStatus;
                     // for transaction states, check status.
