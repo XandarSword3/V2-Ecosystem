@@ -187,12 +187,13 @@ export async function getModuleOrders(req: Request, res: Response) {
     const itemsByOrder: Record<string, Array<{
       id: string; catalogItemId: string | null; name: string; quantity: number;
       unitPrice: number; subtotal: number; specialInstructions: string | null; status: string;
+      modifiers?: string[]; selectedModifiers?: unknown[];
     }>> = {};
 
     if (orderIds.length > 0) {
       const { data: itemRows, error: itemsError } = await supabase
         .from('order_items')
-        .select('id, transaction_id, catalog_item_id, quantity, unit_price, subtotal, special_instructions, status')
+        .select('id, transaction_id, catalog_item_id, quantity, unit_price, subtotal, special_instructions, status, metadata')
         .in('transaction_id', orderIds);
 
       if (itemsError) {
@@ -206,6 +207,9 @@ export async function getModuleOrders(req: Request, res: Response) {
 
         for (const row of itemRows) {
           const list = itemsByOrder[row.transaction_id] ?? (itemsByOrder[row.transaction_id] = []);
+          const rowMeta = (row as any).metadata ?? {};
+          const rowSelectedModifiers = Array.isArray(rowMeta.selectedModifiers) ? rowMeta.selectedModifiers : [];
+          const modifiers = rowSelectedModifiers.map((m: any) => m.name || `${m.groupName ?? ''}: ${m.optionName ?? m.name ?? ''}`);
           list.push({
             id: row.id,
             catalogItemId: row.catalog_item_id,
@@ -215,6 +219,7 @@ export async function getModuleOrders(req: Request, res: Response) {
             subtotal: row.subtotal,
             specialInstructions: row.special_instructions,
             status: row.status ?? 'pending',
+            ...(modifiers.length > 0 ? { modifiers, selectedModifiers: rowSelectedModifiers } : {}),
           });
         }
       }
@@ -401,12 +406,13 @@ export async function getModuleTables(req: Request, res: Response) {
       subtotal: number;
       specialInstructions: string | null;
       status: string;
+      modifiers?: string[]; selectedModifiers?: unknown[];
     }>>();
 
     if (transactionIds.length > 0) {
       const { data: itemRows, error: itemsError } = await supabase
         .from('order_items')
-        .select('id, transaction_id, catalog_item_id, quantity, unit_price, subtotal, special_instructions, status')
+        .select('id, transaction_id, catalog_item_id, quantity, unit_price, subtotal, special_instructions, status, metadata')
         .in('transaction_id', transactionIds);
 
       if (!itemsError && itemRows && itemRows.length > 0) {
@@ -417,6 +423,9 @@ export async function getModuleTables(req: Request, res: Response) {
         const nameById = new Map((catalogRows || []).map((c) => [c.id, c.name]));
 
         for (const row of itemRows) {
+          const rowMeta = (row as any).metadata ?? {};
+          const rowSelectedModifiers = Array.isArray(rowMeta.selectedModifiers) ? rowMeta.selectedModifiers : [];
+          const modifiers = rowSelectedModifiers.map((m: any) => m.name || `${m.groupName ?? ''}: ${m.optionName ?? m.name ?? ''}`);
           const list = itemsByTransaction.get(row.transaction_id) ?? [];
           list.push({
             id: row.id,
@@ -426,6 +435,7 @@ export async function getModuleTables(req: Request, res: Response) {
             subtotal: row.subtotal,
             specialInstructions: row.special_instructions,
             status: row.status ?? 'pending',
+            ...(modifiers.length > 0 ? { modifiers, selectedModifiers: rowSelectedModifiers } : {}),
           });
           itemsByTransaction.set(row.transaction_id, list);
         }

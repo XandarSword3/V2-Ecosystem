@@ -2,6 +2,7 @@ import type { FulfillmentStatus } from '@/types';
 // Canonical helpers live in the domain layer (plan F1) — re-exported here
 // so existing staff components keep their import surface.
 export { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from '@/types';
+export type { FulfillmentState } from '@/types';
 
 export type ItemStatus = 'pending' | 'preparing' | 'ready' | 'served';
 
@@ -17,6 +18,12 @@ export interface OrderItem {
   // Backend now returns this (module-staff.controller.ts getModuleOrders,
   // order_items.status column, defaults to 'pending' if null).
   status: ItemStatus;
+  /** Human-readable modifier names rendered by the KDS. Derived from
+   *  order_items.metadata.selectedModifiers by the backend. */
+  modifiers?: string[];
+  /** Raw modifier selections carried in order_items.metadata — may be
+   *  needed for inventory/customization display. */
+  selectedModifiers?: Array<{ groupId: string; optionId: string; quantity: number; name?: string; groupName?: string }>;
 }
 
 export interface Order {

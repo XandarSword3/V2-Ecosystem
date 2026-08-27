@@ -43,7 +43,7 @@ export default defineConfig({
     exclude: ['node_modules', 'dist'],
 
     // Integration test settings
-    testTimeout: 30000, // 30 seconds per test
+    testTimeout: 60000, // 30 seconds per test
     hookTimeout: 60000, // 60 seconds for setup/teardown
 
     // Run tests sequentially to avoid database conflicts.

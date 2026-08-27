@@ -53,8 +53,8 @@ import {
 } from 'lucide-react';
 import { ReservationFloorMap } from '@/components/staff/ReservationFloorMap';
 import { DispatchBoard } from '@/components/staff/DispatchBoard';
-import type { ItemStatus } from '@/components/staff/types';
-import { itemStatusFlow } from '@/components/staff/types';
+import type { ItemStatus, FulfillmentState } from '@/components/staff/types';
+import { itemStatusFlow, canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from '@/components/staff/types';
 
 // Types
 interface Table {
@@ -72,6 +72,8 @@ interface Order {
   tableNumber?: string;
   staffName?: string;
   status: string;
+  /** Stage 6 canonical fulfillment state — KDS/board key. */
+  fulfillmentStatus?: string | null;
   items: OrderItem[];
   totalAmount: number;
   createdAt: string;
@@ -89,7 +91,9 @@ interface OrderItem {
   quantity: number;
   unitPrice: number;
   modifiers?: string[];
+  selectedModifiers?: Array<{ groupId: string; optionId: string; quantity: number; name?: string; groupName?: string }>;
   notes?: string;
+  specialInstructions?: string;
   status: string;
   station?: string;
 }
@@ -212,8 +216,8 @@ function ItemStatusChip({
       {item.modifiers && item.modifiers.length > 0 && (
         <p className="text-sm text-gray-600 mt-1">+ {item.modifiers.join(', ')}</p>
       )}
-      {item.notes && (
-        <p className="text-sm text-orange-600 mt-1 font-medium">⚠ {item.notes}</p>
+      {(item.specialInstructions || item.notes) && (
+        <p className="text-sm text-orange-600 mt-1 font-medium">⚠ {item.specialInstructions || item.notes}</p>
       )}
     </div>
   );
@@ -263,7 +267,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       const [tablesRes, ordersRes, shiftRes] = await Promise.all([
         api.get(`/staff/modules/${moduleSlug}/tables`),
         api.get(`/staff/modules/${moduleSlug}/orders`, {
-          params: { status: 'pending,confirmed,preparing,ready,completed,delivered' }
+          params: { status: 'pending,confirmed,queued,in_progress,ready,handed_off,completed' }
         }),
         api.get('/staff/shifts/me/current'),
       ]);
@@ -284,9 +288,12 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       setSelectedTable(prev => prev ? (mappedTables.find(t => t.id === prev.id) || prev) : null);
 
       setOrders(ordersRes.data.data || []);
-      setKitchenOrders((ordersRes.data.data || []).filter(
-        (o: Order) => ['confirmed', 'preparing'].includes(o.status)
-      ));
+      // Kitchen tab: orders with a canonical fulfillment state that's kitchen-active
+      // (confirmed = queued, in_progress, ready) or the legacy 'preparing' composite.
+      setKitchenOrders((ordersRes.data.data || []).filter((o: Order) => {
+        const cs = canonicalFulfillmentState(o);
+        return ['confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? o.status);
+      }));
 
       // Normalize shift: backend returns snake_case (opening_cash, start_time)
       // but Shift interface expects camelCase (openingCash, startTime)
@@ -342,7 +349,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
 
       const handleNewOrder = (order: Order) => {
         setOrders(prev => [order, ...prev]);
-        if (['confirmed', 'preparing'].includes(order.status)) {
+        const cs = canonicalFulfillmentState(order);
+        if (['confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? order.status)) {
           setKitchenOrders(prev => [order, ...prev]);
         }
         toast.info(`New order #${order.orderNumber}`, { description: order.customerName });
@@ -357,17 +365,18 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       // payload { id, status, tableNumber } — not { orderId, status }.
       // 'order:updated' is real but only fires on item-add and payment, so
       // status changes (like Accept) never reached this handler at all.
-      const handleStatusUpdate = (update: { id: string; status: string }) => {
+      const handleStatusUpdate = (update: { id: string; status: string; fulfillmentStatus?: string | null }) => {
         setOrders(prev => prev.map(o =>
-          o.id === update.id ? { ...o, status: update.status } : o
+          o.id === update.id ? { ...o, status: update.status, ...(update.fulfillmentStatus ? { fulfillmentStatus: update.fulfillmentStatus } : {}) } : o
         ));
         setKitchenOrders(prev => {
-          if (['confirmed', 'preparing'].includes(update.status)) {
+          const cs = update.fulfillmentStatus ?? update.status;
+          if (['confirmed', 'queued', 'in_progress', 'ready'].includes(cs)) {
             const order = orders.find(o => o.id === update.id);
             if (order && !prev.find(o => o.id === update.id)) {
-              return [{ ...order, status: update.status }, ...prev];
+              return [{ ...order, status: update.status, ...(update.fulfillmentStatus ? { fulfillmentStatus: update.fulfillmentStatus } : {}) }, ...prev];
             }
-            return prev.map(o => o.id === update.id ? { ...o, status: update.status } : o);
+            return prev.map(o => o.id === update.id ? { ...o, status: update.status, ...(update.fulfillmentStatus ? { fulfillmentStatus: update.fulfillmentStatus } : {}) } : o);
           }
           return prev.filter(o => o.id !== update.id);
         });
@@ -416,10 +425,32 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
       await api.patch(`/staff/modules/${moduleSlug}/orders/${orderId}/status`, { status });
+      // Stage 6: fulfillment-layer moves update fulfillmentStatus locally;
+      // transaction-layer moves (confirm / cancel) update status.
+      const isFulfillmentMove = FULFILLMENT_LAYER_STATES.includes(status as FulfillmentState);
       setOrders(prev => prev.map(o =>
-        o.id === orderId ? { ...o, status } : o
+        o.id === orderId
+          ? isFulfillmentMove
+            ? { ...o, fulfillmentStatus: status }
+            : { ...o, status }
+          : o
       ));
-      toast.success(`Order updated to ${status}`);
+      setKitchenOrders(prev => {
+        const cs = isFulfillmentMove ? status : undefined;
+        if (cs && ['queued', 'in_progress', 'ready'].includes(cs)) {
+          // Still kitchen-active — update in place or add if not present.
+          const existing = prev.find(o => o.id === orderId);
+          if (existing) {
+            return prev.map(o => o.id === orderId ? { ...o, fulfillmentStatus: status } : o);
+          }
+          const order = orders.find(o => o.id === orderId);
+          if (order) return [{ ...order, fulfillmentStatus: status }, ...prev];
+          return prev;
+        }
+        // Moved out of kitchen (handed_off / completed / cancelled) — remove.
+        return prev.filter(o => o.id !== orderId);
+      });
+      toast.success(`Order updated to ${status.replace('_', ' ')}`);
     } catch (error) {
       toast.error('Failed to update order');
     }
@@ -467,9 +498,12 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   };
 
   const acceptOrder = (orderId: string) => updateOrderStatus(orderId, 'confirmed');
-  const startPreparing = (orderId: string) => updateOrderStatus(orderId, 'preparing');
+  // Canonical fulfillment-layer moves: 'start_preparation' → in_progress,
+  // 'mark_ready' → ready, 'deliver' → handed_off. Backend resolveAction
+  // maps these from the target state name.
+  const startPreparing = (orderId: string) => updateOrderStatus(orderId, 'in_progress');
   const markReady = (orderId: string) => updateOrderStatus(orderId, 'ready');
-  const markServed = (orderId: string) => updateOrderStatus(orderId, 'delivered');
+  const markServed = (orderId: string) => updateOrderStatus(orderId, 'handed_off');
   const markCompleted = (orderId: string) => updateOrderStatus(orderId, 'completed');
 
   // Add item to existing order
@@ -630,12 +664,14 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
         orderNumber: created.orderNumber,
         tableNumber: created.tableNumber || undefined,
         status: created.status || 'confirmed',
-        items: quickCart.map(c => ({
+        fulfillmentStatus: created.fulfillmentStatus ?? 'queued',
+        items: (quickCart as any[]).map(c => ({
           id: c.id,
           name: c.name,
           quantity: c.quantity,
           unitPrice: quickCartLineUnitPrice(c),
           status: 'pending',
+          ...(c.selectedModifiers?.length ? { modifiers: c.selectedModifiers.map((m: any) => `${m.groupName}: ${m.name}`), selectedModifiers: c.selectedModifiers.map((m: any) => ({ groupId: m.groupId, optionId: m.optionId, quantity: m.quantity, name: m.name, groupName: m.groupName })) } : {}),
         })),
         totalAmount: created.totalAmount ?? quickCartTotal,
         createdAt: created.createdAt || new Date().toISOString(),
@@ -644,7 +680,10 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
         paymentStatus: 'unpaid',
       };
       setOrders(prev => [newOrder, ...prev]);
-      setKitchenOrders(prev => ['confirmed', 'preparing'].includes(newOrder.status) ? [newOrder, ...prev] : prev);
+      setKitchenOrders(prev => {
+        const cs = canonicalFulfillmentState(newOrder);
+        return ['confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? newOrder.status) ? [newOrder, ...prev] : prev;
+      });
       setSelectedOrder(newOrder);
       setShowPaymentModal(true);
       setQuickCart([]);
@@ -1029,7 +1068,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
           <div className="h-full flex flex-col">
             {/* Filter Tabs */}
             <div className="flex gap-2 mb-4">
-              {['active', 'pending', 'preparing', 'ready', 'completed'].map(filter => (
+              {['active', 'pending', 'queued', 'in_progress', 'ready', 'completed'].map(filter => (
                 <button
                   key={filter}
                   onClick={() => setStatusFilter(filter)}
@@ -1038,7 +1077,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                       : 'bg-white dark:bg-gray-800 text-gray-600'
                     }`}
                 >
-                  {filter}
+                  {filter.replace('_', ' ')}
                   {filter === 'pending' && (
                     <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-2">
                       {orders.filter(o => o.status === 'pending').length}
@@ -1052,16 +1091,25 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
             <div className="flex-1 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {orders
-                  .filter(o => statusFilter === 'active'
-                    ? ['pending', 'confirmed', 'preparing', 'ready'].includes(o.status)
-                    : o.status === statusFilter
-                  )
+                  .filter(o => {
+                    if (statusFilter === 'active') {
+                      const cs = canonicalFulfillmentState(o);
+                      return ['pending', 'confirmed', 'queued', 'in_progress', 'ready'].includes(cs ?? o.status);
+                    }
+                    // For named fulfillment states, check fulfillmentStatus;
+                    // for transaction states, check status.
+                    const cs = canonicalFulfillmentState(o);
+                    if (['queued', 'in_progress', 'ready', 'handed_off'].includes(statusFilter)) {
+                      return cs === statusFilter;
+                    }
+                    return o.status === statusFilter;
+                  })
                   .map(order => (
                     <Card
                       key={order.id}
                       className={`${order.status === 'pending' ? 'border-l-4 border-l-yellow-500' :
-                          order.status === 'preparing' ? 'border-l-4 border-l-blue-500' :
-                            order.status === 'ready' ? 'border-l-4 border-l-green-500 animate-pulse' :
+                          (canonicalFulfillmentState(order) ?? order.status) === 'in_progress' ? 'border-l-4 border-l-blue-500' :
+                            (canonicalFulfillmentState(order) ?? order.status) === 'ready' ? 'border-l-4 border-l-green-500 animate-pulse' :
                               ''
                         }`}
                     >
@@ -1080,11 +1128,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                           </div>
                           <div className="text-right">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                order.status === 'preparing' ? 'bg-blue-100 text-blue-800' :
-                                  order.status === 'ready' ? 'bg-green-100 text-green-800' :
+                                (canonicalFulfillmentState(order) ?? order.status) === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                  (canonicalFulfillmentState(order) ?? order.status) === 'ready' ? 'bg-green-100 text-green-800' :
                                     'bg-gray-100 text-gray-800'
                               }`}>
-                              {order.status}
+                              {(canonicalFulfillmentState(order) ?? order.status ?? '').replace('_', ' ')}
                             </span>
                             <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
                               <Timer className="h-3 w-3" />
@@ -1130,7 +1178,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                               </Button>
                             </>
                           )}
-                          {order.status === 'confirmed' && (
+                          {(canonicalFulfillmentState(order) ?? order.status) === 'confirmed' && (
                             <Button
                               size="sm"
                               className="w-full"
@@ -1139,7 +1187,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                               <Play className="h-4 w-4 mr-1" /> Start Prep
                             </Button>
                           )}
-                          {order.status === 'preparing' && (
+                          {(canonicalFulfillmentState(order) ?? order.status) === 'in_progress' && (
                             <Button
                               size="sm"
                               className="w-full bg-green-600 hover:bg-green-700"
@@ -1369,14 +1417,15 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                             : 'bg-green-600 hover:bg-green-700'
                           }`}
                         onClick={() => {
-                          if (order.status === 'confirmed') {
+                          const cs = canonicalFulfillmentState(order) ?? order.status;
+                          if (cs === 'confirmed' || cs === 'queued') {
                             startPreparing(order.id);
-                          } else {
+                          } else if (cs === 'in_progress') {
                             markReady(order.id);
                           }
                         }}
                       >
-                        {order.status === 'confirmed' ? (
+                        {(canonicalFulfillmentState(order) ?? order.status) === 'confirmed' || (canonicalFulfillmentState(order) ?? order.status) === 'queued' ? (
                           <>
                             <Play className="h-5 w-5 mr-2" /> START
                           </>
@@ -1410,7 +1459,10 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
               <h3 className="text-lg font-bold mb-4">Open Tabs & Unpaid Orders</h3>
               <div className="space-y-3">
                 {orders
-                  .filter(o => ['ready', 'delivered'].includes(o.status))
+                  .filter(o => {
+                  const cs = canonicalFulfillmentState(o);
+                  return ['ready', 'handed_off'].includes(cs ?? o.status);
+                })
                   .map(order => (
                     <div
                       key={order.id}

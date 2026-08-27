@@ -89,6 +89,8 @@ export class FulfillmentService {
       .from('fulfillments')
       .select('*')
       .eq('transaction_id', transactionId)
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (error) {
       logger.error('[Fulfillment] Failed to read fulfillment row', { transactionId, error: error.message });

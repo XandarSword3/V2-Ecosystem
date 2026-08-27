@@ -705,7 +705,9 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const stockAfterCreate = await readStock();
     expect(stockAfterCreate).toBe(stockBefore - RECIPE_QTY_PER_ITEM * ORDER_QTY);
 
-    // Advance to in_progress only — not yet handoff-eligible.
+    // Advance item to preparing (KDS kitchen-side view). Item-level bumps
+    // do NOT advance the fulfillment machine — only order-level transitions
+    // drive the fulfillment layer (queued → in_progress → ready → handed_off).
     const { data: payItem } = await supabase
       .from('order_items')
       .select('id')
@@ -719,7 +721,9 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     expect(toPreparing.status).toBe(200);
 
     // PAY #1 — mid-preparation: settlement succeeds, completion is deferred
-    // by the fulfillment gate (cannot complete from in_progress).
+    // by the fulfillment gate (cannot complete from queued/in_progress).
+    // Fulfillment remains at 'queued' because only order-level transitions
+    // advance the fulfillment machine; item-level bumps are kitchen-internal.
     const payMidPrep = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders/${payOrderId}/pay`)
       .set('Authorization', `Bearer ${staffToken}`)
@@ -728,14 +732,16 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     expect(payMidPrep.status).toBe(200);
     expect(payMidPrep.body.data.paymentStatus).toBe('paid');
     expect(payMidPrep.body.data.completionStatus).toBe('pending_fulfillment_handoff');
-    expect(payMidPrep.body.data.status).toBe('in_progress');
+    expect(payMidPrep.body.data.status).toBe('queued');
 
     const { data: fMid } = await supabase
       .from('fulfillments')
       .select('status')
       .eq('transaction_id', payOrderId)
       .single();
-    expect(fMid!.status).toBe('in_progress');
+    // Fulfillment still at 'queued' — item-level 'preparing' bumps are
+    // kitchen-internal and don't advance the fulfillment machine.
+    expect(fMid!.status).toBe('queued');
     const { data: tMid } = await supabase
       .from('transactions')
       .select('status, metadata')
