@@ -242,7 +242,8 @@ function modeGridCols(colCount: number): string {
 
 /** Which board column an order belongs in (per-order mode-aware). */
 function boardColumn(order: Order, modeConfig: ModeStateConfig | null): string {
-  const c = canonicalFulfillmentState(order);
+  const { mode } = resolvedOrderMode(order);
+  const c = canonicalFulfillmentState(order, mode);
   return resolveColumnKey(c, modeConfig);
 }
 
@@ -1013,7 +1014,7 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Status</span>
                   <span className="font-medium capitalize">
-                    {canonicalFulfillmentState(selectedOrder) ?? selectedOrder.status}
+                    {canonicalFulfillmentState(selectedOrder, selMode) ?? selectedOrder.status}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">

@@ -12,6 +12,7 @@ import {
   statesForMode,
   getModeStateConfig,
   resolveColumnKey,
+  canonicalFulfillmentState,
   isFulfillmentState,
   isFulfillmentMode,
   FULFILLMENT_LAYER_STATES,
@@ -672,5 +673,127 @@ describe('Mixed-mode isolation', () => {
 
   it('digital has the fewest columns (3 states)', () => {
     expect(digitalCfg.states).toHaveLength(3);
+  });
+});
+
+// ============================================
+// canonicalFulfillmentState: mode-aware legacy mapping
+// ============================================
+// The legacy mapping (preparing->in_progress, delivered/served->handed_off)
+// is ONLY valid for hospitality modes. Non-hospitality modes must not have
+// their raw FulfillmentState values reinterpreted through hospitality logic.
+
+describe('canonicalFulfillmentState mode-aware legacy mapping', () => {
+  it('hospitality + preparing -> in_progress', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'preparing' },
+      'on_premise',
+    );
+    expect(result).toBe('in_progress');
+  });
+
+  it('hospitality + delivered -> handed_off', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'delivered' },
+      'on_premise',
+    );
+    expect(result).toBe('handed_off');
+  });
+
+  it('hospitality + served -> handed_off', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'served' },
+      'on_premise',
+    );
+    expect(result).toBe('handed_off');
+  });
+
+  it('digital + delivered -> delivered (not handed_off)', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'delivered' },
+      'digital_delivery',
+    );
+    expect(result).toBe('delivered');
+  });
+
+  it('shipment + delivered -> delivered (not handed_off)', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'delivered' },
+      'shipment',
+    );
+    expect(result).toBe('delivered');
+  });
+
+  it('service + ready -> ready (not handed_off)', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'ready' },
+      'service_execution',
+    );
+    expect(result).toBe('ready');
+  });
+
+  it('digital + preparing -> preparing (pass-through, not in_progress)', () => {
+    // 'preparing' is not a valid FulfillmentState for digital, so it
+    // should be passed through as-is, not mapped to 'in_progress'.
+    const result = canonicalFulfillmentState(
+      { status: 'preparing' },
+      'digital_delivery',
+    );
+    expect(result).toBe('preparing');
+  });
+
+  it('shipment + shipped -> shipped (pass-through)', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'shipped' },
+      'shipment',
+    );
+    expect(result).toBe('shipped');
+  });
+
+  it('none + delivered -> delivered (pass-through, no fulfillment mapping)', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'delivered' },
+      'none',
+    );
+    expect(result).toBe('delivered');
+  });
+
+  it('null mode + preparing -> in_progress (legacy recovery)', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'preparing' },
+      null,
+    );
+    expect(result).toBe('in_progress');
+  });
+
+  it('undefined mode + delivered -> handed_off (legacy recovery)', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'delivered' },
+      undefined,
+    );
+    expect(result).toBe('handed_off');
+  });
+
+  it('no mode param + preparing -> in_progress (legacy recovery)', () => {
+    const result = canonicalFulfillmentState(
+      { status: 'preparing' },
+    );
+    expect(result).toBe('in_progress');
+  });
+
+  it('prefers fulfillmentStatus over status regardless of mode', () => {
+    const result = canonicalFulfillmentState(
+      { fulfillmentStatus: 'in_progress', status: 'preparing' },
+      'digital_delivery',
+    );
+    expect(result).toBe('in_progress');
+  });
+
+  it('fulfillmentStatus: delivered passes through for any mode', () => {
+    const result = canonicalFulfillmentState(
+      { fulfillmentStatus: 'delivered' },
+      'on_premise',
+    );
+    expect(result).toBe('delivered');
   });
 });

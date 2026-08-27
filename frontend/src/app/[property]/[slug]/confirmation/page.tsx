@@ -101,6 +101,8 @@ interface OrderConfirmation {
   status: string;
   /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
   fulfillment_status?: string | null;
+  /** Phase F1: which fulfillment mode governs this order's states. */
+  fulfillmentMode?: string | null;
   order_type: string;
   total_amount: number;
   tax_amount?: number;
@@ -690,8 +692,8 @@ function ConfirmationContent() {
                   )}
 
                   <div className="pt-2">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${orderStatusStyle(canonicalFulfillmentState(order) ?? order.status)}`}>
-                      {(canonicalFulfillmentState(order) ?? order.status ?? 'pending').toUpperCase()}
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${orderStatusStyle(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status)}`}>
+                      {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status ?? 'pending').toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -715,7 +717,7 @@ function ConfirmationContent() {
             the backend now routes table orders through
             service_locations.assigned_staff_id, so staff_name is the single
             source of truth for whether this order has someone to rate. */}
-        {order && order.staff_name && ['ready', 'handed_off', 'completed'].includes(canonicalFulfillmentState(order) ?? order.status) && (
+        {order && order.staff_name && ['ready', 'handed_off', 'completed'].includes(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

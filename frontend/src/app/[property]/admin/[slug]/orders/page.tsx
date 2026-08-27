@@ -15,7 +15,8 @@ import { useSocket } from '@/lib/socket';
 // Canonical Engine A domain helpers (plan F1): the page keys off the
 // canonical fulfillment state — never legacy composites (preparing /
 // delivered) and never fulfillment inferred from transactions.status.
-import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState } from '@/types';
+import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState, type FulfillmentMode } from '@/types';
+import { getModeStateConfig, resolveColumnKey } from '@/lib/engine-a/types';
 import {
   Clock,
   CheckCircle2,
@@ -62,6 +63,8 @@ interface Order {
   /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */
   fulfillment_status?: string | null;
   fulfillmentStatus?: string | null;
+  /** Phase F1: which fulfillment mode governs this order's states. */
+  fulfillmentMode?: string | null;
   total_amount: number;
   totalAmount?: number;
   table_number?: number;
@@ -93,14 +96,25 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
 };
 
 /** Canonical state for board/action purposes — a confirmed transaction
- * whose fulfillment is queued (or not yet created) displays as 'queued'. */
+ * whose fulfillment is queued (or not yet created) displays as the mode's
+ * first column state. */
 function effectiveState(order: Order): string {
-  const c = canonicalFulfillmentState(order);
-  return c === 'confirmed' ? 'queued' : (c ?? order.status);
+  const mode = (order.fulfillmentMode as FulfillmentMode | null) ?? null;
+  const c = canonicalFulfillmentState(order, mode);
+  const cfg = getModeStateConfig(mode);
+  return resolveColumnKey(c, cfg);
 }
 
 /** Canonical filter list — transaction states + fulfillment states. */
-const FILTER_STATES = ['all', 'pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'];
+// All possible filter states across all fulfillment modes + transaction layer
+const FILTER_STATES = [
+  'all',
+  'pending', 'confirmed', 'completed', 'cancelled',
+  'queued', 'in_progress', 'ready', 'handed_off',
+  'provisioning', 'provisioned', 'delivered',
+  'allocated', 'picking', 'packed', 'shipped', 'in_transit',
+  'received', 'working', 'collected',
+];
 
 export default function DynamicOrdersPage() {
   const params = useParams();

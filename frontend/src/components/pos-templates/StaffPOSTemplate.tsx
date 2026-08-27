@@ -178,7 +178,7 @@ const ITEM_NEXT_ACTION_LABEL: Record<ItemStatus, string | null> = {
 // An order is "kitchen-active" if its fulfillment state is in the
 // active (non-terminal) portion of its mode's state machine.
 function isKitchenActive(order: Order): boolean {
-  const cs = canonicalFulfillmentState(order);
+  const cs = canonicalFulfillmentState(order, order.fulfillmentMode);
   const mode = (order.fulfillmentMode as FulfillmentMode | null | undefined) ?? null;
   const cfg = getModeStateConfig(mode);
   if (cfg) {
@@ -313,7 +313,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       // (non-terminal) part of the mode's state machine. The mode is derived
       // from the order's fulfillmentMode; hospitality remains the fallback.
       setKitchenOrders((ordersRes.data.data || []).filter((o: Order) => {
-        const cs = canonicalFulfillmentState(o);
+        const cs = canonicalFulfillmentState(o, o.fulfillmentMode);
         const mode = (o.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
         const cfg = getModeStateConfig(mode);
         if (cfg) {
@@ -1141,7 +1141,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                     }
                     // For named fulfillment states, check fulfillmentStatus;
                     // for transaction states, check status.
-                    const cs = canonicalFulfillmentState(o);
+                    const cs = canonicalFulfillmentState(o, o.fulfillmentMode);
                     if (['queued', 'in_progress', 'ready', 'handed_off'].includes(statusFilter)) {
                       return cs === statusFilter;
                     }
@@ -1151,8 +1151,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                     <Card
                       key={order.id}
                       className={`${order.status === 'pending' ? 'border-l-4 border-l-yellow-500' :
-                          (canonicalFulfillmentState(order) ?? order.status) === 'in_progress' ? 'border-l-4 border-l-blue-500' :
-                            (canonicalFulfillmentState(order) ?? order.status) === 'ready' ? 'border-l-4 border-l-green-500 animate-pulse' :
+                          (canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'in_progress' ? 'border-l-4 border-l-blue-500' :
+                            (canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'ready' ? 'border-l-4 border-l-green-500 animate-pulse' :
                               ''
                         }`}
                     >
@@ -1171,11 +1171,11 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                           </div>
                           <div className="text-right">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                (canonicalFulfillmentState(order) ?? order.status) === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                  (canonicalFulfillmentState(order) ?? order.status) === 'ready' ? 'bg-green-100 text-green-800' :
+                                (canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                  (canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'ready' ? 'bg-green-100 text-green-800' :
                                     'bg-gray-100 text-gray-800'
                               }`}>
-                              {(canonicalFulfillmentState(order) ?? order.status ?? '').replace('_', ' ')}
+                              {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status ?? '').replace('_', ' ')}
                             </span>
                             <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
                               <Timer className="h-3 w-3" />
@@ -1221,7 +1221,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                               </Button>
                             </>
                           )}
-                          {(canonicalFulfillmentState(order) ?? order.status) === 'confirmed' && (
+                          {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'confirmed' && (
                             <Button
                               size="sm"
                               className="w-full"
@@ -1230,7 +1230,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                               <Play className="h-4 w-4 mr-1" /> Start Prep
                             </Button>
                           )}
-                          {(canonicalFulfillmentState(order) ?? order.status) === 'in_progress' && (
+                          {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'in_progress' && (
                             <Button
                               size="sm"
                               className="w-full bg-green-600 hover:bg-green-700"
@@ -1460,7 +1460,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                             : 'bg-green-600 hover:bg-green-700'
                           }`}
                         onClick={() => {
-                          const cs = canonicalFulfillmentState(order) ?? order.status;
+                          const cs = canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status;
                           if (cs === 'confirmed' || cs === 'queued') {
                             startPreparing(order.id);
                           } else if (cs === 'in_progress') {
@@ -1468,7 +1468,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                           }
                         }}
                       >
-                        {(canonicalFulfillmentState(order) ?? order.status) === 'confirmed' || (canonicalFulfillmentState(order) ?? order.status) === 'queued' ? (
+                        {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'confirmed' || (canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'queued' ? (
                           <>
                             <Play className="h-5 w-5 mr-2" /> START
                           </>
@@ -1503,7 +1503,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
               <div className="space-y-3">
                 {orders
                   .filter(o => {
-                  const cs = canonicalFulfillmentState(o);
+                  const cs = canonicalFulfillmentState(o, o.fulfillmentMode);
                   return ['ready', 'handed_off'].includes(cs ?? o.status);
                 })
                   .map(order => (

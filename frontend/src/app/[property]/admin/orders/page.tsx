@@ -75,13 +75,26 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
  * whose fulfillment is queued (or not yet created) displays as the mode's
  * first column state. */
 function effectiveState(order: Order): string {
-  const c = canonicalFulfillmentState(order);
-  const mode = (order.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
+  const mode = (order.fulfillmentMode as FulfillmentMode | null) ?? null;
+  const c = canonicalFulfillmentState(order, mode);
   const cfg = getModeStateConfig(mode);
   return resolveColumnKey(c, cfg);
 }
 
-const FILTER_STATES = ['all', 'pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'];
+// All possible filter states across all fulfillment modes + transaction layer
+const FILTER_STATES = [
+  'all',
+  // Transaction layer
+  'pending', 'confirmed', 'completed', 'cancelled',
+  // Hospitality
+  'queued', 'in_progress', 'ready', 'handed_off',
+  // Digital
+  'provisioning', 'provisioned', 'delivered',
+  // Shipment
+  'allocated', 'picking', 'packed', 'shipped', 'in_transit',
+  // Service
+  'received', 'working', 'collected',
+];
 
 export default function AdminOrdersPage() {
   const t = useTranslations('admin');
@@ -445,7 +458,7 @@ export default function AdminOrdersPage() {
                         {(() => {
                           const mode = (order.fulfillmentMode as FulfillmentMode) ?? 'on_premise';
                           const cfg = getModeStateConfig(mode);
-                          const cs = canonicalFulfillmentState(order);
+                          const cs = canonicalFulfillmentState(order, order.fulfillmentMode);
                           // Transaction-layer: pending → confirmed
                           if (cs === 'pending' || (!cs && st === 'pending')) {
                             return (

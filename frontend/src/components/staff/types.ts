@@ -70,11 +70,15 @@ import { getModeStateConfig, type ModeStateConfig } from '@/lib/engine-a/types';
 /** @deprecated Use getModeStateConfig(mode).states instead. */
 export const statusFlow = ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed'] as const;
 
-/** Returns the ordered fulfillment states for a mode, or the legacy
- *  hospitality fallback for null/unknown modes during migration. */
+/** Returns the ordered fulfillment states for a mode.
+ *  - Valid mode: returns its state list (including empty for 'none').
+ *  - null/undefined: legacy hospitality fallback during migration.
+ */
 export function statusFlowForMode(mode: FulfillmentMode | null | undefined): readonly string[] {
   const cfg = getModeStateConfig(mode);
-  return cfg?.states ?? ['queued', 'in_progress', 'ready', 'handed_off'];
+  if (cfg) return cfg.states;
+  // Legacy recovery: null/unknown mode defaults to hospitality states
+  return ['queued', 'in_progress', 'ready', 'handed_off'];
 }
 
 // Mirrors backend ITEM_STATUS_FLOW in module-staff.controller.ts — forward-only,

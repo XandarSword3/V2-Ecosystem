@@ -439,25 +439,59 @@ export function resolveColumnKey(
  * Resolve the canonical state for an order payload. Stage 6: prefer the
  * canonical field (fulfillmentStatus / fulfillment_status), fall back to
  * the transitional metadata value, then map legacy composite statuses
- * (pre-Stage-6 rows / old socket events). The ONLY place legacy composites
- * ('preparing'/'delivered'/'served') may appear outside the adapter.
+ * (pre-Stage-6 rows / old socket events).
+ *
+ * The legacy mapping (preparing->in_progress, delivered/served->handed_off)
+ * is ONLY valid for hospitality modes (on_premise/pickup/local_delivery)
+ * or when the mode is unknown (legacy recovery). When fulfillmentMode is a
+ * known non-hospitality mode, a raw FulfillmentState value from status is
+ * passed through without hospitality reinterpretation.
+ *
+ * @param order - The order object with status fields
+ * @param fulfillmentMode - The order's fulfillment mode. When provided,
+ *   legacy hospitality mappings are ONLY applied for hospitality modes.
+ *   When omitted, the function assumes legacy recovery (hospitality compat).
  */
-export function canonicalFulfillmentState(order: {
-  fulfillmentStatus?: string | null;
-  fulfillment_status?: string | null;
-  status?: string;
-}): CanonicalOrderState | null {
+export function canonicalFulfillmentState(
+  order: {
+    fulfillmentStatus?: string | null;
+    fulfillment_status?: string | null;
+    status?: string;
+  },
+  fulfillmentMode?: FulfillmentMode | string | null,
+): CanonicalOrderState | null {
+  // 1. Prefer the canonical fulfillment status field
   const canonical = order.fulfillmentStatus ?? order.fulfillment_status ?? null;
   if (canonical && (isTransactionState(canonical) || isFulfillmentState(canonical))) {
     return canonical as CanonicalOrderState;
   }
-  switch (order.status) {
-    case 'preparing': return 'in_progress';
-    case 'delivered':
-    case 'served':    return 'handed_off';
-    case 'ready':     return 'ready';
-    default:          return (order.status as CanonicalOrderState) ?? null;
+
+  // 2. Determine if legacy hospitality mapping should apply
+  const isHospitalityOrUnknown = !fulfillmentMode
+    || fulfillmentMode === 'on_premise'
+    || fulfillmentMode === 'pickup'
+    || fulfillmentMode === 'local_delivery';
+
+  // 3. Fall back to status with mode-aware legacy mapping
+  const raw = order.status;
+  if (!raw) return null;
+
+  if (isHospitalityOrUnknown) {
+    // Legacy hospitality composites (pre-Stage-6 / old socket events)
+    switch (raw) {
+      case 'preparing':  return 'in_progress';
+      case 'delivered':
+      case 'served':     return 'handed_off';
+      case 'ready':      return 'ready';
+    }
   }
+
+  // Non-hospitality mode or no legacy match: pass through if valid
+  if (isFulfillmentState(raw)) return raw as FulfillmentState;
+  if (isTransactionState(raw))  return raw as TransactionState;
+
+  // Unknown value — return as-is for downstream handling
+  return raw as CanonicalOrderState;
 }
 
 // ============================================
