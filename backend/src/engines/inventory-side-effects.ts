@@ -1,9 +1,31 @@
 /**
- * Inventory Side Effects for Engine State Transitions
+ * Inventory Side Effects for Engine State Transitions (DEPRECATED — Path B)
  *
- * Automatically deducts inventory when transactions reach states
- * that indicate items have been consumed/used, and restores it when
- * a confirmed order is later cancelled.
+ * PHASE 5 AUTHORITY ARCHITECTURE:
+ *
+ * There are two inventory mutation authorities in the Engine A order flow:
+ *
+ *   Path A (AUTHORITATIVE): deduct_inventory_for_order_items — called at
+ *   order creation time in dynamic-module.router.ts. This is the ONE true
+ *   stock authority. It deducts base stock immediately, before the order is
+ *   committed. Restored by restore_inventory_for_order_items on cancel.
+ *
+ *   Path B (THIS FILE — DEPRECATED): deduct_inventory_for_order — called
+ *   as a state machine side effect on confirmation. This is now a no-op for
+ *   the normal flow because Path A already deducted at creation. Kept only
+ *   as a safety net for legacy rows that predate Path A. If Path A is
+ *   guaranteed to have run for every order, this entire side effect can be
+ *   removed.
+ *
+ *   Path C (Phase 5): ResourceConsumptionService — allocation/consumption/
+ *   release via resource_allocations table. This is the Phase 5 resource
+ *   lifecycle authority, coexisting with Path A's inventory_transactions.
+ *   Path C manages the PLANNING layer (allocation = reservation);
+ *   Path A manages the PHYSICAL layer (deduction = stock movement).
+ *
+ * DO NOT add a third inventory authority. If a new inventory operation is
+ * needed, it must go through either Path A (for direct stock mutations) or
+ * Path C (for resource lifecycle planning), never as a parallel path.
  *
  * Fixed 2026-08-05: the previous version called deduct_inventory_for_order_v2
  * (does not exist in this database) and, on the fallback path, called

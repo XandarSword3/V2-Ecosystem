@@ -39,6 +39,7 @@ import { submitProductReview, submitStaffReview, getProductItemRating } from '..
 import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
 import * as sharedCapacityAccessParser from '../modules/shared/import/shared-capacity-access-import.parser.js';
 import * as timeExclusiveReservationParser from '../modules/shared/import/time-exclusive-reservation-import.parser.js';
+import { isValidLifecycleTransition, ALL_LIFECYCLE_STATUSES, type CatalogLifecycleStatus } from '../modules/catalog/lifecycle.js';
 type TemplateType = 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement' | 'platform_entitlement';
 interface MountedModuleContext {
   id: string;
@@ -647,14 +648,34 @@ function buildInstantTransactionRouter(router: Router): void {
         lifecycle_status,
         ...otherFields
       } = req.body ?? {};
-      // First, get the existing item to preserve metadata
+      // First, get the existing item to preserve metadata AND read current
+      // lifecycle_status for transition graph validation (Phase 8).
       const { data: existingItem } = await supabase
         .from('catalog_items')
-        .select('metadata')
+        .select('metadata, lifecycle_status')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
-      const validLifecycle = ['draft', 'active', 'temporarily_unavailable', 'sold_out', 'archived'];
+
+      // Phase 8: validate lifecycle transition through the canonical graph.
+      // Only apply the update if the transition is legal.
+      let resolvedLifecycleStatus: string | undefined;
+      if (lifecycle_status !== undefined) {
+        const currentStatus = (existingItem?.lifecycle_status ?? 'active') as CatalogLifecycleStatus;
+        const requestedStatus = lifecycle_status as CatalogLifecycleStatus;
+        if (isValidLifecycleTransition(currentStatus, requestedStatus)) {
+          resolvedLifecycleStatus = requestedStatus;
+        } else {
+          // Invalid transition — reject with a clear error.
+          const legalTargets = ALL_LIFECYCLE_STATUSES.filter((s: string) =>
+            isValidLifecycleTransition(currentStatus, s as CatalogLifecycleStatus)
+          );
+          return res.status(400).json({
+            success: false,
+            error: `Invalid lifecycle transition: ${currentStatus} → ${requestedStatus}. Legal targets: ${legalTargets.join(', ') || 'none (terminal state)'}`,
+          });
+        }
+      }
       const { data, error } = await supabase
         .from('catalog_items')
         .update({
@@ -663,7 +684,7 @@ function buildInstantTransactionRouter(router: Router): void {
           ...(description !== undefined && { description }),
           ...(category_id !== undefined && { category: category_id }),
           ...(is_available !== undefined && { is_available }),
-          ...(lifecycle_status !== undefined && validLifecycle.includes(lifecycle_status) && { lifecycle_status }),
+          ...(resolvedLifecycleStatus !== undefined && { lifecycle_status: resolvedLifecycleStatus }),
           metadata: {
             ...(existingItem?.metadata || {}),
             ...(name_ar !== undefined && { name_ar }),
@@ -1111,6 +1132,13 @@ function buildInstantTransactionRouter(router: Router): void {
           };
         });
 
+        // ── PATH A: AUTHORITATIVE stock deduction (Phase 5) ─────────────────
+        // This is the ONE authoritative inventory mutation for Engine A orders.
+        // It deducts base recipe stock immediately at creation time, BEFORE the
+        // order is committed to the kitchen. If this fails, the order is deleted.
+        // Restored by restore_inventory_for_order_items on cancellation.
+        // The engine state machine side effect (Path B in inventory-side-effects.ts)
+        // is now a no-op for orders created through this path.
         const { error: deductErr } = await supabase.rpc('deduct_inventory_for_order_items', {
           p_items: inventoryItemsPayload,
           p_user_id: req.user?.userId ?? null,
@@ -1263,13 +1291,28 @@ function buildInstantTransactionRouter(router: Router): void {
                 baseQuantity: orderItem.quantity,
               });
               
-              // Compensating transaction: delete order and reverse base inventory deduction
+              // Compensating transaction: reverse base inventory deduction FIRST,
+              // then delete order_items and the transaction. Without the restore,
+              // the base deduction from deduct_inventory_for_order_items becomes a
+              // phantom — stock deducted but no order exists to compensate on.
+              const restorePayload = insertedOrderItems.map((oi: any) => ({
+                catalog_item_id: oi.catalog_item_id,
+                quantity: oi.quantity,
+              }));
+              if (restorePayload.length > 0) {
+                const { error: restoreErr } = await supabase.rpc('restore_inventory_for_order_items', {
+                  p_items: restorePayload,
+                  p_user_id: req.user?.userId ?? null,
+                });
+                if (restoreErr) {
+                  logger.error('[Dynamic Router] Failed to restore base inventory after customization failure', {
+                    orderId: created.id,
+                    error: restoreErr.message,
+                  });
+                }
+              }
               await supabase.from('order_items').delete().eq('transaction_id', created.id);
               await supabase.from('transactions').delete().eq('id', created.id);
-              
-              // Note: base inventory deduction reversal would require a compensating RPC
-              // For now, we accept that base deduction may not be reversed on customization failure
-              // This is a known limitation that should be addressed in a future iteration
               
               return res.status(400).json({
                 success: false,
@@ -1281,7 +1324,23 @@ function buildInstantTransactionRouter(router: Router): void {
         } catch (customizationErr: any) {
           logger.error('[Dynamic Router] Exception during customization inventory processing:', customizationErr);
           
-          // Compensating transaction: delete order
+          // Compensating transaction: reverse base inventory, then delete order.
+          const restorePayload = insertedOrderItems.map((oi: any) => ({
+            catalog_item_id: oi.catalog_item_id,
+            quantity: oi.quantity,
+          }));
+          if (restorePayload.length > 0) {
+            const { error: restoreErr } = await supabase.rpc('restore_inventory_for_order_items', {
+              p_items: restorePayload,
+              p_user_id: req.user?.userId ?? null,
+            });
+            if (restoreErr) {
+              logger.error('[Dynamic Router] Failed to restore base inventory after customization exception', {
+                orderId: created.id,
+                error: restoreErr.message,
+              });
+            }
+          }
           await supabase.from('order_items').delete().eq('transaction_id', created.id);
           await supabase.from('transactions').delete().eq('id', created.id);
           
