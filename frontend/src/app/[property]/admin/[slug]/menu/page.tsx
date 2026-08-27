@@ -37,6 +37,32 @@ import {
   Upload,
 } from 'lucide-react';
 
+type LifecycleStatus = 'draft' | 'active' | 'temporarily_unavailable' | 'sold_out' | 'archived';
+
+const LIFECYCLE_TRANSITIONS: Record<LifecycleStatus, { action: string; label: string; color: string }[]> = {
+  draft: [{ action: 'activate', label: 'Publish', color: 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' }],
+  active: [
+    { action: 'temporarily_unavailable', label: 'Pause', color: 'bg-amber-100 text-amber-600 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400' },
+    { action: 'sell_out', label: 'Sell Out', color: 'bg-orange-100 text-orange-600 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
+    { action: 'archive', label: 'Archive', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400' },
+  ],
+  temporarily_unavailable: [
+    { action: 'restore', label: 'Restore', color: 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' },
+    { action: 'sell_out', label: 'Sell Out', color: 'bg-orange-100 text-orange-600 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
+    { action: 'archive', label: 'Archive', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-400' },
+  ],
+  sold_out: [],
+  archived: [],
+};
+
+const LIFECYCLE_BADGE: Record<LifecycleStatus, { label: string; color: string }> = {
+  draft: { label: 'Draft', color: 'bg-slate-500 text-white' },
+  active: { label: 'Active', color: 'bg-emerald-500 text-white' },
+  temporarily_unavailable: { label: 'Paused', color: 'bg-amber-500 text-white' },
+  sold_out: { label: 'Sold Out', color: 'bg-orange-500 text-white' },
+  archived: { label: 'Archived', color: 'bg-gray-400 text-white' },
+};
+
 interface MenuItem {
   id: string;
   name: string;
@@ -47,6 +73,7 @@ interface MenuItem {
   category_id: string;
   image_url?: string;
   is_available: boolean;
+  lifecycle_status: LifecycleStatus;
   is_featured: boolean;
   is_vegetarian: boolean;
   is_spicy: boolean;
@@ -162,6 +189,7 @@ export default function DynamicMenuPage() {
         category_id: item.category,
         image_url: item.metadata?.image_url,
         is_available: item.is_available,
+        lifecycle_status: item.lifecycle_status || 'active',
         is_featured: item.metadata?.is_featured || false,
         is_vegetarian: item.metadata?.is_vegetarian || false,
         is_spicy: item.metadata?.is_spicy || false,
@@ -359,6 +387,20 @@ export default function DynamicMenuPage() {
     }
   };
 
+  const transitionLifecycle = async (item: MenuItem, action: string) => {
+    try {
+      await api.put(`/${slug}/admin/items/${item.id}`, {
+        lifecycle_status: action,
+      });
+      fetchData();
+      const label = LIFECYCLE_TRANSITIONS[item.lifecycle_status]?.find(t => t.action === action)?.label ?? action;
+      toast.success(`${item.name}: ${label}`);
+    } catch (error: any) {
+      const msg = error?.response?.data?.error || 'Failed to update lifecycle';
+      toast.error(msg);
+    }
+  };
+
   const toggleAvailability = async (item: MenuItem) => {
     try {
       await api.put(`/${slug}/admin/items/${item.id}`, {
@@ -466,9 +508,9 @@ export default function DynamicMenuPage() {
           <p className="text-2xl font-bold text-slate-900 dark:text-white">{items.length}</p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Available</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Active</p>
           <p className="text-2xl font-bold text-emerald-600">
-            {items.filter(i => i.is_available).length}
+            {items.filter(i => i.is_available && i.lifecycle_status === 'active').length}
           </p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
@@ -534,6 +576,11 @@ export default function DynamicMenuPage() {
                         {!item.is_available && (
                           <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full">
                             Hidden
+                          </span>
+                        )}
+                        {item.lifecycle_status && item.lifecycle_status !== 'active' && (
+                          <span className={`px-2 py-1 text-xs rounded-full ${LIFECYCLE_BADGE[item.lifecycle_status]?.color ?? 'bg-gray-400 text-white'}`}>
+                            {LIFECYCLE_BADGE[item.lifecycle_status]?.label ?? item.lifecycle_status}
                           </span>
                         )}
                       </div>
@@ -608,6 +655,20 @@ export default function DynamicMenuPage() {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
+                      {/* Phase 8: Lifecycle transition buttons */}
+                      {(LIFECYCLE_TRANSITIONS[item.lifecycle_status] ?? []).length > 0 && (
+                        <div className="flex gap-1.5 mt-2">
+                          {LIFECYCLE_TRANSITIONS[item.lifecycle_status].map((t) => (
+                            <button
+                              key={t.action}
+                              onClick={() => transitionLifecycle(item, t.action)}
+                              className={`flex-1 py-1.5 rounded text-xs font-medium transition-colors ${t.color}`}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -807,6 +868,26 @@ export default function DynamicMenuPage() {
                       />
                       <span className="text-sm text-slate-700 dark:text-slate-300">Available</span>
                     </label>
+                    {/* Phase 8: Lifecycle status selector */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-700 dark:text-slate-300">Lifecycle:</span>
+                      <select
+                        value={(formData as any).lifecycle_status ?? (editingItem?.lifecycle_status ?? 'active')}
+                        onChange={(e) => setFormData({ ...formData, lifecycle_status: e.target.value as LifecycleStatus })}
+                        className="text-sm border border-slate-300 dark:border-slate-600 rounded px-2 py-1 dark:bg-slate-700 dark:text-white"
+                      >
+                        {(['draft', 'active', 'temporarily_unavailable', 'sold_out', 'archived'] as const).map((s) => {
+                          const current = editingItem?.lifecycle_status ?? 'active';
+                          const legal = LIFECYCLE_TRANSITIONS[current]?.some(t => t.action === s);
+                          const isCurrent = s === current;
+                          return (
+                            <option key={s} value={s} disabled={!isCurrent && !legal}>
+                              {LIFECYCLE_BADGE[s]?.label ?? s}{isCurrent ? ' (current)' : !legal ? ' —' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
