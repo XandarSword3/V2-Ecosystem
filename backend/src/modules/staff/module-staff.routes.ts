@@ -25,6 +25,12 @@ router.post('/scan', authorize(...staffRoles), moduleStaffController.scanCode);
 router.get('/customers/search', authorize(...staffRoles), moduleStaffController.searchCustomers);
 
 // ============================================
+// Module Context (staff-facing metadata)
+// ============================================
+
+router.get('/modules/:slug/context', authorize(...staffRoles), verifyStaffModuleAccess, moduleStaffController.getModuleContext);
+
+// ============================================
 // Menu Service Orders (menu-service, kiosk, etc.)
 // ============================================
 

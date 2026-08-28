@@ -58,6 +58,57 @@ function legacyFulfillmentToCanonical(status: string | null): string | null {
  */
 
 // ============================================
+// MODULE CONTEXT (staff-facing metadata)
+// ============================================
+
+/**
+ * GET /staff/modules/:slug/context
+ *
+ * Returns the minimal module metadata the staff frontend needs to
+ * render the correct POS/dashboard template. Protected by the same
+ * requireModulePropertyAccess boundary the rest of the staff routes use.
+ */
+export async function getModuleContext(req: Request, res: Response) {
+  try {
+    const { slug } = req.params;
+    const supabase = getSupabase();
+
+    const { data: mod, error } = await supabase
+      .from('modules')
+      .select('id, slug, name, engine_type, is_active, require_reservation, settings')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (error) {
+      logger.error('[StaffModuleContext] Query failed:', error);
+      res.status(500).json({ success: false, error: 'Failed to load module context' });
+      return;
+    }
+
+    if (!mod) {
+      res.status(404).json({ success: false, error: 'Module not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: mod.id,
+        slug: mod.slug,
+        name: mod.name,
+        engine_type: mod.engine_type,
+        is_active: mod.is_active,
+        require_reservation: mod.require_reservation,
+        settings: mod.settings,
+      },
+    });
+  } catch (err: any) {
+    logger.error('[StaffModuleContext] Unexpected error:', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ============================================
 // ORDERS (for menu_service modules)
 // ============================================
 
@@ -96,7 +147,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       .select(`
         id, customer_id, staff_id, engine_type, status, amount, created_at,
         reference_id, reference_table, metadata, service_location_id,
-        fulfillments ( status )
+        fulfillments ( status, mode )
       `)
       .eq('engine_type', 'instant_transaction')
       .eq('module_id', moduleId || module.id)
@@ -283,10 +334,13 @@ export async function getModuleOrders(req: Request, res: Response) {
       // No transitional metadata mirror exists anymore — the only fallback
       // is the legacy-composite map for pre-Stage-6 rows that have no
       // fulfillment row (historical data on live instances).
-      const fulfillmentRel = (order as { fulfillments?: Array<{ status?: string | null }> | { status?: string | null } | null }).fulfillments ?? null;
+      const fulfillmentRel = (order as { fulfillments?: Array<{ status?: string | null; mode?: string | null }> | { status?: string | null; mode?: string | null } | null }).fulfillments ?? null;
       const fulfillmentStatus = Array.isArray(fulfillmentRel)
         ? (fulfillmentRel[0]?.status ?? null)
         : (fulfillmentRel?.status ?? null);
+      const fulfillmentMode = Array.isArray(fulfillmentRel)
+        ? (fulfillmentRel[0]?.mode ?? null)
+        : (fulfillmentRel?.mode ?? null);
       const canonicalFulfillmentState = fulfillmentStatus ?? legacyFulfillmentToCanonical(order.status);
       return {
         id: order.id,
@@ -299,6 +353,10 @@ export async function getModuleOrders(req: Request, res: Response) {
         status: order.status,
         // Canonical fulfillment state — the KDS consumes THIS, not status.
         fulfillmentStatus: canonicalFulfillmentState,
+        // Phase F1: fulfillment mode tells the frontend which state machine
+        // governs this order (on_premise → hospitality states,
+        // digital_delivery → provisioning/provisioned/delivered, etc.).
+        fulfillmentMode: fulfillmentMode ?? meta.fulfillment_mode ?? null,
         paymentMethod: rawPaymentMethod,
         paymentStatus,
         isPaidOnline: isOnlinePayment,

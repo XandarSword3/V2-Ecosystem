@@ -21,7 +21,7 @@
 import { test, expect } from '../fixtures/auth.fixture';
 import { TEST_STAFF_EMAIL, TEST_STAFF_PASSWORD } from '../fixtures/test-credentials';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://walid.localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 const TEST_MODULE_SLUG = process.env.E2E_ENGINE_A_SLUG || 'poolside-grill';
 
@@ -29,12 +29,37 @@ const TEST_MODULE_SLUG = process.env.E2E_ENGINE_A_SLUG || 'poolside-grill';
 // Helpers
 // ---------------------------------------------------------------------------
 
+const TEST_PROPERTY_SLUG = process.env.E2E_PROPERTY_SLUG || 'walid-s-property';
+
+async function dismissCookieConsent(page: any) {
+  try {
+    const btn = page.getByRole('button', { name: /accept all/i });
+    if (await btn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await btn.click();
+      await page.waitForTimeout(500);
+    }
+  } catch { /* not present */ }
+}
+
 async function loginAsAdmin(page: any) {
-  await page.goto(`${FRONTEND_URL}/login`, { waitUntil: 'networkidle', timeout: 30_000 });
-  await page.fill('input[type="email"]', process.env.E2E_ADMIN_EMAIL || 'admin@v2ecosystem.com');
-  await page.fill('input[type="password"]', process.env.E2E_ADMIN_PASSWORD || 'admin123');
-  await page.click('button[type="submit"]');
-  await page.waitForURL(/\/admin/, { timeout: 30_000 });
+  const email = process.env.E2E_ADMIN_EMAIL || 'test.admin@v2ecosystem.com';
+  const password = process.env.E2E_ADMIN_PASSWORD || 'admin123';
+  const response = await page.request.post(`${API_URL}/api/v1/auth/login`, {
+    data: { email, password },
+    timeout: 30_000,
+  });
+  if (!response.ok()) throw new Error(`API login failed: ${response.status()} ${await response.text()}`);
+  const body = await response.json();
+  const accessToken = body?.data?.tokens?.accessToken || body?.data?.accessToken;
+  if (!accessToken) throw new Error('No accessToken in response');
+  await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  await page.waitForTimeout(1_000);
+  await dismissCookieConsent(page);
+  await page.evaluate(({ token }) => {
+    localStorage.setItem('accessToken', token);
+  }, { token: accessToken });
+  await page.reload({ waitUntil: 'networkidle', timeout: 30_000 });
+  await dismissCookieConsent(page);
 }
 
 /** Find the lifecycle badge span for a given item name. */
@@ -190,7 +215,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     await loginAsAdmin(page);
 
     // Navigate to the admin menu management page for the test module
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -208,7 +233,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     page,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -237,7 +262,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
   // -----------------------------------------------------------------------
   test('draft item shows Publish button', async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -260,7 +285,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     request,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -305,7 +330,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     request,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -349,7 +374,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     page,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -392,7 +417,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     request,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -439,7 +464,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     page,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -466,7 +491,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     const freshItemId = await createTestItem(request, staffToken!, { name: freshItemName });
 
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });
@@ -550,7 +575,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     page,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/admin/${TEST_MODULE_SLUG}/menu`, {
+    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
       waitUntil: 'networkidle',
       timeout: 30_000,
     });

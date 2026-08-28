@@ -38,7 +38,7 @@ export default function ModulesSlugPage() {
   useEffect(() => {
     const fetchModule = async () => {
       try {
-        const response = await api.get(`/admin/modules/${slug}`);
+        const response = await api.get(`/staff/modules/${slug}/context`);
         if (response.data.success) {
           setModule(response.data.data);
         } else {
