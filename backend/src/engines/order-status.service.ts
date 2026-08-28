@@ -168,11 +168,12 @@ export async function changeInstantTransactionOrderStatus(
   const currentState = fulfillment?.status ?? current.status;
 
   const action = resolveAction(engineType, currentState, requestedStatus, actor);
+  const orderFulfillmentMode = fulfillment?.mode as FulfillmentMode | undefined;
   const transition = await engineService.transitionState(engineType, currentState, action, actor, {
     orderId,
     moduleId,
     staffId: userId,
-  });
+  }, orderFulfillmentMode);
 
   if (!transition.allowed) {
     return {

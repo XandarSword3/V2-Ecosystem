@@ -777,14 +777,38 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
     }
 
-    // Valid statuses (Stage 6): canonical fulfillment states for fulfillment
-    // moves, transaction states for transaction moves. Legacy composites
-    // (preparing/delivered) are deliberately gone — resolveAction in
-    // order-status.service.ts still maps them if any old client sends them,
-    // but this route fast-fails on them so nothing new starts using them.
-    const validStatuses = ['pending', 'confirmed', 'queued', 'in_progress', 'ready', 'handed_off', 'completed', 'cancelled'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ success: false, error: 'Invalid status' });
+    // Phase F1 fix: validate status against the mode-specific fulfillment
+    // state machine, NOT a hardcoded hospitality-only list. Each order's
+    // fulfillmentMode determines which states are valid.
+    const { data: fulfillment } = await supabase
+      .from('fulfillments')
+      .select('mode, status')
+      .eq('transaction_id', orderId)
+      .maybeSingle();
+    const orderMode = fulfillment?.mode ?? 'on_premise';
+    
+    // Transaction-layer states are always valid
+    const transactionStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
+    if (transactionStatuses.includes(status)) {
+      // Allow — these are transaction-layer moves
+    } else {
+      // Validate against the mode-specific state machine
+      const { getEngine } = await import('../../engines/registry.js');
+      const { resolveFulfillmentMachine } = await import('../../engines/fulfillment-contract.js');
+      const engine = getEngine('instant_transaction');
+      const machine = resolveFulfillmentMachine(engine.capabilities.fulfillment, orderMode as any);
+      
+      if (!machine) {
+        // Mode with no machine (e.g. 'none') — reject fulfillment moves
+        return res.status(400).json({ success: false, error: `Mode '${orderMode}' has no fulfillment state machine` });
+      }
+      
+      if (!machine.states.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid status '${status}' for mode '${orderMode}'. Valid states: ${machine.states.join(', ')}`,
+        });
+      }
     }
 
     // This used to be two separate implementations of the same responsibility

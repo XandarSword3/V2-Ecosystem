@@ -47,9 +47,9 @@ export const digitalFulfillmentStateMachine: StateMachineDefinition<DigitalFulfi
   terminalStates: ['completed', 'cancelled'],
   transitions: [
     // Entry: provisioning starts the moment the transaction is committed.
-    { from: 'confirmed', to: 'provisioning', action: 'provision', allowedActors: ['system'], guardDescription: 'Transaction confirmed — digital asset provisioning begins' },
-    { from: 'provisioning', to: 'provisioned', action: 'finish_provisioning', allowedActors: ['system'], guardDescription: 'Digital asset generated and available for delivery' },
-    { from: 'provisioned', to: 'delivered', action: 'deliver_digital', allowedActors: ['system'], guardDescription: 'Delivered to the customer digital account' },
+    { from: 'confirmed', to: 'provisioning', action: 'provision', allowedActors: ['system', 'staff', 'admin'], guardDescription: 'Transaction confirmed — digital asset provisioning begins' },
+    { from: 'provisioning', to: 'provisioned', action: 'finish_provisioning', allowedActors: ['system', 'staff', 'admin'], guardDescription: 'Digital asset generated and available for delivery' },
+    { from: 'provisioned', to: 'delivered', action: 'deliver_digital', allowedActors: ['system', 'staff', 'admin'], guardDescription: 'Delivered to the customer digital account' },
     // Completion (cross-layer: fulfillment done → transaction completed).
     { from: 'delivered', to: 'completed', action: 'complete', allowedActors: ['system', 'staff'], guardDescription: 'Delivery acknowledged — transaction completes' },
     // Cancellation from any fulfillment stage (cross-layer → transaction

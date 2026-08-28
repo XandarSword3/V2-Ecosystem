@@ -115,7 +115,7 @@ async function loginAsStaff(page: any) {
   );
 
   // Reload to pick up the authenticated state
-  await page.reload({ waitUntil: 'networkidle', timeout: 30_000 });
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
   await dismissCookieConsent(page);
   await page.waitForTimeout(1_000);
 }
@@ -124,7 +124,7 @@ async function loginAsStaff(page: any) {
  * Navigate to a URL and dismiss cookie consent if present.
  */
 async function navigateTo(page: any, url: string) {
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await dismissNextjsOverlay(page);
   await dismissCookieConsent(page);
   await page.waitForTimeout(1_000);

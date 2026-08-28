@@ -24,7 +24,7 @@ export const serviceFulfillmentStateMachine: StateMachineDefinition<ServiceFulfi
   initialState: 'received',
   terminalStates: ['completed', 'cancelled'],
   transitions: [
-    { from: 'confirmed', to: 'received', action: 'receive', allowedActors: ['system'], guardDescription: 'Service request received' },
+    { from: 'confirmed', to: 'received', action: 'receive', allowedActors: ['system', 'staff', 'admin'], guardDescription: 'Service request received' },
     { from: 'received', to: 'working', action: 'start_work', allowedActors: ['staff'], guardDescription: 'Staff begins service work' },
     { from: 'working', to: 'ready', action: 'finish_work', allowedActors: ['staff'], guardDescription: 'Service work completed' },
     { from: 'ready', to: 'collected', action: 'collect', allowedActors: ['customer', 'staff'], guardDescription: 'Customer collects or staff hands off' },
