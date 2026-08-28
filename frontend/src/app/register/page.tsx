@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 import { Container } from '@/components/layout/Container';
 import { getApiErrorMessage } from '@/types';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const t = useTranslations('auth.register');
   const tAuth = useTranslations('auth');
   const tCommon = useTranslations('common');
@@ -272,5 +272,17 @@ export default function RegisterPage() {
         </motion.div>
       </Container>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

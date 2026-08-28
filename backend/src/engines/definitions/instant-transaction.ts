@@ -36,9 +36,11 @@ import {
 } from '../../adapters/digital/fulfillment.js';
 import {
   shipmentFulfillmentStateMachine,
+  type ShipmentFulfillmentMachineStatus,
 } from '../../adapters/shipment/fulfillment.js';
 import {
   serviceFulfillmentStateMachine,
+  type ServiceFulfillmentMachineStatus,
 } from '../../adapters/service/fulfillment.js';
 
 // ============================================
@@ -146,7 +148,9 @@ export const instantTransactionInteractions: InteractionContract[] = [
  */
 export type InstantTransactionFulfillmentStatus =
   | HospitalityFulfillmentMachineStatus
-  | DigitalFulfillmentMachineStatus;
+  | DigitalFulfillmentMachineStatus
+  | ShipmentFulfillmentMachineStatus
+  | ServiceFulfillmentMachineStatus;
 
 export const instantTransactionEngine: EngineDefinition<TransactionState, InstantTransactionFulfillmentStatus> = {
   type: 'instant_transaction',
@@ -189,10 +193,8 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
         { mode: 'digital_delivery', destinations: ['digital_account'] },
         { mode: 'shipment', destinations: ['address'] },
         { mode: 'service_execution', destinations: ['service_location'] },
-        // Digital delivery is a FULFILLMENT MODE of Engine A — not a new
-        // engine. The same capability contract hosts a radically different
-        // adapter (provisioning → delivered) with zero new engine semantics.
-        { mode: 'digital_delivery', destinations: ['digital_account'] },
+        // 'none' mode is handled as a special case in the controller:
+        // no fulfillment machine, no destination, no allocation.
       ],
       groups: false,
       tracking: false,

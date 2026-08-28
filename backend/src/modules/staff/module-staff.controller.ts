@@ -2102,6 +2102,10 @@ export async function searchCustomers(req: Request, res: Response) {
  * POST /staff/modules/:slug/orders
  */
 export async function createModuleOrder(req: Request, res: Response) {
+  // Hoisted: populated inside the try block when inventory is deducted,
+  // read in the outer catch for compensation. Declared here so both try
+  // and catch can see it.
+  let deductionPayload: Array<{ catalog_item_id: string; quantity: number }> = [];
   try {
     const { slug } = req.params;
     const { serviceLocationId: reqServiceLocId, tableId, tableNumber, customerName, customerId, items, notes, orderType, paymentMethod } = req.body;
@@ -2158,20 +2162,56 @@ export async function createModuleOrder(req: Request, res: Response) {
       if (explicitMode === 'none') {
         fulfillmentSelection = { mode: 'none', destinationType: 'none', destinationRef: null };
       } else {
-        // Build a selection directly from the explicit mode.
-        // Map mode → destinationType using the same vocabulary the engine expects.
-        const modeDestMap: Record<string, string> = {
-          on_premise: 'on_premise_location',
-          pickup: 'pickup_location',
-          local_delivery: 'address',
-          digital_delivery: 'digital_channel',
-          shipment: 'shipping_address',
-          service_execution: 'service_location',
-        };
+        // Phase F1 Fix: validate the explicit mode against the canonical
+        // capability contract and derive destination from the engine
+        // definition — NEVER use a local modeDestMap with stale/wrong
+        // destination vocabulary. The engine definition is the single
+        // source of truth for mode → destination mappings.
+        const { getEngine } = await import('../../engines/registry.js');
+        const { assertValidFulfillmentSelection, FulfillmentContractError } = await import('../../engines/fulfillment-contract.js');
+        const engine = getEngine('instant_transaction');
+        const engineFulfillment = engine.capabilities.fulfillment;
+
+        // Cast to the typed FulfillmentMode — reject arbitrary strings
+        // before they reach the capability validator.
+        const typedMode = explicitMode as FulfillmentMode;
+        const modeOption = engineFulfillment.options.find(o => o.mode === typedMode);
+        if (!modeOption) {
+          return res.status(400).json({
+            success: false,
+            error: 'INVALID_FULFILLMENT_MODE',
+            message: `Fulfillment mode '${explicitMode}' is not supported by this engine. Supported modes: ${engineFulfillment.options.map(o => o.mode).join(', ')}`,
+          });
+        }
+
+        // For 'none', destination is always 'none' — no fulfillment layer.
+        // For other modes, derive destination from the engine definition.
+        const destinationType = typedMode === 'none' ? 'none' : modeOption.destinations[0];
+
+        // Full capability validation: rejects impossible mode+destination
+        // combinations even if the mode itself is valid.
+        try {
+          assertValidFulfillmentSelection(engineFulfillment, typedMode, destinationType);
+        } catch (err: any) {
+          if (err instanceof FulfillmentContractError) {
+            return res.status(400).json({
+              success: false,
+              error: 'FULFILLMENT_CONTRACT_VIOLATION',
+              message: err.message,
+            });
+          }
+          throw err;
+        }
+
+        // Resolve destinationRef: for modes needing a concrete destination,
+        // prefer the provided locationId; for modes with no physical
+        // destination (digital_delivery, none), leave null.
+        const needsPhysicalDestination = !['digital_delivery', 'none'].includes(typedMode);
+
         fulfillmentSelection = {
           mode: explicitMode,
-          destinationType: modeDestMap[explicitMode] || 'on_premise_location',
-          destinationRef: locationId ?? null,
+          destinationType,
+          destinationRef: needsPhysicalDestination ? (locationId ?? null) : null,
         };
       }
     } else {
@@ -2188,6 +2228,8 @@ export async function createModuleOrder(req: Request, res: Response) {
     }
 
     const orderItemsInput = Array.isArray(items) ? items : [];
+
+
 
     // Staff orders price through the SAME pipeline the customer path uses,
     // instead of hand-rolling qty * (client-supplied unitPrice). Prices are
@@ -2309,7 +2351,7 @@ export async function createModuleOrder(req: Request, res: Response) {
 
     // Deduct inventory atomically with audit trail; roll back on stock failure
     if (resolvedItems.length > 0) {
-      const deductionPayload = resolvedItems.map((item) => ({
+      deductionPayload = resolvedItems.map((item) => ({
         catalog_item_id: item.itemId,
         quantity: item.quantity,
       }));
@@ -2412,6 +2454,19 @@ export async function createModuleOrder(req: Request, res: Response) {
                 error: customizationError.message,
                 orderId: transaction.id,
               });
+              // Compensation: restore base inventory that was already deducted
+              if (deductionPayload.length > 0) {
+                const { error: restoreErr } = await supabase.rpc('restore_inventory_for_order_items', {
+                  p_items: deductionPayload,
+                  p_user_id: userId || null,
+                });
+                if (restoreErr) {
+                  logger.error('[Staff Order] CRITICAL: Failed to restore base inventory after customization failure', {
+                    orderId: transaction.id,
+                    error: restoreErr.message,
+                  });
+                }
+              }
               await supabase.from('order_items').delete().eq('transaction_id', transaction.id);
               await supabase.from('transactions').delete().eq('id', transaction.id);
               return res.status(400).json({
@@ -2423,6 +2478,19 @@ export async function createModuleOrder(req: Request, res: Response) {
           }
         } catch (customizationErr: any) {
           logger.error('[Staff Order] Exception during customization inventory processing:', customizationErr);
+          // Compensation: restore base inventory that was already deducted
+          if (deductionPayload.length > 0) {
+            const { error: restoreErr } = await supabase.rpc('restore_inventory_for_order_items', {
+              p_items: deductionPayload,
+              p_user_id: userId || null,
+            });
+            if (restoreErr) {
+              logger.error('[Staff Order] CRITICAL: Failed to restore base inventory after customization exception', {
+                orderId: transaction.id,
+                error: restoreErr.message,
+              });
+            }
+          }
           await supabase.from('order_items').delete().eq('transaction_id', transaction.id);
           await supabase.from('transactions').delete().eq('id', transaction.id);
           return res.status(400).json({
@@ -2454,6 +2522,22 @@ export async function createModuleOrder(req: Request, res: Response) {
         orderId: transaction.id,
         error: allocation.error,
       });
+      // Compensation: restore base inventory + customization inventory.
+      // Both deduction paths may have run. restore_inventory_for_order_items
+      // is idempotent against partial restoration (restores whatever was
+      // deducted for these catalog items).
+      if (deductionPayload.length > 0) {
+        const { error: restoreErr } = await supabase.rpc('restore_inventory_for_order_items', {
+          p_items: deductionPayload,
+          p_user_id: userId || null,
+        });
+        if (restoreErr) {
+          logger.error('[Staff Order] CRITICAL: Failed to restore inventory after resource allocation failure', {
+            orderId: transaction.id,
+            error: restoreErr.message,
+          });
+        }
+      }
       await supabase.from('order_items').delete().eq('transaction_id', transaction.id);
       await supabase.from('fulfillments').delete().eq('transaction_id', transaction.id);
       await supabase.from('resource_allocations').delete().eq('transaction_id', transaction.id);
@@ -2487,6 +2571,25 @@ export async function createModuleOrder(req: Request, res: Response) {
     res.status(201).json({ success: true, data: resultPayload });
   } catch (error: any) {
     logger.error('Error creating module order:', error);
+    // If inventory was deducted but an exception occurred before or during
+    // resource allocation, the order row may or may not exist. Attempt
+    // compensation: restore_inventory_for_order_items is safe to call even
+    // if no deduction was made (idempotent), so we call it whenever items
+    // were present. The transaction row is cleaned up by the DB cascade or
+    // left as a zombie to be caught by the reconciliation job.
+    if (deductionPayload.length > 0) {
+      try {
+        const compensationSupabase = getSupabase();
+        await compensationSupabase.rpc('restore_inventory_for_order_items', {
+          p_items: deductionPayload,
+          p_user_id: req.user?.userId || null,
+        });
+      } catch (restoreErr: any) {
+        logger.error('[Staff Order] CRITICAL: Failed to restore inventory in outer catch', {
+          error: restoreErr.message,
+        });
+      }
+    }
     res.status(500).json({ success: false, error: 'Failed to create order', message: error.message });
   }
 }
