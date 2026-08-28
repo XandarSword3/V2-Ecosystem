@@ -558,7 +558,7 @@ const CURRENCY_EXPONENTS: Record<string, number> = {
   'UGX': 0, 'RWF': 0, 'CLP': 0, 'ISK': 0, 'VUV': 0, 'KMF': 0,
   // 3 decimal places (minor unit = 1/1000)
   'BHD': 3, 'KWD': 3, 'OMR': 3, 'TND': 3, 'LYD': 3, 'JOD': 3,
-  'IQD': 3, 'PCL': 3,
+  'IQD': 3,
 };
 
 /** Get the number of decimal places for a currency code. */
