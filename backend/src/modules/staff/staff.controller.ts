@@ -147,7 +147,9 @@ export const createShift = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) throw new Error('Authentication required');
     const tenantId = req.user?.tenantId;
-    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    // Canonical property source: req.property?.id is set by resolveProperty
+    // middleware. Fall back to req.propertyId for routes that set it directly.
+    const propertyId = req.property?.id || (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
     if (!tenantId || !propertyId) {
       res.status(400).json({ success: false, error: 'Tenant/property context required' });
       return;
@@ -553,7 +555,9 @@ export const getCurrentShift = asyncHandler(async (req: Request, res: Response) 
  * repointed to this path.
  */
 export const getTodaySchedule = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    // Canonical property source: req.property?.id is set by resolveProperty
+    // middleware. Fall back to req.propertyId for routes that set it directly.
+    const propertyId = req.property?.id || (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
     const supabase = getSupabase();
     const today = new Date().toISOString().split('T')[0];
 
@@ -665,7 +669,9 @@ export const recordCashMovement = asyncHandler(async (req: Request, res: Respons
     const userId = req.user?.userId;
     if (!userId) throw new Error('Authentication required');
     const tenantId = req.user?.tenantId;
-    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    // Canonical property source: req.property?.id is set by resolveProperty
+    // middleware. Fall back to req.propertyId for routes that set it directly.
+    const propertyId = req.property?.id || (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
     if (!tenantId || !propertyId) {
       res.status(400).json({ success: false, error: 'Tenant/property context required' });
       return;

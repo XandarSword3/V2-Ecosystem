@@ -14,9 +14,11 @@ import { canonicalFulfillmentState } from '../../src/lib/engine-a/types';
 
 // Order-level legacy composites. 'delivered' is the order-only discriminator:
 // item-level statuses (order_items) legitimately include 'preparing'/'served',
-// but 'delivered' never appears at item level — its presence means order-level
-// fulfillment is being inferred from a legacy composite.
-const LEGACY_ORDER_COMPOSITES = /'delivered'/;
+// but 'delivered' at order level is a legacy composite. However, 'delivered'
+// is ALSO a legitimate mode-specific state for digital_delivery and shipment
+// modes (see mode state configs). The regex targets legacy usage patterns:
+// direct comparisons or includes-checks, not state config array entries.
+const LEGACY_ORDER_COMPOSITES = /(?:===\s*['"]delivered['"]|includes\(['"]delivered['"]\)|case\s+['"]delivered['"]|status.*===.*['"]delivered['"])/;
 // All three composites — the generic domain layer carries NO vertical
 // vocabulary at all (not even item-level).
 const ALL_LEGACY_COMPOSITES = /'preparing'|'delivered'|'served'/;

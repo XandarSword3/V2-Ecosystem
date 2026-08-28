@@ -305,7 +305,6 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
                   slug,
                   name,
                   description,
-                  remetadata,
                   action
                 )
               )
@@ -345,7 +344,6 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
                   slug,
                   name,
                   description,
-                  remetadata,
                   action
                 )
               )
@@ -402,6 +400,7 @@ export const getUserDetails = asyncHandler(async (req: Request, res: Response) =
     const detailedUser = {
       ...typedUser,
       scope: userScope,
+      is_online: getOnlineUsers().includes(id),
       roles: scopeToRoles(userScope as any),
       // Legacy frozen surface for the Roles/permissions admin UI (read-only
       // compatibility — authorization no longer consults user_roles).

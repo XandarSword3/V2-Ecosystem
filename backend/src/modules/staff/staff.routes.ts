@@ -36,8 +36,15 @@ router.get('/shifts', authorize(...managerRoles), staffController.getAllShifts);
 // Get shifts by staff member
 router.get('/shifts/staff/:staffId', authorize(...managerRoles), staffController.getStaffShifts);
 
-// Create a shift (managers/admins)
+// Create a shift for another staff member (managers/admins only)
 router.post('/shifts', authorize(...managerRoles), staffController.createShift);
+
+// Start own ad-hoc shift (any staff — self-service shift start)
+router.post('/shifts/start', authorize(...staffRoles), (req: any, _res: any, next: any) => {
+  // Force staffId to the authenticated user so staff can only start their OWN shift
+  req.body.staffId = req.user.userId;
+  next();
+}, staffController.createShift);
 
 // Update a shift
 router.put('/shifts/:id', authorize(...managerRoles), staffController.updateShift);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -9,12 +9,21 @@ import { Input } from '@/components/ui/Input';
 import { ArrowLeft, UserPlus, Mail, Phone, Lock, User, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface Role {
-  id: string;
-  name: string;
-  description?: string;
-  business_unit?: string;
+interface ScopeOption {
+  value: string;
+  label: string;
+  description: string;
 }
+
+// users.scope is the single source of truth for the authorization tier.
+// The server rejects any scope the caller is not allowed to grant.
+const SCOPE_OPTIONS: ScopeOption[] = [
+  { value: 'customer', label: 'Customer', description: 'Regular customer with booking and ordering access.' },
+  { value: 'property_staff', label: 'Property Staff', description: 'Staff member — day-to-day operations in the property (module staff, shifts, POS).' },
+  { value: 'property_manager', label: 'Property Manager', description: 'Manages staff and operations in the property.' },
+  { value: 'tenant_admin', label: 'Tenant Admin', description: 'Administrator for the whole tenant.' },
+  { value: 'tenant_owner', label: 'Tenant Owner', description: 'Owner with full administrative access (billing, users, roles).' },
+];
 
 interface FormData {
   email: string;
@@ -22,7 +31,7 @@ interface FormData {
   confirmPassword: string;
   fullName: string;
   phone: string;
-  role: string;
+  scope: string;
 }
 
 export default function CreateUserPage() {
@@ -30,31 +39,15 @@ export default function CreateUserPage() {
   const params = useParams();
   const propertySlug = (params?.property as string) || '';
   const [loading, setLoading] = useState(false);
-  const [roles, setRoles] = useState<Role[]>([]);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
     confirmPassword: '',
     fullName: '',
     phone: '',
-    role: 'customer',
+    scope: 'customer',
   });
   const [errors, setErrors] = useState<Partial<FormData>>({});
-
-  useEffect(() => {
-    api.get('/admin/roles')
-      .then(res => setRoles(res.data?.data || res.data || []))
-      .catch(() => {
-        // Fallback to core roles if API fetch fails
-        setRoles([
-          { id: 'customer', name: 'customer', description: 'Regular customer with booking and ordering access.' },
-          { id: 'admin', name: 'admin', description: 'Administrator with full access to the admin dashboard.' },
-          { id: 'super_admin', name: 'super_admin', description: 'Super administrator with system-wide access.' },
-          { id: 'manager', name: 'manager', description: 'Property manager with operational access.' },
-          { id: 'staff', name: 'staff', description: 'Generic staff member.' },
-        ]);
-      });
-  }, []);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<FormData> = {};
@@ -101,16 +94,18 @@ export default function CreateUserPage() {
       await api.post('/admin/users', {
         email: formData.email,
         password: formData.password,
-        full_name: formData.fullName,
+        fullName: formData.fullName,
         phone: formData.phone || null,
-        roles: [formData.role], // Backend expects roles as an array
+        scope: formData.scope,
       });
       
       toast.success('User created successfully');
-      // Navigate to appropriate list based on role
-      const isStaffRole = formData.role.includes('staff');
-      const isAdminRole = formData.role.includes('admin') && formData.role !== 'customer';
-      router.push(`/${propertySlug}/admin/users/${formData.role === 'customer' ? 'customers' : isStaffRole ? 'staff' : isAdminRole ? 'admins' : 'customers'}`);
+      // Navigate to the list matching the created user's access tier
+      const targetList =
+        formData.scope === 'customer' ? 'customers'
+        : (formData.scope === 'property_staff' || formData.scope === 'property_manager') ? 'staff'
+        : 'admins';
+      router.push(`/${propertySlug}/admin/users/${targetList}`);
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string; error?: string } } };
       const message = axiosError.response?.data?.message || axiosError.response?.data?.error || 'Failed to create user';
@@ -204,25 +199,28 @@ export default function CreateUserPage() {
               />
             </div>
 
-            {/* Role */}
+            {/* Access Tier (scope) */}
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                Role *
+                Access Tier *
               </label>
               <select
-                value={formData.role}
-                onChange={handleChange('role')}
+                value={formData.scope}
+                onChange={handleChange('scope')}
                 className="w-full px-3 py-2 border rounded-lg bg-background focus:ring-2 focus:ring-primary focus:border-primary"
               >
-                {roles.map(role => (
-                  <option key={role.id} value={role.name}>
-                    {role.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                {SCOPE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">
-                {roles.find(r => r.name === formData.role)?.description}
+                {SCOPE_OPTIONS.find(o => o.value === formData.scope)?.description}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                You can only create users at or below your own tier (the server enforces this). After creating a staff member, open their profile to set the module department and employment record.
               </p>
             </div>
 

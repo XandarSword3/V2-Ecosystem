@@ -170,6 +170,7 @@ export async function getModuleOrders(req: Request, res: Response) {
             txStatuses.add(s);
             fmStatuses.add(s); // terminal/cross-layer states also live on fulfillments
             break;
+          // Legacy hospitality aliases
           case 'preparing':
           case 'in_progress':
             fmStatuses.add('in_progress');
@@ -181,6 +182,29 @@ export async function getModuleOrders(req: Request, res: Response) {
           case 'served':
           case 'handed_off':
             fmStatuses.add('handed_off');
+            break;
+          // Hospitality fulfillment states
+          case 'queued':
+            fmStatuses.add('queued');
+            break;
+          // Digital delivery fulfillment states
+          case 'provisioning':
+          case 'provisioned':
+            fmStatuses.add(s);
+            break;
+          // Shipment fulfillment states
+          case 'allocated':
+          case 'picking':
+          case 'packed':
+          case 'shipped':
+          case 'in_transit':
+            fmStatuses.add(s);
+            break;
+          // Service execution fulfillment states
+          case 'received':
+          case 'working':
+          case 'collected':
+            fmStatuses.add(s);
             break;
           default:
             // Unknown status — let the DB filter return nothing rather than
@@ -2122,16 +2146,46 @@ export async function createModuleOrder(req: Request, res: Response) {
       }
     }
 
-    // Stage 6 fix: staff-created orders are inserted directly as 'confirmed',
-    // so the fulfillment selection must be snapshotted HERE — the confirm
-    // trigger copies it into the fulfillment row and refuses to confirm an
-    // order without it. Resolved + capability-validated (typed domain values).
-    const fulfillmentSelection = resolveFulfillmentSelection('instant_transaction', {
-      orderType: resolvedOrderType,
-      serviceLocationId: locationId,
-      tableNumber: locationName,
-      address: req.body?.address ?? req.body?.deliveryAddress ?? null,
-    });
+    // Phase F1: when the caller explicitly provides a fulfillment_mode,
+    // bypass orderType-derived resolution entirely so that Engine A
+    // mode-specific orders (digital_delivery, shipment, service_execution,
+    // none) can be created through the staff POS without reverse-engineering
+    // an orderType.
+    const explicitMode = req.body?.fulfillment_mode as string | undefined;
+    let fulfillmentSelection: { mode: string; destinationType: string; destinationRef: string | null };
+
+    if (explicitMode) {
+      if (explicitMode === 'none') {
+        fulfillmentSelection = { mode: 'none', destinationType: 'none', destinationRef: null };
+      } else {
+        // Build a selection directly from the explicit mode.
+        // Map mode → destinationType using the same vocabulary the engine expects.
+        const modeDestMap: Record<string, string> = {
+          on_premise: 'on_premise_location',
+          pickup: 'pickup_location',
+          local_delivery: 'address',
+          digital_delivery: 'digital_channel',
+          shipment: 'shipping_address',
+          service_execution: 'service_location',
+        };
+        fulfillmentSelection = {
+          mode: explicitMode,
+          destinationType: modeDestMap[explicitMode] || 'on_premise_location',
+          destinationRef: locationId ?? null,
+        };
+      }
+    } else {
+      // Stage 6 fix: staff-created orders are inserted directly as 'confirmed',
+      // so the fulfillment selection must be snapshotted HERE — the confirm
+      // trigger copies it into the fulfillment row and refuses to confirm an
+      // order without it. Resolved + capability-validated (typed domain values).
+      fulfillmentSelection = resolveFulfillmentSelection('instant_transaction', {
+        orderType: resolvedOrderType,
+        serviceLocationId: locationId,
+        tableNumber: locationName,
+        address: req.body?.address ?? req.body?.deliveryAddress ?? null,
+      }) as any;
+    }
 
     const orderItemsInput = Array.isArray(items) ? items : [];
 

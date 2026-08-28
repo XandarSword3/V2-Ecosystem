@@ -762,7 +762,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   // Shift management
   const startShift = async (openingCash: number) => {
     try {
-      const res = await api.post('/staff/shifts', { openingCash, moduleId });
+      const res = await api.post('/staff/shifts/start', { openingCash, moduleId });
       const d = res.data.data;
       setCurrentShift({
         id: d.id,

@@ -203,7 +203,7 @@ BEGIN
             LIMIT 1;
             IF FOUND AND v_required THEN
                 RAISE EXCEPTION
-                    'Fulfillment mode %L is not offered by engine % — the snapshotted selection violates the capability contract',
+                    'Fulfillment mode % is not offered by engine % — the snapshotted selection violates the capability contract',
                     v_mode, NEW.engine_type;
             END IF;
             RETURN NEW;

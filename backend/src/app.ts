@@ -278,6 +278,16 @@ apiRouter.use('/loyalty', loyaltyRoutes);
 apiRouter.use('/manager', managerRoutes);
 apiRouter.use('/payments', paymentRoutes);
 apiRouter.use('/reviews', reviewRoutes);
+// Staff routes need tenant + property context (resolveTenant → resolveProperty)
+// so controllers can read req.property.id. Only resolve when the relevant
+// headers are present — skip for routes that don't need property context.
+apiRouter.use('/staff', (req: any, _res: any, next: any) => {
+  // Only resolve when X-Property-Slug is present (property-scoped requests).
+  // Routes like /staff/shifts/me or /staff/customers don't need property context.
+  const needsProperty = req.headers['x-property-slug'] || req.headers['x-property-id'];
+  if (!needsProperty) return next();
+  resolveTenant(req, _res, () => resolveProperty(req, _res, next));
+});
 apiRouter.use('/staff', staffRoutes);
 apiRouter.use('/staff', moduleStaffRoutes); // FIX: Mount dynamic module staff routes (room-service, hotel-rooms, spa, etc.)
 apiRouter.use('/support', supportRoutes);

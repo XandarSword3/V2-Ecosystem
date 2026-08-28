@@ -65,12 +65,19 @@ export function getOnlineUsers(): string[] {
   if (!io) return [];
   const userIds = new Set<string>();
 
-  // Iterate through all connected sockets
-  io.sockets.sockets.forEach((socket) => {
-    if (socket.data.userId) {
-      userIds.add(socket.data.userId);
-    }
-  });
+  // Iterate through all connected sockets in BOTH namespaces: the public /
+  // (default) namespace used by most pages via lib/socket.ts, and the /admin
+  // namespace used by the admin live-users cockpit. A user with a socket open
+  // in either is online; the Set dedupes multi-namespace / multi-tab users.
+  const scanSockets = (sockets: Map<string, Socket>) => {
+    sockets.forEach((socket) => {
+      if (socket.data.userId) {
+        userIds.add(socket.data.userId);
+      }
+    });
+  };
+  scanSockets(io.sockets.sockets);
+  scanSockets(io.of('/admin').sockets);
 
   return Array.from(userIds);
 }

@@ -34,6 +34,12 @@ import {
   digitalFulfillmentStateMachine,
   type DigitalFulfillmentMachineStatus,
 } from '../../adapters/digital/fulfillment.js';
+import {
+  shipmentFulfillmentStateMachine,
+} from '../../adapters/shipment/fulfillment.js';
+import {
+  serviceFulfillmentStateMachine,
+} from '../../adapters/service/fulfillment.js';
 
 // ============================================
 // Transaction-layer state machine
@@ -180,6 +186,9 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
         { mode: 'on_premise', destinations: ['on_premise_location', 'room'] },
         { mode: 'pickup', destinations: ['pickup_location'] },
         { mode: 'local_delivery', destinations: ['address'] },
+        { mode: 'digital_delivery', destinations: ['digital_account'] },
+        { mode: 'shipment', destinations: ['address'] },
+        { mode: 'service_execution', destinations: ['service_location'] },
         // Digital delivery is a FULFILLMENT MODE of Engine A — not a new
         // engine. The same capability contract hosts a radically different
         // adapter (provisioning → delivered) with zero new engine semantics.
@@ -210,6 +219,18 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
           resources: { type: 'none' },
           machine: digitalFulfillmentStateMachine,
         },
+        {
+          modes: ['shipment'],
+          handoff: true,
+          machine: shipmentFulfillmentStateMachine,
+        },
+        {
+          modes: ['service_execution'],
+          handoff: true,
+          machine: serviceFulfillmentStateMachine,
+        },
+        // 'none' mode: no fulfillment machine — order stays in pending/confirmed
+        // until manually completed or cancelled.
       ],
     },
     execution: {
