@@ -82,10 +82,15 @@ export default function LoginPage() {
     }
   };
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated — but NOT while the 2FA intermediate
+  // state is active (show2FA) or mandatory-2FA-enrollment is in progress
+  // (setupToken).  Without these guards, validateSession() completing on
+  // mount after the user clicks Submit can race with setShow2FA(true) and
+  // fire this redirect, which wipes the 2FA form and sends the user back
+  // to the login page.
 
   useEffect(() => {
-    if (isAuthenticated && user && settings.propertySlug) {
+    if (isAuthenticated && user && settings.propertySlug && !show2FA && !setupToken) {
       const redirectPath = getRedirectPath();
       if (redirectPath) {
         router.replace(redirectPath);
@@ -103,7 +108,7 @@ export default function LoginPage() {
         router.replace('/');
       }
     }
-  }, [isAuthenticated, user, router, settings.propertySlug]);
+  }, [isAuthenticated, user, router, settings.propertySlug, show2FA, setupToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -310,17 +310,27 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
   // This is how path-based multi-tenancy works without a custom domain:
   // frontend reads the slug from the URL, sends it as X-Tenant-Slug,
   // and the backend resolves the tenant without subdomain routing.
-  // If a slug was explicitly provided but resolves to nothing, that is NOT
-  // "legacy single-tenant mode" — it is an unknown tenant. Hard 404.
+  // If a slug was explicitly provided but resolves to nothing, try the
+  // platform-root tenant before hard-404ing.  In dev, the frontend runs
+  // on default.localhost and the Axios interceptor sends X-Tenant-Slug:
+  // "default" — but no tenant row has subdomain = 'default'.  Falling
+  // back to the platform root is the correct resolution for that case,
+  // and safe in production because only an unknown slug triggers the path.
   const tenantSlugHeader = req.headers['x-tenant-slug'] as string | undefined;
   if (tenantSlugHeader) {
     const tenant = await lookupTenant(tenantSlugHeader, 'subdomain');
-    if (!tenant) {
-      res.status(404).json({ success: false, error: 'Tenant not found' });
-      return;
+    if (tenant) {
+      req.tenant = tenant;
+      return next();
     }
-    req.tenant = tenant;
-    return next();
+    // Slug unknown — try platform-root fallback before 404
+    const platformRoot = await lookupPlatformRootTenant();
+    if (platformRoot) {
+      req.tenant = platformRoot;
+      return next();
+    }
+    res.status(404).json({ success: false, error: 'Tenant not found' });
+    return;
   }
 
   // Priority 3: subdomain (future — no-op until wildcard domain is configured)
