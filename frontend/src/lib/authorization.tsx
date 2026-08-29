@@ -278,6 +278,9 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
   staff: [
     Perm.USER_READ_SELF,
     Perm.USER_UPDATE_SELF,
+    Perm.ORDER_CREATE,
+    Perm.ORDER_UPDATE,
+    Perm.ORDER_READ_ALL,
     Perm.PAYMENT_RECORD_CASH,
     Perm.LOYALTY_EARN,
     Perm.INVENTORY_READ,

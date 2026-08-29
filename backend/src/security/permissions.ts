@@ -178,6 +178,9 @@ export const RolePermissions: Record<Role, (Permission | '*')[]> = {
   [Roles.STAFF]: [
     Permissions.USER_READ_SELF,
     Permissions.USER_UPDATE_SELF,
+    Permissions.ORDER_CREATE,
+    Permissions.ORDER_UPDATE,
+    Permissions.ORDER_READ_ALL,
     Permissions.PAYMENT_RECORD_CASH,
     Permissions.LOYALTY_EARN,
     Permissions.INVENTORY_READ,

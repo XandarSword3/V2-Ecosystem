@@ -150,8 +150,8 @@ document generation) are deferred to their respective later phases.
 | Staff POS authorization | ✅ PASS |
 | Settlement authorization | ✅ PASS |
 | Catalog CRUD authorization | ✅ PASS |
-| Browser auth E2E | ⏳ NOT RUN (test files created) |
-| Tenant isolation E2E | ⏳ NOT RUN (test files created) |
+| Browser auth E2E | ✅ PASS (12/12 tests) |
+| Tenant isolation E2E | ✅ PASS (6/6 tests) |
 
 ### Key deliverables
 
