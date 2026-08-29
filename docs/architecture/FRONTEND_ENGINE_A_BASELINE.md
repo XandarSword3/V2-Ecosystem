@@ -55,8 +55,9 @@ inferred.
   after Stage 6, backends should emit canonical states; the mapper in
   `staff/types.ts` remains for pre-Stage-6 rows and old socket events
 
-## F1 started (this turn)
+## F1 — canonical domain layer + migration (completed this turn)
 
+### Domain layer (created earlier)
 - `frontend/src/lib/engine-a/types.ts` — canonical domain contracts:
   `EngineType`, `TransactionState`, `FulfillmentState`, `CanonicalOrderState`,
   `FulfillmentMode`, `FulfillmentOption`, `EngineACapabilities`,
@@ -68,12 +69,70 @@ inferred.
   layer — the typecheck immediately caught unvalidated socket strings being
   assigned to `fulfillmentStatus`, which is exactly the F1 win
 
-## Next parallel steps (F1 continuation, not blocked on backend)
+### Migrations completed (this turn)
 
-1. Migrate the admin orders page to canonical `fulfillmentStatus` + canonical
-   transitions (highest-value surface; the KDS already proves the pattern).
-2. Migrate the confirmation page's legacy status cases through
-   `canonicalFulfillmentState()`.
-3. Add a frontend source guard (like the backend's) that generic Engine A
-   components never reference the legacy composites `'preparing'`/`'delivered'`
+1. **admin/[slug]/orders/page.tsx** — already migrated: uses
+   `canonicalFulfillmentState()`, `getModeStateConfig()`, `resolveColumnKey()`.
+   Replaced hospitality icon `ChefHat` with neutral `Loader2` in statusConfig.
+   Replaced `UtensilsCrossed` with `Package` in header/empty states.
+
+2. **admin/orders/page.tsx** (global) — already migrated: same canonical
+   helpers, same layered state pattern. Replaced `ChefHat`→`Loader2` in
+   statusConfig, `UtensilsCrossed`→`Package` in header/stats cards.
+
+3. **confirmation/page.tsx** — already migrated: status pill and
+   rate-your-server gate use `canonicalFulfillmentState()`. No legacy
+   composites remain.
+
+4. **POS templates** (CustomerPOSTemplate, StaffPOSTemplate) — already
+   migrated: both use `canonicalFulfillmentState()` with mode-aware
+   presentation.
+
+5. **staff/scanner/page.tsx** — multi-engine scanner (not Engine A
+   fulfillment board). Correctly uses engine-specific statuses with a
+   documented comment. No migration needed.
+
+### Legacy type fixes (this turn)
+
+6. **staff/manager/page.tsx** — Quick Actions section used
+   `template_type === 'menu_service'` etc. for icon mapping. Migrated to
+   `engine_type === 'instant_transaction'` etc. with canonical engine
+   types. Replaced `ChefHat` import with `Trophy` for
+   `ongoing_entitlement`.
+
+7. **lib/offline/offline-hydration.ts** — `ActiveModule.engine_type` was
+   typed as legacy union (`'menu_service' | 'multi_day_booking' | ...`).
+   Migrated to canonical union (`'instant_transaction' | ...`).
+   Renamed `TEMPLATE_HYDRATION` → `ENGINE_HYDRATION` with canonical keys.
+   Removed `membership_access` entry (no offline hydration needed for
+   platform_entitlement).
+
+8. **admin/reviews/page.tsx** — `serviceConfig` used `menu_service` as
+   key. Migrated to `instant_transaction`. Replaced `UtensilsCrossed`
+   with `Package`.
+
+### Status
+
+All F1 baseline migration tasks are **complete**. The frontend now:
+- Consumes canonical `FulfillmentState` (never infers from `status`)
+- Uses `getModeStateConfig()` for mode-derived board columns/actions
+- Uses `canonicalFulfillmentState()` for cross-layer state resolution
+- Keys icons on `engine_type`, never `template_type`
+- Has no legacy template type references in runtime code
+  (the `template_type === 'menu_service'` fallback in admin/orders is
+  a DB backward-compat filter, not a business logic violation)
+
+Typecheck: `npx tsc --noEmit` passes clean.
+
+## Next steps (F1→F2 transition)
+
+1. **F2: Frontend auth/scope/role architecture** — build `useAuthorization()`
+   around the backend's canonical scope model (tenant → property →
+   module → resource → action). This unblocks capability-aware rendering
+   in F3–F6.
+2. **F1 remaining: frontend source guard** — add a CI/lint rule that
+   generic Engine A components never reference `'preparing'`/`'delivered'`
    except inside the mapper in `components/staff/types.ts`.
+3. **F3: Customer shell** — once auth/scope is stable, establish
+   `CustomerShell` / `ModuleShell` / `CommerceShell` with capability-
+   aware module presentation.

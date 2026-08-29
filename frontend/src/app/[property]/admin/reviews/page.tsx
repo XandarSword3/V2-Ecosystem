@@ -19,7 +19,7 @@ import {
   XCircle,
   Trash2,
   MessageSquare,
-  UtensilsCrossed,
+  Package,
   Home,
   Cookie,
   HelpCircle,
@@ -45,7 +45,7 @@ interface Review {
 
 const serviceConfig: Record<string, { icon: React.ElementType; color: string }> = {
   general: { icon: HelpCircle, color: 'text-slate-500' },
-  menu_service: { icon: UtensilsCrossed, color: 'text-blue-500' },
+  instant_transaction: { icon: Package, color: 'text-blue-500' },
   accommodation: { icon: Home, color: 'text-green-500' },
   kiosk: { icon: Cookie, color: 'text-orange-500' },
 };

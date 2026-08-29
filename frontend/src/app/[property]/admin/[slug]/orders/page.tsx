@@ -21,10 +21,10 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  ChefHat,
+  Loader2,
   RefreshCw,
   Search,
-  UtensilsCrossed,
+  Package,
   Timer,
   User,
 } from 'lucide-react';
@@ -88,7 +88,7 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
   pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock, label: 'Pending' },
   confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2, label: 'Confirmed' },
   queued: { color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Clock, label: 'Queued' },
-  in_progress: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: ChefHat, label: 'In Progress' },
+  in_progress: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: Loader2, label: 'In Progress' },
   ready: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2, label: 'Ready' },
   handed_off: { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', icon: CheckCircle2, label: 'Handed Off' },
   completed: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: CheckCircle2, label: 'Completed' },
@@ -210,7 +210,7 @@ export default function DynamicOrdersPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <UtensilsCrossed className="w-6 h-6 text-white" />
+              <Package className="w-6 h-6 text-white" />
             </div>
             {currentModule.name} Orders
           </h1>
@@ -268,7 +268,7 @@ export default function DynamicOrdersPage() {
           ) : filteredOrders.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                <UtensilsCrossed className="w-8 h-8 text-slate-400" />
+                <Package className="w-8 h-8 text-slate-400" />
               </div>
               <h3 className="text-lg font-medium text-slate-900 dark:text-white">No orders found</h3>
               <p className="text-slate-500 dark:text-slate-400">

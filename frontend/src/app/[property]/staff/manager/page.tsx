@@ -30,7 +30,7 @@ import {
   ArrowDown,
   Search,
   Download,
-  ChefHat,
+  Trophy,
   Home,
   Waves,
   Eye,
@@ -589,9 +589,11 @@ export default function ManagerDashboard() {
                 {(activeModules || []).slice(0, 6).map((m: any) => (
                   <Link key={m.id} href={`/${propertySlug}/staff/modules/${m.slug}`} className="block">
                     <Button variant="outline" className="w-full justify-start gap-3">
-                      {m.template_type === 'menu_service' && <ChefHat className="w-5 h-5 text-amber-500" />}
-                      {m.template_type === 'multi_day_booking' && <Calendar className="w-5 h-5 text-indigo-500" />}
-                      {m.template_type === 'session_access' && <Users className="w-5 h-5 text-teal-500" />}
+                      {/* F1: icon keys on canonical engine_type, never legacy template_type */}
+                      {m.engine_type === 'instant_transaction' && <Package className="w-5 h-5 text-amber-500" />}
+                      {m.engine_type === 'time_exclusive_reservation' && <Calendar className="w-5 h-5 text-indigo-500" />}
+                      {m.engine_type === 'shared_capacity_access' && <Users className="w-5 h-5 text-teal-500" />}
+                      {m.engine_type === 'ongoing_entitlement' && <Trophy className="w-5 h-5 text-amber-600" />}
                       {m.name}
                     </Button>
                   </Link>

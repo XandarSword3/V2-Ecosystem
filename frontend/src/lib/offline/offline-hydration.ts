@@ -4,12 +4,12 @@
  * Dynamic module-based hydration - supports any engine type without hardcoded endpoints.
  * Fetches active modules first, then hydrates based on engine_type.
  * 
- * Template Types:
- * - menu_service: /items, /orders, /modifiers
- * - multi_day_booking: /bookable_units, /bookings
- * - session_access: /sessions, /tickets
- * - subscription: /plans, /subscriptions
- * - membership_access: /memberships
+ * Engine Types (canonical only — F1):
+ * - instant_transaction: /items, /modifiers
+ * - time_exclusive_reservation: /bookable_units, /bookings
+ * - shared_capacity_access: /sessions, /tickets
+ * - ongoing_entitlement: /plans, /subscriptions
+ * - platform_entitlement: (internal-only, no offline hydration needed)
  */
 
 import {
@@ -23,7 +23,7 @@ interface ActiveModule {
   id: string;
   slug: string;
   name: string;
-  engine_type: 'menu_service' | 'multi_day_booking' | 'session_access' | 'subscription' | 'membership_access';
+  engine_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement' | 'platform_entitlement';
   is_active: boolean;
 }
 
@@ -32,28 +32,25 @@ interface HydrationConfig {
   endpoints: string[];
 }
 
-// Template type to hydration configuration
-const TEMPLATE_HYDRATION: Record<string, HydrationConfig> = {
-  menu_service: {
-    ttl: 60 * 24, // Menu rarely changes
+// Engine type to hydration configuration (canonical keys only — F1)
+const ENGINE_HYDRATION: Record<string, HydrationConfig> = {
+  instant_transaction: {
+    ttl: 60 * 24, // Catalog rarely changes
     endpoints: ['items', 'modifiers'],
   },
-  multi_day_booking: {
+  time_exclusive_reservation: {
     ttl: 15,
     endpoints: ['bookable_units', 'bookings'],
   },
-  session_access: {
+  shared_capacity_access: {
     ttl: 15,
     endpoints: ['sessions', 'tickets'],
   },
-  subscription: {
+  ongoing_entitlement: {
     ttl: 60 * 24,
     endpoints: ['plans', 'subscriptions'],
   },
-  membership_access: {
-    ttl: 60 * 24,
-    endpoints: ['memberships'],
-  },
+  // platform_entitlement: internal-only — no offline hydration needed
 };
 
 let activeModules: ActiveModule[] = [];
@@ -111,9 +108,9 @@ export async function hydrateOfflineStores(force: boolean = false): Promise<void
  * Hydrate data for a specific module based on its template type
  */
 async function hydrateModule(module: ActiveModule, force: boolean): Promise<void> {
-  const config = TEMPLATE_HYDRATION[module.engine_type];
+  const config = ENGINE_HYDRATION[module.engine_type];
   if (!config) {
-    console.log(`[Offline] No hydration config for template type: ${module.engine_type}`);
+    console.log(`[Offline] No hydration config for engine type: ${module.engine_type}`);
     return;
   }
 

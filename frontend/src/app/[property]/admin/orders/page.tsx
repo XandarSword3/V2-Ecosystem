@@ -17,13 +17,12 @@ import { useSocket } from '@/lib/socket';
 import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState, type FulfillmentMode, type FulfillmentState } from '@/types';
 import { getModeStateConfig, resolveColumnKey } from '@/lib/engine-a/types';
 import {
-  UtensilsCrossed,
   Search,
   RefreshCw,
   CheckCircle2,
   Clock,
   XCircle,
-  ChefHat,
+  Loader2,
   Truck,
   Package,
   AlertCircle,
@@ -64,7 +63,7 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType; lab
   pending: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: Clock, label: 'Pending' },
   confirmed: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CheckCircle2, label: 'Confirmed' },
   queued: { color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Clock, label: 'Queued' },
-  in_progress: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: ChefHat, label: 'In Progress' },
+  in_progress: { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', icon: Loader2, label: 'In Progress' },
   ready: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: Package, label: 'Ready' },
   handed_off: { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', icon: Truck, label: 'Handed Off' },
   completed: { color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300', icon: CheckCircle2, label: 'Completed' },
@@ -277,7 +276,7 @@ export default function AdminOrdersPage() {
                   <p className="text-blue-100 text-sm">Active Orders</p>
                   <p className="text-2xl font-bold mt-1">{activeOrders.length}</p>
                 </div>
-                <UtensilsCrossed className="w-10 h-10 text-blue-200" />
+                <Package className="w-10 h-10 text-blue-200" />
               </div>
             </CardContent>
           </Card>
@@ -305,7 +304,7 @@ export default function AdminOrdersPage() {
                   <p className="text-orange-100 text-sm">In Progress</p>
                   <p className="text-2xl font-bold mt-1">{inProgressCount}</p>
                 </div>
-                <ChefHat className="w-10 h-10 text-orange-200" />
+                <Loader2 className="w-10 h-10 text-orange-200" />
               </div>
             </CardContent>
           </Card>
