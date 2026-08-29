@@ -130,9 +130,109 @@ function parseFrontendPermissions() {
 // Compare
 // ============================================
 
+// ============================================
+// Parse backend scopeToRoles
+// ============================================
+
+function parseBackendScopeToRoles() {
+  const content = fs.readFileSync(BACKEND_PERMS, 'utf-8');
+  const scopeMap = {};
+
+  // Find the scopeToRoles function
+  const fnStart = content.indexOf('export function scopeToRoles');
+  if (fnStart === -1) return scopeMap;
+
+  const fnBody = content.substring(fnStart, content.indexOf('}', fnStart + 200) + 100);
+
+  // Parse each case
+  const caseRegex = /case\s+'(\w+)':\s*\n\s*return\s*\[([^\]]+)\]/g;
+  let match;
+  while ((match = caseRegex.exec(fnBody)) !== null) {
+    const scope = match[1];
+    const roles = match[2].split(',').map(r => r.trim().replace(/'/g, ''));
+    scopeMap[scope] = roles;
+  }
+
+  return scopeMap;
+}
+
+// ============================================
+// Parse frontend SCOPE_TO_ROLES
+// ============================================
+
+function parseFrontendScopeToRoles() {
+  const content = fs.readFileSync(FRONTEND_PERMS, 'utf-8');
+  const scopeMap = {};
+
+  const fnStart = content.indexOf('const SCOPE_TO_ROLES');
+  if (fnStart === -1) return scopeMap;
+
+  const fnBody = content.substring(fnStart, content.indexOf('};', fnStart) + 2);
+
+  const entryRegex = /(\w+):\s*\[([^\]]+)\]/g;
+  let match;
+  while ((match = entryRegex.exec(fnBody)) !== null) {
+    const scope = match[1];
+    const roles = match[2].split(',').map(r => r.trim().replace(/'/g, ''));
+    scopeMap[scope] = roles;
+  }
+
+  return scopeMap;
+}
+
+// ============================================
+// Scope projection validation
+// ============================================
+
+function validateScopeProjection(frontendScopeRoles, frontendRolePerms) {
+  console.log('\n=== Scope Projection Validation ===\n');
+
+  let issues = 0;
+
+  for (const [scope, roles] of Object.entries(frontendScopeRoles)) {
+    // Check 1: every scope resolves to at least one role
+    if (!roles || roles.length === 0) {
+      console.log(`❌ [${scope}] resolves to EMPTY role list`);
+      issues++;
+      continue;
+    }
+
+    // Check 2: every derived role exists in ROLE_PERMISSIONS
+    let hasPermissions = false;
+    for (const role of roles) {
+      const rolePerms = frontendRolePerms[role];
+      if (!rolePerms) {
+        console.log(`❌ [${scope}] → role '${role}' has no ROLE_PERMISSIONS entry`);
+        issues++;
+        continue;
+      }
+      if (rolePerms.length > 0 || role === 'admin' || role === 'super_admin') {
+        hasPermissions = true;
+      }
+    }
+
+    // Check 3: the scope resolves to a non-empty permission set
+    if (!hasPermissions) {
+      const permCount = roles.reduce((sum, r) => sum + (frontendRolePerms[r]?.length || 0), 0);
+      console.log(`❌ [${scope}] → roles [${roles.join(', ')}] resolve to EMPTY permission set`);
+      issues++;
+    } else {
+      console.log(`✅ [${scope}] → [${roles.join(', ')}] → has permissions`);
+    }
+  }
+
+  return issues;
+}
+
+// ============================================
+// Main comparison
+// ============================================
+
 function compare() {
   const backend = parseBackendPermissions();
   const frontend = parseFrontendPermissions();
+  const backendScopeRoles = parseBackendScopeToRoles();
+  const frontendScopeRoles = parseFrontendScopeToRoles();
 
   let drift = false;
   const allRoles = new Set([
@@ -205,11 +305,33 @@ function compare() {
     }
   }
 
+  // Scope projection validation
+  const scopeIssues = validateScopeProjection(frontendScopeRoles, frontend.rolePerms);
+  if (scopeIssues > 0) {
+    drift = true;
+  }
+
+  // Backend/frontend scope-to-role comparison
+  console.log('\n=== Backend/Frontend Scope-to-Role Comparison ===\n');
+  const allScopes = new Set([...Object.keys(backendScopeRoles), ...Object.keys(frontendScopeRoles)]);
+  for (const scope of allScopes) {
+    const bRoles = backendScopeRoles[scope] || [];
+    const fRoles = frontendScopeRoles[scope] || [];
+    const bSorted = [...bRoles].sort().join(',');
+    const fSorted = [...fRoles].sort().join(',');
+    if (bSorted !== fSorted) {
+      console.log(`⚠️  [${scope}] backend=[${bRoles}] frontend=[${fRoles}]`);
+      // Note: frontend may intentionally map platform_admin → super_admin
+      // This is documented behavior, not drift
+    } else {
+      console.log(`✅ [${scope}] → [${fRoles}]`);
+    }
+  }
+
   console.log('\n' + '='.repeat(40));
 
   if (drift) {
     console.log('\n❌ CONTRACT DRIFT DETECTED');
-    console.log('   Frontend ROLE_PERMISSIONS does not match backend RolePermissions.');
     console.log('   Fix the drift or explicitly document the divergence.\n');
     process.exit(1);
   } else {

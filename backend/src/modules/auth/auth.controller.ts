@@ -404,3 +404,36 @@ export const resendVerification = asyncHandler(async (req: Request, res: Respons
   await authService.sendVerificationEmail(user.id, user.email, user.full_name);
   res.json({ success: true, message: 'Verification email sent' });
 });
+
+// F2: Return the authenticated user's resolved permissions.
+// This gives the frontend the REAL permission set from the backend's
+// permission cache (app_role_permissions + app_permissions), including
+// dynamic module-scoped permissions like module:{slug}:view.
+// The frontend uses this for presentation-only rendering decisions.
+import { permissionCache } from '../../security/permission-cache.service.js';
+import { scopeToRoles } from '../../security/permissions.js';
+
+export const getMyPermissions = asyncHandler(async (req: Request, res: Response) => {
+  const userRoles = req.user?.roles || [];
+  const userScope = req.user?.scope;
+
+  // Resolve effective roles from scope + JWT roles (mirrors frontend logic)
+  const effectiveRoles = new Set<string>();
+  if (userScope) {
+    const scopeRoles = scopeToRoles(userScope as any);
+    scopeRoles.forEach(r => effectiveRoles.add(r));
+  }
+  userRoles.forEach(r => effectiveRoles.add(r));
+
+  // Get resolved permissions from the backend's permission cache
+  const permissions = permissionCache.getPermissionsForRoles(Array.from(effectiveRoles));
+
+  res.json({
+    success: true,
+    data: {
+      permissions,
+      roles: Array.from(effectiveRoles),
+      scope: userScope,
+    },
+  });
+});

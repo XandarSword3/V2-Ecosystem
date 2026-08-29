@@ -332,9 +332,26 @@ const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
  * layer and the role layer. The backend's scopeToRoles() function is the
  * source of truth; this mapping must be kept in sync.
  */
+/**
+ * Scope → derived roles mapping.
+ *
+ * CRITICAL: This must be kept in sync with the backend's scopeToRoles()
+ * in backend/src/security/permissions.ts AND with the backend's actual
+ * middleware behavior.
+ *
+ * platform_admin: The backend's authorize() middleware passes platform_admin
+ * through when the required role matches the scope. The backend's
+ * requirePermission() only bypasses for super_admin. However,
+ * scopeIsPlatformAdmin() treats platform_admin as privileged for property
+ * access. For permission purposes, platform_admin resolves to super_admin
+ * (which has wildcard permissions). This matches the backend's intent that
+ * platform_admin is a platform-level operator with full access.
+ */
 const SCOPE_TO_ROLES: Record<string, readonly string[]> = {
   super_admin: ['super_admin'],
-  platform_admin: ['platform_admin'],
+  // platform_admin → super_admin: backend treats as privileged operator
+  // with full permission access (scopeIsPlatformAdmin, authorize bypass)
+  platform_admin: ['super_admin'],
   tenant_owner: ['tenant_owner', 'admin'],
   tenant_admin: ['admin'],
   property_manager: ['manager', 'staff'],
@@ -424,7 +441,22 @@ export interface AuthorizationContext {
  * Resolve the full permission set for a set of effective roles.
  * Wildcard roles (admin, super_admin) get ALL known permissions.
  */
-function resolvePermissions(roles: readonly string[]): ReadonlySet<string> {
+/**
+ * Resolve the permission set from the backend's resolved permissions array.
+ * When the backend sends real permissions (including dynamic module-scoped
+ * permissions like module:{slug}:view), use those directly.
+ * This is the PRIMARY permission source when available.
+ */
+function resolveFromBackendPermissions(backendPerms: string[]): ReadonlySet<string> {
+  return new Set(backendPerms);
+}
+
+/**
+ * Resolve permissions from the static ROLE_PERMISSIONS matrix.
+ * Used as a FALLBACK when backend permissions are not available
+ * (e.g., before the /auth/me/permissions call completes).
+ */
+function resolveFromStaticMatrix(roles: readonly string[]): ReadonlySet<string> {
   const perms = new Set<string>();
 
   for (const role of roles) {
@@ -506,7 +538,15 @@ export function useAuthorization(displayPropertyId?: string | null): Authorizati
     [userScope, userRoles],
   );
 
-  const permissions = useMemo(() => resolvePermissions(roles), [roles]);
+  // F2: Prefer real backend permissions when available (includes dynamic
+  // module-scoped permissions). Fall back to static ROLE_PERMISSIONS matrix.
+  const backendPermissions = user?.permissions;
+  const permissions = useMemo(
+    () => backendPermissions && backendPermissions.length > 0
+      ? resolveFromBackendPermissions(backendPermissions)
+      : resolveFromStaticMatrix(roles),
+    [backendPermissions, roles],
+  );
 
   // Scope flags (Layer 2)
   const scope = (userScope ?? '') as UserScope;

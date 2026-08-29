@@ -27,8 +27,10 @@ class PermissionCacheService {
       this.loadFallbackFromStaticPermissions();
     }
 
-    // Super admin: wildcard grants everything.
-    if (roleName === 'super_admin') {
+    // Super admin / platform admin: wildcard grants everything.
+    // platform_admin is treated as privileged (scopeIsPlatformAdmin in tenant-scope.ts)
+    // and should have the same permission bypass as super_admin.
+    if (roleName === 'super_admin' || roleName === 'platform_admin') {
       const superAdmin = this.permissionByRole.get('super_admin');
       return Boolean(superAdmin?.has('*') || superAdmin?.has(permissionSlug));
     }

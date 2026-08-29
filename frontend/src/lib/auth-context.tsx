@@ -17,6 +17,10 @@ interface User {
   scope?: string;
   roles: string[];
   is_platform_admin?: boolean;
+  /** F2: resolved permissions from backend's permission cache.
+   *  Includes dynamic module-scoped permissions like module:{slug}:view.
+   *  The frontend uses this for presentation-only rendering decisions. */
+  permissions?: string[];
 }
 
 interface TwoFactorRequired {
@@ -189,6 +193,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             roles: response.data.data.roles || [],
             is_platform_admin: response.data.data.is_platform_admin || false
           };
+          // F2: fetch resolved permissions from backend's permission cache
+          try {
+            const permsRes = await api.get('/auth/me/permissions');
+            if (permsRes.data?.success && permsRes.data?.data?.permissions) {
+              validatedUser.permissions = permsRes.data.data.permissions;
+            }
+          } catch {
+            // Non-critical: permissions will be empty, backend still enforces
+            authLogger.warn('Failed to fetch permissions, proceeding without them');
+          }
+
           setUser(validatedUser);
           // Update localStorage with validated data
           localStorage.setItem('user', JSON.stringify(validatedUser));

@@ -121,20 +121,27 @@ const LEGACY_STATUSES = ['preparing', 'served', 'delivered'];
  * The canonical mapper in staff/types.ts is the ONLY place legacy
  * status composites are allowed.
  */
+/**
+ * Files where legacy status vocabulary is allowed for backward-compat display.
+ * Each entry has a REASON — the guard flags these as informational, not blocking.
+ * The goal is to make the compatibility boundary NARROW and DOCUMENTED.
+ */
 const STATUS_ALLOWLIST = new Set([
+  // === Canonical mappers (the ONLY place composites are translated) ===
   'components/staff/types.ts',
-  'lib/engine-a/types.ts', // canonicalFulfillmentState() maps them
-  // Nexus simulation is a demo/playground, not production code
+  'lib/engine-a/types.ts',
+  // === Backward-compat display only (documented per file) ===
+  // Nexus simulation: demo/playground, not production
   'app/nexus/simulationStore.ts',
-  // Messaging 'delivered' is email/message delivery, not fulfillment
+  // Messaging: 'delivered' is email/message delivery, not fulfillment
   'app/[property]/admin/messaging/page.tsx',
-  // Orders pages reference 'delivered' as a digital fulfillment state
+  // Orders pages: 'delivered' is a digital fulfillment state (provisioned → delivered)
   'app/[property]/admin/orders/page.tsx',
   'app/[property]/admin/[slug]/orders/page.tsx',
-  // POS templates handle legacy status for backward-compat display
+  // POS templates: legacy status for backward-compat display
   'components/pos-templates/CustomerPOSTemplate.tsx',
   'components/pos-templates/StaffPOSTemplate.tsx',
-  // Dispatch/KDS handle legacy 'served' for backward-compat display
+  // Dispatch/KDS: legacy 'served' for backward-compat display
   'components/staff/DispatchBoard.tsx',
   'components/staff/KitchenView.tsx',
 ]);

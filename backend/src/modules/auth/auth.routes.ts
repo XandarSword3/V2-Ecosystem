@@ -59,6 +59,7 @@ router.post('/biometric/authenticate-complete', biometricController.authenticate
 
 // Protected routes
 router.get('/me', authenticate, authController.getCurrentUser);
+router.get('/me/permissions', authenticate, authController.getMyPermissions);
 router.post('/logout', authenticate, authController.logout);
 router.put('/change-password', authenticate, authController.changePassword);
 router.post('/resend-verification', authenticate, authController.resendVerification);
