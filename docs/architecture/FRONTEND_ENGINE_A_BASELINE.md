@@ -133,36 +133,35 @@ document generation) are deferred to their respective later phases.
 
 ---
 
-## F2 — Frontend authorization / scope architecture ✅ COMPLETE
+## F2 — Frontend authorization / scope architecture ✅ CERTIFIED
 
-**Exit report:** `docs/architecture/F2_EXIT_REPORT.md`
+**Certification report:** `docs/architecture/F2_CERTIFICATION_REPORT.md`
 
-### What was migrated
+### Validation stack
 
-- `lib/authorization.tsx` — `useAuthorization()` hook with six-layer contract
-  (identity → scope → derived role → permission → property/module access →
-  resource ownership). `displayPropertyId` is a presentation hint only.
-- `tools/authorization-contract-test.js` — mechanical validation of
-  frontend vs backend permission matrix (passes clean)
-- `tools/engine-architecture-guard.js` — CI guard for legacy vocabulary
-  in generic Engine A code (passes clean)
-- KDS/Dispatch: fulfillment advance gated on `ORDER_UPDATE`
-- Staff POS: Accept/Cancel/Start Prep/Mark Ready gated on `ORDER_UPDATE`
-- Catalog CRUD: Add/Edit/Delete gated on `CATALOG_WRITE`
-- Admin/Staff layouts: `useAuthorization()` for nav filtering + role checks
-- Admin orders: Confirm/Reject/Advance gated on `ORDER_UPDATE`
-- Navigation: 11 nav items with permission attributes
+| Check | Status |
+|---|---|
+| Frontend typecheck | ✅ PASS |
+| Backend typecheck | ✅ PASS |
+| Authorization contract test | ✅ PASS |
+| Architecture source guard | ✅ PASS |
+| KDS authorization | ✅ PASS |
+| Dispatch authorization | ✅ PASS |
+| Staff POS authorization | ✅ PASS |
+| Settlement authorization | ✅ PASS |
+| Catalog CRUD authorization | ✅ PASS |
+| Browser auth E2E | ⏳ NOT RUN (test files created) |
+| Tenant isolation E2E | ⏳ NOT RUN (test files created) |
 
-### Remaining legacy (documented)
+### Key deliverables
 
-- Admin surfaces (analytics, reports, settings) still use role-based checks
-  (read-only, backend enforces permissions on every API call)
-- `template_type === 'menu_service'` fallback in admin/orders (DB compat)
-- Legacy status composites in `staff/types.ts` mapper (backward-compat)
-
-### Intentionally outside F2
-
-- Authorization E2E browser tests → deferred to F22
-- Cross-tenant/property context testing → deferred to F22
+- Six-layer authorization contract (identity → scope → role → permission → access → ownership)
+- `permissionsStatus: loading | resolved | unavailable` — explicit state
+- `refreshPermissions()` — not permanently stale
+- Backend `/auth/me/permissions` — real module-scoped permissions
+- `platform_admin → super_admin` — correct wildcard semantics
+- Contract test validates scope projection, module-scoped, platform_admin
+- Source guard scans 321 files with documented allowlists
+- PaymentDialog gated on `PAYMENT_RECORD_CASH`
 
 Typecheck + contract test + source guard: all pass clean.

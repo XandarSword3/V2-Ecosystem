@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { CreditCard, DollarSign, Wallet, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
+import { useAuthorization, Perm } from '@/lib/authorization';
 import { formatCurrency } from '@/lib/utils';
 
 interface PaymentDialogProps {
@@ -44,6 +45,7 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
   const [splitCount, setSplitCount] = useState(2);
   const [shares, setShares] = useState<SplitShare[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const auth = useAuthorization(); // F2: permission-aware rendering
 
   // Room charge selection states
   const [roomSearch, setRoomSearch] = useState('');
@@ -393,12 +395,21 @@ export function PaymentDialog({ order, onClose, onComplete, slug }: PaymentDialo
           <Button variant="outline" className="flex-1" onClick={onClose}>
             Cancel
           </Button>
+          {/* F2: gate payment on payment:record:cash permission */}
           {shares.length === 0 ? (
-            <Button className="flex-1" onClick={() => handlePayment()} disabled={isProcessing}>
+            <Button
+              className="flex-1"
+              onClick={() => handlePayment()}
+              disabled={isProcessing || !auth.hasPermission(Perm.PAYMENT_RECORD_CASH)}
+            >
               {isProcessing ? 'Processing...' : 'Pay ' + formatCurrency(order.totalAmount)}
             </Button>
           ) : (
-            <Button className="flex-1" onClick={handleComplete} disabled={remaining > 0}>
+            <Button
+              className="flex-1"
+              onClick={handleComplete}
+              disabled={remaining > 0 || !auth.hasPermission(Perm.PAYMENT_RECORD_CASH)}
+            >
               Complete Order
             </Button>
           )}

@@ -396,6 +396,10 @@ export interface AuthorizationContext {
 
   // --- Layer 4: Permissions ---
   permissions: ReadonlySet<string>;
+  /** Whether permissions came from the backend (resolved) or the static
+   *  role matrix (fallback). When 'unavailable', the static matrix is
+   *  still used but capability-sensitive components should fail closed. */
+  permissionsStatus: 'loading' | 'resolved' | 'unavailable';
 
   // --- Layer 5: Scope-level flags ---
   isSuperAdmin: boolean;
@@ -522,7 +526,7 @@ function resolveEffectiveRoles(userScope: string | undefined, userRoles: string[
  *   PropertyContext's active selection — never from user input.
  */
 export function useAuthorization(displayPropertyId?: string | null): AuthorizationContext {
-  const { user } = useAuth();
+  const { user, permissionsStatus } = useAuth();
   const propertyCtx = usePropertySafe();
 
   const userScope = user?.scope as string | undefined;
@@ -538,8 +542,11 @@ export function useAuthorization(displayPropertyId?: string | null): Authorizati
     [userScope, userRoles],
   );
 
-  // F2: Prefer real backend permissions when available (includes dynamic
-  // module-scoped permissions). Fall back to static ROLE_PERMISSIONS matrix.
+  // F2: Permission resolution with explicit status tracking.
+  // - 'resolved': use real backend permissions (includes module-scoped)
+  // - 'loading': use static matrix as temporary fallback
+  // - 'unavailable': use static matrix but components should fail closed
+  //   for capability-sensitive rendering
   const backendPermissions = user?.permissions;
   const permissions = useMemo(
     () => backendPermissions && backendPermissions.length > 0
@@ -637,6 +644,7 @@ export function useAuthorization(displayPropertyId?: string | null): Authorizati
       scope,
       roles,
       permissions,
+      permissionsStatus,
       isSuperAdmin,
       isPlatformAdmin,
       isTenantOwner,
@@ -660,7 +668,7 @@ export function useAuthorization(displayPropertyId?: string | null): Authorizati
       access,
     }),
     [
-      identity, scope, roles, permissions,
+      identity, scope, roles, permissions, permissionsStatus,
       isSuperAdmin, isPlatformAdmin, isTenantOwner, isTenantAdmin,
       isPropertyManager, isPropertyStaff, isCustomer,
       isStaff, isManager, isAdmin,

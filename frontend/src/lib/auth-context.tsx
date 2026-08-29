@@ -43,15 +43,32 @@ interface LoginResult {
   requiresTwoFactor?: false;
 }
 
+/**
+ * Permission loading status:
+ * - loading: initial fetch in progress (UI should show loading state for
+ *   capability-sensitive rendering, or use static role matrix as fallback)
+ * - resolved: backend permissions loaded (UI can use dynamic permissions
+ *   including module-scoped like module:{slug}:view)
+ * - unavailable: backend permissions endpoint failed or is unreachable
+ *   (UI MUST NOT treat static role matrix as complete — fail closed for
+ *   capability-sensitive rendering)
+ */
+export type PermissionsStatus = 'loading' | 'resolved' | 'unavailable';
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** F2: permission loading status — drives useAuthorization() behavior */
+  permissionsStatus: PermissionsStatus;
   login: (email: string, password: string, captchaToken?: string) => Promise<User | TwoFactorRequired | TwoFactorSetupRequired>;
   verify2FA: (userId: string, code: string) => Promise<User>;
   completeTwoFactorSetupLogin: (user: User, accessToken: string) => void;
   logout: () => void;
   refreshUser: () => void;
+  /** F2: re-fetch permissions from backend. Called on refreshUser(),
+   *  explicit refresh, or session validation. Lightweight — single GET. */
+  refreshPermissions: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,6 +76,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [permissionsStatus, setPermissionsStatus] = useState<PermissionsStatus>('loading');
   const router = useRouter();
   const queryClient = useQueryClient();
   const clearCart = useCartStore((state) => state.clearCart);
@@ -75,7 +93,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearCart();
     queryClient.clear();
     setUser(null);
+    setPermissionsStatus('loading');
   }, [clearCart, queryClient]);
+
+  // F2: Re-fetch permissions from backend's permission cache.
+  // Called after login, session validation, explicit refresh, or focus recovery.
+  // Single lightweight GET — does not re-validate the entire session.
+  const refreshPermissions = useCallback(async () => {
+    if (!user) return;
+    try {
+      const permsRes = await api.get('/auth/me/permissions');
+      if (permsRes.data?.success && permsRes.data?.data?.permissions) {
+        setUser(prev => prev ? { ...prev, permissions: permsRes.data.data.permissions } : prev);
+        setPermissionsStatus('resolved');
+      } else {
+        setPermissionsStatus('unavailable');
+      }
+    } catch {
+      authLogger.warn('Failed to refresh permissions');
+      setPermissionsStatus('unavailable');
+    }
+  }, [user]);
 
   // Helper to notify other tabs of auth events
   const notifyAuthEvent = useCallback((type: 'LOGIN' | 'LOGOUT') => {
@@ -198,10 +236,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const permsRes = await api.get('/auth/me/permissions');
             if (permsRes.data?.success && permsRes.data?.data?.permissions) {
               validatedUser.permissions = permsRes.data.data.permissions;
+              setPermissionsStatus('resolved');
+            } else {
+              setPermissionsStatus('unavailable');
             }
           } catch {
-            // Non-critical: permissions will be empty, backend still enforces
-            authLogger.warn('Failed to fetch permissions, proceeding without them');
+            // F2: permissions unavailable — UI must fail closed for
+            // capability-sensitive rendering, not silently pretend
+            // the static role matrix is complete.
+            authLogger.warn('Permissions unavailable — capability-sensitive rendering will use restricted mode');
+            setPermissionsStatus('unavailable');
           }
 
           setUser(validatedUser);
@@ -415,12 +459,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/');
   };
 
-  const refreshUser = () => {
+  const refreshUser = useCallback(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
-  };
+    // F2: also refresh permissions when user data is refreshed
+    refreshPermissions();
+  }, [refreshPermissions]);
 
   return (
     <AuthContext.Provider
@@ -428,11 +474,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated: !!user,
+        permissionsStatus,
         login,
         verify2FA,
         completeTwoFactorSetupLogin,
         logout,
         refreshUser,
+        refreshPermissions,
       }}
     >
       {children}

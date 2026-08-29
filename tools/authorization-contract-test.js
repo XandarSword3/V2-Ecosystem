@@ -225,6 +225,153 @@ function validateScopeProjection(frontendScopeRoles, frontendRolePerms) {
 }
 
 // ============================================
+// Invalid/unknown scope behavior
+// ============================================
+
+function validateInvalidScopes(frontendScopeRoles) {
+  console.log('\n=== Invalid/Unknown Scope Behavior ===\n');
+  let issues = 0;
+
+  const knownScopes = Object.keys(frontendScopeRoles);
+  const testScopes = ['', 'unknown_scope', 'hacker', 'null', 'undefined'];
+
+  for (const scope of testScopes) {
+    if (frontendScopeRoles[scope] !== undefined) {
+      console.log(`⚠️  Unknown scope '${scope}' has an explicit mapping (unexpected)`);
+      issues++;
+    } else {
+      console.log(`✅ Unknown scope '${scope || '(empty)'}' → no mapping (will fall through to default)`);
+    }
+  }
+
+  return issues;
+}
+
+// ============================================
+// Module-scoped permission representation
+// ============================================
+
+function validateModulePermissions(frontendPermConsts) {
+  console.log('\n=== Module-Scoped Permission Representation ===\n');
+  let issues = 0;
+
+  // Module-scoped permissions are DYNAMIC (generated per-module by the backend)
+  // and should NOT be in the static Perm constants. They come from the
+  // backend's /auth/me/permissions endpoint.
+  const modulePermPattern = /^module:[^:]+:(view|order|manage|admin)$/;
+  const staticModulePerms = Object.values(frontendPermConsts).filter(
+    p => modulePermPattern.test(p)
+  );
+
+  if (staticModulePerms.length > 0) {
+    console.log(`❌ Static Perm constants contain module-scoped permissions:`);
+    staticModulePerms.forEach(p => console.log(`   ${p}`));
+    console.log('   Module permissions are DYNAMIC — they come from the backend.');
+    console.log('   Remove them from Perm constants and use canViewModule() etc. instead.');
+    issues++;
+  } else {
+    console.log('✅ No module-scoped permissions in static Perm constants (correct)');
+  }
+
+  // Verify canViewModule/Order/Manage/Admin helpers exist
+  const content = fs.readFileSync(FRONTEND_PERMS, 'utf-8');
+  const helpers = ['canViewModule', 'canOrderModule', 'canManageModule', 'canAdminModule'];
+  for (const h of helpers) {
+    if (!content.includes(h)) {
+      console.log(`❌ Missing helper: ${h}`);
+      issues++;
+    } else {
+      console.log(`✅ Helper present: ${h}`);
+    }
+  }
+
+  // Verify helpers check for module:{slug}:* pattern
+  const modulePermRegex = /module:\$\{slug\}:view|module:\$\{slug\}:order|module:\$\{slug\}:manage|module:\$\{slug\}:admin/;
+  if (!modulePermRegex.test(content)) {
+    console.log('⚠️  Module permission helpers may not check module:{slug}:* pattern');
+    issues++;
+  } else {
+    console.log('✅ Module permission helpers check module:{slug}:* pattern');
+  }
+
+  return issues;
+}
+
+// ============================================
+// Platform admin semantics
+// ============================================
+
+function validatePlatformAdminSemantics(frontendScopeRoles, frontendRolePerms) {
+  console.log('\n=== Platform Admin Semantics ===\n');
+  let issues = 0;
+
+  const platformRoles = frontendScopeRoles['platform_admin'] || [];
+  const superAdminRoles = frontendScopeRoles['super_admin'] || [];
+
+  // platform_admin should resolve to super_admin (or have equivalent permissions)
+  if (platformRoles.includes('super_admin')) {
+    console.log('✅ platform_admin → super_admin (has wildcard permissions)');
+  } else if (platformRoles.includes('admin')) {
+    console.log('✅ platform_admin → admin (has wildcard permissions)');
+  } else {
+    console.log(`❌ platform_admin → [${platformRoles}] — may have insufficient permissions`);
+    // Check if any of the resolved roles have wildcard
+    const hasWildcard = platformRoles.some(r => {
+      const perms = frontendRolePerms[r] || [];
+      return perms.includes('*');
+    });
+    if (!hasWildcard) {
+      console.log('   None of the resolved roles have wildcard permissions');
+      issues++;
+    }
+  }
+
+  // Verify the platform_admin scope flag exists in useAuthorization
+  const content = fs.readFileSync(FRONTEND_PERMS, 'utf-8');
+  if (!content.includes('isPlatformAdmin')) {
+    console.log('❌ Missing isPlatformAdmin flag in authorization context');
+    issues++;
+  } else {
+    console.log('✅ isPlatformAdmin flag present');
+  }
+
+  return issues;
+}
+
+// ============================================
+// Presentation helpers are not security authorities
+// ============================================
+
+function validatePresentationNotSecurity(frontendFile) {
+  console.log('\n=== Presentation Helpers ≠ Security Authorities ===\n');
+  let issues = 0;
+
+  const content = frontendFile;
+
+  // Check that hasPermission comments mention presentation-only
+  if (!content.includes('PRESENTATION') && !content.includes('presentation')) {
+    console.log('⚠️  Authorization hook may not document presentation-only semantics');
+    issues++;
+  } else {
+    console.log('✅ Authorization hook documents presentation-only semantics');
+  }
+
+  // Check that the hook does not export anything that looks like a middleware/guard
+  const guardPatterns = ['middleware', 'guard', 'intercept', 'block', 'deny', 'reject'];
+  for (const pattern of guardPatterns) {
+    if (content.includes(`export function ${pattern}`) || content.includes(`export const ${pattern}`)) {
+      console.log(`❌ Found exported function/const matching '${pattern}' — presentation layer should not gate`);
+      issues++;
+    }
+  }
+  if (issues === 0) {
+    console.log('✅ No exported middleware/guard functions (correct for presentation layer)');
+  }
+
+  return issues;
+}
+
+// ============================================
 // Main comparison
 // ============================================
 
@@ -321,11 +468,34 @@ function compare() {
     const fSorted = [...fRoles].sort().join(',');
     if (bSorted !== fSorted) {
       console.log(`⚠️  [${scope}] backend=[${bRoles}] frontend=[${fRoles}]`);
-      // Note: frontend may intentionally map platform_admin → super_admin
-      // This is documented behavior, not drift
     } else {
       console.log(`✅ [${scope}] → [${fRoles}]`);
     }
+  }
+
+  // Invalid/unknown scope behavior
+  const invalidIssues = validateInvalidScopes(frontendScopeRoles);
+  if (invalidIssues > 0) {
+    drift = true;
+  }
+
+  // Module-scoped permission representation
+  const moduleIssues = validateModulePermissions(frontend.permConsts);
+  if (moduleIssues > 0) {
+    drift = true;
+  }
+
+  // Platform admin semantics
+  const platformIssues = validatePlatformAdminSemantics(frontendScopeRoles, frontend.rolePerms);
+  if (platformIssues > 0) {
+    drift = true;
+  }
+
+  // Presentation helpers are not security authorities
+  const frontendContent = fs.readFileSync(FRONTEND_PERMS, 'utf-8');
+  const presentationIssues = validatePresentationNotSecurity(frontendContent);
+  if (presentationIssues > 0) {
+    drift = true;
   }
 
   console.log('\n' + '='.repeat(40));
