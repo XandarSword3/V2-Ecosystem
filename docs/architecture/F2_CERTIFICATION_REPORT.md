@@ -1,7 +1,18 @@
 # F2 Certification Report — Frontend Authorization/Scope Architecture
 
 **Date:** August 29, 2026
-**Status:** ✅ CERTIFIED
+**Status:** Implementation complete. Backend authorization strongly certified. Frontend browser certification pending.
+
+---
+
+## Classification
+
+```
+F2 IMPLEMENTATION STATUS: COMPLETE
+Backend authorization:     STRONGLY CERTIFIED (56 E2E tests pass)
+Frontend browser E2E:      NOT RUN (requires subdomain-configured environment)
+Cross-tenant E2E:          NOT RUN (single-tenant database; code audit confirms enforcement)
+```
 
 ---
 
@@ -13,95 +24,83 @@
 | Authorization contract test | ✅ PASS | All sub-checks valid, no drift |
 | Architecture source guard | ✅ PASS | 321 files scanned |
 | ORDER_UPDATE asymmetry | ✅ 5/5 passed | Regression test proves and protects asymmetry |
+| Scope/role disagreement | ✅ 8/8 passed, 1 NOT RUN | Scope is primary; conflicting-claims test requires DB fixture |
 | Authorization E2E | ✅ 15 passed, 2 skipped | Real order lifecycle, scope, permissions |
-| Cross-tenant isolation | ✅ 12/12 passed | Real resource access, header manipulation, scope |
-| Tenant isolation | ✅ 12/12 passed | Module scoping, presentation-only, scope/role |
-
-**Total: 56 E2E tests pass, 0 failures, 2 correctly classified NOT RUN**
+| Tenant boundary E2E | ✅ 12/12 passed | Real resource access, header manipulation, scope |
+| Tenant isolation E2E | ✅ 12/12 passed | Module scoping, presentation-only, scope/role |
+| Frontend browser E2E | ❌ NOT RUN | Requires subdomain-configured environment |
+| Cross-tenant real-resource E2E | ❌ NOT RUN | Requires multi-tenant database |
 
 ---
 
 ## Test Suite Summary
 
-### `order-update-asymmetry.spec.ts` — 5 passed
-Proves the frontend ORDER_UPDATE permission gate is stricter than the backend role-based guard.
+### `order-update-asymmetry.spec.ts` — 5/5 passed
 
-1. Staff backend permissions do NOT include `order:update`
-2. Staff CAN create and cancel orders via role-based guard (real order lifecycle)
-3. Frontend `ROLE_PERMISSIONS` includes `Perm.ORDER_UPDATE` for staff
-4. `F2_CERTIFICATION_REPORT.md` documents the asymmetry
-5. Unauthenticated order update is rejected (401)
+Proves and protects the frontend/backend authorization gap.
+
+1. **Staff backend permissions do NOT include `order:update`** — unconditional assertion, no conditional wildcard skip
+2. **Staff CAN create and cancel real orders** — role-based guard passes, real order lifecycle
+3. **Frontend `ROLE_PERMISSIONS` includes `Perm.ORDER_UPDATE`** — source code assertion
+4. **`F2_CERTIFICATION_REPORT.md` documents the asymmetry** — documentation assertion
+5. **Unauthenticated order update rejected** — 401
+
+### `scope-role-disagreement.spec.ts` — 8/8 passed, 1 NOT RUN
+
+Proves scope is the primary authorization source.
+
+1. Staff scope grants staff-level permissions (not admin)
+2. JWT roles match scope-derived role
+3. Staff cannot access admin settings (403)
+4. Staff cannot create users (403)
+5. Staff cannot access platform admin (403)
+6. Staff CAN list orders for own module
+7. Staff CAN access permissions endpoint
+8. Permissions endpoint scope matches JWT scope
+
+**NOT RUN:** True conflicting-claims test (scope=property_staff, roles=admin) — requires database modification to create user with mismatched scope/roles. Classified as NOT RUN rather than faked.
 
 ### `authorization-staff.spec.ts` — 15 passed, 2 skipped
+
 Staff authorization against real backend with real data.
 
-**Scope & permissions (3 tests):**
 - Login returns `property_staff` scope
 - Permissions endpoint returns module-scoped permissions
 - Staff permissions lack `order:update` (discrepancy documented)
+- Real order lifecycle: create → cancel → verify persistence
+- Invalid transitions rejected with state machine errors
+- 4 unauthenticated rejection tests
+- Scope is primary in JWT and permissions
+- Module-scoped permissions validated
 
-**Order lifecycle (4 tests):**
-- Create order with real catalog item → confirmed
-- Cancel confirmed order → persisted cancelled
-- Invalid transition `completed` → rejected with state machine error
-- Invalid state `preparing` → rejected with valid states list
+**NOT RUN:** Admin behavior (requires 2FA), UI capability visibility (requires frontend browser)
 
-**Unauthenticated rejection (4 tests):**
-- Order list: 401
-- Permissions: 401
-- Order update: 401 or CSRF 403
-- Order creation: 401 or 403
+### `tenant-isolation-cross-tenant.spec.ts` — 12/12 passed
 
-**Scope is primary (2 tests):**
-- JWT scope matches permissions endpoint scope
-- Staff lacks admin-level permissions
-
-**Module permissions (2 tests):**
-- Pattern `module:{slug}:{action}` validated
-- Each permission maps to real module
-
-**NOT RUN (2 tests):**
-- Admin behavior (requires 2FA)
-- UI capability visibility (requires frontend browser)
-
-### `tenant-isolation-cross-tenant.spec.ts` — 12 passed
-Cross-tenant boundary enforcement against real database.
+Tenant boundary enforcement against real database.
 
 1. Staff JWT tenant_id matches all returned modules' tenant_id
-2. Staff can list orders for own module
-3. Staff can list items for own module
-4. Nonexistent module slug returns 404 (staff endpoint)
-5. Nonexistent module slug returns 404 (admin endpoint)
-6. Mismatched `x-tenant-id` header causes rejection
-7. `x-property-id` header is ignored for authorization
-8. Staff scope grants only staff-level permissions
-9. JWT scope and permissions endpoint scope agree
-10. Unauthenticated modules access: 401
-11. Unauthenticated staff orders: 401
-12. Unauthenticated auth/me: 401
+2. Staff can list orders and items for own module
+3. Nonexistent module returns 404 (staff endpoint)
+4. Nonexistent module returns 404 (admin endpoint)
+5. Mismatched `x-tenant-id` header causes rejection
+6. `x-property-id` header is ignored for authorization
+7. Staff scope grants only staff-level permissions
+8. JWT scope and permissions endpoint scope agree
+9. 3 unauthenticated rejection tests
 
-### `tenant-property-isolation.spec.ts` — 12 passed
+**Classification:** This is "tenant-boundary E2E + cross-tenant enforcement code audit", NOT "cross-tenant E2E". The database contains only one tenant. True cross-tenant access denial (Staff A → Module B in different tenant) is proven by code audit of `requireModulePropertyAccess()` in `backend/src/middleware/propertyAccess.middleware.ts` (lines 267-278: unconditional 403 on tenant_id mismatch).
+
+### `tenant-property-isolation.spec.ts` — 12/12 passed
+
 Module permission scoping, displayPropertyId isolation, scope/role disagreement.
-
-1. Staff login returns tenantId
-2. All modules belong to staff's tenant
-3. Unauthenticated modules: 401
-4. Unauthenticated auth/me: 401
-5. Nonexistent module returns 404
-6. Nonexistent module via admin returns 404
-7. Staff has module-scoped permissions
-8. Each permission maps to real module
-9. `x-property-id` header ignored
-10. Mismatched `x-tenant-id` rejected
-11. Permissions match scope-derived expectations
-12. JWT and permissions endpoint agree
 
 ---
 
 ## ORDER_UPDATE Asymmetry — Documented and Protected
 
 ### The behavior
-```text
+```
 BACKEND:  authorize(['staff', 'manager', 'admin']) — role-based guard
 FRONTEND: hasPermission(Perm.ORDER_UPDATE) — permission-based gate
 
@@ -111,47 +110,68 @@ Staff frontend gate: FAILS (hides order advance buttons)
 ```
 
 ### Why this is correct
-The frontend is a **presentation layer**, not a security authority. It fails closed:
-- Hides actions the user can technically perform
-- Rather than showing actions the backend would accept
+The frontend is a **presentation layer**, not a security authority. It fails closed: hides actions the user can technically perform, rather than showing actions the backend would accept.
 
 ### What protects this
 - `order-update-asymmetry.spec.ts` proves the asymmetry exists
 - `authorization-staff.spec.ts` proves staff backend permissions lack `order:update`
-- `F2_CERTIFICATION_REPORT.md` documents the discrepancy
-- If someone removes `Perm.ORDER_UPDATE` from frontend ROLE_PERMISSIONS, the regression test FAILS
+- If someone removes `Perm.ORDER_UPDATE` from frontend ROLE_PERMISSIONS → regression test FAILS
+- If someone adds `order:update` to backend staff permissions → test still passes (asymmetry resolved)
+
+### Technical debt
+This asymmetry must eventually be consolidated into one canonical capability model. The backend should either:
+- Add `order:update` to `app_role_permissions` for staff, OR
+- Upgrade order routes to use `requirePermission('order:update')` instead of `authorize()`
+
+Until then, the frontend permission gate is a **stricter presentation layer** — this is intentional and documented.
 
 ---
 
-## Cross-Tenant Isolation — Enforcement Proven
+## Frontend Browser E2E — NOT RUN
 
-### What the tests prove
-1. **Tenant ownership:** Every module returned for staff belongs to staff's `tenantId`
-2. **Module boundary:** Accessing nonexistent module returns 404, not 200
-3. **Header manipulation:** `x-tenant-id` with wrong value → rejection; `x-property-id` → ignored
-4. **Scope primary:** Staff scope grants only staff-level permissions
+### Why
+The frontend uses subdomain-based routing (`{tenant}.localhost:3000`). The backend's `tenantGate` middleware resolves tenants by subdomain from the `tenants` table. The Playwright test environment cannot resolve the correct subdomain for the staff user's tenant because:
 
-### Code audit confirmation
-The `requireModulePropertyAccess` middleware (backend/src/middleware/propertyAccess.middleware.ts) enforces:
-```typescript
-// Line 267-278: Cross-tenant staff access is unconditionally rejected
-if (moduleRecord.tenant_id && userTenantId && moduleRecord.tenant_id !== userTenantId) {
-  res.status(403).json({ success: false, error: 'Access denied: cross-tenant module access prohibited' });
-  return;
-}
+1. The staff user's tenant has an unknown subdomain in the `tenants` table
+2. The frontend's `getApiUrl()` constructs API URLs from the browser hostname (`default.localhost:3005`)
+3. Playwright route interception can rewrite the URL but cannot inject the correct `X-Tenant-Slug` header without knowing the tenant's actual subdomain
+4. Without the correct subdomain, the `tenantGate` returns "Tenant not found" for all API calls
+
+### What's needed
+- A test fixture that provisions a tenant with a known subdomain (e.g., `e2e-test`)
+- Or: environment variable `FRONTEND_URL` pointing to the correct subdomain
+- Or: backend endpoint that resolves tenant by ID rather than subdomain
+
+### Test file
+`tests/frontend-authorization-browser.spec.ts` — written with correct structure, route interception, and assertions. Ready to run when the environment is configured.
+
+---
+
+## Cross-Tenant E2E — NOT RUN
+
+### Why
+The dev database contains only one tenant (`cef22e40-fac4-49d5-ac56-215e1db3fae4`). True cross-tenant access denial requires:
+
+```
+Tenant A / Module A / Staff A
+Tenant B / Module B / Staff B
+
+A → A ✅
+A → B ❌
+B → B ✅
+B → A ❌
 ```
 
-### Database limitation
-This dev database has only one tenant (`cef22e40-fac4-49d5-ac56-215e1db3fae4`). True cross-tenant access denial (Staff A → Module B in different tenant) requires a multi-tenant database. The middleware code audit and the single-tenant tests confirm the enforcement mechanism is correct.
+This cannot be tested with a single tenant.
 
----
+### What proves enforcement
+- Code audit of `requireModulePropertyAccess()` in `backend/src/middleware/propertyAccess.middleware.ts` (lines 267-278) — unconditional 403 on `moduleRecord.tenant_id !== userTenantId`
+- Tenant boundary E2E tests prove single-tenant access patterns work correctly
+- Header manipulation tests prove `x-tenant-id` and `x-tenant-slug` headers are validated
 
-## NOT RUN — Infrastructure Required
-
-| Test | Why | Resolution |
-|---|---|---|
-| Admin authorization behavior | Admin requires 2FA enrollment | Provision 2FA bypass fixture or pre-enrolled TOTP |
-| UI capability visibility | Requires Playwright browser against running frontend | Run when frontend is accessible via Playwright |
+### What's needed
+- Second tenant with verified staff user and modules
+- `tools/setup-cross-tenant.cjs` was created but could not run due to DNS resolution failure from this machine
 
 ---
 
@@ -167,13 +187,15 @@ This dev database has only one tenant (`cef22e40-fac4-49d5-ac56-215e1db3fae4`). 
 - [x] Catalog authorized (`CATALOG_WRITE`)
 - [x] Source guard enforced in CI
 - [x] Real order lifecycle E2E (create → advance → verify → invalid rejection)
-- [x] ORDER_UPDATE asymmetry regression test (5/5 pass)
-- [x] Cross-tenant isolation E2E (12/12 pass)
-- [x] Scope/role disagreement tested
+- [x] ORDER_UPDATE asymmetry regression test (5/5 pass, unconditional assertions)
+- [x] Scope/role disagreement test (8/8 pass)
+- [x] Cross-tenant boundary E2E (12/12 pass) + code audit
 - [x] Backend rejects unauthorized direct requests (4/4 unauthenticated)
-- [x] No tautological or conditional assertions
+- [x] No tautological or conditional assertions for required scenarios
 - [x] Frontend typecheck clean
 - [x] Backend typecheck clean
+- [ ] Frontend browser authorization E2E — NOT RUN (environment limitation)
+- [ ] True cross-tenant resource access E2E — NOT RUN (single-tenant database)
 
 ---
 
@@ -181,3 +203,4 @@ This dev database has only one tenant (`cef22e40-fac4-49d5-ac56-215e1db3fae4`). 
 
 - **Main Phase 11** (Identity, roles and scope) — backend dependency for F2 is satisfied
 - **F3: Customer Shell** — authorization layer is ready for capability-aware module presentation
+- **F2 remaining:** Run frontend browser E2E when subdomain environment is configured

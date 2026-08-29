@@ -70,15 +70,20 @@ test.describe('Backend: staff permissions lack order:update', () => {
     const token = await login(request);
     const permissions = await getPermissions(request, token);
 
-    const hasWildcard = permissions.includes('*');
-    if (!hasWildcard) {
-      expect(
-        !permissions.includes('order:update'),
-        `Backend should NOT grant order:update to staff via permissions endpoint. ` +
-        `If this fails, the asymmetry has been resolved (acceptable). ` +
-        `Current permissions: ${JSON.stringify(permissions.slice(0, 15))}`,
-      ).toBeTruthy();
-    }
+    // Unconditional: staff permissions must NOT include order:update.
+    // If this fails, the asymmetry has been resolved — acceptable, but this
+    // test must then be updated to document the resolution.
+    expect(
+      permissions.includes('*'),
+      `Staff must NOT have wildcard permissions. Got: ${JSON.stringify(permissions.slice(0, 15))}`,
+    ).toBe(false);
+
+    expect(
+      permissions.includes('order:update'),
+      `Staff must NOT have order:update in backend permissions. ` +
+      `The backend order routes use role-based authorize(['staff']), not ` +
+      `requirePermission('order:update'). Current: ${JSON.stringify(permissions.slice(0, 15))}`,
+    ).toBe(false);
   });
 });
 
