@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSocket } from '@/lib/socket';
 import { formatCurrency } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useAuthorization, Perm } from '@/lib/authorization';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Truck, Clock, RefreshCw, MapPin, User, CheckCircle2 } from 'lucide-react';
@@ -71,6 +72,7 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
   const [pendingOrderIds, setPendingOrderIds] = useState<Set<string>>(new Set());
   const [paymentOrder, setPaymentOrder] = useState<Order | null>(null);
   const { socket } = useSocket();
+  const auth = useAuthorization(); // F2: permission-aware rendering
 
   const loadOrders = async () => {
     try {
@@ -294,16 +296,19 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
                         </div>
                       )}
 
-                      <div className="p-3 bg-gray-50 dark:bg-gray-900/50">
-                        <Button
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                          size="sm"
-                          disabled={isPending}
-                          onClick={() => markDelivered(order)}
-                        >
-                          {isPending ? 'Marking Delivered…' : 'Mark Delivered'}
-                        </Button>
-                      </div>
+                      {/* F2: gate dispatch action on order:update permission */}
+                      {auth.hasPermission(Perm.ORDER_UPDATE) && (
+                        <div className="p-3 bg-gray-50 dark:bg-gray-900/50">
+                          <Button
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                            size="sm"
+                            disabled={isPending}
+                            onClick={() => markDelivered(order)}
+                          >
+                            {isPending ? 'Marking Delivered…' : 'Mark Delivered'}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

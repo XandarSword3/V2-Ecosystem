@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useAuthorization, Perm } from '@/lib/authorization';
 import { useSocket } from '@/lib/socket';
 import { formatCurrency, formatTime } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -247,6 +248,7 @@ function ItemStatusChip({
 export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, requireReservation, cashHandlingEnabled = true }: StaffPOSTemplateProps) {
   const t = useTranslations();
   const { user } = useAuth();
+  const auth = useAuthorization(); // F2: permission-aware rendering
   const { socket } = useSocket();
 
   // State
@@ -1202,7 +1204,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                           <span>{formatCurrency(order.totalAmount)}</span>
                         </div>
                         <div className="flex gap-2">
-                          {order.status === 'pending' && (
+                          {/* F2: gate pending-order actions on order:update permission */}
+                          {order.status === 'pending' && auth.hasPermission(Perm.ORDER_UPDATE) && (
                             <>
                               <Button
                                 size="sm"
@@ -1221,7 +1224,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                               </Button>
                             </>
                           )}
-                          {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'confirmed' && (
+                          {/* F2: gate fulfillment advance on order:update permission */}
+                          {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'confirmed' && auth.hasPermission(Perm.ORDER_UPDATE) && (
                             <Button
                               size="sm"
                               className="w-full"
@@ -1230,7 +1234,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                               <Play className="h-4 w-4 mr-1" /> Start Prep
                             </Button>
                           )}
-                          {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'in_progress' && (
+                          {/* F2: gate fulfillment advance on order:update permission */}
+                          {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status) === 'in_progress' && auth.hasPermission(Perm.ORDER_UPDATE) && (
                             <Button
                               size="sm"
                               className="w-full bg-green-600 hover:bg-green-700"

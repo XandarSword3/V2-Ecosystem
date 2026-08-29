@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
+import { useAuthorization, Perm } from '@/lib/authorization';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useProperty } from '@/context/PropertyContext';
 import { toast } from 'sonner';
@@ -132,6 +133,7 @@ export default function DynamicMenuPage() {
   const router = useRouter();
   const { modules } = useSiteSettings();
   const { activePropertyId } = useProperty();
+  const auth = useAuthorization(); // F2: permission-aware rendering
   const t = useTranslations('admin');
   
   const slug = Array.isArray(params?.slug) ? params?.slug[0] : params?.slug;
@@ -459,13 +461,16 @@ export default function DynamicMenuPage() {
             <Upload className="w-4 h-4" />
             Import Menu
           </Button>
-          <Button
-            onClick={openCreateModal}
-            className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 text-white"
-          >
-            <Plus className="w-4 h-4" />
-            Add Item
-          </Button>
+          {/* F2: gate catalog create on catalog:write permission */}
+          {auth.hasPermission(Perm.CATALOG_WRITE) && (
+            <Button
+              onClick={openCreateModal}
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 text-white"
+            >
+              <Plus className="w-4 h-4" />
+              Add Item
+            </Button>
+          )}
         </motion.div>
       </div>
 
@@ -641,19 +646,24 @@ export default function DynamicMenuPage() {
                             </>
                           )}
                         </button>
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="p-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {/* F2: gate catalog edit/delete on catalog:write permission */}
+                        {auth.hasPermission(Perm.CATALOG_WRITE) && (
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 transition-colors"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                            Edit
+                          </button>
+                        )}
+                        {auth.hasPermission(Perm.CATALOG_WRITE) && (
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="p-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                       {/* Phase 8: Lifecycle transition buttons */}
                       {(LIFECYCLE_TRANSITIONS[item.lifecycle_status] ?? []).length > 0 && (

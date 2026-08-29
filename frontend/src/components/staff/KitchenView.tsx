@@ -4,6 +4,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useSocket } from '@/lib/socket';
 import { formatCurrency, formatTime } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useAuthorization, Perm } from '@/lib/authorization';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import {
@@ -325,6 +326,7 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
   // the tapped chip so a slow network doesn't invite a double-tap.
   const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(new Set());
   const { socket } = useSocket();
+  const auth = useAuthorization(); // F2: permission-aware rendering
   // F1: mode-filtered board. 'all' shows a merged board; any specific mode
   // shows only that mode's columns and orders.
   const [activeModeTab, setActiveModeTab] = useState<FulfillmentMode | 'all'>('all');
@@ -921,6 +923,8 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                                       const nextTarget = nextCanonicalTarget(order, oCfg);
                                       const isWaitingOnDispatch = oCol === 'ready';
                                       if (!nextTarget && !isWaitingOnDispatch) return null;
+                                      // F2: only show fulfillment action if user has order:update permission
+                                      if (!auth.hasPermission(Perm.ORDER_UPDATE)) return null;
                                       return (
                                         <div className="px-2 pb-2 flex gap-2">
                                           {isWaitingOnDispatch ? (
@@ -1099,6 +1103,8 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                   const selCol = boardColumn(selectedOrder, selModeConfig);
                   const isTerminal = selectedOrder.status === 'completed' || selectedOrder.status === 'cancelled';
                   if (!isTerminal && nextTarget && selCol !== 'ready') {
+                    // F2: gate fulfillment advance on order:update permission
+                    if (!auth.hasPermission(Perm.ORDER_UPDATE)) return null;
                     return (
                       <Button
                         className="flex-1"

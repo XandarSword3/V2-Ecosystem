@@ -1,21 +1,42 @@
 /**
- * F2: Frontend Authorization / Scope Architecture
+ * F2.1: Frontend Authorization Contract
  *
- * This module provides a useAuthorization() hook and permission helpers that
- * mirror the backend's canonical authorization model exactly. It is
- * PRESENTATION-ONLY — the backend remains the authoritative security boundary.
+ * This module provides a useAuthorization() hook that models the backend's
+ * canonical authorization hierarchy for PRESENTATION decisions only.
  *
- * The backend model (source of truth):
- *   Scope (JWT): super_admin > platform_admin > tenant_owner > tenant_admin
- *                > property_manager > property_staff > customer
- *   Roles (backward-compat, derived from scope):
- *     super_admin, admin, manager, staff, customer, guest
- *   Permissions (granular strings):
- *     resource:action[:scope] — e.g. order:create, catalog:write, payment:refund
- *   Module-scoped permissions:
- *     module:{slug}:view|order|manage|admin
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │                     AUTHORIZATION LAYERS                        │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │                                                                 │
+ * │  IDENTITY          user.id, user.email                         │
+ * │       ↓                                                        │
+ * │  SCOPE             JWT scope: super_admin, tenant_owner, …     │
+ * │                    ← primary source of truth (JWT-verified)     │
+ * │       ↓                                                        │
+ * │  DERIVED ROLE      scope → roles mapping                       │
+ * │                    ← backward-compat, NOT used for decisions    │
+ * │       ↓                                                        │
+ * │  PERMISSION        resource:action[:scope] strings              │
+ * │                    ← granular, role→perm matrix                 │
+ * │       ↓                                                        │
+ * │  PROPERTY ACCESS   user_property_access / user_group_access     │
+ * │                    ← validated by backend middleware only       │
+ * │       ↓                                                        │
+ * │  MODULE ACCESS     module:{slug}:view|order|manage|admin        │
+ * │                    ← derived from module permissions            │
+ * │       ↓                                                        │
+ * │  RESOURCE OWNERSHIP resource.user_id = user.id                 │
+ * │                    ← validated by backend ownerOrAdmin only     │
+ * │                                                                 │
+ * └─────────────────────────────────────────────────────────────────┘
  *
- * Reference: backend/src/security/permissions.ts (RolePermissions matrix)
+ * CRITICAL INVARIANT: This hook NEVER authorizes. It provides hints
+ * for rendering: which buttons to show, which nav items to display,
+ * which sections to highlight. The backend is the sole security authority.
+ * A hidden button is not a security mechanism.
+ *
+ * Reference: backend/src/security/permissions.ts
+ * Reference: backend/src/middleware/propertyAccess.middleware.ts
  */
 
 'use client';
@@ -39,9 +60,80 @@ function usePropertySafe(): { activePropertyId: string | null } {
 }
 
 // ============================================
-// Permission constants (mirrors backend Permissions)
+// LAYER 1: Identity
 // ============================================
 
+/**
+ * The authenticated user's identity. Read-only from the JWT.
+ * Never used for authorization decisions — only for display and ownership checks.
+ */
+export interface Identity {
+  userId: string;
+  email: string;
+}
+
+// ============================================
+// LAYER 2: Scope (JWT-derived, primary source of truth)
+// ============================================
+
+/**
+ * The user's scope as issued by the JWT. This is the PRIMARY authorization
+ * signal — it determines what the user can do at the highest level.
+ *
+ * Backend: req.user.scope (set by auth.middleware from verified JWT payload)
+ * Frontend: user.scope (from /auth/me response)
+ *
+ * Scope hierarchy (descending authority):
+ *   super_admin > platform_admin > tenant_owner > tenant_admin
+ *   > property_manager > property_staff > customer
+ */
+export type UserScope =
+  | 'super_admin'
+  | 'platform_admin'
+  | 'tenant_owner'
+  | 'tenant_admin'
+  | 'property_manager'
+  | 'property_staff'
+  | 'customer'
+  | '';
+
+// ============================================
+// LAYER 3: Derived Roles (backward-compat)
+// ============================================
+
+/**
+ * Roles derived from scope via the backend's scopeToRoles mapping.
+ * These exist for backward compatibility with route guards that check roles.
+ *
+ * IMPORTANT: Do not use role checks for new authorization decisions.
+ * Use permission checks instead. Roles are a coarse-grained approximation
+ * that does not capture module-level or resource-level access.
+ */
+export type DerivedRole =
+  | 'super_admin'
+  | 'admin'
+  | 'manager'
+  | 'staff'
+  | 'customer'
+  | 'guest'
+  | 'tenant_owner'
+  | 'tenant_admin'
+  | 'property_manager'
+  | 'property_staff';
+
+// ============================================
+// LAYER 4: Permissions (granular, role→perm matrix)
+// ============================================
+
+/**
+ * Permission constants mirroring backend/src/security/permissions.ts.
+ *
+ * Pattern: resource:action[:scope]
+ * Examples: order:create, catalog:write, payment:refund, loyalty:adjust
+ *
+ * These are the ONLY strings that should appear in permission checks.
+ * Do not invent new permission strings — they must exist in the backend.
+ */
 export const Perm = {
   // Users
   USER_READ_SELF: 'user:read:self',
@@ -152,10 +244,18 @@ export const Perm = {
 export type Permission = (typeof Perm)[keyof typeof Perm];
 
 // ============================================
-// Role → Permission matrix (mirrors backend RolePermissions)
+// ROLE → PERMISSION MATRIX (must match backend exactly)
 // ============================================
 
-const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
+/**
+ * Role → Permission mapping. MUST be kept in sync with the backend's
+ * RolePermissions in backend/src/security/permissions.ts.
+ *
+ * The frontend contract test (tools/authorization-contract-test.js)
+ * validates this automatically. Do not add comments saying "mirrors backend"
+ * — the test proves it.
+ */
+const ROLE_PERMISSIONS: Record<string, readonly string[]> = {
   guest: [Perm.REVIEW_READ],
 
   customer: [
@@ -206,25 +306,32 @@ const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   ],
 
   admin: [
-    // Wildcard — admin has all permissions.
-    // The backend uses '*' for this; the frontend resolves it in hasPermission().
+    // Wildcard: admin has all permissions (backend uses '*').
+    // The hasPermission() resolver treats this role as having every Perm value.
+    // Do NOT enumerate permissions here — the wildcard IS the contract.
   ],
 
   super_admin: [
-    // Wildcard — super_admin has all permissions.
+    // Wildcard: super_admin has all permissions (backend uses '*').
   ],
 
-  // Scope-derived pseudo-roles (scopeToRoles in backend)
-  tenant_owner: [],  // Maps to admin in backend
-  tenant_admin: [],  // Maps to admin in backend
-  property_manager: [],  // Maps to manager + staff in backend
-  property_staff: [],  // Maps to staff in backend
+  // Scope-derived pseudo-roles: these map to actual roles via SCOPE_TO_ROLES.
+  // They carry no direct permissions — they are entry points into the role layer.
+  tenant_owner: [],
+  tenant_admin: [],
+  property_manager: [],
+  property_staff: [],
 };
 
 // ============================================
-// Scope → derived roles (mirrors backend scopeToRoles)
+// LAYER 5: Scope → Derived Roles (mirrors backend scopeToRoles)
 // ============================================
 
+/**
+ * Maps JWT scope to derived roles. This is the bridge between the scope
+ * layer and the role layer. The backend's scopeToRoles() function is the
+ * source of truth; this mapping must be kept in sync.
+ */
 const SCOPE_TO_ROLES: Record<string, readonly string[]> = {
   super_admin: ['super_admin'],
   platform_admin: ['platform_admin'],
@@ -236,38 +343,44 @@ const SCOPE_TO_ROLES: Record<string, readonly string[]> = {
 };
 
 // ============================================
-// Authorization context
+// LAYER 6: Property/Module Access (presentation hints)
+// ============================================
+
+/**
+ * Presentation-only access context. These are hints for rendering —
+ * they do NOT authorize anything. The backend's validatePropertyAccess
+ * and requireModulePropertyAccess middleware are the real gates.
+ *
+ * displayPropertyId: The property the UI is currently showing. Derived from
+ *   the URL path (/{property}/...) or the PropertyContext's active selection.
+ *   This is NOT an authorization override — it's a presentation hint that
+ *   tells the frontend which property's data to display.
+ */
+export interface AccessContext {
+  /** The property the UI is currently displaying (from URL or PropertyContext). */
+  displayPropertyId: string | null;
+  /** The property the user has selected in the property switcher. */
+  activePropertyId: string | null;
+}
+
+// ============================================
+// Authorization Context
 // ============================================
 
 export interface AuthorizationContext {
-  /** The user's effective roles (scope-derived + legacy JWT roles). */
-  roles: readonly string[];
+  // --- Layer 1: Identity ---
+  identity: Identity | null;
 
-  /** The user's scope from JWT. */
-  scope: string | null;
+  // --- Layer 2: Scope ---
+  scope: UserScope;
 
-  /** All permissions the user holds (union of role permissions). */
+  // --- Layer 3: Derived Roles ---
+  roles: readonly DerivedRole[];
+
+  // --- Layer 4: Permissions ---
   permissions: ReadonlySet<string>;
 
-  // --- Role checks ---
-  hasRole: (role: string) => boolean;
-  hasAnyRole: (roles: string[]) => boolean;
-
-  // --- Permission checks ---
-  hasPermission: (permission: string) => boolean;
-  hasAnyPermission: (permissions: string[]) => boolean;
-  hasAllPermissions: (permissions: string[]) => boolean;
-
-  // --- Convenience: resource:action ---
-  canDo: (resource: string, action: string) => boolean;
-
-  // --- Module-scoped permissions ---
-  canViewModule: (slug: string) => boolean;
-  canOrderModule: (slug: string) => boolean;
-  canManageModule: (slug: string) => boolean;
-  canAdminModule: (slug: string) => boolean;
-
-  // --- Scope-level flags ---
+  // --- Layer 5: Scope-level flags ---
   isSuperAdmin: boolean;
   isPlatformAdmin: boolean;
   isTenantOwner: boolean;
@@ -276,19 +389,41 @@ export interface AuthorizationContext {
   isPropertyStaff: boolean;
   isCustomer: boolean;
 
-  // --- Role-level flags (backward-compat) ---
+  // --- Role-level flags (backward-compat — prefer permission checks) ---
   isStaff: boolean;
   isManager: boolean;
   isAdmin: boolean;
 
-  // --- Property context ---
-  activePropertyId: string | null;
+  // --- Permission checks (primary authorization surface) ---
+  hasPermission: (permission: string) => boolean;
+  hasAnyPermission: (permissions: string[]) => boolean;
+  hasAllPermissions: (permissions: string[]) => boolean;
+
+  // --- Convenience: resource:action ---
+  canDo: (resource: string, action: string) => boolean;
+
+  // --- Module-scoped permission checks ---
+  canViewModule: (slug: string) => boolean;
+  canOrderModule: (slug: string) => boolean;
+  canManageModule: (slug: string) => boolean;
+  canAdminModule: (slug: string) => boolean;
+
+  // --- Role checks (backward-compat — prefer permission checks) ---
+  hasRole: (role: string) => boolean;
+  hasAnyRole: (roles: string[]) => boolean;
+
+  // --- Access context (presentation-only) ---
+  access: AccessContext;
 }
 
 // ============================================
-// Permission resolution
+// Permission Resolution
 // ============================================
 
+/**
+ * Resolve the full permission set for a set of effective roles.
+ * Wildcard roles (admin, super_admin) get ALL known permissions.
+ */
 function resolvePermissions(roles: readonly string[]): ReadonlySet<string> {
   const perms = new Set<string>();
 
@@ -296,13 +431,11 @@ function resolvePermissions(roles: readonly string[]): ReadonlySet<string> {
     const rolePerms = ROLE_PERMISSIONS[role];
     if (!rolePerms) continue;
 
-    // Wildcard roles (admin, super_admin) get all known permissions
+    // Wildcard roles get all known permissions
     if (role === 'admin' || role === 'super_admin') {
-      // Add all known permissions
       for (const permSet of Object.values(ROLE_PERMISSIONS)) {
         for (const p of permSet) perms.add(p);
       }
-      // Also add module-scoped wildcard
       perms.add('*');
       continue;
     }
@@ -315,7 +448,11 @@ function resolvePermissions(roles: readonly string[]): ReadonlySet<string> {
   return perms;
 }
 
-function resolveEffectiveRoles(userScope: string | undefined, userRoles: string[]): string[] {
+/**
+ * Resolve effective roles from scope + JWT roles.
+ * Scope-derived roles take precedence; JWT roles fill gaps.
+ */
+function resolveEffectiveRoles(userScope: string | undefined, userRoles: string[]): DerivedRole[] {
   const effective = new Set<string>();
 
   // Scope-derived roles (primary)
@@ -331,7 +468,7 @@ function resolveEffectiveRoles(userScope: string | undefined, userRoles: string[
     effective.add(r);
   }
 
-  return Array.from(effective);
+  return Array.from(effective) as DerivedRole[];
 }
 
 // ============================================
@@ -339,17 +476,30 @@ function resolveEffectiveRoles(userScope: string | undefined, userRoles: string[
 // ============================================
 
 /**
- * @param overridePropertyId When provided (e.g. from useParams()), bypasses
- * PropertyContext entirely. Useful at layout level where PropertyProvider
- * wraps children but the layout itself is outside the provider.
+ * @param displayPropertyId When provided, overrides PropertyContext's activePropertyId
+ *   for presentation purposes. This is used at layout level where PropertyProvider
+ *   wraps children but the layout itself is outside the provider.
+ *
+ *   CRITICAL: This parameter is a PRESENTATION hint only. It tells the frontend
+ *   "the user is looking at this property's data." It does NOT authorize access.
+ *   The backend's validatePropertyAccess middleware independently verifies that
+ *   the authenticated user actually has access to this property. If they don't,
+ *   the backend returns 403 regardless of what this hint says.
+ *
+ *   The value should come from the URL path (/{property}/...) or the
+ *   PropertyContext's active selection — never from user input.
  */
-export function useAuthorization(overridePropertyId?: string | null): AuthorizationContext {
+export function useAuthorization(displayPropertyId?: string | null): AuthorizationContext {
   const { user } = useAuth();
   const propertyCtx = usePropertySafe();
-  const activePropertyId = overridePropertyId ?? propertyCtx.activePropertyId;
 
-  const userScope = user?.scope;
+  const userScope = user?.scope as string | undefined;
   const userRoles = user?.roles ?? [];
+
+  const identity = useMemo<Identity | null>(
+    () => user ? { userId: user.id, email: user.email } : null,
+    [user],
+  );
 
   const roles = useMemo(
     () => resolveEffectiveRoles(userScope, userRoles),
@@ -358,27 +508,25 @@ export function useAuthorization(overridePropertyId?: string | null): Authorizat
 
   const permissions = useMemo(() => resolvePermissions(roles), [roles]);
 
-  const isSuperAdmin = roles.includes('super_admin');
-  const isAdmin = isSuperAdmin || roles.includes('admin') || roles.includes('tenant_owner') || roles.includes('tenant_admin');
-  const isManager = isAdmin || roles.includes('manager') || roles.includes('property_manager');
-  const isStaff = isManager || roles.includes('staff') || roles.includes('property_staff');
-  const isCustomer = roles.includes('customer');
+  // Scope flags (Layer 2)
+  const scope = (userScope ?? '') as UserScope;
+  const isSuperAdmin = scope === 'super_admin';
+  const isPlatformAdmin = scope === 'platform_admin';
+  const isTenantOwner = scope === 'tenant_owner';
+  const isTenantAdmin = scope === 'tenant_admin';
+  const isPropertyManager = scope === 'property_manager';
+  const isPropertyStaff = scope === 'property_staff';
+  const isCustomer = scope === 'customer';
 
-  const hasRole = useCallback(
-    (role: string) => roles.includes(role),
-    [roles],
-  );
+  // Role flags (Layer 3, backward-compat)
+  const isAdmin = isSuperAdmin || roles.includes('admin') || isTenantOwner || isTenantAdmin;
+  const isManager = isAdmin || roles.includes('manager') || isPropertyManager;
+  const isStaff = isManager || roles.includes('staff') || isPropertyStaff;
 
-  const hasAnyRole = useCallback(
-    (checkRoles: string[]) => checkRoles.some((r) => roles.includes(r)),
-    [roles],
-  );
-
+  // Permission checks (Layer 4)
   const hasPermission = useCallback(
     (permission: string) => {
-      // Wildcard check
       if (permissions.has('*')) return true;
-      // Exact match
       if (permissions.has(permission)) return true;
       // Module-scoped wildcard: module:{slug}:* matches any action on that module
       const parts = permission.split(':');
@@ -406,7 +554,7 @@ export function useAuthorization(overridePropertyId?: string | null): Authorizat
     [hasPermission],
   );
 
-  // Module-scoped permission checks
+  // Module-scoped permission checks (Layer 6)
   const canViewModule = useCallback(
     (slug: string) => hasPermission(`module:${slug}:view`) || hasPermission(`module:${slug}:*`),
     [hasPermission],
@@ -424,13 +572,41 @@ export function useAuthorization(overridePropertyId?: string | null): Authorizat
     [hasPermission],
   );
 
+  // Role checks (backward-compat)
+  const hasRole = useCallback(
+    (role: string) => roles.includes(role as DerivedRole),
+    [roles],
+  );
+  const hasAnyRole = useCallback(
+    (checkRoles: string[]) => checkRoles.some((r) => roles.includes(r as DerivedRole)),
+    [roles],
+  );
+
+  // Access context (Layer 6, presentation-only)
+  const access = useMemo<AccessContext>(
+    () => ({
+      displayPropertyId: displayPropertyId ?? propertyCtx.activePropertyId ?? null,
+      activePropertyId: propertyCtx.activePropertyId,
+    }),
+    [displayPropertyId, propertyCtx.activePropertyId],
+  );
+
   return useMemo(
     () => ({
+      identity,
+      scope,
       roles,
-      scope: userScope ?? null,
       permissions,
-      hasRole,
-      hasAnyRole,
+      isSuperAdmin,
+      isPlatformAdmin,
+      isTenantOwner,
+      isTenantAdmin,
+      isPropertyManager,
+      isPropertyStaff,
+      isCustomer,
+      isStaff,
+      isManager,
+      isAdmin,
       hasPermission,
       hasAnyPermission,
       hasAllPermissions,
@@ -439,24 +615,18 @@ export function useAuthorization(overridePropertyId?: string | null): Authorizat
       canOrderModule,
       canManageModule,
       canAdminModule,
-      isSuperAdmin,
-      isPlatformAdmin: userScope === 'platform_admin',
-      isTenantOwner: userScope === 'tenant_owner',
-      isTenantAdmin: userScope === 'tenant_admin',
-      isPropertyManager: userScope === 'property_manager',
-      isPropertyStaff: userScope === 'property_staff',
-      isCustomer,
-      isStaff,
-      isManager,
-      isAdmin,
-      activePropertyId,
+      hasRole,
+      hasAnyRole,
+      access,
     }),
     [
-      roles, userScope, permissions,
-      hasRole, hasAnyRole, hasPermission, hasAnyPermission, hasAllPermissions,
-      canDo, canViewModule, canOrderModule, canManageModule, canAdminModule,
-      isSuperAdmin, isCustomer, isStaff, isManager, isAdmin,
-      activePropertyId,
+      identity, scope, roles, permissions,
+      isSuperAdmin, isPlatformAdmin, isTenantOwner, isTenantAdmin,
+      isPropertyManager, isPropertyStaff, isCustomer,
+      isStaff, isManager, isAdmin,
+      hasPermission, hasAnyPermission, hasAllPermissions, canDo,
+      canViewModule, canOrderModule, canManageModule, canAdminModule,
+      hasRole, hasAnyRole, access,
     ],
   );
 }

@@ -133,69 +133,36 @@ document generation) are deferred to their respective later phases.
 
 ---
 
-## F2 — Frontend authorization / scope architecture (in progress)
+## F2 — Frontend authorization / scope architecture ✅ COMPLETE
 
-### Backend model (source of truth)
+**Exit report:** `docs/architecture/F2_EXIT_REPORT.md`
 
-Scope (JWT): `super_admin > platform_admin > tenant_owner > tenant_admin >
-property_manager > property_staff > customer`
+### What was migrated
 
-Roles (backward-compat, derived from scope):
-`super_admin, admin, manager, staff, customer, guest`
+- `lib/authorization.tsx` — `useAuthorization()` hook with six-layer contract
+  (identity → scope → derived role → permission → property/module access →
+  resource ownership). `displayPropertyId` is a presentation hint only.
+- `tools/authorization-contract-test.js` — mechanical validation of
+  frontend vs backend permission matrix (passes clean)
+- `tools/engine-architecture-guard.js` — CI guard for legacy vocabulary
+  in generic Engine A code (passes clean)
+- KDS/Dispatch: fulfillment advance gated on `ORDER_UPDATE`
+- Staff POS: Accept/Cancel/Start Prep/Mark Ready gated on `ORDER_UPDATE`
+- Catalog CRUD: Add/Edit/Delete gated on `CATALOG_WRITE`
+- Admin/Staff layouts: `useAuthorization()` for nav filtering + role checks
+- Admin orders: Confirm/Reject/Advance gated on `ORDER_UPDATE`
+- Navigation: 11 nav items with permission attributes
 
-Permissions (granular strings): `resource:action[:scope]`
+### Remaining legacy (documented)
 
-Module-scoped: `module:{slug}:view|order|manage|admin`
+- Admin surfaces (analytics, reports, settings) still use role-based checks
+  (read-only, backend enforces permissions on every API call)
+- `template_type === 'menu_service'` fallback in admin/orders (DB compat)
+- Legacy status composites in `staff/types.ts` mapper (backward-compat)
 
-Middleware: `authenticate` → `authorize(roles)` → `requirePermission(perm)`
+### Intentionally outside F2
 
-### Frontend F2 deliverables (this turn)
+- Authorization E2E browser tests → deferred to F22
+- Cross-tenant/property context testing → deferred to F22
 
-1. **`lib/authorization.tsx`** — `useAuthorization()` hook + `Perm` constants
-   + `ROLE_PERMISSIONS` matrix (mirrors backend exactly). Provides:
-   - `hasPermission(perm)`, `hasAnyPermission(perms)`, `hasAllPermissions(perms)`
-   - `canDo(resource, action)` convenience
-   - Module-scoped: `canViewModule(slug)`, `canOrderModule(slug)`, etc.
-   - Scope flags: `isSuperAdmin`, `isAdmin`, `isManager`, `isStaff`
-   - Accepts optional `overridePropertyId` for layout-level use
-     (before PropertyProvider wraps children)
-
-2. **`config/admin-navigation.ts`** — `NavItem`/`NavChild` interfaces
-   extended with optional `permissions?: string[]`. `filterNavigationByRole()`
-   now accepts a third `userPermissions` parameter; nav items are visible
-   if EITHER roles OR permissions match (OR logic). Key items now have
-   permission attributes:
-   - Audit Logs → `admin:audit:read`
-   - Loyalty → `loyalty:read:any`, `loyalty:settings:manage`
-   - Gift Cards → `giftcard:manage`
-   - Coupons → `coupon:manage`
-   - Reviews → `review:moderate`
-   - Housekeeping → `housekeeping:task:manage`
-   - Inventory → `inventory:manage`, `inventory:read`
-   - Modules → `admin:modules:manage`
-   - Settings → `admin:settings:manage`
-   - Users → `user:read:any`
-   - Reports → `admin:reports:read`
-
-3. **`app/[property]/admin/layout.tsx`** — imports `useAuthorization()`,
-   passes `auth.permissions` to `filterNavigationByRole()`.
-
-4. **`app/[property]/staff/layout.tsx`** — imports `useAuthorization()`,
-   replaces manual `staffRoles.includes(role)` check with `auth.isStaff`.
-
-5. **`app/[property]/staff/manager/page.tsx`** — replaces manual
-   `user.roles.some(r => ['admin', 'super_admin', 'manager'].includes(r))`
-   with `auth.isManager`.
-
-6. **Admin orders pages** (both global and `[slug]`) — order action buttons
-   (Confirm/Reject/Advance) are now gated on `auth.hasPermission(Perm.ORDER_UPDATE)`.
-   Staff without `order:update` see orders but cannot modify them.
-
-### F2 carry-over items (next turn)
-
-- KDS/Dispatch: gate handoff actions on `order:update`
-- Staff POS: gate order creation on `order:create`, settlement on `payment:record:cash`
-- Catalog controls: gate menu item CRUD on `catalog:write`
-- Frontend source guard (F1 carry-over)
-
-Typecheck: `npx tsc --noEmit` passes clean.
+Typecheck + contract test + source guard: all pass clean.
