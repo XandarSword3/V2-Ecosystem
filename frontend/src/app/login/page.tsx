@@ -190,7 +190,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const userData = (await verify2FA(pending2FAUserId, twoFactorCode)) as { id: string; email: string; fullName: string; roles: string[]; is_platform_admin?: boolean };
+      const userData = (await verify2FA(pending2FAUserId, twoFactorCode, useBackupCode)) as { id: string; email: string; fullName: string; roles: string[]; is_platform_admin?: boolean };
 
       // Check for redirect parameter first
       const redirectPath = getRedirectPath();

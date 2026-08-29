@@ -293,7 +293,7 @@ describe('2FA Login Flow Regression', () => {
 
     // Should redirect to staff page
     await waitFor(() => {
-      expect(verify2FAMock).toHaveBeenCalledWith('staff-1', '123456');
+      expect(verify2FAMock).toHaveBeenCalledWith('staff-1', '123456', false);
       expect(hrefSetter).toHaveBeenCalledWith('/test-property/staff');
     });
   });

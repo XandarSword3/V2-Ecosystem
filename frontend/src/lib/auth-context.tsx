@@ -62,7 +62,7 @@ interface AuthContextType {
   /** F2: permission loading status — drives useAuthorization() behavior */
   permissionsStatus: PermissionsStatus;
   login: (email: string, password: string, captchaToken?: string) => Promise<User | TwoFactorRequired | TwoFactorSetupRequired>;
-  verify2FA: (userId: string, code: string) => Promise<User>;
+  verify2FA: (userId: string, code: string, isBackupCode?: boolean) => Promise<User>;
   completeTwoFactorSetupLogin: (user: User, accessToken: string) => void;
   logout: () => void;
   refreshUser: () => void;
@@ -402,8 +402,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return userData;
   };
 
-  const verify2FA = async (userId: string, code: string): Promise<User> => {
-    const response = await api.post('/auth/2fa/verify', { userId, code });
+  const verify2FA = async (userId: string, code: string, isBackupCode?: boolean): Promise<User> => {
+    const response = await api.post('/auth/2fa/verify', { userId, code, isBackupCode });
     const data = response.data;
 
     if (!data.success) {
