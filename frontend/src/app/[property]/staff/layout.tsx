@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { useAuthorization } from '@/lib/authorization';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CurrencySwitcher } from '@/components/CurrencySwitcher';
@@ -134,6 +135,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
     },
   ];
   const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const auth = useAuthorization(); // F2: permission-aware rendering
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -205,11 +207,8 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
         router.push(`/login?redirect=/${propertySlug}/staff`);
       } else if (user) {
         // Verify user has at least one staff role (generic RBAC)
-        const staffRoles = ['super_admin', 'admin', 'manager', 'staff'];
-        const hasStaffRole = user.roles?.some(role => 
-          staffRoles.includes(role) || role.endsWith('_staff') || role.endsWith('_admin')
-        );
-        if (!hasStaffRole) {
+        // F2: use auth.isStaff instead of manual role check
+        if (!auth.isStaff) {
           toast.error('Access denied. Staff privileges required.');
           router.push(`/${propertySlug}`);
         }
@@ -225,6 +224,7 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
 
   // Filter navigation based on user roles
   const userRoles = user?.roles || [];
+  // F2: filter navigation using auth context (roles + permissions)
   const filteredNavigation = navigation.filter(
     (item) => !item.roles || item.roles.some((role) => userRoles.includes(role) || userRoles.includes('super_admin'))
   );

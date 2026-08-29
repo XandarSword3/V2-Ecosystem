@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ReactNode, useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { useAuthorization } from '@/lib/authorization';
 import { useSiteSettings } from '@/lib/settings-context';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -50,6 +51,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const t = useTranslations('admin');
   const { modules, settings } = useSiteSettings();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const auth = useAuthorization(); // F2: permission-aware rendering
   const onboardingBypassEnabled = process.env.NEXT_PUBLIC_ADMIN_SETUP_BYPASS === 'true';
   
   // Dynamic branding from CMS
@@ -107,7 +109,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     
     // Filter by user roles
     const userRoles = user?.roles || [];
-    return filterNavigationByRole(categories, userRoles.length > 0 ? userRoles : ['admin']);
+    return filterNavigationByRole(
+      categories,
+      userRoles.length > 0 ? userRoles : ['admin'],
+      auth.permissions,
+    );
   }, [modules, t, user?.roles, propertySlug]);
 
   // Flatten for search

@@ -124,15 +124,78 @@ All F1 baseline migration tasks are **complete**. The frontend now:
 
 Typecheck: `npx tsc --noEmit` passes clean.
 
-## Next steps (F1→F2 transition)
+## F1 carry-over certification items
 
-1. **F2: Frontend auth/scope/role architecture** — build `useAuthorization()`
-   around the backend's canonical scope model (tenant → property →
-   module → resource → action). This unblocks capability-aware rendering
-   in F3–F6.
-2. **F1 remaining: frontend source guard** — add a CI/lint rule that
-   generic Engine A components never reference `'preparing'`/`'delivered'`
-   except inside the mapper in `components/staff/types.ts`.
-3. **F3: Customer shell** — once auth/scope is stable, establish
-   `CustomerShell` / `ModuleShell` / `CommerceShell` with capability-
-   aware module presentation.
+Recorded in `docs/architecture/F1_CARRY_OVER_TESTS.md`. Seven items
+(catalog lifecycle E2E, customer→staff workflow, fulfillment mode selection,
+multi-tenant isolation, offline staff queue, loyalty lifecycle, fiscal
+document generation) are deferred to their respective later phases.
+
+---
+
+## F2 — Frontend authorization / scope architecture (in progress)
+
+### Backend model (source of truth)
+
+Scope (JWT): `super_admin > platform_admin > tenant_owner > tenant_admin >
+property_manager > property_staff > customer`
+
+Roles (backward-compat, derived from scope):
+`super_admin, admin, manager, staff, customer, guest`
+
+Permissions (granular strings): `resource:action[:scope]`
+
+Module-scoped: `module:{slug}:view|order|manage|admin`
+
+Middleware: `authenticate` → `authorize(roles)` → `requirePermission(perm)`
+
+### Frontend F2 deliverables (this turn)
+
+1. **`lib/authorization.tsx`** — `useAuthorization()` hook + `Perm` constants
+   + `ROLE_PERMISSIONS` matrix (mirrors backend exactly). Provides:
+   - `hasPermission(perm)`, `hasAnyPermission(perms)`, `hasAllPermissions(perms)`
+   - `canDo(resource, action)` convenience
+   - Module-scoped: `canViewModule(slug)`, `canOrderModule(slug)`, etc.
+   - Scope flags: `isSuperAdmin`, `isAdmin`, `isManager`, `isStaff`
+   - Accepts optional `overridePropertyId` for layout-level use
+     (before PropertyProvider wraps children)
+
+2. **`config/admin-navigation.ts`** — `NavItem`/`NavChild` interfaces
+   extended with optional `permissions?: string[]`. `filterNavigationByRole()`
+   now accepts a third `userPermissions` parameter; nav items are visible
+   if EITHER roles OR permissions match (OR logic). Key items now have
+   permission attributes:
+   - Audit Logs → `admin:audit:read`
+   - Loyalty → `loyalty:read:any`, `loyalty:settings:manage`
+   - Gift Cards → `giftcard:manage`
+   - Coupons → `coupon:manage`
+   - Reviews → `review:moderate`
+   - Housekeeping → `housekeeping:task:manage`
+   - Inventory → `inventory:manage`, `inventory:read`
+   - Modules → `admin:modules:manage`
+   - Settings → `admin:settings:manage`
+   - Users → `user:read:any`
+   - Reports → `admin:reports:read`
+
+3. **`app/[property]/admin/layout.tsx`** — imports `useAuthorization()`,
+   passes `auth.permissions` to `filterNavigationByRole()`.
+
+4. **`app/[property]/staff/layout.tsx`** — imports `useAuthorization()`,
+   replaces manual `staffRoles.includes(role)` check with `auth.isStaff`.
+
+5. **`app/[property]/staff/manager/page.tsx`** — replaces manual
+   `user.roles.some(r => ['admin', 'super_admin', 'manager'].includes(r))`
+   with `auth.isManager`.
+
+6. **Admin orders pages** (both global and `[slug]`) — order action buttons
+   (Confirm/Reject/Advance) are now gated on `auth.hasPermission(Perm.ORDER_UPDATE)`.
+   Staff without `order:update` see orders but cannot modify them.
+
+### F2 carry-over items (next turn)
+
+- KDS/Dispatch: gate handoff actions on `order:update`
+- Staff POS: gate order creation on `order:create`, settlement on `payment:record:cash`
+- Catalog controls: gate menu item CRUD on `catalog:write`
+- Frontend source guard (F1 carry-over)
+
+Typecheck: `npx tsc --noEmit` passes clean.

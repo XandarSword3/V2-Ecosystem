@@ -46,7 +46,12 @@ export interface NavItem {
   icon: LucideIcon;
   translationKey?: string;
   children?: NavChild[];
-  roles?: string[]; // Role-based filtering
+  roles?: string[]; // Role-based filtering (backward-compat)
+  /** F2: permission-based filtering. When set, the item is visible only
+   *  if the user holds at least one of these permissions. This is the
+   *  preferred mechanism over roles — it matches the backend's granular
+   *  permission model (resource:action:scope). */
+  permissions?: string[];
   badge?: string; // Optional badge (e.g., "New", "Beta")
 }
 
@@ -55,6 +60,8 @@ export interface NavChild {
   href: string;
   translationKey?: string;
   roles?: string[];
+  /** F2: permission-based filtering (same semantics as NavItem). */
+  permissions?: string[];
 }
 
 export interface NavCategory {
@@ -177,24 +184,28 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           href: `${base}/loyalty`,
           icon: Award,
           translationKey: 'nav.loyalty',
+          permissions: ['loyalty:read:any', 'loyalty:settings:manage'],
         },
         {
           name: t('nav.giftCards') || 'Gift Cards',
           href: `${base}/giftcards`,
           icon: Gift,
           translationKey: 'nav.giftCards',
+          permissions: ['giftcard:manage'],
         },
         {
           name: t('nav.coupons') || 'Coupons',
           href: `${base}/coupons`,
           icon: Ticket,
           translationKey: 'nav.coupons',
+          permissions: ['coupon:manage'],
         },
         {
           name: t('nav.reviews') || 'Reviews',
           href: `${base}/reviews`,
           icon: Star,
           translationKey: 'nav.reviews',
+          permissions: ['review:moderate'],
         },
       ],
       collapsible: true,
@@ -213,12 +224,14 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           href: `${base}/housekeeping`,
           icon: Brush,
           translationKey: 'nav.housekeeping',
+          permissions: ['housekeeping:task:manage'],
         },
         {
           name: t('nav.inventory') || 'Inventory',
           href: `${base}/inventory`,
           icon: Package,
           translationKey: 'nav.inventory',
+          permissions: ['inventory:manage', 'inventory:read'],
         },
         {
           name: 'Channel Manager',
@@ -262,6 +275,7 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           href: `${base}/users`,
           icon: Users,
           translationKey: 'nav.users',
+          permissions: ['user:read:any'],
           children: [
             { name: t('nav.customers'), href: `${base}/users/customers`, translationKey: 'nav.customers' },
             { name: t('nav.staff'), href: `${base}/users/staff`, translationKey: 'nav.staff' },
@@ -288,6 +302,7 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           href: `${base}/cockpit`,
           icon: BarChart3,
           translationKey: 'nav.reports',
+          permissions: ['admin:reports:read'],
           children: [
             { name: 'Economics', href: `${base}/reports?tab=economics`, translationKey: 'nav.economics' },
             { name: 'Executive Cockpit', href: `${base}/cockpit`, translationKey: 'nav.executiveCockpit' },
@@ -300,12 +315,14 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           href: `${base}/modules`,
           icon: Cloud,
           translationKey: 'nav.modules',
+          permissions: ['admin:modules:manage'],
         },
         {
           name: t('nav.settings'),
           href: `${base}/settings`,
           icon: Settings,
           translationKey: 'nav.settings',
+          permissions: ['admin:settings:manage'],
           children: [
             { name: t('nav.general'), href: `${base}/settings`, translationKey: 'nav.general' },
             { name: t('nav.propertySettings') || 'Property Settings', href: `${base}/settings/properties`, translationKey: 'nav.propertySettings' },
@@ -330,6 +347,7 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           icon: Shield,
           translationKey: 'nav.auditLogs',
           roles: ['super_admin', 'admin'],
+          permissions: ['admin:audit:read'],
         },
       ],
       collapsible: true,
@@ -356,17 +374,50 @@ export function flattenNavigation(categories: NavCategory[]): Array<{ name: stri
   return items;
 }
 
-// Filter navigation by user roles
-export function filterNavigationByRole(categories: NavCategory[], userRoles: string[]): NavCategory[] {
+// F2: Check if a user's permission set satisfies a nav item's access control.
+// An item is visible if:
+//   1. Neither roles nor permissions are set (unconditionally visible)
+//   2. roles is set and user has at least one matching role (backward-compat)
+//   3. permissions is set and user has at least one matching permission
+// When BOTH roles and permissions are set, EITHER match suffices (OR logic).
+function navItemVisible(
+  item: { roles?: string[]; permissions?: string[] },
+  userRoles: string[],
+  userPermissions: ReadonlySet<string>,
+): boolean {
+  const hasRoles = item.roles && item.roles.length > 0;
+  const hasPerms = item.permissions && item.permissions.length > 0;
+
+  // Neither set → unconditionally visible
+  if (!hasRoles && !hasPerms) return true;
+
+  // Roles check (backward-compat)
+  if (hasRoles && item.roles!.some((role) => userRoles.includes(role))) return true;
+
+  // Permission check (F2)
+  if (hasPerms && item.permissions!.some((perm) => userPermissions.has(perm) || userPermissions.has('*'))) return true;
+
+  return false;
+}
+
+// Filter navigation by user roles + permissions.
+// userPermissions: the resolved permission set from useAuthorization().
+// When provided, permission-based filtering is applied alongside role-based.
+export function filterNavigationByRole(
+  categories: NavCategory[],
+  userRoles: string[],
+  userPermissions?: ReadonlySet<string>,
+): NavCategory[] {
+  const perms = userPermissions ?? new Set<string>();
   return categories
     .map((category) => ({
       ...category,
       items: category.items
-        .filter((item) => !item.roles || item.roles.some((role) => userRoles.includes(role)))
+        .filter((item) => navItemVisible(item, userRoles, perms))
         .map((item) => ({
           ...item,
           children: item.children?.filter(
-            (child) => !child.roles || child.roles.some((role) => userRoles.includes(role)),
+            (child) => navItemVisible(child, userRoles, perms),
           ),
         })),
     }))

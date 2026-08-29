@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
+import { useAuthorization, Perm } from '@/lib/authorization';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -105,6 +106,7 @@ export default function AdminOrdersPage() {
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { socket } = useSocket();
+  const auth = useAuthorization(); // F2: permission-aware rendering
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -455,6 +457,8 @@ export default function AdminOrdersPage() {
                           fulfillmentMode via getModeStateConfig. */}
                       <div className="flex gap-2 pt-2">
                         {(() => {
+                          // F2: only show order actions if user has order:update permission
+                          if (!auth.hasPermission(Perm.ORDER_UPDATE)) return null;
                           const mode = (order.fulfillmentMode as FulfillmentMode | null) ?? null;
                           const cfg = getModeStateConfig(mode);
                           const cs = canonicalFulfillmentState(order, order.fulfillmentMode);

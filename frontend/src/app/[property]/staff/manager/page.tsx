@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
+import { useAuthorization } from '@/lib/authorization';
 import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
 import { MULTI_ENGINE_LEGACY_STATUSES, MULTI_ENGINE_ACTIVE_STATUSES } from '@/components/staff/types';
@@ -88,6 +89,7 @@ export default function ManagerDashboard() {
 
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const auth = useAuthorization(); // F2: permission-aware rendering
   
   const [stats, setStats] = useState<OverviewStats>({
     totalRevenue: 0,
@@ -123,9 +125,8 @@ export default function ManagerDashboard() {
   const { socket } = useSocket();
 
   // Check for manager role
-  const isManager = user?.roles?.some(r => 
-    ['admin', 'super_admin', 'manager'].includes(r)
-  );
+  // F2: use auth.isManager instead of manual role check
+  const isManager = auth.isManager;
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {

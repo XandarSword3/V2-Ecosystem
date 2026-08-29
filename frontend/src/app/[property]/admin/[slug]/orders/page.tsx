@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
+import { useAuthorization, Perm } from '@/lib/authorization';
 import { useSiteSettings } from '@/lib/settings-context';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -128,6 +129,7 @@ export default function DynamicOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { socket } = useSocket();
+  const auth = useAuthorization(); // F2: permission-aware rendering
 
   const fetchOrders = useCallback(async () => {
     if (!currentModule) return;
@@ -356,6 +358,8 @@ export default function DynamicOrdersPage() {
                           No hardcoded hospitality action arrays. */}
                       <div className="grid grid-cols-2 gap-2 pt-2">
                         {(() => {
+                          // F2: only show order actions if user has order:update permission
+                          if (!auth.hasPermission(Perm.ORDER_UPDATE)) return null;
                           const mode = (order.fulfillmentMode as FulfillmentMode | null) ?? null;
                           const cs = canonicalFulfillmentState(order, mode);
                           // Transaction-layer: pending → confirmed
