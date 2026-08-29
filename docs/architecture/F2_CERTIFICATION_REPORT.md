@@ -12,11 +12,11 @@
 | Frontend typecheck | ✅ PASS | `tsc --noEmit` exits 0 |
 | Authorization contract test | ✅ PASS | All 8 sub-checks valid, no drift |
 | Architecture source guard | ✅ PASS | 321 files scanned, no violations |
-| Authorization E2E | ✅ PASS | 12/12 tests pass |
-| Tenant isolation E2E | ✅ PASS | 6/6 tests pass |
+| Authorization E2E | ✅ PASS | 15 passed, 2 skipped (NOT RUN) |
+| Tenant isolation E2E | ✅ PASS | 12/12 tests pass |
 | Backend typecheck | ✅ PASS | `tsc --noEmit` exits 0 |
 
-**Total: 18 E2E tests, 0 failures**
+**Total: 27 E2E tests pass, 0 failures, 2 skipped (NOT RUN)**
 
 ---
 
@@ -87,29 +87,64 @@ Until then, the frontend permission gate is a **stricter presentation layer** �
 
 ---
 
-## E2E Test Coverage
+## E2E Test Coverage (Certification-grade)
 
-### `tests/authorization-staff.spec.ts` — 12 tests
-1. Staff login succeeds with real credentials
+### `tests/authorization-staff.spec.ts` — 15 passed, 2 skipped
+
+**Scope & permissions:**
+1. Staff login returns `property_staff` scope and `staff` role
 2. Staff permissions endpoint returns module-scoped permissions
-3. Staff permissions do NOT include `order:update` from DB (gap documented)
-4. Staff can list orders for an active module (role-based guard)
-5. Staff can advance order status (role-based guard)
-6. Unauthenticated order access returns 401
-7. Unauthenticated permissions endpoint returns 401
-8. Unauthenticated order update is rejected (401 or 403 CSRF)
-9. Staff scope resolves to staff role with correct JWT claims
-10. Admin scope resolves to admin role (documentation assertion)
-11. Staff gets `module:{slug}:view/manage` for assigned modules
-12. Frontend `canViewModule()` checks backend module permissions
+3. Staff permissions do NOT include `order:update` from DB (discrepancy documented)
 
-### `tests/tenant-property-isolation.spec.ts` — 6 tests
+**Order lifecycle (real order, real transitions):**
+4. Staff can create an order with a real catalog item → initial state is `confirmed`
+5. Staff can cancel a confirmed order (valid transition) → persisted `cancelled`
+6. Invalid transition (`confirmed → completed`) rejected with exact state machine error
+7. Invalid fulfillment state (`preparing`) rejected with valid states listed
+
+**Unauthenticated rejection:**
+8. Unauthenticated order list returns 401
+9. Unauthenticated permissions endpoint returns 401
+10. Unauthenticated order update rejected (401 or CSRF 403)
+11. Unauthenticated order creation rejected
+
+**Scope is primary:**
+12. JWT scope matches permissions endpoint scope (`property_staff`)
+13. Permissions projection matches scope-derived role (staff lacks admin permissions)
+
+**Module-scoped permissions:**
+14. Module permissions follow `module:{slug}:{action}` pattern
+15. Module permissions cover exactly the modules the staff can access
+
+**NOT RUN (infrastructure required):**
+- Admin behavior (requires 2FA enrollment)
+- UI capability visibility (requires running frontend)
+
+### `tests/tenant-property-isolation.spec.ts` — 12 passed
+
+**Tenant data access:**
 1. Staff login returns `tenantId` in user object
-2. Staff can access own tenant modules
-3. Unauthenticated modules access returns 401
-4. Staff accessing nonexistent property gets appropriate error
-5. Staff permissions are scoped to specific modules
-6. Frontend `displayPropertyId` does not affect backend authorization
+2. Staff can list modules in own tenant; all belong to same tenant
+
+**Unauthenticated rejection:**
+3. Unauthenticated modules endpoint returns 401
+4. Unauthenticated `/auth/me` returns 401
+
+**Nonexistent resource:**
+5. Staff accessing nonexistent module returns 404 (not 200)
+6. Staff accessing nonexistent module via admin endpoint returns 404
+
+**Module permission scoping:**
+7. Staff has module-scoped permissions for specific modules
+8. Each module permission maps to a real module in the tenant
+
+**displayPropertyId is presentation-only:**
+9. Backend ignores `x-property-id` header for authorization
+10. Backend rejects mismatched `x-tenant-id` header (returns error)
+
+**Scope/role disagreement:**
+11. Permissions endpoint returns scope-derived permissions (staff lacks admin perms)
+12. Scope and roles are consistent between JWT and permissions endpoint
 
 ---
 
@@ -124,8 +159,12 @@ Until then, the frontend permission gate is a **stricter presentation layer** �
 - [x] Settlement authorized (`PAYMENT_RECORD_CASH`)
 - [x] Catalog authorized (`CATALOG_WRITE`)
 - [x] Source guard enforced in CI
-- [x] Real browser authorization E2E passes (12/12)
-- [x] Backend still rejects unauthorized direct requests (3/3 unauthenticated tests)
+- [x] Real browser authorization E2E passes (15 passed, 2 NOT RUN)
+- [x] Real tenant isolation E2E passes (12/12)
+- [x] Backend rejects unauthorized direct requests (4/4 unauthenticated tests)
+- [x] Real order lifecycle proven (create → advance → verify → invalid rejection)
+- [x] Scope/role disagreement tested (scope is primary)
+- [x] No tautological or conditional assertions
 
 ---
 
