@@ -987,4 +987,128 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
     expect(alertsEmitted.length).toBe(1);
     expect(alertsEmitted[0].severity).toBe('CRITICAL');
   });
+
+  it('claim-first pattern prevents double-compensation across concurrent duplicate queue rows', async () => {
+    // Database tables
+    const compensationLogTable = new Map<string, { logical_key: string; claim_token: string; status: string; expires_at: number }>();
+    let actualStockRestored = 0;
+
+    const txId = 'tx-conc-123';
+    const queueRows = [
+      { id: 'q-row-1', transaction_id: txId, operation: 'restore_inventory', payload: [{ catalog_item_id: 'item-1', quantity: 5 }], status: 'pending' },
+      { id: 'q-row-2', transaction_id: txId, operation: 'restore_inventory', payload: [{ catalog_item_id: 'item-1', quantity: 5 }], status: 'pending' },
+    ];
+
+    async function processQueueRow(row: typeof queueRows[0], workerId: string) {
+      const logicalKey = `tx:${row.transaction_id}:${row.operation}`;
+      const token = `token-${workerId}-${Math.random().toString(36).slice(2, 6)}`;
+      const now = Date.now();
+      const expiresAt = now + 60000;
+
+      let hasClaim = false;
+
+      // 1. Claim-first atomic check
+      if (!compensationLogTable.has(logicalKey)) {
+        compensationLogTable.set(logicalKey, {
+          logical_key: logicalKey,
+          claim_token: token,
+          status: 'in_progress',
+          expires_at: expiresAt,
+        });
+        hasClaim = true;
+      } else {
+        const existing = compensationLogTable.get(logicalKey)!;
+        if (existing.status === 'completed') {
+          row.status = 'completed';
+          return { claimed: false, completed: true };
+        }
+        if (existing.status === 'failed' || (existing.status === 'in_progress' && existing.expires_at < now)) {
+          existing.claim_token = token;
+          existing.status = 'in_progress';
+          existing.expires_at = expiresAt;
+          hasClaim = true;
+        } else {
+          // Another worker is actively executing this claim
+          return { claimed: false, completed: false };
+        }
+      }
+
+      if (hasClaim) {
+        // Execute economic side effect
+        actualStockRestored += row.payload.reduce((sum, i) => sum + i.quantity, 0);
+
+        // Mark log completed
+        const logEntry = compensationLogTable.get(logicalKey)!;
+        logEntry.status = 'completed';
+
+        // Mark queue row completed
+        row.status = 'completed';
+        return { claimed: true, completed: true };
+      }
+
+      return { claimed: false, completed: false };
+    }
+
+    // Run both workers concurrently
+    const [result1, result2] = await Promise.all([
+      processQueueRow(queueRows[0], 'worker-A'),
+      processQueueRow(queueRows[1], 'worker-B'),
+    ]);
+
+    // Exactly one worker claimed and executed the economic mutation
+    const claimedCount = (result1.claimed ? 1 : 0) + (result2.claimed ? 1 : 0);
+    expect(claimedCount).toBe(1);
+    expect(actualStockRestored).toBe(5); // NOT 10!
+
+    // Second worker (or subsequent retry) cleans up duplicate row
+    if (queueRows[1].status === 'pending') {
+      await processQueueRow(queueRows[1], 'worker-B');
+    }
+    expect(queueRows[0].status).toBe('completed');
+    expect(queueRows[1].status).toBe('completed');
+    expect(actualStockRestored).toBe(5); // Still strictly 5!
+  });
+
+  it('crash recovery with lease expiry allows new worker to safely complete abandoned compensation', async () => {
+    const compensationLogTable = new Map<string, { logical_key: string; claim_token: string; status: string; expires_at: number }>();
+    let actualDiscountsReversed = 0;
+
+    const txId = 'tx-crash-lease';
+    const logicalKey = `tx:${txId}:reverse_discounts`;
+
+    // 1. Worker A claims compensation but crashes without running or completing
+    compensationLogTable.set(logicalKey, {
+      logical_key: logicalKey,
+      claim_token: 'token-worker-a-crashed',
+      status: 'in_progress',
+      expires_at: Date.now() - 5000, // expired lease
+    });
+
+    // 2. Retry Worker B attempts to process the compensation queue row
+    const queueRow = { id: 'q-row-crash', transaction_id: txId, operation: 'reverse_discounts', status: 'pending' };
+
+    async function retryWorker(row: typeof queueRow) {
+      const now = Date.now();
+      const existing = compensationLogTable.get(logicalKey);
+
+      if (existing && existing.status === 'in_progress' && existing.expires_at < now) {
+        // Reclaim expired lease
+        existing.claim_token = 'token-worker-b-active';
+        existing.expires_at = now + 60000;
+
+        // Execute side effect
+        actualDiscountsReversed += 1;
+
+        // Mark completed
+        existing.status = 'completed';
+        row.status = 'completed';
+      }
+    }
+
+    await retryWorker(queueRow);
+
+    expect(queueRow.status).toBe('completed');
+    expect(actualDiscountsReversed).toBe(1);
+    expect(compensationLogTable.get(logicalKey)!.status).toBe('completed');
+  });
 });

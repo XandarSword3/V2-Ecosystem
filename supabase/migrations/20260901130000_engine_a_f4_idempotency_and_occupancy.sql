@@ -423,14 +423,17 @@ CREATE INDEX IF NOT EXISTS idx_compensation_queue_status ON checkout_compensatio
 
 -- Compensation idempotency log ensuring that retries or crash recoveries never double-compensate
 CREATE TABLE IF NOT EXISTS checkout_compensation_log (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  logical_key VARCHAR(255) PRIMARY KEY,
   idempotency_key TEXT,
   transaction_id UUID,
   operation VARCHAR(50) NOT NULL,
-  executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  claim_token UUID NOT NULL DEFAULT gen_random_uuid(),
+  status VARCHAR(50) NOT NULL DEFAULT 'in_progress',
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '60 seconds'),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_compensation_log_key ON checkout_compensation_log(idempotency_key, operation);
-CREATE INDEX IF NOT EXISTS idx_compensation_log_tx ON checkout_compensation_log(transaction_id, operation);
+CREATE INDEX IF NOT EXISTS idx_compensation_log_status ON checkout_compensation_log(status);
 
 CREATE OR REPLACE FUNCTION queue_failed_compensation(
   p_key TEXT,
@@ -463,7 +466,7 @@ BEGIN
 END;
 $$;
 
--- Worker function to process and retry queued compensations with idempotent execution guards
+-- Worker function to process and retry queued compensations with atomic claim-first execution
 CREATE OR REPLACE FUNCTION process_checkout_compensation_queue(
   p_batch_size INTEGER DEFAULT 10
 ) RETURNS JSONB
@@ -473,7 +476,12 @@ DECLARE
   v_row RECORD;
   v_processed INTEGER := 0;
   v_failed INTEGER := 0;
-  v_already_done BOOLEAN;
+  v_logical_key VARCHAR(255);
+  v_claim_token UUID;
+  v_now TIMESTAMPTZ;
+  v_expires TIMESTAMPTZ;
+  v_has_claim BOOLEAN;
+  v_log_claim RECORD;
 BEGIN
   FOR v_row IN
     SELECT * FROM checkout_compensation_queue
@@ -483,14 +491,75 @@ BEGIN
     FOR UPDATE SKIP LOCKED
   LOOP
     BEGIN
-      -- Check idempotency log so retried or crashed tasks never double-compensate
-      SELECT EXISTS(
-        SELECT 1 FROM checkout_compensation_log
-        WHERE (v_row.idempotency_key IS NOT NULL AND idempotency_key = v_row.idempotency_key AND operation = v_row.operation)
-           OR (v_row.transaction_id IS NOT NULL AND transaction_id = v_row.transaction_id AND operation = v_row.operation)
-      ) INTO v_already_done;
+      v_logical_key := COALESCE('tx:' || v_row.transaction_id, 'idemp:' || v_row.idempotency_key) || ':' || v_row.operation;
+      v_claim_token := gen_random_uuid();
+      v_now := NOW();
+      v_expires := v_now + INTERVAL '60 seconds';
 
-      IF NOT v_already_done THEN
+      -- 1. Atomic claim attempt: INSERT ... ON CONFLICT DO NOTHING
+      INSERT INTO checkout_compensation_log (
+        logical_key,
+        idempotency_key,
+        transaction_id,
+        operation,
+        claim_token,
+        status,
+        expires_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        v_logical_key,
+        v_row.idempotency_key,
+        v_row.transaction_id,
+        v_row.operation,
+        v_claim_token,
+        'in_progress',
+        v_expires,
+        v_now,
+        v_now
+      )
+      ON CONFLICT (logical_key) DO NOTHING
+      RETURNING * INTO v_log_claim;
+
+      v_has_claim := FOUND;
+
+      -- 2. If row already exists, check status with row lock
+      IF NOT v_has_claim THEN
+        SELECT * INTO v_log_claim
+        FROM checkout_compensation_log
+        WHERE logical_key = v_logical_key
+        FOR UPDATE;
+
+        IF FOUND THEN
+          IF v_log_claim.status = 'completed' THEN
+            -- Already completed: mark this duplicate queue row completed without executing side effect
+            UPDATE checkout_compensation_queue
+            SET status = 'completed',
+                updated_at = NOW()
+            WHERE id = v_row.id;
+
+            v_processed := v_processed + 1;
+            CONTINUE;
+          END IF;
+
+          -- If failed or expired in_progress, reclaim it
+          IF v_log_claim.status = 'failed' OR (v_log_claim.status = 'in_progress' AND v_log_claim.expires_at < v_now) THEN
+            UPDATE checkout_compensation_log
+            SET claim_token = v_claim_token,
+                status = 'in_progress',
+                expires_at = v_expires,
+                updated_at = v_now
+            WHERE logical_key = v_logical_key;
+
+            v_has_claim := true;
+          ELSE
+            -- Another worker holds active lease; skip this duplicate queue item for now
+            CONTINUE;
+          END IF;
+        END IF;
+      END IF;
+
+      IF v_has_claim THEN
         IF v_row.operation = 'restore_inventory' THEN
           PERFORM restore_inventory_for_order_items(v_row.payload);
         ELSIF v_row.operation = 'reverse_discounts' THEN
@@ -514,16 +583,20 @@ BEGIN
           END IF;
         END IF;
 
-        INSERT INTO checkout_compensation_log (idempotency_key, transaction_id, operation)
-        VALUES (v_row.idempotency_key, v_row.transaction_id, v_row.operation);
+        -- Mark log completed with claim token fencing
+        UPDATE checkout_compensation_log
+        SET status = 'completed',
+            updated_at = NOW()
+        WHERE logical_key = v_logical_key AND claim_token = v_claim_token;
+
+        -- Mark queue row completed
+        UPDATE checkout_compensation_queue
+        SET status = 'completed',
+            updated_at = NOW()
+        WHERE id = v_row.id;
+
+        v_processed := v_processed + 1;
       END IF;
-
-      UPDATE checkout_compensation_queue
-      SET status = 'completed',
-          updated_at = NOW()
-      WHERE id = v_row.id;
-
-      v_processed := v_processed + 1;
     EXCEPTION WHEN OTHERS THEN
       UPDATE checkout_compensation_queue
       SET attempts = attempts + 1,
@@ -531,6 +604,13 @@ BEGIN
           status = CASE WHEN attempts + 1 >= 5 THEN 'failed' ELSE 'pending' END,
           updated_at = NOW()
       WHERE id = v_row.id;
+
+      IF v_has_claim THEN
+        UPDATE checkout_compensation_log
+        SET status = 'failed',
+            updated_at = NOW()
+        WHERE logical_key = v_logical_key AND claim_token = v_claim_token;
+      END IF;
 
       v_failed := v_failed + 1;
     END;
