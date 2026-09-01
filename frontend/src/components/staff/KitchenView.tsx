@@ -860,11 +860,11 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                                     data-testid={`order-card-${order.id}`}
                                     data-fulfillment-mode={resolvedOrderMode(order).mode}
                                     data-fulfillment-column={oCol}
-                                    className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden transition-all hover:shadow-md cursor-pointer ${
+                                    className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden transition-all hover:shadow-md cursor-pointer max-h-[360px] flex flex-col ${
                                       selectedOrder?.id === order.id ? 'ring-2 ring-primary' : ''
                                     }`}
                                   >
-                                    <div className="p-3">
+                                    <div className="p-3 flex flex-col flex-1 min-h-0">
                                       <div className="flex justify-between items-start mb-2">
                                         <div className="flex items-center gap-1.5">
                                           <span className="font-bold text-sm">#{order.orderNumber}</span>
@@ -899,7 +899,7 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                                         </span>
                                       </div>
 
-                                      <div className="space-y-1 mb-2">
+                                      <div className="space-y-1 mb-2 max-h-[180px] overflow-y-auto pr-1 scrollbar-thin">
                                         {order.items.map((item) => (
                                           <ItemStatusChip
                                             key={item.id}
@@ -926,7 +926,7 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                                       // F2: only show fulfillment action if user has order:update permission
                                       if (!auth.hasPermission(Perm.ORDER_UPDATE)) return null;
                                       return (
-                                        <div className="px-2 pb-2 flex gap-2">
+                                        <div className="px-2 pb-2 flex gap-2 mt-auto shrink-0">
                                           {isWaitingOnDispatch ? (
                                             <span className="w-full text-center text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 py-1.5">
                                               Waiting on Dispatch

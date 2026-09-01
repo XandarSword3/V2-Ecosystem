@@ -1,33 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { useSiteSettings } from '@/lib/settings-context';
 import { MenuService } from '@/components/modules/MenuService';
 import { BookingService } from '@/components/modules/BookingService';
 import { SessionService } from '@/components/modules/SessionService';
-import { Loader2, AlertCircle, Home } from 'lucide-react';
-import { motion } from 'framer-motion';
-
 import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
-import { Container } from '@/components/layout/Container';
-import { Button } from '@/components/ui/Button';
-import type { Module } from '@/lib/settings-context';
-
-interface ModuleWithLayout extends Module {
-  settings?: Module['settings'] & {
-    layout?: any[];
-  };
-}
+import { ModuleProvider, ModuleWithLayout } from '@/components/shells/ModuleContext';
+import { ModuleShell } from '@/components/shells/ModuleShell';
+import { CommerceShell } from '@/components/shells/CommerceShell';
 
 export default function ModulePage() {
-  const t = useTranslations('errors');
-  const tCommon = useTranslations('common');
   const params = useParams();
   const propertySlug = (params?.property as string) || '';
 
-  const router = useRouter();
   const { modules: cachedModules, loading: isLoading } = useSiteSettings();
   const [slug, setSlug] = useState<string>('');
   const [allModules, setAllModules] = useState<any[]>([]);
@@ -38,9 +25,6 @@ export default function ModulePage() {
   useEffect(() => {
     const fetchAllModules = async () => {
       try {
-        // NOTE: NEXT_PUBLIC_API_URL may already include a trailing /api
-        // (it does in .env.local) — strip it before appending /api/modules,
-        // same pattern as settings-context.tsx, or this becomes /api/api/modules.
         const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
         const apiUrl = rawBaseUrl.replace(/\/api\/?$/, '');
         const response = await fetch(`${apiUrl}/api/modules`);
@@ -97,14 +81,6 @@ export default function ModulePage() {
     fetchModuleDetails();
   }, [slug, cachedModules]);
 
-  if (isLoading || fetchingLayout) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-12 h-12 animate-spin text-primary-600" />
-      </div>
-    );
-  }
-
   // Check if module is active (case-insensitive comparison)
   // Prefer moduleWithLayout (has full settings from API) over cachedModules
   const currentModule = moduleWithLayout || cachedModules.find((m) => m.slug.toLowerCase() === slug);
@@ -112,89 +88,57 @@ export default function ModulePage() {
   // Check if module exists but is disabled
   const disabledModule = !currentModule && allModules.find((m) => m.slug.toLowerCase() === slug && !m.is_active);
 
-  if (disabledModule) {
-    // Module exists but is disabled - show friendly message
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Container size="sm" className="w-full py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-500/20 flex items-center justify-center">
-            <AlertCircle className="w-10 h-10 text-amber-500" />
+  const isDataLoading = isLoading || fetchingLayout;
+  const isNotFound = !isDataLoading && !currentModule && !disabledModule;
+
+  // Render the appropriate renderer inside ModuleShell
+  const renderModuleContent = () => {
+    if (!currentModule) return null;
+
+    // 1. Custom Visual Builder layout (preserved unchanged)
+    if (currentModule.settings?.layout && Array.isArray(currentModule.settings.layout) && currentModule.settings.layout.length > 0) {
+      return <DynamicModuleRenderer layout={currentModule.settings.layout} module={currentModule} propertySlug={propertySlug} />;
+    }
+
+    // 2. Fallback to canonical engine renderers
+    switch (currentModule.engine_type) {
+      case 'instant_transaction':
+        return (
+          <CommerceShell>
+            <MenuService module={currentModule} />
+          </CommerceShell>
+        );
+      case 'time_exclusive_reservation':
+        return <BookingService module={currentModule} />;
+      case 'shared_capacity_access':
+        return <SessionService module={currentModule} />;
+      case 'ongoing_entitlement':
+        return (
+          <div className="min-h-[40vh] flex items-center justify-center p-8 text-center text-muted-foreground">
+            <p>Module type &quot;{currentModule.engine_type}&quot; has no default renderer. Build a layout in the Visual Builder.</p>
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-3">
-            {t('featureUnavailable')}
-          </h1>
-          <p className="text-muted-foreground mb-6">
-            {t('featureUnavailableDesc', { name: disabledModule.name })}
-          </p>
-          <Button onClick={() => router.push(`/${propertySlug}`)} className="gap-2">
-            <Home className="w-5 h-5" />
-            {tCommon('returnHome')}
-          </Button>
-        </motion.div>
-        </Container>
-      </div>
-    );
-  }
+        );
+      default:
+        return (
+          <div className="min-h-[40vh] flex items-center justify-center p-8 text-center text-muted-foreground">
+            <p>Unknown module type: {currentModule.engine_type}</p>
+          </div>
+        );
+    }
+  };
 
-  if (!currentModule) {
-    // Module not found at all - 404
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Container size="sm" className="w-full py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <h1 className="text-6xl font-bold text-foreground mb-4">404</h1>
-          <h2 className="text-2xl font-semibold text-muted-foreground mb-3">{t('pageNotFound')}</h2>
-          <p className="text-muted-foreground mb-6">
-            {t('pageNotFoundDesc')}
-          </p>
-          <Button onClick={() => router.push(`/${propertySlug}`)} className="gap-2">
-            <Home className="w-5 h-5" />
-            {tCommon('returnHome')}
-          </Button>
-        </motion.div>
-        </Container>
-      </div>
-    );
-  }
-
-  // Check if module has a custom layout defined
-  if (currentModule.settings?.layout && Array.isArray(currentModule.settings.layout) && currentModule.settings.layout.length > 0) {
-    return <DynamicModuleRenderer layout={currentModule.settings.layout} module={currentModule} propertySlug={propertySlug} />;
-  }
-
-  // Fallback to legacy hardcoded templates for modules that have no custom layout.
-  // Maps real engine types → nearest legacy component. Switches on engine_type,
-  // not the legacy template_type column (see backend/src/engines/types.ts) —
-  // this was previously broken and meant any module without a custom Visual
-  // Builder layout showed "Unknown module type" to customers.
-  switch (currentModule.engine_type) {
-    case 'instant_transaction':
-      return <MenuService module={currentModule} />;
-    case 'time_exclusive_reservation':
-      return <BookingService module={currentModule} />;
-    case 'shared_capacity_access':
-      return <SessionService module={currentModule} />;
-    case 'ongoing_entitlement':
-      // No dedicated legacy component yet — fall through to generic message.
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <p>Module type &quot;{currentModule.engine_type}&quot; has no default renderer. Build a layout in the Visual Builder.</p>
-        </div>
-      );
-    default:
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <p>Unknown module type: {currentModule.engine_type}</p>
-        </div>
-      );
-  }
+  return (
+    <ModuleProvider
+      module={(currentModule as ModuleWithLayout) || (disabledModule as ModuleWithLayout) || null}
+      slug={slug}
+      propertySlug={propertySlug}
+      isLoading={isDataLoading}
+      isDisabled={Boolean(disabledModule)}
+      isNotFound={isNotFound}
+    >
+      <ModuleShell>
+        {renderModuleContent()}
+      </ModuleShell>
+    </ModuleProvider>
+  );
 }
