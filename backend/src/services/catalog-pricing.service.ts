@@ -76,9 +76,34 @@ export async function resolveAndPriceCatalogItems(
     throw new Error(`Failed to fetch catalog items: ${catalogError.message}`);
   }
 
-  // Build price and name maps
-  const priceMap = new Map((catalogRows ?? []).map((row) => [row.id, Number(row.price)]));
-  const nameMap = new Map((catalogRows ?? []).map((row) => [row.id, row.name as string]));
+  // Build price and name maps from catalog_items
+  const priceMap = new Map<string, number>((catalogRows ?? []).map((row) => [row.id, Number(row.price)]));
+  const nameMap = new Map<string, string>((catalogRows ?? []).map((row) => [row.id, row.name as string]));
+
+  // If some items were not found in catalog_items, check bookable_units and accommodation_add_ons
+  const remainingIds = itemIds.filter((id) => !priceMap.has(id));
+  if (remainingIds.length > 0) {
+    const { data: unitRows } = await supabase
+      .from('bookable_units')
+      .select('id, name, base_price, price')
+      .in('id', remainingIds);
+    (unitRows ?? []).forEach((row: any) => {
+      priceMap.set(row.id, Number(row.base_price ?? row.price ?? 0));
+      nameMap.set(row.id, row.name as string);
+    });
+
+    const stillRemaining = itemIds.filter((id) => !priceMap.has(id));
+    if (stillRemaining.length > 0) {
+      const { data: addOnRows } = await supabase
+        .from('accommodation_add_ons')
+        .select('id, name, price')
+        .in('id', stillRemaining);
+      (addOnRows ?? []).forEach((row: any) => {
+        priceMap.set(row.id, Number(row.price ?? 0));
+        nameMap.set(row.id, row.name as string);
+      });
+    }
+  }
 
   // FIX 0: Hard-fail on unresolved catalog items
   const unknownIds = itemIds.filter((id) => !priceMap.has(id));

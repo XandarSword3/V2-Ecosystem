@@ -15,6 +15,9 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { PaymentDiscounts } from '@/components/customer/PaymentDiscounts';
+import { usePricingPreview } from '@/hooks/usePricingPreview';
+import { getStoredPropertyId } from '@/lib/property-id';
+import { useMemo } from 'react';
 import StripePayment from '@/components/payments/StripePayment';
 import {
   Loader2,
@@ -151,49 +154,86 @@ export default function DynamicUnitDetailPage() {
     }
   };
 
-  const calculatePricing = () => {
-    if (!unit || !checkInDate || !checkOutDate) return null;
-    const checkIn = new Date(checkInDate);
-    const checkOut = new Date(checkOutDate);
-    const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-    if (nights <= 0) return null;
+  const propertyId = getStoredPropertyId();
 
-    let baseAmount = 0;
-    const current = new Date(checkIn);
-    while (current < checkOut) {
-      const dayOfWeek = current.getDay();
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
-      baseAmount += isWeekend
-        ? (unit.weekend_price || unit.base_price || 0)
-        : (unit.base_price || 0);
-      current.setDate(current.getDate() + 1);
-    }
+  const checkIn = checkInDate ? new Date(checkInDate) : null;
+  const checkOut = checkOutDate ? new Date(checkOutDate) : null;
+  const nights = (checkIn && checkOut && checkOut > checkIn)
+    ? Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
 
-    let addOnsAmount = 0;
+  // Build canonical reservation items array for server pricing preview
+  const reservationItems = useMemo(() => {
+    if (!unit || nights <= 0) return [];
+    const items = [
+      {
+        id: unit.id,
+        name: unit.name,
+        price: 0,
+        quantity: nights,
+        category: 'accommodation',
+        moduleId,
+      },
+    ];
     selectedAddOns.forEach(({ addOnId, quantity }) => {
-      const addOn = addOns.find(a => a.id === addOnId);
-      if (addOn) {
-        addOnsAmount += addOn.price * quantity * (addOn.price_type === 'per_night' ? nights : 1);
+      const addOn = addOns.find((a) => a.id === addOnId);
+      if (addOn && quantity > 0) {
+        const multiplier = addOn.price_type === 'per_night' ? nights : 1;
+        items.push({
+          id: addOn.id,
+          name: addOn.name,
+          price: 0,
+          quantity: quantity * multiplier,
+          category: 'add_on',
+          moduleId,
+        });
       }
     });
+    return items;
+  }, [unit, nights, selectedAddOns, addOns, moduleId]);
 
-    return { nights, baseAmount, addOnsAmount, depositAmount: baseAmount * 0.3, totalAmount: baseAmount + addOnsAmount };
-  };
-
-  const pricing = calculatePricing();
+  const {
+    pricing: serverPricing,
+    isLoading: loadingPricing,
+    isStale: isPricingStale,
+    isError: isPricingError,
+    error: pricingError,
+  } = usePricingPreview({
+    items: reservationItems,
+    moduleId,
+    propertyId,
+    fulfillmentMode: 'none',
+    paymentMethod,
+    couponCode,
+    giftCardCodes,
+    loyaltyPointsToRedeem: loyaltyPoints,
+    customerId: user?.id,
+    enabled: !!unit && nights > 0 && !!moduleId,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!unit || !pricing) { toast.error('Please select valid dates'); return; }
-    if (!customerName || !customerEmail || !customerPhone) { toast.error('Please fill in all required fields'); return; }
+    if (!unit || nights <= 0 || !serverPricing || isPricingStale || isPricingError || loadingPricing) {
+      toast.error('Please select valid dates and wait for pricing calculation');
+      return;
+    }
+    if (!customerName || !customerEmail || !customerPhone) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const response = await api.post(`/${slug}/bookings`, {
         unitId: unit.id,
-        customerName, customerEmail, customerPhone,
-        checkInDate, checkOutDate, numberOfGuests,
-        addOns: selectedAddOns, specialRequests,
+        customerName,
+        customerEmail,
+        customerPhone,
+        checkInDate,
+        checkOutDate,
+        numberOfGuests,
+        addOns: selectedAddOns,
+        specialRequests,
         paymentMethod,
         // Pass canonical discount instrument inputs to backend
         couponCode: couponCode || undefined,
@@ -204,7 +244,7 @@ export default function DynamicUnitDetailPage() {
       const bookingId = response.data.data.id;
 
       // For card payments, show Stripe checkout instead of redirecting
-      if (paymentMethod === 'card' && (pricing.totalAmount || 0) > 0) {
+      if (paymentMethod === 'card' && (serverPricing.totalAmount || 0) > 0) {
         setPendingBookingId(bookingId);
         setShowStripePayment(true);
         toast.info('Complete your card payment');
@@ -444,7 +484,7 @@ export default function DynamicUnitDetailPage() {
                     )}
 
                     {/* Discounts Section */}
-                    {pricing && (
+                    {nights > 0 && (
                       <div className="border-t pt-4">
                         <PaymentDiscounts
                           couponCode={couponCode}
@@ -454,31 +494,82 @@ export default function DynamicUnitDetailPage() {
                           onAddGiftCard={(code) => setGiftCardCodes((prev) => [...prev, code])}
                           onRemoveGiftCard={(code) => setGiftCardCodes((prev) => prev.filter((c) => c !== code))}
                           onLoyaltyPointsChange={setLoyaltyPoints}
-                          currency={currency}
+                          pricingDiscounts={serverPricing?.discounts}
+                          isPricingStale={isPricingStale}
+                          isLoadingPricing={loadingPricing}
+                          currency={serverPricing?.currency || currency}
                           moduleId={moduleId}
                           moduleSlug={currentModule?.slug}
                         />
                       </div>
                     )}
 
-                    {/* Pricing Summary */}
-                    {pricing && (
+                    {/* Authoritative Pricing Summary */}
+                    {nights > 0 && (
                       <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-slate-500">{pricing.nights} night{pricing.nights > 1 ? 's' : ''}</span>
-                          <span>{formatCurrency(pricing.baseAmount, currency)}</span>
-                        </div>
-                        {pricing.addOnsAmount > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-slate-500">Add-ons</span>
-                            <span>{formatCurrency(pricing.addOnsAmount, currency)}</span>
+                        {loadingPricing || isPricingStale ? (
+                          <div className="py-4 text-center text-sm text-slate-400 italic animate-pulse">
+                            Calculating pricing...
                           </div>
+                        ) : isPricingError || !serverPricing ? (
+                          <div className="py-2 text-center text-sm text-red-500">
+                            {pricingError || 'Pricing unavailable'}
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-slate-500">{nights} night{nights > 1 ? 's' : ''}</span>
+                              <span className="font-medium text-slate-700 dark:text-slate-300">
+                                {formatCurrency(serverPricing.subtotal, serverPricing.currency || currency)}
+                              </span>
+                            </div>
+
+                            {/* Tax lines from backend breakdown */}
+                            {(serverPricing.taxBreakdown || []).map((t, idx) => (
+                              <div key={idx} className="flex justify-between text-sm">
+                                <span className="text-slate-500">{t.name} ({t.rate}%)</span>
+                                <span className="text-slate-700 dark:text-slate-300">
+                                  {formatCurrency(t.amount, serverPricing.currency || currency)}
+                                </span>
+                              </div>
+                            ))}
+
+                            {/* Fee lines from backend breakdown */}
+                            {(serverPricing.feeBreakdown || []).map((f, idx) => (
+                              <div key={idx} className="flex justify-between text-sm">
+                                <span className="text-slate-500">{f.name}</span>
+                                <span className="text-slate-700 dark:text-slate-300">
+                                  {formatCurrency(f.amount, serverPricing.currency || currency)}
+                                </span>
+                              </div>
+                            ))}
+
+                            {/* Applied Discounts from backend */}
+                            {(serverPricing.discounts || []).map((d, idx) => (
+                              <div key={idx} className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                                <span>{d.name || (d.type === 'coupon' ? `Coupon: ${d.code}` : d.type === 'gift_card' ? `Gift Card: ${d.code}` : 'Loyalty Reward')}</span>
+                                <span>-{formatCurrency(d.amount, serverPricing.currency || currency)}</span>
+                              </div>
+                            ))}
+
+                            <div className="flex justify-between font-bold pt-2 border-t">
+                              <span>Total</span>
+                              <div className="text-right">
+                                {serverPricing.totalDiscount > 0 && serverPricing.preDiscountTotal !== undefined && serverPricing.preDiscountTotal > serverPricing.totalAmount && (
+                                  <span className="text-xs text-slate-400 line-through mr-2 font-normal">
+                                    {formatCurrency(serverPricing.preDiscountTotal, serverPricing.currency || currency)}
+                                  </span>
+                                )}
+                                <span className="text-primary-600">
+                                  {formatCurrency(serverPricing.totalAmount, serverPricing.currency || currency)}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              Deposit: {formatCurrency(serverPricing.totalAmount * 0.3, serverPricing.currency || currency)} (30%)
+                            </p>
+                          </>
                         )}
-                        <div className="flex justify-between font-bold pt-2 border-t">
-                          <span>Total</span>
-                          <span className="text-primary-600">{formatCurrency(pricing.totalAmount, currency)}</span>
-                        </div>
-                        <p className="text-xs text-slate-500">Deposit: {formatCurrency(pricing.depositAmount, currency)} (30%)</p>
                       </div>
                     )}
 
@@ -532,11 +623,19 @@ export default function DynamicUnitDetailPage() {
                       </div>
                     </div>
 
-                    <Button type="submit" className="w-full" disabled={isSubmitting || !pricing}>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={isSubmitting || !serverPricing || isPricingStale || isPricingError || loadingPricing || nights <= 0}
+                    >
                       {isSubmitting ? (
                         <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Submitting...</>
+                      ) : loadingPricing || isPricingStale ? (
+                        <>Calculating pricing...</>
+                      ) : isPricingError ? (
+                        <>Pricing Error</>
                       ) : (
-                        <>Book Now{pricing ? ` • ${formatCurrency(pricing.totalAmount, currency)}` : ''}</>
+                        <>Book Now • {formatCurrency(serverPricing?.totalAmount ?? 0, serverPricing?.currency || currency)}</>
                       )}
                     </Button>
                   </form>
@@ -564,7 +663,7 @@ export default function DynamicUnitDetailPage() {
             </div>
 
             <StripePayment
-              amount={pricing?.totalAmount || 0}
+              amount={serverPricing?.totalAmount || 0}
               currency="USD"
               referenceType="time_exclusive_reservation"
               referenceId={pendingBookingId}

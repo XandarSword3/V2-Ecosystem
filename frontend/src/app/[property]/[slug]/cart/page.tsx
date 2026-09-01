@@ -179,7 +179,6 @@ export default function ModuleCartPage() {
   const tax = serverPricing?.taxAmount ?? 0;
   const taxBreakdown = serverPricing?.taxBreakdown ?? [];
   const feeBreakdown = serverPricing?.feeBreakdown ?? [];
-  const totalFees = feeBreakdown.reduce((sum: number, fee: any) => sum + fee.amount, 0);
   const serviceCharge = serverPricing?.serviceCharge ?? 0;
   const deliveryFee = serverPricing?.deliveryFee ?? 0;
   const totalDiscount = serverPricing?.totalDiscount ?? 0;
