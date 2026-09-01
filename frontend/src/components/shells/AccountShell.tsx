@@ -22,18 +22,21 @@ export type AccountTabKey =
   | 'loyalty'
   | 'gift-cards'
   | 'reviews'
-  | 'support';
+  | 'support'
+  | string;
 
 export interface AccountTabItem {
   key: AccountTabKey;
   label: string;
-  href: string;
+  href?: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
 export interface AccountShellProps {
   children: React.ReactNode;
   activeTab?: AccountTabKey;
+  onTabChange?: (tabKey: AccountTabKey) => void;
+  tabs?: AccountTabItem[];
   propertySlug?: string;
   className?: string;
   headerSlot?: React.ReactNode;
@@ -45,7 +48,7 @@ export interface AccountShellProps {
  * Responsibilities:
  * - Provides responsive tabbed navigation across customer lifecycle views
  * - Displays guest vs authenticated presentation banner
- * - Houses child account views (`OrderHistory`, `OrderTracking`, `Loyalty`, etc.)
+ * - Houses child account views (`OrderHistory`, `OrderTracking`, `Loyalty`, `Profile`, etc.)
  *
  * Explicit Non-Responsibilities (F3 Law):
  * - Does NOT own order lifecycle state machines or refunds
@@ -55,6 +58,8 @@ export interface AccountShellProps {
 export function AccountShell({
   children,
   activeTab = 'orders',
+  onTabChange,
+  tabs: customTabs,
   propertySlug = '',
   className = '',
   headerSlot,
@@ -64,7 +69,7 @@ export function AccountShell({
 
   const basePath = propertySlug ? `/${propertySlug}/account` : '/account';
 
-  const tabs: AccountTabItem[] = [
+  const defaultTabs: AccountTabItem[] = [
     { key: 'orders', label: t('orders') || 'Orders', href: `${basePath}/orders`, icon: Package },
     { key: 'tracking', label: t('orderTracking') || 'Live Tracking', href: `${basePath}/tracking`, icon: Clock },
     { key: 'loyalty', label: t('loyalty') || 'Loyalty & Rewards', href: `${basePath}/loyalty`, icon: Sparkles },
@@ -72,6 +77,8 @@ export function AccountShell({
     { key: 'reviews', label: t('reviews') || 'Reviews', href: `${basePath}/reviews`, icon: Star },
     { key: 'support', label: t('support') || 'Support & Help', href: `${basePath}/support`, icon: LifeBuoy },
   ];
+
+  const activeTabs = customTabs && customTabs.length > 0 ? customTabs : defaultTabs;
 
   return (
     <div className={`account-shell min-h-screen bg-slate-50/50 dark:bg-slate-950/50 py-8 ${className}`}>
@@ -119,13 +126,33 @@ export function AccountShell({
         {/* Tab Navigation */}
         <div className="border-b border-border/60 mb-8 overflow-x-auto scrollbar-none">
           <nav className="flex space-x-2 sm:space-x-6 min-w-max pb-px" aria-label="Account Tabs">
-            {tabs.map((tab) => {
+            {activeTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
+              
+              if (onTabChange) {
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => onTabChange(tab.key)}
+                    className={`flex items-center gap-2 py-3 px-3 sm:px-1 border-b-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                    }`}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              }
+
               return (
                 <Link
                   key={tab.key}
-                  href={tab.href}
+                  href={tab.href || '#'}
                   className={`flex items-center gap-2 py-3 px-3 sm:px-1 border-b-2 text-sm font-medium transition-colors ${
                     isActive
                       ? 'border-primary-600 text-primary-600 dark:text-primary-400'

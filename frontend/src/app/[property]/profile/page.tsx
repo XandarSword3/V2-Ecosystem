@@ -15,8 +15,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { fadeInUp, staggerContainer } from '@/lib/animations/presets';
+import { useParams } from 'next/navigation';
 import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import PrivacyCenter from '@/components/PrivacyCenter';
+import { AccountShell } from '@/components/shells/AccountShell';
 import {
   User,
   Mail,
@@ -123,6 +125,8 @@ const statusColors: Record<string, string> = {
 };
 
 export default function ProfilePage() {
+  const params = useParams();
+  const propertySlug = (params?.property as string) || '';
   const t = useTranslations('profile');
   const tCommon = useTranslations('common');
   const { user, logout, isLoading: authLoading, refreshUser } = useAuth();
@@ -289,61 +293,49 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        <Card>
-          <CardContent className="p-12 text-center">
-            <User className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-            <p className="text-slate-500 dark:text-slate-400">{t('pleaseLogin')}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <AccountShell propertySlug={propertySlug}>
+        <div className="max-w-4xl mx-auto py-4">
+          <Card>
+            <CardContent className="p-12 text-center">
+              <User className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500 dark:text-slate-400">{t('pleaseLogin')}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </AccountShell>
     );
   }
 
-  const tabs = [
-    { id: 'profile' as TabType, label: 'Profile', icon: User },
-    { id: 'orders' as TabType, label: 'Orders', icon: UtensilsCrossed },
-    { id: 'bookings' as TabType, label: 'Bookings', icon: Home },
-    { id: 'tickets' as TabType, label: 'Passes & Tickets', icon: Ticket },
-    { id: 'loyalty' as TabType, label: 'Loyalty & Rewards', icon: Award },
-    { id: 'statement' as TabType, label: 'Unified Statement', icon: Calendar },
-    { id: 'privacy' as TabType, label: 'Privacy & Data', icon: Shield },
+  const accountTabs = [
+    { key: 'profile' as TabType, label: 'Profile', icon: User },
+    { key: 'orders' as TabType, label: 'Orders', icon: UtensilsCrossed },
+    { key: 'bookings' as TabType, label: 'Bookings', icon: Home },
+    { key: 'tickets' as TabType, label: 'Passes & Tickets', icon: Ticket },
+    { key: 'loyalty' as TabType, label: 'Loyalty & Rewards', icon: Award },
+    { key: 'statement' as TabType, label: 'Unified Statement', icon: Calendar },
+    { key: 'privacy' as TabType, label: 'Privacy & Data', icon: Shield },
   ];
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-6">
-        {/* Header */}
-        <motion.div variants={fadeInUp} className="flex items-center justify-between">
+    <AccountShell
+      propertySlug={propertySlug}
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as TabType)}
+      tabs={accountTabs}
+      headerSlot={
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{t('title')}</h1>
-            <p className="text-slate-500 dark:text-slate-400">{t('subtitle')}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{t('title')}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t('subtitle')}</p>
           </div>
           <Button variant="danger" onClick={handleLogout} size="sm">
             <LogOut className="w-4 h-4 mr-2" />
             {tCommon('logout')}
           </Button>
-        </motion.div>
-
-        {/* Tabs */}
-        <motion.div variants={fadeInUp}>
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </motion.div>
+        </div>
+      }
+    >
+      <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-6">
 
         {/* Tab Content */}
         <AnimatePresence mode="wait">
@@ -1010,6 +1002,6 @@ export default function ProfilePage() {
           </div>
         )}
       </motion.div>
-    </div>
+    </AccountShell>
   );
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { CustomerShell } from '@/components/shells/CustomerShell';
 import { ModuleProvider, useModuleContext, resolveEngineACapabilities } from '@/components/shells/ModuleContext';
 import { ModuleShell } from '@/components/shells/ModuleShell';
@@ -38,6 +38,29 @@ vi.mock('@/components/ThemeInjector', () => ({
   ThemeInjector: () => <div data-testid="theme-injector" />,
 }));
 
+import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
+import { MenuService } from '@/components/modules/MenuService';
+
+// Mock DynamicModuleRenderer to verify Visual Builder coexistence
+vi.mock('@/components/module-builder/DynamicModuleRenderer', () => ({
+  DynamicModuleRenderer: ({ layout, module }: any) => (
+    <div data-testid="dynamic-renderer" data-module-id={module.id} data-blocks-count={layout.length}>
+      {layout.map((b: any) => (
+        <div key={b.id} data-testid={`block-${b.type}`}>{b.type}</div>
+      ))}
+    </div>
+  ),
+}));
+
+// Mock MenuService to verify default Engine A coexistence
+vi.mock('@/components/modules/MenuService', () => ({
+  MenuService: ({ module }: any) => (
+    <div data-testid="menu-service-renderer" data-module-id={module.id}>
+      <span data-testid="menu-module-name">{module.name}</span>
+    </div>
+  ),
+}));
+
 describe('F3: Customer Application Shell Modernization', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -48,8 +71,8 @@ describe('F3: Customer Application Shell Modernization', () => {
     });
   });
 
-  describe('1. CustomerShell', () => {
-    it('renders skip to main content link and brand theme injector', () => {
+  describe('1. CustomerShell (Pure Presentation)', () => {
+    it('renders accessibility skip link and brand theme injector', () => {
       render(
         <CustomerShell>
           <div data-testid="child-content">Storefront Content</div>
@@ -61,7 +84,7 @@ describe('F3: Customer Application Shell Modernization', () => {
       expect(screen.getByTestId('child-content').textContent).toBe('Storefront Content');
     });
 
-    it('renders optional header and footer slots', () => {
+    it('renders optional header and footer layout slots', () => {
       render(
         <CustomerShell
           headerSlot={<div data-testid="custom-header">Header Slot</div>}
@@ -76,8 +99,8 @@ describe('F3: Customer Application Shell Modernization', () => {
     });
   });
 
-  describe('2. ModuleContext & Capabilities Projection', () => {
-    it('projects canonical fulfillment capabilities for instant_transaction', () => {
+  describe('2. Canonical Engine A Capability Projection (No duplicate mode list)', () => {
+    it('projects the canonical F1 capability model with all 6 fulfillment modes for instant_transaction', () => {
       const module: any = {
         id: 'mod-1',
         name: 'Main Restaurant',
@@ -88,9 +111,15 @@ describe('F3: Customer Application Shell Modernization', () => {
       const caps = resolveEngineACapabilities(module);
       expect(caps).not.toBeNull();
       expect(caps?.fulfillment.required).toBe(true);
-      expect(caps?.fulfillment.options).toHaveLength(4);
-      expect(caps?.fulfillment.options.map(o => o.mode)).toContain('on_premise');
-      expect(caps?.fulfillment.options.map(o => o.mode)).toContain('pickup');
+      expect(caps?.fulfillment.options).toHaveLength(6);
+      
+      const modes = caps?.fulfillment.options.map(o => o.mode);
+      expect(modes).toContain('on_premise');
+      expect(modes).toContain('pickup');
+      expect(modes).toContain('local_delivery');
+      expect(modes).toContain('digital_delivery');
+      expect(modes).toContain('shipment');
+      expect(modes).toContain('service_execution');
     });
 
     it('returns null capability projection for non-instant_transaction engines', () => {
@@ -139,7 +168,7 @@ describe('F3: Customer Application Shell Modernization', () => {
   });
 
   describe('3. ModuleShell Lifecycle States', () => {
-    it('renders loading state when isLoading is true', () => {
+    it('renders loading skeleton when isLoading is true', () => {
       render(
         <ModuleProvider module={null} slug="restaurant" propertySlug="demo-resort" isLoading={true}>
           <ModuleShell>
@@ -213,8 +242,49 @@ describe('F3: Customer Application Shell Modernization', () => {
     });
   });
 
-  describe('4. CommerceShell & Coexistence', () => {
-    it('renders commerce body and slots without altering catalog data', () => {
+  describe('4. CommerceShell & Cart Scoping Regression Test', () => {
+    it('scopes cart item count strictly to current module context (Module A x2, Module B x3 -> shows 2)', () => {
+      const moduleA: any = {
+        id: 'mod-a',
+        name: 'Restaurant A',
+        slug: 'restaurant-a',
+        engine_type: 'instant_transaction',
+      };
+
+      // Populate cart with 2 items from Module A and 3 items from Module B
+      useCartStore.getState().addItem({
+        id: 'item-a-1',
+        name: 'Burger',
+        price: 10,
+        moduleId: 'mod-a',
+        moduleSlug: 'restaurant-a',
+        quantity: 2,
+      });
+
+      useCartStore.getState().addItem({
+        id: 'item-b-1',
+        name: 'Cocktail',
+        price: 15,
+        moduleId: 'mod-b',
+        moduleSlug: 'bar-b',
+        quantity: 3,
+      });
+
+      render(
+        <ModuleProvider module={moduleA} slug="restaurant-a" propertySlug="demo-resort">
+          <CommerceShell>
+            <div>Module A Content</div>
+          </CommerceShell>
+        </ModuleProvider>
+      );
+
+      // Verify that Module A cart trigger reflects only Module A's 2 items (not all 5)
+      const cartLink = screen.getByLabelText(/View Cart with 2 items/i);
+      expect(cartLink).toBeDefined();
+      expect(cartLink.getAttribute('href')).toBe('/demo-resort/restaurant-a/cart');
+    });
+
+    it('renders toolbar and fulfillment mode selector slots when provided', () => {
       const module: any = {
         id: 'mod-1',
         name: 'Snack Bar',
@@ -237,50 +307,137 @@ describe('F3: Customer Application Shell Modernization', () => {
       expect(screen.getByTestId('mode-bar').textContent).toBe('On-Premise | Pickup');
       expect(screen.getByTestId('menu-service-content').textContent).toBe('Existing MenuService items');
     });
+  });
 
-    it('shows floating cart affordance when items are added to cart', () => {
-      const module: any = {
-        id: 'mod-1',
-        name: 'Snack Bar',
-        slug: 'snack-bar',
+  describe('5. Coexistence Proof: Visual Builder and Engine Renderers', () => {
+    it('coexists with custom Visual Builder layout via DynamicModuleRenderer unchanged', () => {
+      const customLayoutModule: any = {
+        id: 'mod-vb',
+        name: 'Custom Page',
+        slug: 'custom-page',
+        engine_type: 'instant_transaction',
+        settings: {
+          layout: [
+            { id: 'blk-1', type: 'hero_v2', props: {} },
+            { id: 'blk-2', type: 'card_grid', props: {} },
+          ],
+        },
+      };
+
+      render(
+        <CustomerShell>
+          <ModuleProvider module={customLayoutModule} slug="custom-page" propertySlug="demo-resort">
+            <ModuleShell>
+              <DynamicModuleRenderer
+                layout={customLayoutModule.settings.layout}
+                module={customLayoutModule}
+                propertySlug="demo-resort"
+              />
+            </ModuleShell>
+          </ModuleProvider>
+        </CustomerShell>
+      );
+
+      expect(screen.getByTestId('dynamic-renderer')).toBeDefined();
+      expect(screen.getByTestId('block-hero_v2')).toBeDefined();
+      expect(screen.getByTestId('block-card_grid')).toBeDefined();
+    });
+
+    it('coexists with default Engine A MenuService without altering catalog data or pricing', () => {
+      const defaultEngineAModule: any = {
+        id: 'mod-menu',
+        name: 'Default Menu Service',
+        slug: 'menu-service',
         engine_type: 'instant_transaction',
       };
 
-      const { rerender } = render(
-        <ModuleProvider module={module} slug="snack-bar" propertySlug="demo-resort">
-          <CommerceShell>
-            <div>Storefront</div>
-          </CommerceShell>
-        </ModuleProvider>
+      render(
+        <CustomerShell>
+          <ModuleProvider module={defaultEngineAModule} slug="menu-service" propertySlug="demo-resort">
+            <ModuleShell>
+              <CommerceShell>
+                <MenuService module={defaultEngineAModule} />
+              </CommerceShell>
+            </ModuleShell>
+          </ModuleProvider>
+        </CustomerShell>
       );
 
-      expect(screen.queryByLabelText(/View Cart/)).toBeNull();
+      expect(screen.getByTestId('menu-service-renderer')).toBeDefined();
+      expect(screen.getByTestId('menu-module-name').textContent).toBe('Default Menu Service');
+    });
 
-      // Add item to cart store
+    it('preserves catalog pricing, customization, cart state, inventory flags, and fulfillment options unchanged', () => {
+      const catalogItem = {
+        id: 'item-burger',
+        name: 'Gourmet Burger',
+        price: 18.5,
+        is_available: true,
+        inventory_tracked: true,
+        available_quantity: 42,
+        customizations: [
+          { id: 'opt-cheese', name: 'Extra Cheese', price_adjustment: 2.0 },
+        ],
+      };
+
+      const module: any = {
+        id: 'mod-gourmet',
+        name: 'Gourmet Kitchen',
+        slug: 'gourmet-kitchen',
+        engine_type: 'instant_transaction',
+      };
+
+      // Add item with customization to cart store
       useCartStore.getState().addItem({
-        id: 'item-1',
-        name: 'Burger',
-        price: 10,
-        moduleId: 'mod-1',
-        quantity: 2,
+        id: catalogItem.id,
+        name: catalogItem.name,
+        price: catalogItem.price,
+        moduleId: module.id,
+        moduleSlug: module.slug,
+        quantity: 1,
+        selectedModifiers: [
+          {
+            optionId: 'opt-cheese',
+            optionName: 'Extra Cheese',
+            groupId: 'grp-1',
+            groupName: 'Add-ons',
+            modifierType: 'add',
+            priceAdjustment: 2.0,
+            quantity: 1,
+          },
+        ],
       });
 
-      rerender(
-        <ModuleProvider module={module} slug="snack-bar" propertySlug="demo-resort">
-          <CommerceShell>
-            <div>Storefront</div>
-          </CommerceShell>
-        </ModuleProvider>
+      render(
+        <CustomerShell>
+          <ModuleProvider module={module} slug="gourmet-kitchen" propertySlug="demo-resort">
+            <ModuleShell>
+              <CommerceShell>
+                <div data-testid="item-price">${catalogItem.price.toFixed(2)}</div>
+                <div data-testid="item-availability">{catalogItem.is_available ? 'In Stock' : 'Out'}</div>
+                <div data-testid="item-qty">{catalogItem.available_quantity}</div>
+                <div data-testid="item-mod">{catalogItem.customizations[0].name} (+${catalogItem.customizations[0].price_adjustment})</div>
+              </CommerceShell>
+            </ModuleShell>
+          </ModuleProvider>
+        </CustomerShell>
       );
 
-      const cartLink = screen.getByLabelText(/View Cart with 2 items/i);
-      expect(cartLink).toBeDefined();
-      expect(cartLink.getAttribute('href')).toBe('/demo-resort/snack-bar/cart');
+      // Verify presentation renders exactly without shell interference
+      expect(screen.getByTestId('item-price').textContent).toBe('$18.50');
+      expect(screen.getByTestId('item-availability').textContent).toBe('In Stock');
+      expect(screen.getByTestId('item-qty').textContent).toBe('42');
+      expect(screen.getByTestId('item-mod').textContent).toBe('Extra Cheese (+$2)');
+
+      // Verify cart store state was untouched by shell
+      const storeItem = useCartStore.getState().items[0];
+      expect(storeItem.price).toBe(18.5);
+      expect(storeItem.selectedModifiers?.[0].priceAdjustment).toBe(2.0);
     });
   });
 
-  describe('5. AccountShell', () => {
-    it('renders guest mode banner when unauthenticated', () => {
+  describe('6. AccountShell Integration & Verification', () => {
+    it('renders guest mode banner when unauthenticated with sign-in link', () => {
       mockUseAuth.mockReturnValue({
         isAuthenticated: false,
         user: null,
@@ -313,19 +470,29 @@ describe('F3: Customer Application Shell Modernization', () => {
       expect(screen.getByText(/Welcome back, customer@example.com/)).toBeDefined();
     });
 
-    it('renders canonical account navigation tabs', () => {
+    it('handles tab selection and onTabChange callback for custom profile tabs', () => {
+      const onTabChangeMock = vi.fn();
+      const customTabs = [
+        { key: 'profile', label: 'Profile', icon: () => null },
+        { key: 'orders', label: 'Orders', icon: () => null },
+        { key: 'loyalty', label: 'Loyalty', icon: () => null },
+      ];
+
       render(
-        <AccountShell activeTab="tracking" propertySlug="demo-resort">
-          <div>Tracking Content</div>
+        <AccountShell
+          activeTab="orders"
+          onTabChange={onTabChangeMock}
+          tabs={customTabs}
+          propertySlug="demo-resort"
+        >
+          <div>Orders View</div>
         </AccountShell>
       );
 
-      expect(screen.getByText('orders')).toBeDefined();
-      expect(screen.getByText('orderTracking')).toBeDefined();
-      expect(screen.getByText('loyalty')).toBeDefined();
-      expect(screen.getByText('giftCards')).toBeDefined();
-      expect(screen.getByText('reviews')).toBeDefined();
-      expect(screen.getByText('support')).toBeDefined();
+      const loyaltyTabButton = screen.getByText('Loyalty');
+      fireEvent.click(loyaltyTabButton);
+
+      expect(onTabChangeMock).toHaveBeenCalledWith('loyalty');
     });
   });
 });

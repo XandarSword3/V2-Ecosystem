@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import type { Module } from '@/lib/settings-context';
 import type { EngineACapabilities, FulfillmentOption } from '@/lib/engine-a/types';
+import { CANONICAL_ENGINE_A_CAPABILITIES } from '@/lib/engine-a/types';
 
 export interface ModuleWithLayout extends Module {
   settings?: Module['settings'] & {
@@ -37,6 +38,7 @@ const ModuleContext = createContext<ModuleContextValue | null>(null);
 
 /**
  * Derives canonical Engine A capabilities from module metadata without hardcoding vertical rules.
+ * Consumes the single canonical Engine A capability contract from lib/engine-a/types.
  */
 export function resolveEngineACapabilities(module: ModuleWithLayout | null): EngineACapabilities | null {
   if (!module) return null;
@@ -56,18 +58,8 @@ export function resolveEngineACapabilities(module: ModuleWithLayout | null): Eng
     };
   }
 
-  // Canonical default options for Engine A (instant_transaction)
-  return {
-    fulfillment: {
-      required: true,
-      options: [
-        { mode: 'on_premise', destinations: ['on_premise_location', 'room'] },
-        { mode: 'pickup', destinations: ['pickup_location'] },
-        { mode: 'local_delivery', destinations: ['address'] },
-        { mode: 'digital_delivery', destinations: ['digital_account'] },
-      ],
-    },
-  };
+  // Directly return the canonical Engine A capability contract (no duplicate mode/destination table)
+  return CANONICAL_ENGINE_A_CAPABILITIES;
 }
 
 export interface ModuleProviderProps {

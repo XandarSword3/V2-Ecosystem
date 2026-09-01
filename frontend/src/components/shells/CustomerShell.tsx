@@ -1,7 +1,4 @@
-'use client';
-
 import React from 'react';
-import { useAuth } from '@/lib/auth-context';
 import { ThemeInjector } from '@/components/ThemeInjector';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -20,6 +17,7 @@ export interface CustomerShellProps {
  * - Theme/brand injection wrapper (`ThemeInjector`)
  * - Accessibility skip link (`#main-content`)
  * - Presentation error boundary for customer surfaces
+ * - Optional header and footer layout slots
  * - Responsive layout container
  *
  * Explicit Non-Responsibilities (F3 Law):
@@ -34,8 +32,6 @@ export function CustomerShell({
   headerSlot,
   footerSlot,
 }: CustomerShellProps) {
-  const { isAuthenticated, user } = useAuth();
-
   return (
     <div className={`customer-shell min-h-screen flex flex-col bg-background text-foreground transition-colors duration-300 ${className}`}>
       {/* Brand theme CSS variables injection */}

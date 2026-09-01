@@ -39,11 +39,18 @@ export function CommerceShell({
   showDefaultCartAffordance = true,
 }: CommerceShellProps) {
   const t = useTranslations('common');
-  const { propertySlug, slug } = useModuleContext();
+  const { propertySlug, slug, module } = useModuleContext();
   const cartItems = useCartStore((s) => s.items);
 
-  // Derive total item count for the module (or all cart items)
-  const totalItemCount = cartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  // Derive item count strictly scoped to the active module context
+  const moduleItems = cartItems.filter((item) => {
+    if (module?.id && item.moduleId === module.id) return true;
+    if (item.moduleSlug && item.moduleSlug.toLowerCase() === slug.toLowerCase()) return true;
+    if (item.moduleId && item.moduleId.toLowerCase() === slug.toLowerCase()) return true;
+    return false;
+  });
+
+  const totalItemCount = moduleItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
 
   return (
     <div className={`commerce-shell relative w-full flex flex-col ${className}`}>

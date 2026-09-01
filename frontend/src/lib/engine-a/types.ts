@@ -534,6 +534,24 @@ export interface EngineACapabilities {
   fulfillment: FulfillmentCapability;
 }
 
+/**
+ * Canonical default Engine A capabilities matching backend EngineDefinition (backend/src/engines/definitions/instant-transaction.ts).
+ * Mode/destination combinations are legal contract values covering all 6 canonical fulfillment modes.
+ */
+export const CANONICAL_ENGINE_A_CAPABILITIES: EngineACapabilities = {
+  fulfillment: {
+    required: true,
+    options: [
+      { mode: 'on_premise', destinations: ['on_premise_location', 'room'] },
+      { mode: 'pickup', destinations: ['pickup_location'] },
+      { mode: 'local_delivery', destinations: ['address'] },
+      { mode: 'digital_delivery', destinations: ['digital_account'] },
+      { mode: 'shipment', destinations: ['address'] },
+      { mode: 'service_execution', destinations: ['service_location'] },
+    ],
+  },
+};
+
 // ============================================
 // Money — never floats at the boundary
 // ============================================
