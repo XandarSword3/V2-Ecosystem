@@ -116,12 +116,11 @@ export default function ModuleCartPage() {
   const selectedDestinationRef = rawSelection?.destinationRef ?? null;
 
   const handleSelectMode = (mode: FulfillmentMode) => {
-    let destType: DestinationType = 'none';
-    if (mode === 'on_premise') destType = 'on_premise_location';
-    else if (mode === 'pickup') destType = 'pickup_location';
-    else if (mode === 'local_delivery' || mode === 'shipment') destType = 'address';
-    else if (mode === 'digital_delivery') destType = 'digital_account';
-    else if (mode === 'service_execution') destType = 'service_location';
+    // Resolve destination type canonically from module capability options
+    const matchedOption = fulfillmentOptions.find((opt) => opt.mode === mode);
+    const destType: DestinationType = (matchedOption?.destinations?.[0] as DestinationType) || (
+      mode === 'none' ? 'none' : 'on_premise_location'
+    );
 
     if (moduleKey) {
       setFulfillmentForModule(moduleKey, {
@@ -174,7 +173,7 @@ export default function ModuleCartPage() {
   const localEstimatedSubtotal = calculateSubtotal(moduleItems);
 
   // Authoritative money derivations strictly from server
-  const subtotal = serverPricing?.subtotal ?? localEstimatedSubtotal;
+  const subtotal = serverPricing?.subtotal;
   const tax = serverPricing?.taxAmount ?? 0;
   const taxBreakdown = serverPricing?.taxBreakdown ?? [];
   const feeBreakdown = serverPricing?.feeBreakdown ?? [];
@@ -183,7 +182,7 @@ export default function ModuleCartPage() {
   const deliveryFee = serverPricing?.deliveryFee ?? 0;
   const totalDiscount = serverPricing?.totalDiscount ?? 0;
   const appliedDiscounts = serverPricing?.discounts ?? [];
-  const total = serverPricing?.totalAmount ?? Math.max(0, localEstimatedSubtotal);
+  const total = serverPricing?.totalAmount;
   const resolvedCurrency = serverPricing?.currency || currency || 'USD';
 
   // Fetch service locations for this module & auto-fill from URL query param
@@ -222,7 +221,7 @@ export default function ModuleCartPage() {
       const orderId = order?.id || order?.order_id || '';
 
       // For card payments, show Stripe checkout instead of redirecting
-      if (paymentMethod === 'card' && total > 0) {
+      if (paymentMethod === 'card' && (total ?? 0) > 0) {
         setPendingOrderId(orderId);
         setShowStripePayment(true);
         toast.info('Complete your card payment');
@@ -705,7 +704,7 @@ export default function ModuleCartPage() {
                         <h3 className="font-semibold text-slate-900 dark:text-white">Apply Discounts</h3>
                       </div>
                       <PaymentDiscounts
-                        orderTotal={subtotal}
+                        orderTotal={subtotal ?? localEstimatedSubtotal}
                         orderType={selectedMode}
                         moduleId={moduleId}
                         moduleSlug={currentModule?.slug}
@@ -815,88 +814,105 @@ export default function ModuleCartPage() {
                   </div>
 
                   <div className="border-t border-dashed border-slate-200 dark:border-slate-700" />
-
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500">Subtotal</span>
                       <span className="text-slate-700 dark:text-slate-300 font-medium">
-                        {formatCurrency(subtotal, resolvedCurrency)}
+                        {loadingPricing || isPricingStale ? (
+                          <span className="text-slate-400 italic animate-pulse">Calculating...</span>
+                        ) : isPricingError || subtotal === undefined ? (
+                          <span className="text-slate-400 italic">—</span>
+                        ) : (
+                          formatCurrency(subtotal, resolvedCurrency)
+                        )}
                       </span>
                     </div>
 
                     {/* Show individual tax lines from backend breakdown */}
-                    {taxBreakdown.length > 0 ? (
-                      taxBreakdown.map((taxItem: any, index: number) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span className="text-slate-500">{taxItem.name} ({taxItem.rate}%)</span>
-                          <span className="text-slate-700 dark:text-slate-300">{formatCurrency(taxItem.amount, resolvedCurrency)}</span>
-                        </div>
-                      ))
-                    ) : tax > 0 ? (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Tax</span>
-                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, resolvedCurrency)}</span>
-                      </div>
-                    ) : null}
-
-                    {/* Fees and service charges from backend */}
-                    {serviceCharge > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Service Charge</span>
-                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(serviceCharge, resolvedCurrency)}</span>
-                      </div>
-                    )}
-                    {deliveryFee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Delivery Fee</span>
-                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(deliveryFee, resolvedCurrency)}</span>
-                      </div>
-                    )}
-                    {feeBreakdown.map((fee: any, index: number) => (
-                      <div key={fee.id ?? index} className="flex justify-between text-sm">
-                        <span className="text-slate-500">
-                          {fee.name}{fee.rate !== undefined ? ` (${fee.rate}%)` : ''}
-                        </span>
-                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(fee.amount, resolvedCurrency)}</span>
-                      </div>
-                    ))}
-                    
-                    {/* Show applied discounts */}
-                    {appliedDiscounts.length > 0 && (
+                    {serverPricing && !loadingPricing && !isPricingStale ? (
                       <>
-                        <div className="border-t border-dashed border-slate-200 dark:border-slate-700 pt-2" />
-                        {appliedDiscounts.map((discount, index) => (
-                          <div key={index} className="flex justify-between text-sm">
-                            <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                              {discount.type === 'coupon' && <Tag className="w-3 h-3" />}
-                              {discount.type === 'gift_card' && <CreditCard className="w-3 h-3" />}
-                              {discount.type === 'loyalty' && <Sparkles className="w-3 h-3" />}
-                              {discount.name || (discount.type === 'coupon' ? `Coupon: ${discount.code}` : discount.type === 'gift_card' ? `Gift Card: ${discount.code}` : 'Loyalty Reward')}
+                        {taxBreakdown.length > 0 ? (
+                          taxBreakdown.map((taxItem: any, index: number) => (
+                            <div key={index} className="flex justify-between text-sm">
+                              <span className="text-slate-500">{taxItem.name} ({taxItem.rate}%)</span>
+                              <span className="text-slate-700 dark:text-slate-300">{formatCurrency(taxItem.amount, resolvedCurrency)}</span>
+                            </div>
+                          ))
+                        ) : tax > 0 ? (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">Tax</span>
+                            <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, resolvedCurrency)}</span>
+                          </div>
+                        ) : null}
+
+                        {/* Fees and service charges from backend */}
+                        {serviceCharge > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">Service Charge</span>
+                            <span className="text-slate-700 dark:text-slate-300">{formatCurrency(serviceCharge, resolvedCurrency)}</span>
+                          </div>
+                        )}
+                        {deliveryFee > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">Delivery Fee</span>
+                            <span className="text-slate-700 dark:text-slate-300">{formatCurrency(deliveryFee, resolvedCurrency)}</span>
+                          </div>
+                        )}
+                        {feeBreakdown.map((fee: any, index: number) => (
+                          <div key={fee.id ?? index} className="flex justify-between text-sm">
+                            <span className="text-slate-500">
+                              {fee.name}{fee.rate !== undefined ? ` (${fee.rate}%)` : ''}
                             </span>
-                            <span className="text-green-600 dark:text-green-400 font-medium">
-                              -{formatCurrency(discount.amount, resolvedCurrency)}
-                            </span>
+                            <span className="text-slate-700 dark:text-slate-300">{formatCurrency(fee.amount, resolvedCurrency)}</span>
                           </div>
                         ))}
-                        <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-semibold">
-                          <span>Total Savings</span>
-                          <span>-{formatCurrency(totalDiscount, resolvedCurrency)}</span>
-                        </div>
+                        
+                        {/* Show applied discounts */}
+                        {appliedDiscounts.length > 0 && (
+                          <>
+                            <div className="border-t border-dashed border-slate-200 dark:border-slate-700 pt-2" />
+                            {appliedDiscounts.map((discount, index) => (
+                              <div key={index} className="flex justify-between text-sm">
+                                <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                                  {discount.type === 'coupon' && <Tag className="w-3 h-3" />}
+                                  {discount.type === 'gift_card' && <CreditCard className="w-3 h-3" />}
+                                  {discount.type === 'loyalty' && <Sparkles className="w-3 h-3" />}
+                                  {discount.name || (discount.type === 'coupon' ? `Coupon: ${discount.code}` : discount.type === 'gift_card' ? `Gift Card: ${discount.code}` : 'Loyalty Reward')}
+                                </span>
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  -{formatCurrency(discount.amount, resolvedCurrency)}
+                                </span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-semibold">
+                              <span>Total Savings</span>
+                              <span>-{formatCurrency(totalDiscount, resolvedCurrency)}</span>
+                            </div>
+                          </>
+                        )}
                       </>
-                    )}
+                    ) : null}
                     
                     <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-slate-900 dark:text-white">Total</span>
                         <div className="text-right">
-                          {totalDiscount > 0 && (
-                            <span className="text-sm text-slate-400 line-through mr-2">
-                              {formatCurrency(subtotal + tax + totalFees + serviceCharge + deliveryFee, resolvedCurrency)}
-                            </span>
+                          {loadingPricing || isPricingStale ? (
+                            <span className="text-sm font-medium text-slate-400 animate-pulse">Calculating pricing...</span>
+                          ) : isPricingError || total === undefined ? (
+                            <span className="text-sm font-medium text-red-500">Pricing unavailable</span>
+                          ) : (
+                            <>
+                              {totalDiscount > 0 && subtotal !== undefined && (
+                                <span className="text-sm text-slate-400 line-through mr-2">
+                                  {formatCurrency(subtotal + tax + totalFees + serviceCharge + deliveryFee, resolvedCurrency)}
+                                </span>
+                              )}
+                              <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
+                                {formatCurrency(total, resolvedCurrency)}
+                              </span>
+                            </>
                           )}
-                          <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
-                            {formatCurrency(total, resolvedCurrency)}
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -949,7 +965,9 @@ export default function ModuleCartPage() {
                         <Loader2 className="w-5 h-5 animate-spin" />
                         Processing...
                       </>
-                    ) : authLoading || loadingPricing ? (
+                    ) : authLoading ? (
+                      'Authenticating...'
+                    ) : loadingPricing ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
                         Calculating Price...
@@ -960,15 +978,11 @@ export default function ModuleCartPage() {
                         Updating Price...
                       </>
                     ) : isPricingError ? (
-                      <>
-                        <AlertCircle className="w-5 h-5" />
-                        Pricing Error
-                      </>
+                      'Pricing Error'
+                    ) : !serverPricing || total === undefined ? (
+                      'Pricing Unavailable'
                     ) : (
-                      <>
-                        <Sparkles className="w-5 h-5" />
-                        Place Order • {formatCurrency(total, resolvedCurrency)}
-                      </>
+                      `Place Order • ${formatCurrency(total, resolvedCurrency)}`
                     )}
                   </motion.button>
 
@@ -1014,8 +1028,8 @@ export default function ModuleCartPage() {
               </div>
 
               <StripePayment
-                amount={total}
-                currency="USD"
+                amount={total ?? 0}
+                currency={resolvedCurrency}
                 referenceType="instant_transaction"
                 referenceId={pendingOrderId}
                 onSuccess={handleStripePaymentSuccess}

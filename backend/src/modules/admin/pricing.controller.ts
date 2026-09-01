@@ -334,6 +334,7 @@ router.post(
       items,
       moduleId,
       orderType,
+      fulfillmentMode,
       conditions,
       couponCode,
       giftCardCodes,
@@ -354,13 +355,13 @@ router.post(
     console.log(`[PricingController] RequestID: ${requestId} - Validation done: ${Date.now() - controllerStart}ms`);
 
     // Fetch module's tax category for server-side resolution (cached), plus its
-    // template_type so this preview runs through the exact same engine pipeline
-    // (same discount resolvers, same engine.pricing config) that confirmation uses.
+    // template_type and canonical property_id so this preview runs through the exact
+    // same engine pipeline with tamper-proof property context.
     const moduleFetchStart = Date.now();
     const moduleTaxCategory = await getModuleTaxCategory(moduleId);
     const { data: moduleRow } = await supabase
       .from('modules')
-      .select('template_type')
+      .select('template_type, property_id')
       .eq('id', moduleId)
       .maybeSingle();
     const templateType = moduleRow?.template_type;
@@ -410,19 +411,28 @@ router.post(
     
     console.log(`[PricingController] RequestID: ${requestId} - Item processing: ${Date.now() - itemProcessingStart}ms`);
 
-    // Build pricing context
-    const resolvedPropertyId = (req as any).property?.id || propertyId || ((req as any).propertyId as string | undefined) || (req.headers?.['x-property-id'] as string | undefined);
+    // Build pricing context with strict canonical property and fulfillment resolution
+    const canonicalPropertyId = moduleRow.property_id || (req as any).property?.id;
+    const resolvedPropertyId = canonicalPropertyId || propertyId || ((req as any).propertyId as string | undefined) || (req.headers?.['x-property-id'] as string | undefined);
+
+    const resolvedFulfillmentMode = conditions?.fulfillmentMode || fulfillmentMode || conditions?.orderType || orderType;
+    const resolvedPaymentMethod = conditions?.paymentMethod || req.body.paymentMethod;
+
+    const pricingConditions: Record<string, any> = {
+      ...conditions,
+      fulfillmentMode: resolvedFulfillmentMode,
+      paymentMethod: resolvedPaymentMethod,
+      orderType: resolvedFulfillmentMode,
+    };
+
     const pricingContext: PricingContext = {
       moduleId,
       currency: await resolveModuleCurrency(moduleId, resolvedPropertyId),
-      conditions: conditions || { orderType: orderType, paymentMethod: req.body.paymentMethod },
+      conditions: pricingConditions,
       customerId,
       couponCode,
       giftCardCodes,
       loyaltyPointsToRedeem,
-      // FIX 3: Use consistent propertyId resolution order with order endpoint
-      // Order endpoint uses: mounted.property_id || req.propertyId || req.headers['x-property-id']
-      // Preview uses: req.property?.id (same middleware source as mounted.property_id) || body.propertyId || fallbacks
       propertyId: resolvedPropertyId,
       staffId: (req.user as any)?.userId
     };

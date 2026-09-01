@@ -18,7 +18,7 @@ vi.mock('@/lib/api', () => {
   };
 });
 
-describe('usePricingPreview Hook — Canonical Server Pricing Authority & Stale Invalidation', () => {
+describe('usePricingPreview Hook — Canonical Server Pricing Authority, Request Ordering & Fail-Closed Errors', () => {
   beforeEach(() => {
     mockPost.mockReset();
   });
@@ -63,7 +63,7 @@ describe('usePricingPreview Hook — Canonical Server Pricing Authority & Stale 
     currency: 'USD',
   };
 
-  it('debounces and calls POST /pricing/preview with formatted items and parameters', async () => {
+  it('debounces and calls POST /pricing/preview WITHOUT client-derived unitPrice', async () => {
     mockPost.mockResolvedValueOnce({
       data: {
         success: true,
@@ -94,6 +94,7 @@ describe('usePricingPreview Hook — Canonical Server Pricing Authority & Stale 
       expect(result.current.pricing).toEqual(mockServerPricing);
     });
 
+    // Check payload does NOT include client-calculated unitPrice
     expect(mockPost).toHaveBeenCalledWith(
       '/pricing/preview',
       {
@@ -101,7 +102,6 @@ describe('usePricingPreview Hook — Canonical Server Pricing Authority & Stale 
           {
             itemId: 'item-burger',
             name: 'Gourmet Burger',
-            unitPrice: 17, // 15 + 2
             quantity: 2,
             taxCategory: 'food',
             moduleId: 'mod-123',
@@ -125,51 +125,79 @@ describe('usePricingPreview Hook — Canonical Server Pricing Authority & Stale 
     );
   });
 
-  it('marks state as isStale immediately when line items or coupon changes', async () => {
-    mockPost.mockResolvedValue({
-      data: {
-        success: true,
-        data: mockServerPricing,
-      },
+  it('hardens against out-of-order responses: Request A arriving after Request B cannot overwrite state', async () => {
+    let resolveRequestA: (val: any) => void;
+    let resolveRequestB: (val: any) => void;
+
+    const promiseA = new Promise((resolve) => {
+      resolveRequestA = resolve;
     });
+    const promiseB = new Promise((resolve) => {
+      resolveRequestB = resolve;
+    });
+
+    mockPost.mockImplementationOnce(() => promiseA).mockImplementationOnce(() => promiseB);
 
     let hookProps = {
       items: sampleItems,
       moduleId: 'mod-123',
-      couponCode: 'PROMO1',
-      debounceMs: 20,
+      couponCode: 'PROMO_A',
+      debounceMs: 10,
     };
 
     const { result, rerender } = renderHook((props) => usePricingPreview(props), {
       initialProps: hookProps,
     });
 
+    // Wait for Request A to be dispatched
     await waitFor(() => {
-      expect(result.current.isStale).toBe(false);
-      expect(result.current.pricing).toBeDefined();
+      expect(mockPost).toHaveBeenCalledTimes(1);
     });
 
-    // Mutate coupon code
+    // Trigger Request B by modifying coupon
     hookProps = {
       ...hookProps,
-      couponCode: 'PROMO2',
+      couponCode: 'PROMO_B',
     };
-
     rerender(hookProps);
 
-    // Must transition to isStale: true immediately
-    expect(result.current.isStale).toBe(true);
+    // Wait for Request B to be dispatched
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledTimes(2);
+    });
+
+    const pricingA = { ...mockServerPricing, totalAmount: 100 };
+    const pricingB = { ...mockServerPricing, totalAmount: 50 };
+
+    // Request B resolves FIRST
+    act(() => {
+      resolveRequestB({
+        data: { success: true, data: pricingB },
+      });
+    });
 
     await waitFor(() => {
-      expect(result.current.isStale).toBe(false);
+      expect(result.current.pricing?.totalAmount).toBe(50);
+    });
+
+    // Request A resolves LATER
+    act(() => {
+      resolveRequestA({
+        data: { success: true, data: pricingA },
+      });
+    });
+
+    // State MUST NOT be overwritten by older Request A
+    await waitFor(() => {
+      expect(result.current.pricing?.totalAmount).toBe(50);
     });
   });
 
-  it('handles server pricing error and exposes isError and error message', async () => {
+  it('fails closed on pricing error and recovers on retry', async () => {
     mockPost.mockRejectedValueOnce({
       response: {
         data: {
-          error: 'Coupon code PROMO_EXPIRED has expired',
+          error: 'Item out of stock',
         },
       },
     });
@@ -179,15 +207,33 @@ describe('usePricingPreview Hook — Canonical Server Pricing Authority & Stale 
         items: sampleItems,
         moduleId: 'mod-123',
         couponCode: 'PROMO_EXPIRED',
-        debounceMs: 20,
+        debounceMs: 10,
       })
     );
 
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
-      expect(result.current.error).toBe('Coupon code PROMO_EXPIRED has expired');
+      expect(result.current.error).toBe('Item out of stock');
       expect(result.current.isStale).toBe(false);
       expect(result.current.pricing).toBeNull();
+    });
+
+    // Retry successfully
+    mockPost.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: mockServerPricing,
+      },
+    });
+
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(false);
+      expect(result.current.error).toBeNull();
+      expect(result.current.pricing).toEqual(mockServerPricing);
     });
   });
 });

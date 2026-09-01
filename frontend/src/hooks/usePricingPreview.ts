@@ -86,7 +86,7 @@ export function usePricingPreview({
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isFirstRender = useRef(true);
+  const requestIdRef = useRef<number>(0);
 
   // Stable stringified representation of pricing parameters
   const dependencyKey = JSON.stringify({
@@ -101,8 +101,6 @@ export function usePricingPreview({
     items: items.map((i) => ({
       id: i.id,
       quantity: i.quantity,
-      price: i.price,
-      modifierTotal: i.modifierTotal || 0,
       selectedModifiers: (i.selectedModifiers || []).map((m) => ({
         optionId: m.optionId,
         quantity: m.quantity,
@@ -156,16 +154,20 @@ export function usePricingPreview({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    const currentRequestId = ++requestIdRef.current;
+
     setIsLoading(true);
     setIsError(false);
     setError(null);
 
     try {
+      // NOTE: We deliberately DO NOT send client-derived unitPrice.
+      // Backend resolveAndPriceCatalogItems() resolves authoritative base prices
+      // and modifier adjustments from the canonical catalog database.
       const payload = {
         items: params.items.map((item) => ({
           itemId: item.id,
           name: item.name,
-          unitPrice: item.price + (item.modifierTotal || 0),
           quantity: item.quantity,
           taxCategory: item.category,
           moduleId: item.moduleId || params.moduleId,
@@ -189,6 +191,11 @@ export function usePricingPreview({
         signal: abortController.signal,
       });
 
+      // Request ordering guard: discard response if a newer request has been triggered
+      if (currentRequestId !== requestIdRef.current) {
+        return;
+      }
+
       if (response.data?.success && response.data?.data) {
         setPricing(response.data.data);
         setIsStale(false);
@@ -201,13 +208,18 @@ export function usePricingPreview({
       if (err.name === 'CanceledError' || err.name === 'AbortError') {
         return;
       }
+      if (currentRequestId !== requestIdRef.current) {
+        return;
+      }
       const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Pricing preview error';
       setIsError(true);
       setError(errorMessage);
       setIsStale(false);
       setPricing(null);
     } finally {
-      setIsLoading(false);
+      if (currentRequestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 

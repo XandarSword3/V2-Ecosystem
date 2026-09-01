@@ -222,12 +222,13 @@ export default function CartPage() {
           {/* Checkout Section */}
           <div className="mt-8 flex justify-end">
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-full max-w-md">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-slate-600 dark:text-slate-400">{t('total')}</span>
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-slate-600 dark:text-slate-400">Estimated Items Subtotal</span>
                 <span className="text-2xl font-bold text-slate-900 dark:text-white">
                   {formatCurrency(total, currency)}
                 </span>
               </div>
+              <p className="text-xs text-slate-400 mb-4">Taxes, delivery fees, and discounts are calculated authoritatively during module checkout.</p>
               <Button 
                 className="w-full h-12 text-lg gap-2"
                 onClick={() => handleCheckout()}

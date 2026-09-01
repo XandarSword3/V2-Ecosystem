@@ -29,6 +29,16 @@ vi.mock('@/lib/settings-context', () => ({
         name: 'Fine Dining Restaurant',
         engine_type: 'instant_transaction',
         template_type: 'instant_transaction',
+        capabilities: {
+          fulfillment: {
+            required: true,
+            options: [
+              { mode: 'on_premise', destinations: ['on_premise_location'] },
+              { mode: 'pickup', destinations: ['pickup_location'] },
+              { mode: 'local_delivery', destinations: ['address'] },
+            ],
+          },
+        },
       },
     ],
     loading: false,
@@ -166,7 +176,7 @@ describe('ModuleCartPage — Authoritative Server Pricing & Guarded Checkout', (
     expect(screen.getByText(/Place Order • \$40\.00/)).toBeDefined();
   });
 
-  it('disables place order button when pricing preview encounters an error', async () => {
+  it('disables place order button and shows pricing unavailable when pricing preview encounters an error', async () => {
     mockPost.mockImplementation(async (url: string) => {
       if (url === '/pricing/preview') {
         const err: any = new Error('Out of stock for Ribeye Steak');
@@ -181,6 +191,7 @@ describe('ModuleCartPage — Authoritative Server Pricing & Guarded Checkout', (
     await waitFor(() => {
       expect(screen.getByText('Pricing update failed')).toBeDefined();
       expect(screen.getByText('Out of stock for Ribeye Steak')).toBeDefined();
+      expect(screen.getByText('Pricing unavailable')).toBeDefined();
       const placeOrderBtn = screen.getByRole('button', { name: /Pricing Error/i });
       expect(placeOrderBtn).toBeDefined();
       expect((placeOrderBtn as HTMLButtonElement).disabled).toBe(true);
