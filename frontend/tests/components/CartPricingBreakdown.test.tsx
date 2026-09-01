@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ModuleCartPage from '@/app/[property]/[slug]/cart/page';
@@ -85,10 +85,6 @@ vi.mock('@/components/customer/DestinationRequirementsEditor', () => ({
   DestinationRequirementsEditor: () => <div data-testid="destination-requirements-editor" />,
 }));
 
-vi.mock('@/components/customer/PaymentDiscounts', () => ({
-  PaymentDiscounts: () => <div data-testid="payment-discounts" />,
-}));
-
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -104,7 +100,7 @@ function renderWithProviders(ui: React.ReactElement) {
   );
 }
 
-describe('ModuleCartPage — Authoritative Server Pricing & Guarded Checkout', () => {
+describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount Interaction Flows', () => {
   beforeEach(() => {
     mockGet.mockReset();
     mockPost.mockReset();
@@ -113,11 +109,11 @@ describe('ModuleCartPage — Authoritative Server Pricing & Guarded Checkout', (
     useCartStore.getState().clearCart();
     useCartStore.getState().clearOrderDetails();
 
-    // Populate module items
+    // Populate module items with arbitrary client price
     useCartStore.getState().addItem({
-      id: 'item-steak',
-      name: 'Ribeye Steak',
-      price: 40,
+      id: 'item-burger-1',
+      name: 'Signature Burger',
+      price: 999.0, // Client claims item is $999
       quantity: 1,
       category: 'food',
       moduleId: 'mod-restaurant-1',
@@ -133,26 +129,34 @@ describe('ModuleCartPage — Authoritative Server Pricing & Guarded Checkout', (
     });
   });
 
-  const mockServerPricing = {
-    subtotal: 40.0,
-    taxAmount: 4.0,
-    taxBreakdown: [{ name: 'City Tax', rate: 10, amount: 4.0 }],
-    feeBreakdown: [],
-    serviceCharge: 6.0,
-    deliveryFee: 0.0,
-    totalDiscount: 10.0,
-    discounts: [{ type: 'coupon', name: 'VIP Promo', amount: 10.0, code: 'VIP10' }],
-    totalAmount: 40.0, // 40 + 4 + 6 - 10 = 40.0
-    currency: 'USD',
-  };
-
-  it('renders authoritative subtotal, tax, service charge, discount, and total from server PricingResult', async () => {
+  it('proves server pricing authority: server says item is $16, client says $999 -> UI strictly renders $16', async () => {
     mockPost.mockImplementation(async (url: string) => {
       if (url === '/pricing/preview') {
         return {
           data: {
             success: true,
-            data: mockServerPricing,
+            data: {
+              subtotal: 16.0,
+              taxAmount: 1.6,
+              taxBreakdown: [{ name: 'Tax', rate: 10, amount: 1.6 }],
+              feeBreakdown: [],
+              serviceCharge: 0,
+              deliveryFee: 0,
+              totalDiscount: 0,
+              discounts: [],
+              totalAmount: 17.6,
+              currency: 'USD',
+              preDiscountTotal: 17.6,
+              lineItems: [
+                {
+                  itemId: 'item-burger-1',
+                  name: 'Signature Burger',
+                  unitPrice: 16.0,
+                  quantity: 1,
+                  lineTotal: 16.0,
+                },
+              ],
+            },
           },
         };
       }
@@ -162,25 +166,170 @@ describe('ModuleCartPage — Authoritative Server Pricing & Guarded Checkout', (
     renderWithProviders(<ModuleCartPage />);
 
     await waitFor(() => {
-      expect(mockPost).toHaveBeenCalled();
-    }, { timeout: 3000 });
+      expect(mockPost).toHaveBeenCalledWith(
+        '/pricing/preview',
+        expect.anything(),
+        expect.anything()
+      );
+    });
 
-    // Wait a tick for React re-render
-    await new Promise(r => setTimeout(r, 100));
+    // Authoritative $16.00 unit price and line total must be displayed
+    await waitFor(() => {
+      expect(screen.getByText('$16.00 each')).toBeDefined();
+      expect(screen.getByText('Place Order • $17.60')).toBeDefined();
+    });
 
-    // Order summary contains server lines
-    expect(screen.getByText(/City Tax/i)).toBeDefined();
-    expect(screen.getByText(/Service Charge/i)).toBeDefined();
-    expect(screen.getByText(/VIP Promo/i)).toBeDefined();
-    expect(screen.getAllByText('-$10.00').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/Place Order • \$40\.00/)).toBeDefined();
+    // The client's $999 price MUST NOT appear anywhere in the document
+    expect(screen.queryByText(/999/)).toBeNull();
+  });
+
+  it('proves discount authority: server determines coupon amount ($12), client does not calculate locally', async () => {
+    mockPost.mockImplementation(async (url: string, payload: any) => {
+      if (url === '/pricing/preview') {
+        const hasCoupon = payload.couponCode === 'SAVE20';
+        return {
+          data: {
+            success: true,
+            data: {
+              subtotal: 50.0,
+              taxAmount: 5.0,
+              taxBreakdown: [{ name: 'VAT', rate: 10, amount: 5.0 }],
+              feeBreakdown: [],
+              serviceCharge: 0,
+              deliveryFee: 0,
+              totalDiscount: hasCoupon ? 12.0 : 0,
+              discounts: hasCoupon
+                ? [{ type: 'coupon', name: 'Promo Save', amount: 12.0, code: 'SAVE20' }]
+                : [],
+              totalAmount: hasCoupon ? 43.0 : 55.0,
+              currency: 'USD',
+              preDiscountTotal: 55.0,
+              lineItems: [
+                {
+                  itemId: 'item-burger-1',
+                  name: 'Signature Burger',
+                  unitPrice: 50.0,
+                  quantity: 1,
+                  lineTotal: 50.0,
+                },
+              ],
+            },
+          },
+        };
+      }
+      return { data: { success: true } };
+    });
+
+    renderWithProviders(<ModuleCartPage />);
+
+    // Step 1: Initial preview resolves without coupon ($55.00)
+    await waitFor(() => {
+      expect(screen.getByText('Place Order • $55.00')).toBeDefined();
+    });
+
+    // Step 2: User applies coupon SAVE20 via cartStore
+    act(() => {
+      useCartStore.getState().setCouponForModule('mod-restaurant-1', 'SAVE20');
+    });
+
+    // Step 3: Preview re-runs, and server returns $12 discount and $43.00 total
+    await waitFor(() => {
+      expect(screen.getAllByText('-$12.00').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('Place Order • $43.00')).toBeDefined();
+    });
+
+    // Step 4: User removes coupon
+    act(() => {
+      useCartStore.getState().setCouponForModule('mod-restaurant-1', null);
+    });
+
+    // Step 5: Preview re-runs, and discount disappears
+    await waitFor(() => {
+      expect(screen.getByText('Place Order • $55.00')).toBeDefined();
+      expect(screen.queryByText('-$12.00')).toBeNull();
+    });
+  });
+
+  it('handles gift card and loyalty points interactions through server-authoritative preview', async () => {
+    mockPost.mockImplementation(async (url: string, payload: any) => {
+      if (url === '/pricing/preview') {
+        const giftCardAmount = payload.giftCardCodes?.includes('GC-100') ? 20.0 : 0;
+        const loyaltyAmount = (payload.loyaltyPointsToRedeem || 0) > 0 ? 5.0 : 0;
+        const totalDiscount = giftCardAmount + loyaltyAmount;
+
+        const discounts = [];
+        if (giftCardAmount > 0) {
+          discounts.push({ type: 'gift_card', name: 'Gift Card', amount: giftCardAmount, code: 'GC-100' });
+        }
+        if (loyaltyAmount > 0) {
+          discounts.push({ type: 'loyalty', name: 'Loyalty Reward', amount: loyaltyAmount });
+        }
+
+        return {
+          data: {
+            success: true,
+            data: {
+              subtotal: 50.0,
+              taxAmount: 5.0,
+              taxBreakdown: [],
+              feeBreakdown: [],
+              serviceCharge: 0,
+              deliveryFee: 0,
+              totalDiscount,
+              discounts,
+              totalAmount: 55.0 - totalDiscount,
+              currency: 'USD',
+              preDiscountTotal: 55.0,
+              lineItems: [
+                {
+                  itemId: 'item-burger-1',
+                  name: 'Signature Burger',
+                  unitPrice: 50.0,
+                  quantity: 1,
+                  lineTotal: 50.0,
+                },
+              ],
+            },
+          },
+        };
+      }
+      return { data: { success: true } };
+    });
+
+    renderWithProviders(<ModuleCartPage />);
+
+    // Wait for initial render without discounts ($55.00)
+    await waitFor(() => {
+      expect(screen.getByText('Place Order • $55.00')).toBeDefined();
+    });
+
+    // Apply Gift Card
+    act(() => {
+      useCartStore.getState().addGiftCardForModule('mod-restaurant-1', 'GC-100');
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('-$20.00').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('Place Order • $35.00')).toBeDefined();
+    });
+
+    // Apply Loyalty Points
+    act(() => {
+      useCartStore.getState().setLoyaltyPointsForModule('mod-restaurant-1', 500);
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('-$5.00').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('-$25.00').length).toBeGreaterThanOrEqual(1); // Total savings
+      expect(screen.getByText('Place Order • $30.00')).toBeDefined();
+    });
   });
 
   it('disables place order button and shows pricing unavailable when pricing preview encounters an error', async () => {
     mockPost.mockImplementation(async (url: string) => {
       if (url === '/pricing/preview') {
-        const err: any = new Error('Out of stock for Ribeye Steak');
-        err.response = { data: { error: 'Out of stock for Ribeye Steak' } };
+        const err: any = new Error('Out of stock for Signature Burger');
+        err.response = { data: { error: 'Out of stock for Signature Burger' } };
         throw err;
       }
       return { data: { success: true } };
@@ -190,7 +339,7 @@ describe('ModuleCartPage — Authoritative Server Pricing & Guarded Checkout', (
 
     await waitFor(() => {
       expect(screen.getByText('Pricing update failed')).toBeDefined();
-      expect(screen.getByText('Out of stock for Ribeye Steak')).toBeDefined();
+      expect(screen.getByText('Out of stock for Signature Burger')).toBeDefined();
       expect(screen.getByText('Pricing unavailable')).toBeDefined();
       const placeOrderBtn = screen.getByRole('button', { name: /Pricing Error/i });
       expect(placeOrderBtn).toBeDefined();

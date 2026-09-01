@@ -14,7 +14,7 @@ import { useAuth } from '@/lib/auth-context';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { PaymentDiscounts, AppliedDiscount } from '@/components/customer/PaymentDiscounts';
+import { PaymentDiscounts } from '@/components/customer/PaymentDiscounts';
 import StripePayment from '@/components/payments/StripePayment';
 import {
   Loader2,
@@ -103,8 +103,9 @@ export default function DynamicUnitDetailPage() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
-  const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
-  const [finalTotal, setFinalTotal] = useState(0);
+  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [giftCardCodes, setGiftCardCodes] = useState<string[]>([]);
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [showStripePayment, setShowStripePayment] = useState(false);
   const [pendingBookingId, setPendingBookingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -181,14 +182,6 @@ export default function DynamicUnitDetailPage() {
 
   const pricing = calculatePricing();
 
-  // Update final total when pricing or discounts change
-  useEffect(() => {
-    if (pricing) {
-      const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
-      setFinalTotal(Math.max(0, pricing.totalAmount - totalDiscount));
-    }
-  }, [pricing, appliedDiscounts]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unit || !pricing) { toast.error('Please select valid dates'); return; }
@@ -196,32 +189,22 @@ export default function DynamicUnitDetailPage() {
 
     setIsSubmitting(true);
     try {
-      // Build discount data from applied discounts
-      const couponDiscount = appliedDiscounts.find(d => d.type === 'coupon');
-      const giftCardDiscounts = appliedDiscounts.filter(d => d.type === 'giftcard');
-      const loyaltyDiscount = appliedDiscounts.find(d => d.type === 'loyalty');
-
       const response = await api.post(`/${slug}/bookings`, {
         unitId: unit.id,
         customerName, customerEmail, customerPhone,
         checkInDate, checkOutDate, numberOfGuests,
         addOns: selectedAddOns, specialRequests,
         paymentMethod,
-        // Pass discount information to backend
-        couponCode: couponDiscount?.code,
-        giftCardRedemptions: giftCardDiscounts.length > 0 
-          ? giftCardDiscounts.map(gc => ({ code: gc.code!, amount: gc.amount }))
-          : undefined,
-        loyaltyPointsToRedeem: loyaltyDiscount 
-          ? parseInt(loyaltyDiscount.details?.replace(/[^\d]/g, '') || '0')
-          : undefined,
-        loyaltyPointsDollarValue: loyaltyDiscount?.amount,
+        // Pass canonical discount instrument inputs to backend
+        couponCode: couponCode || undefined,
+        giftCardCodes: giftCardCodes.length > 0 ? giftCardCodes : undefined,
+        loyaltyPointsToRedeem: loyaltyPoints > 0 ? loyaltyPoints : undefined,
       });
 
       const bookingId = response.data.data.id;
 
       // For card payments, show Stripe checkout instead of redirecting
-      if (paymentMethod === 'card' && finalTotal > 0) {
+      if (paymentMethod === 'card' && (pricing.totalAmount || 0) > 0) {
         setPendingBookingId(bookingId);
         setShowStripePayment(true);
         toast.info('Complete your card payment');
@@ -464,14 +447,16 @@ export default function DynamicUnitDetailPage() {
                     {pricing && (
                       <div className="border-t pt-4">
                         <PaymentDiscounts
-                          orderTotal={pricing.totalAmount}
-                          orderType="multi_day_booking"
+                          couponCode={couponCode}
+                          giftCardCodes={giftCardCodes}
+                          loyaltyPointsToRedeem={loyaltyPoints}
+                          onCouponChange={setCouponCode}
+                          onAddGiftCard={(code) => setGiftCardCodes((prev) => [...prev, code])}
+                          onRemoveGiftCard={(code) => setGiftCardCodes((prev) => prev.filter((c) => c !== code))}
+                          onLoyaltyPointsChange={setLoyaltyPoints}
+                          currency={currency}
                           moduleId={moduleId}
                           moduleSlug={currentModule?.slug}
-                          onTotalChange={(newTotal, discounts) => {
-                            setAppliedDiscounts(discounts);
-                            setFinalTotal(newTotal);
-                          }}
                         />
                       </div>
                     )}
@@ -579,7 +564,7 @@ export default function DynamicUnitDetailPage() {
             </div>
 
             <StripePayment
-              amount={finalTotal}
+              amount={pricing?.totalAmount || 0}
               currency="USD"
               referenceType="time_exclusive_reservation"
               referenceId={pendingBookingId}

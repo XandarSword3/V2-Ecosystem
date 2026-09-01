@@ -1,267 +1,166 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatNumber } from '@/lib/utils';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Card, CardContent } from '@/components/ui/Card';
-import { CouponInput, AvailableCoupons } from './CouponInput';
-import { PointsPreview } from './LoyaltyDisplay';
+import { Card } from '@/components/ui/Card';
 import {
   ChevronDown,
   ChevronUp,
   Gift,
   Ticket,
   Award,
-  CreditCard,
-  Check,
-  Loader2,
-  X,
+  Plus,
+  Trash2,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 
-export interface AppliedDiscount {
-  type: 'coupon' | 'giftcard' | 'loyalty';
-  code?: string;
+export interface PricingDiscountDisplay {
+  type: 'coupon' | 'gift_card' | 'loyalty';
+  name: string;
   amount: number;
-  details?: string;
-  pointsUsed?: number;
+  code?: string;
+  referenceId?: string;
 }
 
-interface PaymentDiscountsProps {
-  orderTotal: number;
-  orderType?: string;
+export interface PaymentDiscountsProps {
+  couponCode?: string | null;
+  giftCardCodes?: string[];
+  loyaltyPointsToRedeem?: number;
+  onCouponChange?: (code: string | null) => void;
+  onAddGiftCard?: (code: string) => void;
+  onRemoveGiftCard?: (code: string) => void;
+  onLoyaltyPointsChange?: (points: number) => void;
+  pricingDiscounts?: PricingDiscountDisplay[];
+  isPricingStale?: boolean;
+  isLoadingPricing?: boolean;
+  currency?: string;
   moduleId?: string;
-  /** Module slug (e.g. 'delete', 'menu_service') — matches coupons.applies_to. */
   moduleSlug?: string;
-  onTotalChange?: (finalTotal: number, discounts: AppliedDiscount[]) => void;
   className?: string;
 }
 
+/**
+ * PaymentDiscounts — Pure Presentation & Discount Instrument Input Component.
+ *
+ * Implements strict F5 architecture:
+ * 1. Collects discount instrument inputs (coupon code, gift card codes, loyalty points requested).
+ * 2. Emits input mutations to parent / module-scoped cart store.
+ * 3. Renders discount monetary values EXCLUSIVELY from server-authoritative PricingResult.
+ * 4. NEVER calculates discount amounts or final totals on the client.
+ */
 export function PaymentDiscounts({
-  orderTotal,
-  orderType = 'general',
+  couponCode = null,
+  giftCardCodes = [],
+  loyaltyPointsToRedeem = 0,
+  onCouponChange,
+  onAddGiftCard,
+  onRemoveGiftCard,
+  onLoyaltyPointsChange,
+  pricingDiscounts = [],
+  isPricingStale = false,
+  isLoadingPricing = false,
+  currency = 'USD',
   moduleId,
   moduleSlug,
-  onTotalChange,
   className = '',
 }: PaymentDiscountsProps) {
   const { user, isAuthenticated } = useAuth();
   const [expanded, setExpanded] = useState(true);
-  const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
-  
-  // Gift Card State
-  const [giftCardCode, setGiftCardCode] = useState('');
-  const [giftCardLoading, setGiftCardLoading] = useState(false);
-  const [giftCardBalance, setGiftCardBalance] = useState<number | null>(null);
-  const [giftCardApplied, setGiftCardApplied] = useState<{ code: string; amount: number } | null>(null);
-  
-  // Loyalty Points State
-  const [loyaltyAccount, setLoyaltyAccount] = useState<{
-    currentPoints: number;
-    dollarValue: number;
-    pointsRate: number;
-  } | null>(null);
-  const [pointsToRedeem, setPointsToRedeem] = useState('');
-  const [pointsRedeemed, setPointsRedeemed] = useState(0);
-  
-  // Coupon State
-  const [couponDiscount, setCouponDiscount] = useState(0);
 
-  // Load loyalty account info
+  // Local input fields
+  const [inputCoupon, setInputCoupon] = useState('');
+  const [inputGiftCard, setInputGiftCard] = useState('');
+  const [inputPoints, setInputPoints] = useState<string>(
+    loyaltyPointsToRedeem && loyaltyPointsToRedeem > 0 ? loyaltyPointsToRedeem.toString() : ''
+  );
+
+  // User loyalty account balance (for informational balance display only)
+  const [userLoyaltyPoints, setUserLoyaltyPoints] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (loyaltyPointsToRedeem && loyaltyPointsToRedeem > 0) {
+      setInputPoints(loyaltyPointsToRedeem.toString());
+    } else {
+      setInputPoints('');
+    }
+  }, [loyaltyPointsToRedeem]);
+
   useEffect(() => {
     if (isAuthenticated && user) {
-      loadLoyaltyInfo();
+      api.get('/loyalty/me')
+        .then((res) => {
+          if (res.data?.success && res.data?.data) {
+            const pts = res.data.data.available_points || res.data.data.currentPoints || 0;
+            setUserLoyaltyPoints(pts);
+          }
+        })
+        .catch(() => {});
     }
   }, [isAuthenticated, user]);
 
-  // Calculate total discounts and notify parent
-  useEffect(() => {
-    const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
-    const finalTotal = Math.max(0, orderTotal - totalDiscount);
-    onTotalChange?.(finalTotal, appliedDiscounts);
-  }, [appliedDiscounts, orderTotal]);
+  // Server discount matching
+  const serverCouponDiscount = pricingDiscounts.find((d) => d.type === 'coupon');
+  const serverLoyaltyDiscount = pricingDiscounts.find((d) => d.type === 'loyalty');
+  const serverGiftCardDiscounts = pricingDiscounts.filter((d) => d.type === 'gift_card');
 
-  const loadLoyaltyInfo = async () => {
-    try {
-      // Check if token exists before making the call
-      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      if (!token) {
-        return;
-      }
-      
-      const res = await api.get('/loyalty/me');
-      if (res.data.success) {
-        const account = res.data.data;
-        // Map backend field name (available_points) to frontend field name (currentPoints)
-        const currentPoints = account.available_points || account.currentPoints || 0;
-        // Assuming 100 points = $1
-        const pointsRate = 100; // This should come from settings
-        setLoyaltyAccount({
-          currentPoints: currentPoints,
-          dollarValue: currentPoints / pointsRate,
-          pointsRate,
-        });
-      }
-    } catch (error: any) {
-      // Only log if it's not a 401 (user not authenticated is expected in some cases)
-      if (error.response?.status !== 401) {
-        console.error('[PaymentDiscounts] Error loading loyalty info:', error.response?.status, error.response?.data || error.message);
-      }
-      // Clear loyalty account on auth error - user may need to re-login
-      if (error.response?.status === 401) {
-        setLoyaltyAccount(null);
-      }
+  const handleApplyCoupon = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = inputCoupon.trim().toUpperCase();
+    if (!clean) return;
+    onCouponChange?.(clean);
+    setInputCoupon('');
+  };
+
+  const handleRemoveCoupon = () => {
+    onCouponChange?.(null);
+    setInputCoupon('');
+  };
+
+  const handleAddGiftCard = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = inputGiftCard.trim().toUpperCase();
+    if (!clean) return;
+    if (giftCardCodes.includes(clean)) {
+      setInputGiftCard('');
+      return;
     }
+    onAddGiftCard?.(clean);
+    setInputGiftCard('');
   };
 
-  const handleCouponApply = (coupon: any) => {
-    if (coupon) {
-      // Remove any existing coupon discount
-      setAppliedDiscounts(prev => prev.filter(d => d.type !== 'coupon'));
-      
-      // Add new coupon
-      setAppliedDiscounts(prev => [...prev, {
-        type: 'coupon',
-        code: coupon.code,
-        amount: coupon.discountAmount,
-        details: coupon.description,
-      }]);
-      setCouponDiscount(coupon.discountAmount);
-    } else {
-      // Remove coupon
-      setAppliedDiscounts(prev => prev.filter(d => d.type !== 'coupon'));
-      setCouponDiscount(0);
-    }
+  const handlePointsInputBlurOrSubmit = () => {
+    const parsed = parseInt(inputPoints, 10);
+    const validPoints = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+    onLoyaltyPointsChange?.(validPoints);
   };
-
-  const handleGiftCardCheck = async () => {
-    if (!giftCardCode.trim()) return;
-    
-    setGiftCardLoading(true);
-    try {
-      const res = await api.get(`/giftcards/check/${giftCardCode.trim()}`);
-      const data = res.data.data;
-      // /giftcards/check returns success:true even for a disabled/used/expired
-      // card (it responds with the real status + a human-readable message
-      // instead of a 4xx) — status must be checked explicitly, not inferred
-      // from `success`, or a non-active card renders as if it were valid here
-      // only to be rejected for real at order creation.
-      if (res.data.success && data.status === 'active') {
-        setGiftCardBalance(data.balance);
-      } else {
-        toast.error(data?.message || 'This gift card is not active');
-        setGiftCardBalance(null);
-      }
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Gift card not found');
-      setGiftCardBalance(null);
-    } finally {
-      setGiftCardLoading(false);
-    }
-  };
-
-  const handleGiftCardApply = () => {
-    if (giftCardBalance === null) return;
-    
-    const currentTotal = orderTotal - couponDiscount - pointsRedeemed;
-    const amountToApply = Math.min(giftCardBalance, currentTotal);
-    
-    // Remove any existing gift card
-    setAppliedDiscounts(prev => prev.filter(d => d.type !== 'giftcard'));
-    
-    // Add gift card
-    setGiftCardApplied({ code: giftCardCode, amount: amountToApply });
-    setAppliedDiscounts(prev => [...prev, {
-      type: 'giftcard',
-      code: giftCardCode,
-      amount: amountToApply,
-    }]);
-    
-    setGiftCardCode('');
-    setGiftCardBalance(null);
-    toast.success(`Gift card applied: ${formatCurrency(amountToApply)}`);
-  };
-
-  const handleRemoveGiftCard = () => {
-    setGiftCardApplied(null);
-    setAppliedDiscounts(prev => prev.filter(d => d.type !== 'giftcard'));
-  };
-
-  const handlePointsChange = (value: string) => {
-    setPointsToRedeem(value);
-    
-    const points = parseInt(value) || 0;
-    if (!loyaltyAccount) return;
-    
-    // Validate points
-    const maxPoints = Math.min(
-      loyaltyAccount.currentPoints,
-      Math.ceil((orderTotal - couponDiscount - (giftCardApplied?.amount || 0)) * loyaltyAccount.pointsRate)
-    );
-    
-    const validPoints = Math.min(points, maxPoints);
-    const dollarValue = validPoints / loyaltyAccount.pointsRate;
-    
-    // Update redemption
-    setPointsRedeemed(validPoints);
-    
-    // Update discounts
-    setAppliedDiscounts(prev => {
-      const filtered = prev.filter(d => d.type !== 'loyalty');
-      if (validPoints > 0) {
-        return [...filtered, {
-          type: 'loyalty',
-          amount: dollarValue,
-          details: `${formatNumber(validPoints)} points`,
-          pointsUsed: validPoints,
-        }];
-      }
-      return filtered;
-    });
-  };
-
-  const handleRedeemAllPoints = () => {
-    if (!loyaltyAccount) return;
-    
-    const maxDollarValue = orderTotal - couponDiscount - (giftCardApplied?.amount || 0);
-    const maxPoints = Math.min(
-      loyaltyAccount.currentPoints,
-      Math.ceil(maxDollarValue * loyaltyAccount.pointsRate)
-    );
-    
-    setPointsToRedeem(maxPoints.toString());
-    handlePointsChange(maxPoints.toString());
-  };
-
-  const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
-  const finalTotal = Math.max(0, orderTotal - totalDiscount);
-  const pointsToEarn = Math.floor(finalTotal); // 1 point per dollar (can be configured)
 
   return (
-    <Card className={className}>
+    <Card className={`overflow-hidden border border-slate-200 dark:border-slate-800 ${className}`}>
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full p-4 flex items-center justify-between text-left"
+        className="w-full p-4 flex items-center justify-between text-left bg-slate-50/50 dark:bg-slate-900/50 hover:bg-slate-100/50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <Sparkles className="w-5 h-5 text-purple-500" />
-          <span className="font-semibold">Discounts & Rewards</span>
-          {totalDiscount > 0 && (
-            <span className="text-green-600 font-medium">
-              -{formatCurrency(totalDiscount)}
-            </span>
-          )}
+          <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 dark:text-orange-400">
+            <Ticket className="w-4 h-4" />
+          </div>
+          <div>
+            <h4 className="font-semibold text-sm text-slate-900 dark:text-white">
+              Promotions & Discounts
+            </h4>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Apply coupons, gift cards, or loyalty rewards
+            </p>
+          </div>
         </div>
-        {expanded ? (
-          <ChevronUp className="w-5 h-5 text-slate-400" />
-        ) : (
-          <ChevronDown className="w-5 h-5 text-slate-400" />
-        )}
+        {expanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
       </button>
 
       <AnimatePresence>
@@ -270,169 +169,199 @@ export function PaymentDiscounts({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
+            transition={{ duration: 0.2 }}
+            className="p-4 space-y-5 border-t border-slate-200 dark:border-slate-800 text-sm"
           >
-            <CardContent className="pt-0 space-y-6">
-              {/* Coupon Section */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Ticket className="w-4 h-4 text-purple-500" />
-                  <span className="font-medium text-sm">Coupon Code</span>
-                </div>
-                <CouponInput
-                  orderTotal={orderTotal}
-                  orderType={orderType}
-                  moduleId={moduleId}
-                  moduleSlug={moduleSlug}
-                  onCouponApply={handleCouponApply}
-                  onDiscountChange={setCouponDiscount}
-                />
-              </div>
+            {/* 1. Coupon Code Section */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Promo / Coupon Code
+              </label>
 
-              {/* Gift Card Section */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Gift className="w-4 h-4 text-pink-500" />
-                  <span className="font-medium text-sm">Gift Card</span>
+              {couponCode ? (
+                <div className="flex items-center justify-between p-3 rounded-xl bg-green-50/80 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40">
+                  <div className="flex items-center gap-2">
+                    <Ticket className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <div>
+                      <span className="font-bold text-green-800 dark:text-green-300">{couponCode}</span>
+                      {serverCouponDiscount?.name && (
+                        <p className="text-xs text-green-600 dark:text-green-400">{serverCouponDiscount.name}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-green-700 dark:text-green-300">
+                      {isPricingStale || isLoadingPricing ? (
+                        <span className="text-xs text-slate-400 animate-pulse">Calculating...</span>
+                      ) : serverCouponDiscount ? (
+                        `-${formatCurrency(serverCouponDiscount.amount, currency)}`
+                      ) : (
+                        <span className="text-xs text-slate-400">Applied</span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                      title="Remove coupon"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                
-                {giftCardApplied ? (
-                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Check className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="font-mono text-sm font-medium">{giftCardApplied.code}</p>
-                        <p className="text-green-600 font-semibold">
-                          -{formatCurrency(giftCardApplied.amount)}
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={handleRemoveGiftCard}>
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter gift card code"
-                        value={giftCardCode}
-                        onChange={(e) => { setGiftCardCode(e.target.value.toUpperCase()); setGiftCardBalance(null); }}
-                        className="font-mono uppercase"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={handleGiftCardCheck}
-                        disabled={giftCardLoading || !giftCardCode.trim()}
+              ) : (
+                <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Enter coupon code"
+                    value={inputCoupon}
+                    onChange={(e) => setInputCoupon(e.target.value)}
+                    className="h-10 text-sm uppercase"
+                  />
+                  <Button type="submit" size="sm" variant="outline" className="h-10 px-4 shrink-0 font-medium">
+                    Apply
+                  </Button>
+                </form>
+              )}
+            </div>
+
+            {/* 2. Gift Cards Section */}
+            <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Gift Cards
+              </label>
+
+              {giftCardCodes.length > 0 && (
+                <div className="space-y-2">
+                  {giftCardCodes.map((code) => {
+                    const matchingDiscount = serverGiftCardDiscounts.find(
+                      (d) => d.code?.toUpperCase() === code.toUpperCase()
+                    );
+                    return (
+                      <div
+                        key={code}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/80 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40"
                       >
-                        {giftCardLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Check'}
-                      </Button>
-                    </div>
-                    
-                    {giftCardBalance !== null && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg"
-                      >
-                        <div>
-                          <p className="text-sm text-slate-600">Available Balance</p>
-                          <p className="text-lg font-bold text-blue-600">{formatCurrency(giftCardBalance)}</p>
+                        <div className="flex items-center gap-2">
+                          <Gift className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <span className="font-mono font-medium text-blue-900 dark:text-blue-300">{code}</span>
                         </div>
-                        <Button size="sm" onClick={handleGiftCardApply}>
-                          Apply
-                        </Button>
-                      </motion.div>
-                    )}
-                  </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold text-blue-700 dark:text-blue-300">
+                            {isPricingStale || isLoadingPricing ? (
+                              <span className="text-xs text-slate-400 animate-pulse">Calculating...</span>
+                            ) : matchingDiscount ? (
+                              `-${formatCurrency(matchingDiscount.amount, currency)}`
+                            ) : (
+                              <span className="text-xs text-slate-400">Pending</span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveGiftCard?.(code)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                            title="Remove gift card"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <form onSubmit={handleAddGiftCard} className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="Enter gift card code"
+                  value={inputGiftCard}
+                  onChange={(e) => setInputGiftCard(e.target.value)}
+                  className="h-10 text-sm uppercase font-mono"
+                />
+                <Button type="submit" size="sm" variant="outline" className="h-10 px-4 shrink-0 font-medium">
+                  <Plus className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </form>
+            </div>
+
+            {/* 3. Loyalty Points Section */}
+            <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Loyalty Points
+                </label>
+                {userLoyaltyPoints !== null && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Available: <strong className="text-slate-900 dark:text-white">{formatNumber(userLoyaltyPoints)}</strong> pts
+                  </span>
                 )}
               </div>
 
-              {/* Loyalty Points Section */}
-              {isAuthenticated && loyaltyAccount && loyaltyAccount.currentPoints > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Award className="w-4 h-4 text-amber-500" />
-                      <span className="font-medium text-sm">Loyalty Points</span>
-                    </div>
-                    <span className="text-sm text-slate-500">
-                      {formatNumber(loyaltyAccount.currentPoints)} pts available
-                      ({formatCurrency(loyaltyAccount.dollarValue)} value)
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  max={userLoyaltyPoints !== null ? userLoyaltyPoints : undefined}
+                  placeholder="Points to redeem"
+                  value={inputPoints}
+                  onChange={(e) => setInputPoints(e.target.value)}
+                  onBlur={handlePointsInputBlurOrSubmit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handlePointsInputBlurOrSubmit();
+                    }
+                  }}
+                  className="h-10 text-sm"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePointsInputBlurOrSubmit}
+                  className="h-10 px-4 shrink-0 font-medium"
+                >
+                  Set Points
+                </Button>
+              </div>
+
+              {loyaltyPointsToRedeem > 0 && (
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span className="text-xs font-medium text-amber-900 dark:text-amber-300">
+                      Redeeming {formatNumber(loyaltyPointsToRedeem)} points
                     </span>
                   </div>
-                  
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        type="number"
-                        placeholder="Points to redeem"
-                        value={pointsToRedeem}
-                        onChange={(e) => handlePointsChange(e.target.value)}
-                        max={loyaltyAccount.currentPoints}
-                        min={0}
-                      />
-                      {parseInt(pointsToRedeem) > 0 && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-green-600">
-                          = {formatCurrency(pointsRedeemed / loyaltyAccount.pointsRate)}
-                        </span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-amber-700 dark:text-amber-300">
+                      {isPricingStale || isLoadingPricing ? (
+                        <span className="text-xs text-slate-400 animate-pulse">Calculating...</span>
+                      ) : serverLoyaltyDiscount ? (
+                        `-${formatCurrency(serverLoyaltyDiscount.amount, currency)}`
+                      ) : (
+                        <span className="text-xs text-slate-400">Pending</span>
                       )}
-                    </div>
-                    <Button variant="outline" size="sm" onClick={handleRedeemAllPoints}>
-                      Max
-                    </Button>
-                  </div>
-                  
-                  <p className="text-xs text-slate-500 mt-1">
-                    {loyaltyAccount.pointsRate} points = $1.00
-                  </p>
-                </div>
-              )}
-
-              {/* Summary */}
-              {appliedDiscounts.length > 0 && (
-                <div className="border-t dark:border-slate-700 pt-4">
-                  <p className="text-sm font-medium mb-2">Applied Discounts</p>
-                  <div className="space-y-2">
-                    {appliedDiscounts.map((discount, i) => (
-                      <div key={i} className="flex items-center justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                          {discount.type === 'coupon' && <Ticket className="w-4 h-4" />}
-                          {discount.type === 'giftcard' && <Gift className="w-4 h-4" />}
-                          {discount.type === 'loyalty' && <Award className="w-4 h-4" />}
-                          {discount.code || discount.details}
-                        </span>
-                        <span className="font-medium text-green-600">
-                          -{formatCurrency(discount.amount)}
-                        </span>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between font-bold pt-2 border-t dark:border-slate-700">
-                      <span>Total Savings</span>
-                      <span className="text-green-600">-{formatCurrency(totalDiscount)}</span>
-                    </div>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputPoints('');
+                        onLoyaltyPointsChange?.(0);
+                      }}
+                      className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
+                      title="Remove loyalty points"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               )}
-
-              {/* Points to earn */}
-              {isAuthenticated && pointsToEarn > 0 && (
-                <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
-                  <Award className="w-4 h-4" />
-                  <span>
-                    You'll earn <strong>{formatNumber(pointsToEarn)}</strong> loyalty points with this order!
-                  </span>
-                </div>
-              )}
-            </CardContent>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
     </Card>
   );
 }
-
-// Export individual components for flexible use
-export { CouponInput, AvailableCoupons } from './CouponInput';
-export { LoyaltyDisplay, PointsPreview } from './LoyaltyDisplay';
-export { GiftCardPurchase, GiftCardBalance } from './GiftCardPurchase';

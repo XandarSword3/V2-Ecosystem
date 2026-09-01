@@ -22,6 +22,14 @@ export interface PricingFeeLine {
   amount: number;
 }
 
+export interface PricingLineItemResult {
+  itemId: string;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  lineTotal: number;
+}
+
 export interface PricingResult {
   subtotal: number;
   taxAmount: number;
@@ -33,13 +41,9 @@ export interface PricingResult {
   discounts: PricingDiscount[];
   totalAmount: number;
   currency: string;
-  breakdown?: Array<{
-    itemId: string;
-    name: string;
-    unitPrice: number;
-    quantity: number;
-    subtotal: number;
-  }>;
+  preDiscountTotal?: number;
+  lineItems?: PricingLineItemResult[];
+  breakdown?: PricingLineItemResult[];
 }
 
 export interface UsePricingPreviewOptions {

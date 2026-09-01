@@ -141,6 +141,16 @@ vi.mock('@/lib/api', () => {
               taxBreakdown: [{ name: 'VAT', rate: 0.1, amount: 2.5 }],
               totalAmount: 27.5,
               currency: 'USD',
+              preDiscountTotal: 27.5,
+              lineItems: [
+                {
+                  itemId: 'dish-1',
+                  name: 'Seafood Pasta',
+                  unitPrice: 25.0,
+                  quantity: 1,
+                  lineTotal: 25.0,
+                },
+              ],
             },
           },
         });

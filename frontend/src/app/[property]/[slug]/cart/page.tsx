@@ -52,6 +52,8 @@ import { CustomerShell } from '@/components/shells/CustomerShell';
 import { ModuleShell } from '@/components/shells/ModuleShell';
 import { ModuleProvider, resolveEngineACapabilities } from '@/components/shells/ModuleContext';
 
+const EMPTY_GIFT_CARDS: string[] = [];
+
 export default function ModuleCartPage() {
   const t = useTranslations('common');
   const router = useRouter();
@@ -99,10 +101,10 @@ export default function ModuleCartPage() {
   const rawSelection = useCartStore((s) => moduleKey ? s.getFulfillmentForModule(moduleKey) : undefined);
   const setFulfillmentForModule = useCartStore((s) => s.setFulfillmentForModule);
 
-  // Module-scoped discount state from cartStore
-  const couponCode = useCartStore((s) => moduleKey ? s.getCouponForModule(moduleKey) : null);
-  const giftCardCodes = useCartStore((s) => moduleKey ? s.getGiftCardsForModule(moduleKey) : []);
-  const loyaltyPoints = useCartStore((s) => moduleKey ? s.getLoyaltyPointsForModule(moduleKey) : 0);
+  // Module-scoped discount state from cartStore (reactive slice subscriptions)
+  const couponCode = useCartStore((s) => moduleKey ? (s.couponByModule[moduleKey] ?? null) : null);
+  const giftCardCodes = useCartStore((s) => moduleKey ? (s.giftCardsByModule[moduleKey] ?? EMPTY_GIFT_CARDS) : EMPTY_GIFT_CARDS);
+  const loyaltyPoints = useCartStore((s) => moduleKey ? (s.loyaltyPointsByModule[moduleKey] ?? 0) : 0);
   const setCouponForModule = useCartStore((s) => s.setCouponForModule);
   const addGiftCardForModule = useCartStore((s) => s.addGiftCardForModule);
   const removeGiftCardForModule = useCartStore((s) => s.removeGiftCardForModule);
@@ -184,6 +186,31 @@ export default function ModuleCartPage() {
   const appliedDiscounts = serverPricing?.discounts ?? [];
   const total = serverPricing?.totalAmount;
   const resolvedCurrency = serverPricing?.currency || currency || 'USD';
+
+  // Helper to extract authoritative line pricing from server PricingResult
+  const getAuthoritativeLinePrice = (itemId: string, index: number) => {
+    if (loadingPricing || isPricingStale) {
+      return { unitPriceText: 'Calculating...', lineTotalText: '...' };
+    }
+    if (isPricingError || !serverPricing) {
+      return { unitPriceText: '—', lineTotalText: '—' };
+    }
+    const matchingLine =
+      serverPricing.lineItems?.[index] ||
+      serverPricing.lineItems?.find((li) => li.itemId === itemId) ||
+      serverPricing.breakdown?.[index] ||
+      serverPricing.breakdown?.find((b) => b.itemId === itemId);
+
+    if (matchingLine) {
+      const unitPrice = matchingLine.unitPrice;
+      const lineTotal = matchingLine.lineTotal !== undefined ? matchingLine.lineTotal : (matchingLine as any).subtotal;
+      return {
+        unitPriceText: `${formatCurrency(unitPrice, resolvedCurrency)} each`,
+        lineTotalText: formatCurrency(lineTotal, resolvedCurrency),
+      };
+    }
+    return { unitPriceText: '—', lineTotalText: '—' };
+  };
 
   // Fetch service locations for this module & auto-fill from URL query param
   useEffect(() => {
@@ -507,58 +534,61 @@ export default function ModuleCartPage() {
 
                     {/* Cart Items List */}
                     <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {moduleItems.map((item) => (
-                        <div key={item.uniqueKey || item.id} className="py-4 flex items-center justify-between gap-4">
-                          <div className="flex-1">
-                            <h3 className="font-medium text-slate-900 dark:text-white">{item.name}</h3>
-                            <p className="text-sm text-slate-500">{formatCurrency(item.price + (item.modifierTotal || 0), resolvedCurrency)} each</p>
-                            {item.selectedModifiers && item.selectedModifiers.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {item.selectedModifiers.map((mod, i) => (
-                                  <span
-                                    key={i}
-                                    className={`text-xs px-2 py-0.5 rounded-full ${
-                                      mod.modifierType === 'remove'
-                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                        : mod.modifierType === 'swap'
-                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                        : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                    }`}
-                                  >
-                                    {mod.modifierType === 'remove' ? 'No ' : mod.modifierType === 'swap' ? 'Swap: ' : '+'}
-                                    {mod.optionName}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0"
-                                onClick={() => removeItem(item.id, item.uniqueKey)}
-                              >
-                                <Minus className="w-3 h-3" />
-                              </Button>
-                              <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0"
-                                onClick={() => addItem(item)}
-                              >
-                                <Plus className="w-3 h-3" />
-                              </Button>
+                      {moduleItems.map((item, index) => {
+                        const linePricing = getAuthoritativeLinePrice(item.id, index);
+                        return (
+                          <div key={item.uniqueKey || item.id} className="py-4 flex items-center justify-between gap-4">
+                            <div className="flex-1">
+                              <h3 className="font-medium text-slate-900 dark:text-white">{item.name}</h3>
+                              <p className="text-sm text-slate-500">{linePricing.unitPriceText}</p>
+                              {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {item.selectedModifiers.map((mod, i) => (
+                                    <span
+                                      key={i}
+                                      className={`text-xs px-2 py-0.5 rounded-full ${
+                                        mod.modifierType === 'remove'
+                                          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                          : mod.modifierType === 'swap'
+                                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                          : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                      }`}
+                                    >
+                                      {mod.modifierType === 'remove' ? 'No ' : mod.modifierType === 'swap' ? 'Swap: ' : '+'}
+                                      {mod.optionName}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            <span className="font-bold w-20 text-right">
-                              {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, resolvedCurrency)}
-                            </span>
+
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => removeItem(item.id, item.uniqueKey)}
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => addItem(item)}
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <span className="font-bold w-20 text-right">
+                                {linePricing.lineTotalText}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <div className="pt-4 flex justify-end">
@@ -704,23 +734,27 @@ export default function ModuleCartPage() {
                         <h3 className="font-semibold text-slate-900 dark:text-white">Apply Discounts</h3>
                       </div>
                       <PaymentDiscounts
-                        orderTotal={subtotal ?? localEstimatedSubtotal}
-                        orderType={selectedMode}
+                        couponCode={couponCode}
+                        giftCardCodes={giftCardCodes}
+                        loyaltyPointsToRedeem={loyaltyPoints}
+                        onCouponChange={(code) => {
+                          if (moduleKey) setCouponForModule(moduleKey, code);
+                        }}
+                        onAddGiftCard={(code) => {
+                          if (moduleKey) addGiftCardForModule(moduleKey, code);
+                        }}
+                        onRemoveGiftCard={(code) => {
+                          if (moduleKey) removeGiftCardForModule(moduleKey, code);
+                        }}
+                        onLoyaltyPointsChange={(pts) => {
+                          if (moduleKey) setLoyaltyPointsForModule(moduleKey, pts);
+                        }}
+                        pricingDiscounts={appliedDiscounts}
+                        isPricingStale={isPricingStale}
+                        isLoadingPricing={loadingPricing}
+                        currency={resolvedCurrency}
                         moduleId={moduleId}
                         moduleSlug={currentModule?.slug}
-                        onTotalChange={(_ignored, discounts) => {
-                          if (!moduleKey) return;
-                          const c = discounts.find(d => d.type === 'coupon');
-                          setCouponForModule(moduleKey, c?.code || null);
-
-                          const gcs = discounts.filter(d => d.type === 'giftcard');
-                          gcs.forEach(gc => {
-                            if (gc.code) addGiftCardForModule(moduleKey, gc.code);
-                          });
-
-                          const l = discounts.find(d => d.type === 'loyalty');
-                          setLoyaltyPointsForModule(moduleKey, l?.pointsUsed || 0);
-                        }}
                         className="mt-2"
                       />
                     </div>
@@ -778,39 +812,42 @@ export default function ModuleCartPage() {
                   )}
 
                   <div className="space-y-3 max-h-48 overflow-y-auto">
-                    {moduleItems.map((item) => (
-                      <div key={item.uniqueKey || item.id} className="text-sm">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                              {item.quantity}
-                            </span>
-                            <span className="text-slate-700 dark:text-slate-300 line-clamp-1">{item.name}</span>
-                          </div>
-                          <span className="font-medium text-slate-900 dark:text-white flex-shrink-0 ml-2">
-                            {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, resolvedCurrency)}
-                          </span>
-                        </div>
-                        {item.selectedModifiers && item.selectedModifiers.length > 0 && (
-                          <div className="mt-1 ml-8 flex flex-wrap gap-1">
-                            {item.selectedModifiers.map((mod, i) => (
-                              <span
-                                key={i}
-                                className={`text-xs px-1.5 py-0.5 rounded-full ${
-                                  mod.modifierType === 'remove'
-                                    ? 'bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-400'
-                                    : mod.modifierType === 'swap'
-                                    ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400'
-                                    : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
-                                }`}
-                              >
-                                {mod.modifierType === 'remove' ? '−' : '+'} {mod.optionName}
+                    {moduleItems.map((item, index) => {
+                      const linePricing = getAuthoritativeLinePrice(item.id, index);
+                      return (
+                        <div key={item.uniqueKey || item.id} className="text-sm">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                {item.quantity}
                               </span>
-                            ))}
+                              <span className="text-slate-700 dark:text-slate-300 line-clamp-1">{item.name}</span>
+                            </div>
+                            <span className="font-medium text-slate-900 dark:text-white flex-shrink-0 ml-2">
+                              {linePricing.lineTotalText}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {item.selectedModifiers && item.selectedModifiers.length > 0 && (
+                            <div className="mt-1 ml-8 flex flex-wrap gap-1">
+                              {item.selectedModifiers.map((mod, i) => (
+                                <span
+                                  key={i}
+                                  className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                    mod.modifierType === 'remove'
+                                      ? 'bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-400'
+                                      : mod.modifierType === 'swap'
+                                      ? 'bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400'
+                                      : 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400'
+                                  }`}
+                                >
+                                  {mod.modifierType === 'remove' ? '−' : '+'} {mod.optionName}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div className="border-t border-dashed border-slate-200 dark:border-slate-700" />
@@ -903,9 +940,9 @@ export default function ModuleCartPage() {
                             <span className="text-sm font-medium text-red-500">Pricing unavailable</span>
                           ) : (
                             <>
-                              {totalDiscount > 0 && subtotal !== undefined && (
+                              {totalDiscount > 0 && serverPricing?.preDiscountTotal !== undefined && serverPricing.preDiscountTotal > total && (
                                 <span className="text-sm text-slate-400 line-through mr-2">
-                                  {formatCurrency(subtotal + tax + totalFees + serviceCharge + deliveryFee, resolvedCurrency)}
+                                  {formatCurrency(serverPricing.preDiscountTotal, resolvedCurrency)}
                                 </span>
                               )}
                               <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
