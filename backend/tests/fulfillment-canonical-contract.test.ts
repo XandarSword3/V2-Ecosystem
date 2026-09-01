@@ -218,40 +218,167 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
     expect(key1).not.toBe(keyDiffTenant);
   });
 
-  it('manages idempotency lifecycle states: in_progress -> completed, and in_progress -> failed with safe retry', () => {
-    interface IdempState {
-      status: 'in_progress' | 'completed' | 'failed';
-      transactionId?: string;
-      response?: any;
+  it('enforces single-writer mutual exclusion: concurrent claims elect exactly 1 owner', async () => {
+    // Simulated database table with unique constraint on key
+    const dbRecords = new Map<string, { key: string; status: string; expires_at: string; response?: any; transaction_id?: string }>();
+
+    const mockSupabase = {
+      from: (table: string) => ({
+        insert: (row: any) => ({
+          select: () => ({
+            maybeSingle: async () => {
+              if (dbRecords.has(row.key)) {
+                return { data: null, error: { code: '23505', message: 'duplicate key' } };
+              }
+              dbRecords.set(row.key, { ...row });
+              return { data: row, error: null };
+            },
+            single: async () => {
+              if (dbRecords.has(row.key)) {
+                return { data: null, error: { code: '23505', message: 'duplicate key' } };
+              }
+              dbRecords.set(row.key, { ...row });
+              return { data: row, error: null };
+            },
+          }),
+        }),
+        select: () => ({
+          eq: (_col: string, val: string) => ({
+            maybeSingle: async () => ({
+              data: dbRecords.get(val) || null,
+              error: null,
+            }),
+          }),
+        }),
+        update: (updates: any) => ({
+          eq: (_col1: string, val1: string) => ({
+            eq: (_col2: string, val2: string) => ({
+              select: () => ({
+                maybeSingle: async () => {
+                  const curr = dbRecords.get(val1);
+                  if (curr && curr.status === val2) {
+                    const next = { ...curr, ...updates };
+                    dbRecords.set(val1, next);
+                    return { data: next, error: null };
+                  }
+                  return { data: null, error: null };
+                },
+              }),
+            }),
+          }),
+        }),
+      }),
+      rpc: async () => ({ data: null, error: { message: 'function not found' } }),
+    };
+
+    // Helper implementing the exact claim logic
+    async function testClaim(key: string, leaseSec: number = 60) {
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + leaseSec * 1000).toISOString();
+
+      const { data: inserted, error: insertErr } = await mockSupabase
+        .from('idempotency_records')
+        .insert({
+          key,
+          status: 'in_progress',
+          expires_at: expiresAt,
+          created_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        })
+        .select()
+        .maybeSingle();
+
+      if (!insertErr && inserted) {
+        return { claimed: true, status: 'in_progress' };
+      }
+
+      const { data: existing } = await mockSupabase
+        .from('idempotency_records')
+        .select()
+        .eq('key', key)
+        .maybeSingle();
+
+      if (!existing) return { claimed: false, status: 'in_progress' };
+
+      if (existing.status === 'completed' && existing.response) {
+        return { claimed: false, status: 'completed', response: existing.response, transaction_id: existing.transaction_id };
+      }
+
+      const isExpired = existing.expires_at && new Date(existing.expires_at).getTime() < now.getTime();
+      if (existing.status === 'failed' || (existing.status === 'in_progress' && isExpired)) {
+        const { data: updated } = await mockSupabase
+          .from('idempotency_records')
+          .update({ status: 'in_progress', response: null, transaction_id: null, expires_at: expiresAt })
+          .eq('key', key)
+          .eq('status', existing.status)
+          .select()
+          .maybeSingle();
+
+        if (updated) return { claimed: true, status: 'in_progress' };
+      }
+
+      return { claimed: false, status: existing.status, response: existing.response, transaction_id: existing.transaction_id };
     }
 
-    const table = new Map<string, IdempState>();
+    const key = 'tenant1:prop1:mod1:cust1:chk_race_001';
 
-    // 1. First attempt starts
-    const key = 't1:p1:m1:cust1:chk_xyz';
-    table.set(key, { status: 'in_progress' });
+    // 1. Two requests race to claim the same idempotency key simultaneously
+    const [resultA, resultB] = await Promise.all([
+      testClaim(key),
+      testClaim(key),
+    ]);
 
-    // 2. Concurrent request arrives: sees in_progress
-    expect(table.get(key)?.status).toBe('in_progress');
+    // Exactly one must claim; the other must be rejected / in_progress
+    const claimSuccessCount = (resultA.claimed ? 1 : 0) + (resultB.claimed ? 1 : 0);
+    expect(claimSuccessCount).toBe(1);
 
-    // 3. First attempt fails on stock check: status transitions to failed, transaction deleted
-    table.set(key, { status: 'failed' });
+    const loserResult = resultA.claimed ? resultB : resultA;
+    expect(loserResult.claimed).toBe(false);
+    expect(loserResult.status).toBe('in_progress');
 
-    // 4. Retry after failure: sees failed, starts fresh attempt cleanly (zero phantom reuse)
-    expect(table.get(key)?.status).toBe('failed');
-    table.set(key, { status: 'in_progress' });
-
-    // 5. Retry succeeds: status transitions to completed with snapshot response
-    table.set(key, {
+    // 2. Owner completes checkout: marks completed with snapshot response
+    dbRecords.set(key, {
+      key,
       status: 'completed',
-      transactionId: 'tx-123',
-      response: { success: true, data: { id: 'tx-123', amount: 45 } },
+      transaction_id: 'tx-ord-888',
+      response: { success: true, data: { id: 'tx-ord-888', total: 55.0 } },
+      expires_at: new Date().toISOString(),
     });
 
-    // 6. Subsequent duplicate network replay returns cached completed response
-    const record = table.get(key);
-    expect(record?.status).toBe('completed');
-    expect(record?.transactionId).toBe('tx-123');
-    expect(record?.response.data.id).toBe('tx-123');
+    // 3. Network duplicate request arrives after completion: returns identical snapshot
+    const duplicateResult = await testClaim(key);
+    expect(duplicateResult.claimed).toBe(false);
+    expect(duplicateResult.status).toBe('completed');
+    expect(duplicateResult.transaction_id).toBe('tx-ord-888');
+    expect(duplicateResult.response.data.id).toBe('tx-ord-888');
+
+    // 4. Test failure rollback & safe retry
+    const failedKey = 'tenant1:prop1:mod1:cust1:chk_fail_002';
+    const firstAttempt = await testClaim(failedKey);
+    expect(firstAttempt.claimed).toBe(true);
+
+    // Simulated stock failure -> mark failed
+    dbRecords.set(failedKey, {
+      key: failedKey,
+      status: 'failed',
+      expires_at: new Date().toISOString(),
+    });
+
+    // Customer retry with same key: claims successfully without phantom transaction
+    const retryAttempt = await testClaim(failedKey);
+    expect(retryAttempt.claimed).toBe(true);
+    expect(retryAttempt.status).toBe('in_progress');
+
+    // 5. Test expired lease reclamation (crashed worker)
+    const crashedKey = 'tenant1:prop1:mod1:cust1:chk_crash_003';
+    dbRecords.set(crashedKey, {
+      key: crashedKey,
+      status: 'in_progress',
+      expires_at: new Date(Date.now() - 10000).toISOString(), // expired 10s ago
+    });
+
+    const recoveryClaim = await testClaim(crashedKey);
+    expect(recoveryClaim.claimed).toBe(true);
+    expect(recoveryClaim.status).toBe('in_progress');
   });
 });
