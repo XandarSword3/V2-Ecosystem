@@ -7,6 +7,7 @@ import { initializeSocketServer, closeSocketServer } from './socket/index.js';
 import { initSentry } from './instrumentation.js';
 import { SchedulerService } from './services/scheduler.service.js';
 import { registerEngineCleanupJobs } from './jobs/engine-cleanup.job.js';
+import { startCheckoutCompensationWorker, stopCheckoutCompensationWorker } from './jobs/checkout-compensation.job.js';
 import http from 'http';
 import { permissionCache } from './security/permission-cache.service.js';
 import { cache } from './utils/cache.js';
@@ -47,9 +48,10 @@ async function main() {
     initializeSocketServer(server);
     logger.info('WebSocket server initialized');
 
-    // Initialize Scheduler
+    // Initialize Scheduler and Background Workers
     SchedulerService.init();
     registerEngineCleanupJobs();
+    startCheckoutCompensationWorker(30_000);
 
     // Graceful shutdown with timeout and proper cleanup
     const shutdown = async (signal: string) => {
@@ -67,6 +69,11 @@ async function main() {
       }, 30000);
 
       try {
+        // Stop background workers
+        try {
+          stopCheckoutCompensationWorker();
+        } catch (_) {}
+
         // Stop accepting new connections
         server.close(() => {
           logger.info('HTTP server closed');

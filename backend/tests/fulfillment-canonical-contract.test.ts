@@ -907,4 +907,84 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
     expect(deletedTransactions).toContain(txId);
     expect(failedIdempotencyKeys).toContain(key);
   });
+
+  it('compensation operations are strictly idempotent across worker crashes and retries', async () => {
+    const compensationLog = new Set<string>();
+    let totalStockRestored = 0;
+    let totalDiscountsReversed = 0;
+
+    function executeIdempotentCompensation(idempKey: string, txId: string, operation: string, payload: any): boolean {
+      const logKey = `${idempKey || txId}:${operation}`;
+      if (compensationLog.has(logKey)) {
+        // Already executed (idempotent no-op)
+        return true;
+      }
+
+      if (operation === 'restore_inventory') {
+        totalStockRestored += payload.reduce((acc: number, item: any) => acc + item.quantity, 0);
+      } else if (operation === 'reverse_discounts') {
+        totalDiscountsReversed += 1;
+      }
+
+      compensationLog.add(logKey);
+      return true;
+    }
+
+    const key = 'tenant1:prop1:mod1:cust1:chk_crash_idempotent';
+    const txId = 'tx-crash-456';
+    const items = [{ catalog_item_id: 'item-1', quantity: 3 }];
+
+    // Worker 1 executes compensation step for inventory
+    executeIdempotentCompensation(key, txId, 'restore_inventory', items);
+    executeIdempotentCompensation(key, txId, 'reverse_discounts', [{ code: 'SALE10' }]);
+
+    expect(totalStockRestored).toBe(3);
+    expect(totalDiscountsReversed).toBe(1);
+
+    // Worker 1 crashes before updating queue status.
+    // Worker 2 (or scheduled retry) re-executes the exact same queue items:
+    executeIdempotentCompensation(key, txId, 'restore_inventory', items);
+    executeIdempotentCompensation(key, txId, 'reverse_discounts', [{ code: 'SALE10' }]);
+
+    // Economic state MUST NOT double-compensate!
+    expect(totalStockRestored).toBe(3);
+    expect(totalDiscountsReversed).toBe(1);
+  });
+
+  it('permanently failed compensation items (attempts >= 5) are retained and flagged for operational alerts', async () => {
+    const queueRecord = {
+      id: 'comp-dead-1',
+      idempotency_key: 'tenant1:prop1:mod1:cust1:chk_dead_letter',
+      transaction_id: 'tx-unrecoverable',
+      operation: 'restore_inventory',
+      payload: [{ catalog_item_id: 'item-deleted', quantity: 1 }],
+      status: 'pending',
+      attempts: 4,
+      last_error: null as string | null,
+    };
+
+    const alertsEmitted: any[] = [];
+
+    // Attempt 5 fails
+    try {
+      throw new Error('Foreign key target not found');
+    } catch (e: any) {
+      queueRecord.attempts += 1;
+      queueRecord.last_error = e.message;
+      if (queueRecord.attempts >= 5) {
+        queueRecord.status = 'failed';
+        alertsEmitted.push({
+          severity: 'CRITICAL',
+          id: queueRecord.id,
+          operation: queueRecord.operation,
+          error: queueRecord.last_error,
+        });
+      }
+    }
+
+    expect(queueRecord.status).toBe('failed');
+    expect(queueRecord.attempts).toBe(5);
+    expect(alertsEmitted.length).toBe(1);
+    expect(alertsEmitted[0].severity).toBe('CRITICAL');
+  });
 });

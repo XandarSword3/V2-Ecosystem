@@ -651,6 +651,16 @@ export async function migrate() {
       );
       CREATE INDEX IF NOT EXISTS idx_compensation_queue_status ON checkout_compensation_queue(status);
 
+      CREATE TABLE IF NOT EXISTS checkout_compensation_log (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        idempotency_key TEXT,
+        transaction_id UUID,
+        operation VARCHAR(50) NOT NULL,
+        executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_compensation_log_key ON checkout_compensation_log(idempotency_key, operation);
+      CREATE INDEX IF NOT EXISTS idx_compensation_log_tx ON checkout_compensation_log(transaction_id, operation);
+
       CREATE OR REPLACE FUNCTION queue_failed_compensation(
         p_key TEXT,
         p_transaction_id UUID,
@@ -691,6 +701,7 @@ export async function migrate() {
         v_row RECORD;
         v_processed INTEGER := 0;
         v_failed INTEGER := 0;
+        v_already_done BOOLEAN;
       BEGIN
         FOR v_row IN
           SELECT * FROM checkout_compensation_queue
@@ -700,27 +711,39 @@ export async function migrate() {
           FOR UPDATE SKIP LOCKED
         LOOP
           BEGIN
-            IF v_row.operation = 'restore_inventory' THEN
-              PERFORM restore_inventory_for_order_items(v_row.payload);
-            ELSIF v_row.operation = 'reverse_discounts' THEN
-              IF v_row.transaction_id IS NOT NULL THEN
-                PERFORM reverse_coupon_usage(v_row.transaction_id);
+            -- Check idempotency log so retried or crashed tasks never double-compensate
+            SELECT EXISTS(
+              SELECT 1 FROM checkout_compensation_log
+              WHERE (v_row.idempotency_key IS NOT NULL AND idempotency_key = v_row.idempotency_key AND operation = v_row.operation)
+                 OR (v_row.transaction_id IS NOT NULL AND transaction_id = v_row.transaction_id AND operation = v_row.operation)
+            ) INTO v_already_done;
+
+            IF NOT v_already_done THEN
+              IF v_row.operation = 'restore_inventory' THEN
+                PERFORM restore_inventory_for_order_items(v_row.payload);
+              ELSIF v_row.operation = 'reverse_discounts' THEN
+                IF v_row.transaction_id IS NOT NULL THEN
+                  PERFORM reverse_coupon_usage(v_row.transaction_id);
+                END IF;
+              ELSIF v_row.operation = 'delete_order_items' THEN
+                IF v_row.transaction_id IS NOT NULL THEN
+                  DELETE FROM order_items WHERE transaction_id = v_row.transaction_id;
+                END IF;
+              ELSIF v_row.operation = 'delete_transaction' THEN
+                IF v_row.transaction_id IS NOT NULL THEN
+                  DELETE FROM transactions WHERE id = v_row.transaction_id;
+                END IF;
+              ELSIF v_row.operation = 'fail_idempotency_key' THEN
+                IF v_row.idempotency_key IS NOT NULL THEN
+                  UPDATE idempotency_records
+                  SET status = 'failed',
+                      updated_at = NOW()
+                  WHERE key = v_row.idempotency_key;
+                END IF;
               END IF;
-            ELSIF v_row.operation = 'delete_order_items' THEN
-              IF v_row.transaction_id IS NOT NULL THEN
-                DELETE FROM order_items WHERE transaction_id = v_row.transaction_id;
-              END IF;
-            ELSIF v_row.operation = 'delete_transaction' THEN
-              IF v_row.transaction_id IS NOT NULL THEN
-                DELETE FROM transactions WHERE id = v_row.transaction_id;
-              END IF;
-            ELSIF v_row.operation = 'fail_idempotency_key' THEN
-              IF v_row.idempotency_key IS NOT NULL THEN
-                UPDATE idempotency_records
-                SET status = 'failed',
-                    updated_at = NOW()
-                WHERE key = v_row.idempotency_key;
-              END IF;
+
+              INSERT INTO checkout_compensation_log (idempotency_key, transaction_id, operation)
+              VALUES (v_row.idempotency_key, v_row.transaction_id, v_row.operation);
             END IF;
 
             UPDATE checkout_compensation_queue
