@@ -992,20 +992,29 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'tenant_id is required but could not be resolved for this module' });
       }
 
-      // Check customer checkout idempotency (Phase F4)
-      const idempotencyKey = (req.body?.idempotencyKey || req.headers['idempotency-key']) as string | undefined;
-      if (idempotencyKey && typeof idempotencyKey === 'string') {
+      const isStaffUser = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
+      const staffId = isStaffUser ? (req.user?.userId ?? null) : null;
+      const customerId = isStaffUser ? null : (req.user?.userId ?? null);
+
+      // Scoped customer checkout idempotency (Phase F4)
+      const rawIdempotencyKey = (req.body?.idempotencyKey || req.headers['idempotency-key']) as string | undefined;
+      const customerScope = customerId || resolvedCustomerPhone || resolvedCustomerName || 'guest';
+      const scopedIdempotencyKey = rawIdempotencyKey && typeof rawIdempotencyKey === 'string'
+        ? `${tenantId}:${propertyId}:${mounted.id}:${customerScope}:${rawIdempotencyKey}`
+        : null;
+
+      if (scopedIdempotencyKey) {
         const { data: existingTx } = await supabase
           .from('transactions')
           .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
           .eq('module_id', mounted.id)
-          .contains('metadata', { idempotency_key: idempotencyKey })
+          .eq('metadata->>scoped_idempotency_key', scopedIdempotencyKey)
           .maybeSingle();
 
         if (existingTx) {
           logger.info('[Dynamic Router] Idempotent checkout hit: returning existing order', {
             orderId: existingTx.id,
-            idempotencyKey,
+            scopedIdempotencyKey,
           });
           return res.json({ success: true, data: existingTx });
         }
@@ -1092,9 +1101,6 @@ function buildInstantTransactionRouter(router: Router): void {
         }
         serviceLocationId = locationRow.id;
       }
-      const isStaffUser = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
-      const staffId = isStaffUser ? (req.user?.userId ?? null) : null;
-      const customerId = isStaffUser ? null : (req.user?.userId ?? null);
 
       // Phase F4: Canonical fulfillment selection is primary API contract
       const fulfillmentSelection = resolveFulfillmentSelection('instant_transaction', {
@@ -1108,41 +1114,82 @@ function buildInstantTransactionRouter(router: Router): void {
         address: req.body?.address ?? req.body?.deliveryAddress ?? req.body?.metadata?.address ?? null,
       });
 
-      const { data: created, error: createError } = await supabase
+      let created: any;
+      const insertPayload = {
+        engine_type: 'instant_transaction',
+        module_id: mounted.id,
+        property_id: propertyId,
+        tenant_id: tenantId,
+        customer_id: customerId,
+        staff_id: staffId,
+        status: 'pending',
+        amount: pricing.totalAmount,
+        discount_amount: pricing.totalDiscount ?? 0,
+        tax_amount: pricing.taxAmount ?? 0,
+        service_charge: pricing.serviceCharge ?? 0,
+        currency,
+        service_location_id: serviceLocationId,
+        metadata: {
+          order_number: `ORD-${Date.now().toString(36).toUpperCase().slice(-5)}`,
+          notes: req.body?.notes ?? req.body?.metadata?.notes ?? null,
+          payment_method: resolvedPaymentMethod,
+          order_type: legacyOrderType || fulfillmentSelection.mode,
+          table_number: resolvedTableNumber,
+          customer_name: resolvedCustomerName,
+          customer_phone: resolvedCustomerPhone,
+          // Typed canonical fulfillment snapshot
+          fulfillment_mode: fulfillmentSelection.mode,
+          fulfillment_destination_type: fulfillmentSelection.destinationType,
+          fulfillment_destination_ref: fulfillmentSelection.destinationRef,
+          // Scoped idempotency tracking
+          ...(rawIdempotencyKey ? { idempotency_key: rawIdempotencyKey } : {}),
+          ...(scopedIdempotencyKey ? { scoped_idempotency_key: scopedIdempotencyKey } : {}),
+        },
+      };
+
+      const { data: createdData, error: createError } = await supabase
         .from('transactions')
-        .insert({
-          engine_type: 'instant_transaction',
-          module_id: mounted.id,
-          property_id: propertyId,
-          tenant_id: tenantId,
-          customer_id: customerId,
-          staff_id: staffId,
-          status: 'pending',
-          amount: pricing.totalAmount,
-          discount_amount: pricing.totalDiscount ?? 0,
-          tax_amount: pricing.taxAmount ?? 0,
-          service_charge: pricing.serviceCharge ?? 0,
-          currency,
-          service_location_id: serviceLocationId,
-          metadata: {
-            order_number: `ORD-${Date.now().toString(36).toUpperCase().slice(-5)}`,
-            notes: req.body?.notes ?? req.body?.metadata?.notes ?? null,
-            payment_method: resolvedPaymentMethod,
-            order_type: legacyOrderType || fulfillmentSelection.mode,
-            table_number: resolvedTableNumber,
-            customer_name: resolvedCustomerName,
-            customer_phone: resolvedCustomerPhone,
-            // Typed canonical fulfillment snapshot
-            fulfillment_mode: fulfillmentSelection.mode,
-            fulfillment_destination_type: fulfillmentSelection.destinationType,
-            fulfillment_destination_ref: fulfillmentSelection.destinationRef,
-            // Idempotency tracking
-            ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
-          },
-        })
+        .insert(insertPayload)
         .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
         .single();
-      if (createError) throw createError;
+
+      if (createError) {
+        // Handle database-level concurrent service location occupancy race
+        if (
+          createError.message?.includes('idx_transactions_active_service_location') ||
+          createError.details?.includes('idx_transactions_active_service_location')
+        ) {
+          logger.warn('[Dynamic Router] Concurrent table race caught by database constraint:', {
+            serviceLocationId,
+            error: createError.message,
+          });
+          return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
+        }
+
+        // Handle database-level concurrent idempotency race: return already-created transaction
+        if (
+          scopedIdempotencyKey &&
+          ((createError as any).code === '23505' ||
+            createError.message?.includes('idx_transactions_scoped_idempotency') ||
+            createError.message?.includes('duplicate key') ||
+            createError.message?.includes('unique constraint'))
+        ) {
+          logger.info('[Dynamic Router] Concurrent checkout race caught by unique constraint, returning existing order');
+          const { data: existingTx } = await supabase
+            .from('transactions')
+            .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
+            .eq('module_id', mounted.id)
+            .eq('metadata->>scoped_idempotency_key', scopedIdempotencyKey)
+            .maybeSingle();
+
+          if (existingTx) {
+            return res.json({ success: true, data: existingTx });
+          }
+        }
+
+        throw createError;
+      }
+      created = createdData;
 
       // Deduct inventory atomically with audit trail; roll back transaction on stock failure
       try {

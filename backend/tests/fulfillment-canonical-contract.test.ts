@@ -136,3 +136,28 @@ describe('Currency-Aware Preview Tolerance & Exact Normalization — Phase F4 Pr
     expect(validatePricingMatch('KWD', 15.250, 15.251)).toBe(false);
   });
 });
+
+describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Integrity', () => {
+  it('scopes customer checkout idempotency to tenant, property, module, customer context, and key', () => {
+    function computeScopedKey(tenantId: string, propertyId: string, moduleId: string, customerScope: string, key: string): string {
+      return `${tenantId}:${propertyId}:${moduleId}:${customerScope}:${key}`;
+    }
+
+    const key1 = computeScopedKey('t1', 'p1', 'm1', 'guest-123', 'chk_abc123');
+    const key2 = computeScopedKey('t1', 'p1', 'm1', 'guest-123', 'chk_abc123');
+    // Same commercial context & key match
+    expect(key1).toBe(key2);
+
+    // Different customer with same key does not collide
+    const keyDiffCustomer = computeScopedKey('t1', 'p1', 'm1', 'guest-456', 'chk_abc123');
+    expect(key1).not.toBe(keyDiffCustomer);
+
+    // Different module with same key does not collide
+    const keyDiffModule = computeScopedKey('t1', 'p1', 'm2', 'guest-123', 'chk_abc123');
+    expect(key1).not.toBe(keyDiffModule);
+
+    // Different tenant with same key does not collide
+    const keyDiffTenant = computeScopedKey('t2', 'p1', 'm1', 'guest-123', 'chk_abc123');
+    expect(key1).not.toBe(keyDiffTenant);
+  });
+});

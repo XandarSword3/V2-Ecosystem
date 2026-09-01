@@ -67,8 +67,8 @@ describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning'
     expect(getFulfillmentForModule('mod-spa')).toBeUndefined();
   });
 
-  it('clears items only for the specified module, preserving items from other modules', () => {
-    const { addItem, clearModuleItems } = useCartStore.getState();
+  it('clears items and fulfillment selection only for the specified module on checkout completion', () => {
+    const { addItem, setFulfillmentForModule, clearModuleCheckoutState, getFulfillmentForModule } = useCartStore.getState();
 
     addItem({
       id: 'burger-1',
@@ -88,15 +88,37 @@ describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning'
       moduleSlug: 'retail',
     });
 
-    expect(useCartStore.getState().items).toHaveLength(2);
+    setFulfillmentForModule('mod-restaurant', {
+      mode: 'on_premise',
+      destinationType: 'on_premise_location',
+      destinationRef: 'loc-1',
+    });
 
-    // Clear only restaurant items
-    clearModuleItems('mod-restaurant');
+    setFulfillmentForModule('mod-retail', {
+      mode: 'local_delivery',
+      destinationType: 'address',
+      destinationRef: '456 Elm St',
+    });
+
+    expect(useCartStore.getState().items).toHaveLength(2);
+    expect(getFulfillmentForModule('mod-restaurant')).toBeDefined();
+    expect(getFulfillmentForModule('mod-retail')).toBeDefined();
+
+    // Clear checkout state for restaurant
+    clearModuleCheckoutState('mod-restaurant');
 
     const remaining = useCartStore.getState().items;
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe('tshirt-1');
     expect(remaining[0].moduleId).toBe('mod-retail');
+
+    // Restaurant fulfillment selection is cleared; retail fulfillment selection remains intact!
+    expect(getFulfillmentForModule('mod-restaurant')).toBeUndefined();
+    expect(getFulfillmentForModule('mod-retail')).toEqual({
+      mode: 'local_delivery',
+      destinationType: 'address',
+      destinationRef: '456 Elm St',
+    });
   });
 
   describe('Zustand Persistence Migration (Version 2)', () => {

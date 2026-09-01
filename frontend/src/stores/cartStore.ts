@@ -52,6 +52,7 @@ export interface CartState {
   updateInstructions: (itemId: string, instructions: string, uniqueKey?: string) => void;
   clearCart: () => void;
   clearModuleItems: (moduleId: string) => void;
+  clearModuleCheckoutState: (moduleId: string) => void;
   getTotal: () => number;
   getCount: () => number;
 
@@ -144,9 +145,18 @@ export const useCartStore = create<CartState>()(
 
       clearCart: () => set({ items: [], fulfillmentByModule: {} }),
 
-      clearModuleItems: (moduleIdOrSlug) => set((state) => ({
-        items: state.items.filter((i) => i.moduleId !== moduleIdOrSlug && i.moduleSlug !== moduleIdOrSlug),
-      })),
+      clearModuleCheckoutState: (moduleIdOrSlug) => set((state) => {
+        const nextFulfillment = { ...state.fulfillmentByModule };
+        delete nextFulfillment[moduleIdOrSlug];
+        return {
+          items: state.items.filter((i) => i.moduleId !== moduleIdOrSlug && i.moduleSlug !== moduleIdOrSlug),
+          fulfillmentByModule: nextFulfillment,
+        };
+      }),
+
+      clearModuleItems: (moduleIdOrSlug) => {
+        get().clearModuleCheckoutState(moduleIdOrSlug);
+      },
 
       getTotal: () => calculateSubtotal(get().items),
 

@@ -75,6 +75,35 @@ describe('FulfillmentModeSelector — Phase F4 Canonical Modes Presentation', ()
     expect(screen.getByTestId('mode-option-none')).toBeDefined();
   });
 
+  it('fails closed when options are empty: renders unavailable state and NEVER invents on_premise or pickup', () => {
+    const handleSelect = vi.fn();
+    render(
+      <FulfillmentModeSelector
+        options={[]}
+        selectedMode={undefined}
+        onSelectMode={handleSelect}
+      />
+    );
+
+    expect(screen.getByTestId('fulfillment-modes-unavailable')).toBeDefined();
+    expect(screen.queryByTestId('mode-option-on_premise')).toBeNull();
+    expect(screen.queryByTestId('mode-option-pickup')).toBeNull();
+  });
+
+  it('renders loading skeleton when loading={true}', () => {
+    const handleSelect = vi.fn();
+    render(
+      <FulfillmentModeSelector
+        options={allSevenOptions}
+        selectedMode="on_premise"
+        onSelectMode={handleSelect}
+        loading={true}
+      />
+    );
+
+    expect(screen.getByTestId('fulfillment-mode-selector-loading')).toBeDefined();
+  });
+
   it('invokes onSelectMode with the canonical mode when clicked', () => {
     const handleSelect = vi.fn();
     render(
@@ -126,6 +155,22 @@ describe('DestinationRequirementsEditor — Phase F4 Destination Semantics', () 
     expect(availableBtn.disabled).toBe(false);
     fireEvent.click(availableBtn);
     expect(handleChange).toHaveBeenCalledWith('on_premise_location', 'loc-1');
+  });
+
+  it('fails closed when no service locations are available for on_premise mode (no text input fallback)', () => {
+    const handleChange = vi.fn();
+    render(
+      <DestinationRequirementsEditor
+        mode="on_premise"
+        destinationType="on_premise_location"
+        destinationRef={null}
+        onChange={handleChange}
+        serviceLocations={[]}
+      />
+    );
+
+    expect(screen.getByTestId('no-locations-available')).toBeDefined();
+    expect(screen.queryByRole('textbox')).toBeNull();
   });
 
   it('renders pickup instructions for pickup mode', () => {

@@ -272,10 +272,11 @@ describe('CustomerCommerceFlow — Phase F4 End-to-End Commerce Lifecycle', () =
     // Verify router redirected to confirmation
     expect(mockPush).toHaveBeenCalledWith('/demo-resort/restaurant/confirmation?type=order&id=tx-ord-999');
 
-    // Verify ONLY restaurant items were cleared from the global cart; retail item remains!
+    // Verify ONLY restaurant items and restaurant fulfillment state were cleared; retail item remains!
     const remainingItems = useCartStore.getState().items;
     expect(remainingItems).toHaveLength(1);
     expect(remainingItems[0].id).toBe('gift-1');
     expect(remainingItems[0].moduleId).toBe('mod-retail');
+    expect(useCartStore.getState().getFulfillmentForModule('mod-restaurant')).toBeUndefined();
   });
 });

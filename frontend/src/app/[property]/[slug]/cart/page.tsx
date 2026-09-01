@@ -304,8 +304,11 @@ export default function ModuleCartPage() {
     }
 
     // Destination requirements validation per canonical mode
-    if (selectedMode === 'on_premise' && (!selectedDestinationRef || !selectedDestinationRef.trim())) {
-      toast.error(t('selectLocationOrTable') || 'Please select your table or service location');
+    if (
+      selectedMode === 'on_premise' &&
+      (!selectedDestinationRef || !serviceLocations.some(l => l.id === selectedDestinationRef))
+    ) {
+      toast.error(t('selectLocationOrTable') || 'Please select a valid table or service location');
       setActiveStep(2);
       return;
     }
@@ -664,6 +667,7 @@ export default function ModuleCartPage() {
                       options={fulfillmentOptions}
                       selectedMode={selectedMode}
                       onSelectMode={handleSelectMode}
+                      loading={modulesLoading}
                     />
 
                     <DestinationRequirementsEditor

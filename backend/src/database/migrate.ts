@@ -256,6 +256,8 @@ export async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_transactions_customer_id ON transactions(customer_id);
       CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status);
       CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_scoped_idempotency ON transactions ((metadata->>'scoped_idempotency_key')) WHERE (metadata->>'scoped_idempotency_key') IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_active_service_location ON transactions (service_location_id) WHERE service_location_id IS NOT NULL AND engine_type = 'instant_transaction' AND status NOT IN ('completed', 'cancelled');
 
       -- Support inquiries table
       CREATE TABLE IF NOT EXISTS support_inquiries (

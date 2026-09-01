@@ -64,7 +64,7 @@ export function DestinationRequirementsEditor({
         ) : activeLocations.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
             {activeLocations.map((loc) => {
-              const isSelected = destinationRef === loc.id || destinationRef === loc.name;
+              const isSelected = destinationRef === loc.id;
               const isOccupied = loc.is_occupied;
 
               return (
@@ -101,14 +101,8 @@ export function DestinationRequirementsEditor({
             })}
           </div>
         ) : (
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={destinationRef || ''}
-              onChange={(e) => onChange('on_premise_location', e.target.value)}
-              placeholder={t('enterTableNumberPlaceholder') || 'e.g. Table 5, Poolside Lounger 12'}
-              className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+          <div data-testid="no-locations-available" className="p-4 rounded-xl border border-dashed border-border bg-muted/30 text-xs text-muted-foreground text-center">
+            {t('noLocationsConfigured') || 'No service locations or tables are currently available for this module.'}
           </div>
         )}
       </div>

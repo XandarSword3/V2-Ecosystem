@@ -20,6 +20,7 @@ export interface FulfillmentModeSelectorProps {
   onSelectMode: (mode: FulfillmentMode) => void;
   className?: string;
   disabled?: boolean;
+  loading?: boolean;
 }
 
 interface ModeDisplayMeta {
@@ -87,6 +88,8 @@ const MODE_META: Record<FulfillmentMode, ModeDisplayMeta> = {
  *
  * Renders available selectable fulfillment modes and non-fulfillment mode (`none`)
  * derived directly from EngineACapabilities options.
+ *
+ * FAILS CLOSED: Never invents fallback modes if capabilities are empty or unavailable.
  */
 export function FulfillmentModeSelector({
   options,
@@ -94,13 +97,37 @@ export function FulfillmentModeSelector({
   onSelectMode,
   className = '',
   disabled = false,
+  loading = false,
 }: FulfillmentModeSelectorProps) {
   const t = useTranslations('common');
 
-  // If no options are declared by capability, fall back safely
-  const availableModes: FulfillmentMode[] = options && options.length > 0
-    ? options.map(o => o.mode)
-    : ['on_premise', 'pickup'];
+  if (loading) {
+    return (
+      <div className={`fulfillment-mode-selector space-y-3 ${className}`} data-testid="fulfillment-mode-selector-loading">
+        <div className="h-4 w-40 bg-muted/60 rounded animate-pulse mb-2" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="h-20 rounded-xl bg-muted/40 animate-pulse border border-border/40" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!options || options.length === 0) {
+    return (
+      <div className={`fulfillment-mode-selector space-y-2 ${className}`} data-testid="fulfillment-mode-selector">
+        <label className="block text-sm font-semibold text-foreground mb-2">
+          {t('selectFulfillmentMode') || 'Select Fulfillment Method'}
+        </label>
+        <div data-testid="fulfillment-modes-unavailable" className="p-4 rounded-xl border border-dashed border-border bg-muted/30 text-muted-foreground text-sm text-center">
+          {t('noFulfillmentModesAvailable') || 'No fulfillment methods are currently offered for this module.'}
+        </div>
+      </div>
+    );
+  }
+
+  const availableModes: FulfillmentMode[] = options.map((o) => o.mode);
 
   return (
     <div className={`fulfillment-mode-selector space-y-3 ${className}`} data-testid="fulfillment-mode-selector">
