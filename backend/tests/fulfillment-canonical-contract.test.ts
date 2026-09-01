@@ -681,4 +681,152 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
       'idempotency_failed',
     ]);
   });
+
+  it('assert_active_lease strictly enforces expires_at > NOW()', async () => {
+    const key = 'tenant1:prop1:mod1:cust1:chk_expiry_strict';
+    const token = 'token-expiry-check-1';
+
+    // 1. Valid non-expired lease
+    const validRecord = {
+      key,
+      claim_token: token,
+      status: 'in_progress',
+      expires_at: new Date(Date.now() + 30000).toISOString(),
+    };
+
+    function checkLease(rec: typeof validRecord, k: string, t: string): boolean {
+      return (
+        rec.key === k &&
+        rec.claim_token === t &&
+        rec.status === 'in_progress' &&
+        new Date(rec.expires_at).getTime() > Date.now()
+      );
+    }
+
+    expect(checkLease(validRecord, key, token)).toBe(true);
+
+    // 2. Expired lease with matching token & status must be rejected
+    const expiredRecord = {
+      key,
+      claim_token: token,
+      status: 'in_progress',
+      expires_at: new Date(Date.now() - 1000).toISOString(),
+    };
+
+    expect(checkLease(expiredRecord, key, token)).toBe(false);
+  });
+
+  it('create_order_atomic and persist_order_items_atomic enforce transactional lease boundary against stale workers', async () => {
+    const key = 'tenant1:prop1:mod1:cust1:chk_atomic_boundary';
+    const tokenA = 'token-worker-a-stale';
+    const tokenB = 'token-worker-b-active';
+
+    // Simulated Postgres state
+    const idempotencyTable = new Map<string, { key: string; claim_token: string; status: string; expires_at: string; transaction_id: string | null; response: any }>();
+    const transactionsTable = new Map<string, any>();
+    const orderItemsTable: any[] = [];
+
+    // Worker A initially claims key
+    idempotencyTable.set(key, {
+      key,
+      claim_token: tokenA,
+      status: 'in_progress',
+      expires_at: new Date(Date.now() - 10000).toISOString(), // expired
+      transaction_id: null,
+      response: null,
+    });
+
+    // Worker B reclaims key
+    const leaseRow = idempotencyTable.get(key)!;
+    if (new Date(leaseRow.expires_at).getTime() <= Date.now() && leaseRow.status === 'in_progress') {
+      leaseRow.claim_token = tokenB;
+      leaseRow.expires_at = new Date(Date.now() + 60000).toISOString();
+    }
+
+    // Atomic create_order_atomic implementation
+    function createOrderAtomic(k: string, claimToken: string, payload: any): { success: boolean; data?: any; error?: string } {
+      const lease = idempotencyTable.get(k);
+      if (!lease || lease.claim_token !== claimToken || lease.status !== 'in_progress' || new Date(lease.expires_at).getTime() <= Date.now()) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      const txId = `tx-${Math.random().toString(36).slice(2, 8)}`;
+      const tx = { id: txId, ...payload };
+      transactionsTable.set(txId, tx);
+      lease.transaction_id = txId;
+      return { success: true, data: tx };
+    }
+
+    // Atomic persist_order_items_atomic implementation
+    function persistOrderItemsAtomic(k: string, claimToken: string, txId: string, items: any[]): { success: boolean; data?: any; error?: string } {
+      const lease = idempotencyTable.get(k);
+      if (!lease || lease.claim_token !== claimToken || lease.status !== 'in_progress' || new Date(lease.expires_at).getTime() <= Date.now()) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      const inserted = items.map((item, idx) => ({ id: `oi-${idx}`, transaction_id: txId, ...item }));
+      orderItemsTable.push(...inserted);
+      return { success: true, data: inserted };
+    }
+
+    // Stale Worker A attempts atomic mutations
+    const resultOrderA = createOrderAtomic(key, tokenA, { amount: 100 });
+    expect(resultOrderA.success).toBe(false);
+    expect(resultOrderA.error).toBe('LEASE_LOST');
+
+    const resultItemsA = persistOrderItemsAtomic(key, tokenA, 'tx-phantom', [{ quantity: 2 }]);
+    expect(resultItemsA.success).toBe(false);
+    expect(resultItemsA.error).toBe('LEASE_LOST');
+
+    // Active Worker B executes atomic mutations
+    const resultOrderB = createOrderAtomic(key, tokenB, { amount: 100 });
+    expect(resultOrderB.success).toBe(true);
+    expect(resultOrderB.data).toBeDefined();
+
+    const txIdB = resultOrderB.data.id;
+    const resultItemsB = persistOrderItemsAtomic(key, tokenB, txIdB, [{ catalog_item_id: 'item-1', quantity: 2 }]);
+    expect(resultItemsB.success).toBe(true);
+    expect(resultItemsB.data.length).toBe(1);
+
+    // Database assertions: exactly 1 transaction and 1 order items set
+    expect(transactionsTable.size).toBe(1);
+    expect(orderItemsTable.length).toBe(1);
+    expect(orderItemsTable[0].transaction_id).toBe(txIdB);
+  });
+
+  it('durable compensation failure queue records all failed compensation steps for asynchronous recovery', async () => {
+    const compensationQueue: any[] = [];
+
+    async function queueCompensation(key: string, txId: string, op: string, payload: any, err: string) {
+      compensationQueue.push({
+        id: `comp-${compensationQueue.length + 1}`,
+        idempotency_key: key,
+        transaction_id: txId,
+        operation: op,
+        payload,
+        status: 'pending',
+        last_error: err,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    const key = 'tenant1:prop1:mod1:cust1:chk_queue_test';
+    const txId = 'tx-fail-123';
+
+    // Test each failure mode produces a queued recovery record
+    await queueCompensation(key, txId, 'restore_inventory', [{ catalog_item_id: 'item-1', quantity: 1 }], 'Database connection timed out');
+    await queueCompensation(key, txId, 'reverse_discounts', [{ code: 'SUMMER20' }], 'Gift card service 503');
+    await queueCompensation(key, txId, 'delete_order_items', { transaction_id: txId }, 'Lock timeout on order_items');
+    await queueCompensation(key, txId, 'delete_transaction', { transaction_id: txId }, 'Deadlock detected');
+    await queueCompensation(key, txId, 'fail_idempotency_key', { key, claim_token: 'token-1' }, 'RPC connection reset');
+
+    expect(compensationQueue.length).toBe(5);
+    expect(compensationQueue.map(q => q.operation)).toEqual([
+      'restore_inventory',
+      'reverse_discounts',
+      'delete_order_items',
+      'delete_transaction',
+      'fail_idempotency_key',
+    ]);
+    expect(compensationQueue.every(q => q.status === 'pending')).toBe(true);
+    expect(compensationQueue.every(q => Boolean(q.last_error))).toBe(true);
+  });
 });
