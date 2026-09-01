@@ -265,6 +265,7 @@ export async function migrate() {
 
       CREATE TABLE IF NOT EXISTS idempotency_records (
         key VARCHAR(255) PRIMARY KEY,
+        claim_token UUID NOT NULL DEFAULT gen_random_uuid(),
         status VARCHAR(50) NOT NULL DEFAULT 'in_progress',
         transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
         response JSONB,
@@ -272,6 +273,7 @@ export async function migrate() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      ALTER TABLE idempotency_records ADD COLUMN IF NOT EXISTS claim_token UUID NOT NULL DEFAULT gen_random_uuid();
       ALTER TABLE idempotency_records ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '60 seconds');
       CREATE INDEX IF NOT EXISTS idx_idempotency_records_status ON idempotency_records(status);
 
@@ -285,28 +287,29 @@ export async function migrate() {
         v_record RECORD;
         v_now TIMESTAMPTZ := NOW();
         v_expires TIMESTAMPTZ := v_now + (p_lease_seconds || ' seconds')::INTERVAL;
+        v_token UUID := gen_random_uuid();
       BEGIN
-        -- Try to insert new claim
-        INSERT INTO idempotency_records (key, status, response, transaction_id, created_at, updated_at, expires_at)
-        VALUES (p_key, 'in_progress', NULL, NULL, v_now, v_now, v_expires)
+        -- 1. Try to insert new claim with token
+        INSERT INTO idempotency_records (key, claim_token, status, response, transaction_id, created_at, updated_at, expires_at)
+        VALUES (p_key, v_token, 'in_progress', NULL, NULL, v_now, v_now, v_expires)
         ON CONFLICT (key) DO NOTHING
         RETURNING * INTO v_record;
 
         IF FOUND THEN
-          RETURN jsonb_build_object('claimed', true, 'status', 'in_progress');
+          RETURN jsonb_build_object('claimed', true, 'status', 'in_progress', 'claim_token', v_record.claim_token);
         END IF;
 
-        -- Row exists, check current state with lock
+        -- 2. Row exists, check current state with row lock
         SELECT * INTO v_record FROM idempotency_records WHERE key = p_key FOR UPDATE;
 
         IF NOT FOUND THEN
-          INSERT INTO idempotency_records (key, status, response, transaction_id, created_at, updated_at, expires_at)
-          VALUES (p_key, 'in_progress', NULL, NULL, v_now, v_now, v_expires)
+          INSERT INTO idempotency_records (key, claim_token, status, response, transaction_id, created_at, updated_at, expires_at)
+          VALUES (p_key, v_token, 'in_progress', NULL, NULL, v_now, v_now, v_expires)
           ON CONFLICT (key) DO NOTHING
           RETURNING * INTO v_record;
           
           IF FOUND THEN
-            RETURN jsonb_build_object('claimed', true, 'status', 'in_progress');
+            RETURN jsonb_build_object('claimed', true, 'status', 'in_progress', 'claim_token', v_record.claim_token);
           END IF;
           SELECT * INTO v_record FROM idempotency_records WHERE key = p_key;
         END IF;
@@ -322,14 +325,15 @@ export async function migrate() {
 
         IF v_record.status = 'failed' OR (v_record.status = 'in_progress' AND v_record.expires_at < v_now) THEN
           UPDATE idempotency_records
-          SET status = 'in_progress',
+          SET claim_token = v_token,
+              status = 'in_progress',
               response = NULL,
               transaction_id = NULL,
               updated_at = v_now,
               expires_at = v_expires
           WHERE key = p_key;
 
-          RETURN jsonb_build_object('claimed', true, 'status', 'in_progress');
+          RETURN jsonb_build_object('claimed', true, 'status', 'in_progress', 'claim_token', v_token);
         END IF;
 
         RETURN jsonb_build_object(
@@ -337,6 +341,68 @@ export async function migrate() {
           'status', 'in_progress',
           'expires_at', v_record.expires_at
         );
+      END;
+      $$;
+
+      CREATE OR REPLACE FUNCTION complete_idempotency_key(
+        p_key TEXT,
+        p_claim_token UUID,
+        p_transaction_id UUID,
+        p_response JSONB
+      ) RETURNS BOOLEAN
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        v_updated INTEGER;
+      BEGIN
+        UPDATE idempotency_records
+        SET status = 'completed',
+            transaction_id = p_transaction_id,
+            response = p_response,
+            updated_at = NOW()
+        WHERE key = p_key AND claim_token = p_claim_token AND status = 'in_progress';
+
+        GET DIAGNOSTICS v_updated = ROW_COUNT;
+        RETURN v_updated > 0;
+      END;
+      $$;
+
+      CREATE OR REPLACE FUNCTION fail_idempotency_key(
+        p_key TEXT,
+        p_claim_token UUID
+      ) RETURNS BOOLEAN
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        v_updated INTEGER;
+      BEGIN
+        UPDATE idempotency_records
+        SET status = 'failed',
+            updated_at = NOW()
+        WHERE key = p_key AND claim_token = p_claim_token AND status = 'in_progress';
+
+        GET DIAGNOSTICS v_updated = ROW_COUNT;
+        RETURN v_updated > 0;
+      END;
+      $$;
+
+      CREATE OR REPLACE FUNCTION heartbeat_idempotency_key(
+        p_key TEXT,
+        p_claim_token UUID,
+        p_extension_seconds INTEGER DEFAULT 60
+      ) RETURNS BOOLEAN
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        v_updated INTEGER;
+      BEGIN
+        UPDATE idempotency_records
+        SET expires_at = NOW() + (p_extension_seconds || ' seconds')::INTERVAL,
+            updated_at = NOW()
+        WHERE key = p_key AND claim_token = p_claim_token AND status = 'in_progress';
+
+        GET DIAGNOSTICS v_updated = ROW_COUNT;
+        RETURN v_updated > 0;
       END;
       $$;
 

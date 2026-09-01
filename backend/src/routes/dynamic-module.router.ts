@@ -282,17 +282,19 @@ async function fetchServiceLocationsWithOccupancy(moduleId: string) {
 interface IdempotencyClaimResult {
   claimed: boolean;
   status: 'in_progress' | 'completed' | 'failed';
+  claim_token?: string;
   response?: any;
   transaction_id?: string;
 }
 
 /**
- * Single-writer atomic lease claim for commercial checkout requests (Phase F4).
+ * Single-writer atomic lease claim with ownership token for commercial checkout requests (Phase F4).
  * Enforces single executor, eliminates concurrent race executions, and supports safe retries on failure.
  */
 async function claimIdempotency(supabase: any, key: string, leaseSeconds: number = 60): Promise<IdempotencyClaimResult> {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + leaseSeconds * 1000).toISOString();
+  const token = crypto.randomUUID();
 
   try {
     const { data: rpcResult, error: rpcError } = await supabase.rpc('claim_idempotency_key', {
@@ -304,26 +306,27 @@ async function claimIdempotency(supabase: any, key: string, leaseSeconds: number
     }
   } catch (_) {}
 
-  // Direct database claim fallback
+  // Direct database claim fallback (atomic insert with token)
   const { data: inserted, error: insertErr } = await supabase
     .from('idempotency_records')
     .insert({
       key,
+      claim_token: token,
       status: 'in_progress',
       expires_at: expiresAt,
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
     })
-    .select('key, status, response, transaction_id, expires_at')
+    .select('key, claim_token, status, response, transaction_id, expires_at')
     .maybeSingle();
 
   if (!insertErr && inserted) {
-    return { claimed: true, status: 'in_progress' };
+    return { claimed: true, status: 'in_progress', claim_token: token };
   }
 
   const { data: existing } = await supabase
     .from('idempotency_records')
-    .select('key, status, response, transaction_id, expires_at')
+    .select('key, claim_token, status, response, transaction_id, expires_at')
     .eq('key', key)
     .maybeSingle();
 
@@ -345,6 +348,7 @@ async function claimIdempotency(supabase: any, key: string, leaseSeconds: number
     const { data: updated } = await supabase
       .from('idempotency_records')
       .update({
+        claim_token: token,
         status: 'in_progress',
         response: null,
         transaction_id: null,
@@ -353,11 +357,11 @@ async function claimIdempotency(supabase: any, key: string, leaseSeconds: number
       })
       .eq('key', key)
       .eq('status', existing.status)
-      .select('key, status')
+      .select('key, claim_token, status')
       .maybeSingle();
 
     if (updated) {
-      return { claimed: true, status: 'in_progress' };
+      return { claimed: true, status: 'in_progress', claim_token: token };
     }
   }
 
@@ -375,13 +379,16 @@ async function claimIdempotency(supabase: any, key: string, leaseSeconds: number
 async function rollbackFailedOrder(
   supabase: any,
   transactionId: string | null,
-  orderItems: any[],
+  baseInventoryItems: any[],
+  discounts: any[] | undefined,
   scopedIdempotencyKey: string | null,
+  claimToken: string | null,
   userId?: string | null,
 ) {
   try {
-    if (orderItems && orderItems.length > 0) {
-      const restorePayload = orderItems.map((oi: any) => ({
+    // 1. Compensate base inventory if deducted
+    if (baseInventoryItems && baseInventoryItems.length > 0) {
+      const restorePayload = baseInventoryItems.map((oi: any) => ({
         catalog_item_id: oi.catalog_item_id,
         quantity: oi.quantity,
       }));
@@ -391,19 +398,38 @@ async function rollbackFailedOrder(
       });
     }
 
+    // 2. Reverse discounts if any were applied
+    if (discounts && discounts.length > 0) {
+      await reverseDiscounts(supabase, discounts, { userId: userId ?? undefined, orderId: transactionId ?? undefined });
+    }
+
+    // 3. Delete order_items
     if (transactionId) {
       await supabase.from('order_items').delete().eq('transaction_id', transactionId);
       await supabase.from('transactions').delete().eq('id', transactionId);
     }
 
-    if (scopedIdempotencyKey) {
-      await supabase
-        .from('idempotency_records')
-        .update({
-          status: 'failed',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('key', scopedIdempotencyKey);
+    // 4. Mark idempotency failed with owner token check
+    if (scopedIdempotencyKey && claimToken) {
+      try {
+        const { data: rpcFailed } = await supabase.rpc('fail_idempotency_key', {
+          p_key: scopedIdempotencyKey,
+          p_claim_token: claimToken,
+        });
+        if (!rpcFailed) {
+          await supabase
+            .from('idempotency_records')
+            .update({ status: 'failed', updated_at: new Date().toISOString() })
+            .eq('key', scopedIdempotencyKey)
+            .eq('claim_token', claimToken);
+        }
+      } catch (_) {
+        await supabase
+          .from('idempotency_records')
+          .update({ status: 'failed', updated_at: new Date().toISOString() })
+          .eq('key', scopedIdempotencyKey)
+          .eq('claim_token', claimToken);
+      }
     }
   } catch (err) {
     logger.error('[Dynamic Router] Failed during order rollback compensation:', err);
@@ -1006,7 +1032,11 @@ function buildInstantTransactionRouter(router: Router): void {
   });
   router.post('/orders', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
     let scopedIdempotencyKey: string | null = null;
+    let claimToken: string | null = null;
     let created: any = null;
+    let baseInventoryDeducted = false;
+    let baseInventoryRestorePayload: any[] = [];
+    let appliedDiscounts: any[] | undefined = undefined;
     let insertedOrderItems: any[] = [];
     const supabase = getSupabase();
     try {
@@ -1167,6 +1197,7 @@ function buildInstantTransactionRouter(router: Router): void {
                 const retryClaim = await claimIdempotency(supabase, scopedIdempotencyKey);
                 if (retryClaim.claimed) {
                   claimResult = retryClaim;
+                  claimToken = retryClaim.claim_token ?? null;
                   break;
                 }
               }
@@ -1184,6 +1215,8 @@ function buildInstantTransactionRouter(router: Router): void {
               });
             }
           }
+        } else {
+          claimToken = claimResult.claim_token ?? null;
         }
       }
 
@@ -1206,6 +1239,7 @@ function buildInstantTransactionRouter(router: Router): void {
           paymentMethod: resolvedPaymentMethod,
         },
       });
+      appliedDiscounts = pricing.discounts;
 
       // Validate pricing matches preview if provided (currency-aware exact normalization)
       const previewTotal = typeof req.body?.previewTotal === 'number' ? req.body.previewTotal : null;
@@ -1223,6 +1257,7 @@ function buildInstantTransactionRouter(router: Router): void {
             currency,
             moduleId: mounted.id,
           });
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
           return res.status(400).json({
             success: false,
             error: 'Pricing mismatch detected',
@@ -1251,6 +1286,7 @@ function buildInstantTransactionRouter(router: Router): void {
           .maybeSingle();
         if (locationError) throw locationError;
         if (!locationRow) {
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
           return res.status(400).json({ success: false, error: 'service_location_id does not belong to this module' });
         }
         
@@ -1264,6 +1300,7 @@ function buildInstantTransactionRouter(router: Router): void {
           .limit(1);
         if (occupancyError) throw occupancyError;
         if (existingOrders && existingOrders.length > 0) {
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
           return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
         }
         serviceLocationId = locationRow.id;
@@ -1281,7 +1318,6 @@ function buildInstantTransactionRouter(router: Router): void {
         address: req.body?.address ?? req.body?.deliveryAddress ?? req.body?.metadata?.address ?? null,
       });
 
-      let created: any;
       const insertPayload = {
         engine_type: 'instant_transaction',
         module_id: mounted.id,
@@ -1330,6 +1366,7 @@ function buildInstantTransactionRouter(router: Router): void {
             serviceLocationId,
             error: createError.message,
           });
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
           return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
         }
 
@@ -1371,14 +1408,9 @@ function buildInstantTransactionRouter(router: Router): void {
             quantity: item.quantity,
           };
         });
+        baseInventoryRestorePayload = inventoryItemsPayload;
 
         // ── PATH A: AUTHORITATIVE stock deduction (Phase 5) ─────────────────
-        // This is the ONE authoritative inventory mutation for Engine A orders.
-        // It deducts base recipe stock immediately at creation time, BEFORE the
-        // order is committed to the kitchen. If this fails, the order is deleted.
-        // Restored by restore_inventory_for_order_items on cancellation.
-        // The engine state machine side effect (Path B in inventory-side-effects.ts)
-        // is now a no-op for orders created through this path.
         const { error: deductErr } = await supabase.rpc('deduct_inventory_for_order_items', {
           p_items: inventoryItemsPayload,
           p_user_id: req.user?.userId ?? null,
@@ -1387,16 +1419,17 @@ function buildInstantTransactionRouter(router: Router): void {
 
         if (deductErr) {
           logger.warn('[Dynamic Router] Inventory deduction failed, rolling back order:', deductErr.message);
-          await rollbackFailedOrder(supabase, created.id, [], scopedIdempotencyKey, req.user?.userId);
+          await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
           return res.status(400).json({
             success: false,
             error: 'INSUFFICIENT_STOCK',
             message: 'One or more items in your order are out of stock',
           });
         }
+        baseInventoryDeducted = true;
       } catch (invErr: any) {
         logger.error('[Dynamic Router] Exception during inventory deduction:', invErr);
-        await rollbackFailedOrder(supabase, created.id, [], scopedIdempotencyKey, req.user?.userId);
+        await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
         return res.status(400).json({
           success: false,
           error: 'INSUFFICIENT_STOCK',
@@ -1405,33 +1438,23 @@ function buildInstantTransactionRouter(router: Router): void {
       }
 
       // Backfill the order_id onto the coupon_usage/gift_card_transactions
-      // row(s) created during pricing above (they were inserted with
-      // order_id NULL since the order didn't exist yet) so this order can be
-      // traced back to what it consumed, and so a later cancellation/refund
-      // can reverse it precisely by order_id instead of by fuzzy recency.
-      await linkDiscountsToOrder(supabase, pricing.discounts, created.id, req.user?.userId ?? undefined);
+      try {
+        await linkDiscountsToOrder(supabase, pricing.discounts, created.id, req.user?.userId ?? undefined);
+      } catch (linkErr) {
+        logger.error('[Dynamic Router] Exception during discount linking, rolling back order:', linkErr);
+        await rollbackFailedOrder(
+          supabase,
+          created.id,
+          baseInventoryDeducted ? baseInventoryRestorePayload : [],
+          appliedDiscounts,
+          scopedIdempotencyKey,
+          claimToken,
+          req.user?.userId,
+        );
+        return res.status(500).json({ success: false, error: 'Failed to process discounts for order' });
+      }
 
-      // CRITICAL: persist order_items. Previously nothing in this codebase
-      // ever wrote a row to order_items — the only per-item record of an
-      // order was `receiptLineItems`, buried inside engine_financial_ledger
-      // metadata for receipt display only. Two real capabilities were
-      // silently broken as a result:
-      //   1. deduct_inventory_for_order_v2 (called on status → confirmed,
-      //      see engines/inventory-side-effects.ts) reads FROM order_items
-      //      WHERE transaction_id = p_transaction_id — with no rows, it
-      //      iterates zero times and deducts nothing. Every "confirmed"
-      //      order has been a no-op for inventory.
-      //   2. The staff/KDS orders endpoint has always returned items: []
-      //      for every order (see module-staff.controller.ts) — kitchen
-      //      staff never saw what was actually ordered.
-      // Item status defaults to 'pending' — this is what the item-level
-      // KDS (staff/KitchenView.tsx) advances through preparing/ready/served.
-      // Non-fatal by design, matching the ledger-recording block below: the
-      // transactions row is already the authoritative "an order exists"
-      // record, so a hiccup here must not block order creation — but unlike
-      // the ledger snapshot, a failure here means inventory won't deduct
-      // and the kitchen won't see items, so it's logged at error, not warn.
-      let insertedOrderItems: any[] = [];
+      // CRITICAL: persist order_items
       try {
         const orderItemRows = catalogResult.resolvedItems.map((item, index) => {
           const currentItem = items[index] as {
@@ -1465,25 +1488,43 @@ function buildInstantTransactionRouter(router: Router): void {
         const { data: orderItemsData, error: orderItemsError } = await supabase
           .from('order_items')
           .insert(orderItemRows)
-          .select('id, catalog_item_id, metadata');
+          .select('id, catalog_item_id, quantity, metadata');
         
         if (orderItemsError) {
-          logger.error('[Dynamic Router] Failed to persist order_items — inventory deduction and KDS item display will be broken for this order', {
+          logger.error('[Dynamic Router] Failed to persist order_items, rolling back:', {
             orderId: created.id,
             error: orderItemsError.message,
           });
-        } else {
-          insertedOrderItems = orderItemsData || [];
+          await rollbackFailedOrder(
+            supabase,
+            created.id,
+            baseInventoryDeducted ? baseInventoryRestorePayload : [],
+            appliedDiscounts,
+            scopedIdempotencyKey,
+            claimToken,
+            req.user?.userId,
+          );
+          return res.status(500).json({ success: false, error: 'Failed to record order items' });
         }
+        insertedOrderItems = orderItemsData || [];
       } catch (orderItemsErr) {
-        logger.error('[Dynamic Router] Unexpected error persisting order_items', {
+        logger.error('[Dynamic Router] Unexpected error persisting order_items, rolling back:', {
           orderId: created.id,
           error: orderItemsErr instanceof Error ? orderItemsErr.message : String(orderItemsErr),
         });
+        await rollbackFailedOrder(
+          supabase,
+          created.id,
+          baseInventoryDeducted ? baseInventoryRestorePayload : [],
+          appliedDiscounts,
+          scopedIdempotencyKey,
+          claimToken,
+          req.user?.userId,
+        );
+        return res.status(500).json({ success: false, error: 'Failed to record order items' });
       }
 
       // Process customization inventory for items with selectedModifiers
-      // This must happen after order_items insertion so we have order_item_id for snapshots
       if (insertedOrderItems.length > 0) {
         try {
           for (const orderItem of insertedOrderItems) {
@@ -1492,23 +1533,13 @@ function buildInstantTransactionRouter(router: Router): void {
               continue;
             }
 
-            // Transform selectedModifiers to the format expected by create_order_customization_snapshot
-            // Expected format: [{ groupId, optionId, quantity }]
             const selections = selectedModifiers.map((mod: any) => ({
               groupId: mod.groupId,
               optionId: mod.optionId,
               quantity: mod.quantity || 1,
             }));
 
-            logger.info('[Dynamic Router] Processing customizations for order item:', {
-              orderItemId: orderItem.id,
-              catalogItemId: orderItem.catalog_item_id,
-              baseQuantity: orderItem.quantity,
-              selections: selections,
-            });
-
-            // Call create_order_customization_snapshot to validate, snapshot, and execute inventory
-            const { error: customizationError, data: customizationData } = await supabase.rpc('create_order_customization_snapshot', {
+            const { error: customizationError } = await supabase.rpc('create_order_customization_snapshot', {
               p_order_type: 'instant_transaction',
               p_order_id: created.id,
               p_order_item_id: orderItem.id,
@@ -1524,18 +1555,18 @@ function buildInstantTransactionRouter(router: Router): void {
               logger.error('[Dynamic Router] Customization inventory deduction failed, rolling back order:', {
                 error: customizationError,
                 message: customizationError.message,
-                details: customizationError.details,
-                hint: customizationError.hint,
-                code: customizationError.code,
                 selections: selections,
-                baseQuantity: orderItem.quantity,
               });
               
-              // Compensating transaction: reverse base inventory deduction FIRST,
-              // then delete order_items and the transaction. Without the restore,
-              // the base deduction from deduct_inventory_for_order_items becomes a
-              // phantom — stock deducted but no order exists to compensate on.
-              await rollbackFailedOrder(supabase, created.id, insertedOrderItems, scopedIdempotencyKey, req.user?.userId);
+              await rollbackFailedOrder(
+                supabase,
+                created.id,
+                baseInventoryDeducted ? baseInventoryRestorePayload : [],
+                appliedDiscounts,
+                scopedIdempotencyKey,
+                claimToken,
+                req.user?.userId,
+              );
               
               return res.status(400).json({
                 success: false,
@@ -1547,7 +1578,15 @@ function buildInstantTransactionRouter(router: Router): void {
         } catch (customizationErr: any) {
           logger.error('[Dynamic Router] Exception during customization inventory processing:', customizationErr);
           
-          await rollbackFailedOrder(supabase, created.id, insertedOrderItems, scopedIdempotencyKey, req.user?.userId);
+          await rollbackFailedOrder(
+            supabase,
+            created.id,
+            baseInventoryDeducted ? baseInventoryRestorePayload : [],
+            appliedDiscounts,
+            scopedIdempotencyKey,
+            claimToken,
+            req.user?.userId,
+          );
           
           return res.status(400).json({
             success: false,
@@ -1557,17 +1596,7 @@ function buildInstantTransactionRouter(router: Router): void {
         }
       }
 
-      // Persist the full pricing breakdown (subtotal, discount detail,
-      // service charge, delivery fee, itemization) to the financial ledger.
-      // Previously this whole breakdown was computed by calculatePricing()
-      // above and then thrown away — only the three scalar columns on
-      // `transactions` were kept, so the confirmation page had nothing to
-      // reconstruct a receipt from. engine_financial_ledger already exists
-      // for exactly this (see FINANCIAL_INVARIANTS.md, INV-L1) but had no
-      // real call site anywhere in the app until now.
-      // Non-fatal by design: a ledger hiccup must never block the order
-      // itself from completing, since the transactions row is already the
-      // authoritative record of "an order exists" — this only enriches it.
+      // Persist to financial ledger (non-fatal)
       try {
         const actorIsStaff = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
         await engineService.recordToLedger(pricing, {
@@ -1595,13 +1624,10 @@ function buildInstantTransactionRouter(router: Router): void {
           error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
         });
       }
-      // Flatten metadata fields to top level for client convenience
+      
       const meta = (created?.metadata ?? {}) as Record<string, unknown>;
 
-      // Real-time notify the KDS. KitchenView.tsx joins both the module id
-      // and slug as socket rooms and listens for 'order:new' — nothing
-      // anywhere in the backend previously emitted it, so "live" order
-      // updates never actually happened; staff needed a manual refresh.
+      // Notify KDS (non-fatal)
       try {
         const kdsPayload = {
           id: created.id,
@@ -1637,17 +1663,26 @@ function buildInstantTransactionRouter(router: Router): void {
         },
       };
 
-      if (scopedIdempotencyKey) {
+      if (scopedIdempotencyKey && claimToken) {
         try {
-          await supabase
-            .from('idempotency_records')
-            .update({
-              status: 'completed',
-              transaction_id: created.id,
-              response: responsePayload,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('key', scopedIdempotencyKey);
+          const { data: rpcCompleted } = await supabase.rpc('complete_idempotency_key', {
+            p_key: scopedIdempotencyKey,
+            p_claim_token: claimToken,
+            p_transaction_id: created.id,
+            p_response: responsePayload,
+          });
+          if (!rpcCompleted) {
+            await supabase
+              .from('idempotency_records')
+              .update({
+                status: 'completed',
+                transaction_id: created.id,
+                response: responsePayload,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('key', scopedIdempotencyKey)
+              .eq('claim_token', claimToken);
+          }
         } catch (idempSaveErr) {
           logger.warn('[Dynamic Router] Failed to mark idempotency record completed:', idempSaveErr);
         }
@@ -1657,7 +1692,15 @@ function buildInstantTransactionRouter(router: Router): void {
     } catch (error) {
       logger.error('[Dynamic Router] POST /orders failed', error);
       if (scopedIdempotencyKey) {
-        await rollbackFailedOrder(supabase, created?.id ?? null, insertedOrderItems, scopedIdempotencyKey, req.user?.userId);
+        await rollbackFailedOrder(
+          supabase,
+          created?.id ?? null,
+          baseInventoryDeducted ? baseInventoryRestorePayload : [],
+          appliedDiscounts,
+          scopedIdempotencyKey,
+          claimToken,
+          req.user?.userId,
+        );
       }
       res.status(500).json({ success: false, error: 'Failed to create order' });
     }

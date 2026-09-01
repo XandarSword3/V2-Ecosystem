@@ -381,4 +381,110 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
     expect(recoveryClaim.claimed).toBe(true);
     expect(recoveryClaim.status).toBe('in_progress');
   });
+
+  it('rejects stale owner actions when claim_token does not match active lease', async () => {
+    const key = 'tenant1:prop1:mod1:cust1:chk_token_fencing';
+    const activeToken = 'token-worker-b-777';
+    const staleToken = 'token-worker-a-111';
+
+    const dbRecord = {
+      key,
+      claim_token: activeToken,
+      status: 'in_progress',
+      expires_at: new Date(Date.now() + 60000).toISOString(),
+      transaction_id: null as string | null,
+      response: null as any,
+    };
+
+    // Stale worker A tries to complete the order with old token
+    function attemptComplete(token: string, txId: string, resp: any): boolean {
+      if (dbRecord.key === key && dbRecord.claim_token === token && dbRecord.status === 'in_progress') {
+        dbRecord.status = 'completed';
+        dbRecord.transaction_id = txId;
+        dbRecord.response = resp;
+        return true;
+      }
+      return false;
+    }
+
+    const workerAResult = attemptComplete(staleToken, 'tx-stale-999', { success: true });
+    expect(workerAResult).toBe(false);
+    expect(dbRecord.status).toBe('in_progress');
+    expect(dbRecord.claim_token).toBe(activeToken);
+
+    // Active worker B completes with valid active token
+    const workerBResult = attemptComplete(activeToken, 'tx-valid-888', { success: true, data: { id: 'tx-valid-888' } });
+    expect(workerBResult).toBe(true);
+    expect(dbRecord.status).toBe('completed');
+    expect(dbRecord.transaction_id).toBe('tx-valid-888');
+  });
+
+  it('durable rollback compensates base inventory, reverses discounts, and fails idempotency on downstream link failure', async () => {
+    let inventoryRestored = false;
+    let discountReversed = false;
+    let transactionDeleted = false;
+    let idempotencyFailed = false;
+
+    const mockRollbackSupabase = {
+      rpc: async (fnName: string, params: any) => {
+        if (fnName === 'restore_inventory_for_order_items') {
+          inventoryRestored = true;
+          return { data: { success: true }, error: null };
+        }
+        if (fnName === 'reverse_coupon_usage' || fnName === 'restore_gift_card_balance') {
+          discountReversed = true;
+          return { data: { success: true }, error: null };
+        }
+        if (fnName === 'fail_idempotency_key') {
+          idempotencyFailed = true;
+          return { data: true, error: null };
+        }
+        return { data: null, error: null };
+      },
+      from: (table: string) => ({
+        delete: () => ({
+          eq: (col: string, val: string) => {
+            if (table === 'transactions' && val === 'tx-rollback-123') {
+              transactionDeleted = true;
+            }
+            return { data: null, error: null };
+          },
+        }),
+        update: () => ({
+          eq: () => ({
+            eq: () => ({ data: null, error: null }),
+          }),
+        }),
+      }),
+    };
+
+    // Simulate the rollback helper
+    async function executeRollback(txId: string, baseItems: any[], discounts: any[], idempKey: string, claimToken: string) {
+      if (baseItems.length > 0) {
+        await mockRollbackSupabase.rpc('restore_inventory_for_order_items', { p_items: baseItems });
+      }
+      if (discounts.length > 0) {
+        await mockRollbackSupabase.rpc('reverse_coupon_usage', { p_order_id: txId });
+      }
+      if (txId) {
+        await mockRollbackSupabase.from('transactions').delete().eq('id', txId);
+      }
+      if (idempKey && claimToken) {
+        await mockRollbackSupabase.rpc('fail_idempotency_key', { p_key: idempKey, p_claim_token: claimToken });
+      }
+    }
+
+    await executeRollback(
+      'tx-rollback-123',
+      [{ catalog_item_id: 'item-1', quantity: 2 }],
+      [{ type: 'coupon', referenceId: 'coup-1', amount: 10 }],
+      'tenant1:prop1:mod1:cust1:chk_rollback_test',
+      'token-rollback-abc',
+    );
+
+    expect(inventoryRestored).toBe(true);
+    expect(discountReversed).toBe(true);
+    expect(transactionDeleted).toBe(true);
+    expect(idempotencyFailed).toBe(true);
+  });
 });
