@@ -113,8 +113,8 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 // Mock API
-vi.mock('@/lib/api', () => ({
-  api: {
+vi.mock('@/lib/api', () => {
+  const instance = {
     get: vi.fn().mockImplementation((url: string) => {
       if (url.includes('/service-locations')) {
         return Promise.resolve({
@@ -140,6 +140,7 @@ vi.mock('@/lib/api', () => ({
               feeBreakdown: [],
               taxBreakdown: [{ name: 'VAT', rate: 0.1, amount: 2.5 }],
               totalAmount: 27.5,
+              currency: 'USD',
             },
           },
         });
@@ -165,8 +166,13 @@ vi.mock('@/lib/api', () => ({
       }
       return Promise.resolve({ data: { success: true } });
     }),
-  },
-}));
+  };
+  return {
+    __esModule: true,
+    default: instance,
+    api: instance,
+  };
+});
 
 describe('CustomerCommerceFlow — Phase F4 End-to-End Commerce Lifecycle', () => {
   beforeEach(() => {

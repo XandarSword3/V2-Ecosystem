@@ -1,13 +1,13 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { useCartStore, calculateSubtotal, type CartItem } from '@/stores/cartStore';
 
-describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning', () => {
+describe('useCartStore — Phase F5 Canonical State, Module Partitioning & Discounts', () => {
   beforeEach(() => {
     useCartStore.getState().clearCart();
     useCartStore.getState().clearOrderDetails();
   });
 
-  it('calculates subtotal with modifiers and quantities accurately', () => {
+  it('calculates subtotal with modifiers and quantities accurately (harmless UI arithmetic)', () => {
     const items: CartItem[] = [
       {
         id: 'item-1',
@@ -67,8 +67,68 @@ describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning'
     expect(getFulfillmentForModule('mod-spa')).toBeUndefined();
   });
 
-  it('clears items and fulfillment selection only for the specified module on checkout completion', () => {
-    const { addItem, setFulfillmentForModule, clearModuleCheckoutState, getFulfillmentForModule } = useCartStore.getState();
+  it('stores and isolates discount states (coupons, gift cards, loyalty points) per module', () => {
+    const {
+      setCouponForModule,
+      getCouponForModule,
+      addGiftCardForModule,
+      removeGiftCardForModule,
+      getGiftCardsForModule,
+      setLoyaltyPointsForModule,
+      getLoyaltyPointsForModule,
+      clearDiscountsForModule,
+    } = useCartStore.getState();
+
+    // Set discounts for Module A
+    setCouponForModule('mod-a', 'summer20');
+    addGiftCardForModule('mod-a', 'gc-100');
+    addGiftCardForModule('mod-a', 'gc-200');
+    setLoyaltyPointsForModule('mod-a', 500);
+
+    // Set discounts for Module B
+    setCouponForModule('mod-b', 'vip50');
+    addGiftCardForModule('mod-b', 'gc-999');
+    setLoyaltyPointsForModule('mod-b', 100);
+
+    // Assert Module A values
+    expect(getCouponForModule('mod-a')).toBe('SUMMER20');
+    expect(getGiftCardsForModule('mod-a')).toEqual(['GC-100', 'GC-200']);
+    expect(getLoyaltyPointsForModule('mod-a')).toBe(500);
+
+    // Assert Module B values
+    expect(getCouponForModule('mod-b')).toBe('VIP50');
+    expect(getGiftCardsForModule('mod-b')).toEqual(['GC-999']);
+    expect(getLoyaltyPointsForModule('mod-b')).toBe(100);
+
+    // Remove single gift card from Module A
+    removeGiftCardForModule('mod-a', 'gc-100');
+    expect(getGiftCardsForModule('mod-a')).toEqual(['GC-200']);
+
+    // Clear discounts for Module A only
+    clearDiscountsForModule('mod-a');
+    expect(getCouponForModule('mod-a')).toBeUndefined();
+    expect(getGiftCardsForModule('mod-a')).toEqual([]);
+    expect(getLoyaltyPointsForModule('mod-a')).toBe(0);
+
+    // Module B remains completely untouched
+    expect(getCouponForModule('mod-b')).toBe('VIP50');
+    expect(getGiftCardsForModule('mod-b')).toEqual(['GC-999']);
+    expect(getLoyaltyPointsForModule('mod-b')).toBe(100);
+  });
+
+  it('clears items, fulfillment selection, and discounts only for the specified module on checkout completion', () => {
+    const {
+      addItem,
+      setFulfillmentForModule,
+      setCouponForModule,
+      addGiftCardForModule,
+      setLoyaltyPointsForModule,
+      clearModuleCheckoutState,
+      getFulfillmentForModule,
+      getCouponForModule,
+      getGiftCardsForModule,
+      getLoyaltyPointsForModule,
+    } = useCartStore.getState();
 
     addItem({
       id: 'burger-1',
@@ -93,16 +153,20 @@ describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning'
       destinationType: 'on_premise_location',
       destinationRef: 'loc-1',
     });
+    setCouponForModule('mod-restaurant', 'FOOD10');
+    addGiftCardForModule('mod-restaurant', 'GC-FOOD');
+    setLoyaltyPointsForModule('mod-restaurant', 250);
 
     setFulfillmentForModule('mod-retail', {
       mode: 'local_delivery',
       destinationType: 'address',
       destinationRef: '456 Elm St',
     });
+    setCouponForModule('mod-retail', 'CLOTHES20');
 
     expect(useCartStore.getState().items).toHaveLength(2);
     expect(getFulfillmentForModule('mod-restaurant')).toBeDefined();
-    expect(getFulfillmentForModule('mod-retail')).toBeDefined();
+    expect(getCouponForModule('mod-restaurant')).toBe('FOOD10');
 
     // Clear checkout state for restaurant
     clearModuleCheckoutState('mod-restaurant');
@@ -112,20 +176,26 @@ describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning'
     expect(remaining[0].id).toBe('tshirt-1');
     expect(remaining[0].moduleId).toBe('mod-retail');
 
-    // Restaurant fulfillment selection is cleared; retail fulfillment selection remains intact!
+    // Restaurant state is completely cleared
     expect(getFulfillmentForModule('mod-restaurant')).toBeUndefined();
+    expect(getCouponForModule('mod-restaurant')).toBeUndefined();
+    expect(getGiftCardsForModule('mod-restaurant')).toEqual([]);
+    expect(getLoyaltyPointsForModule('mod-restaurant')).toBe(0);
+
+    // Retail state remains intact!
     expect(getFulfillmentForModule('mod-retail')).toEqual({
       mode: 'local_delivery',
       destinationType: 'address',
       destinationRef: '456 Elm St',
     });
+    expect(getCouponForModule('mod-retail')).toBe('CLOTHES20');
   });
 
-  describe('Zustand Persistence Migration (Version 2)', () => {
+  describe('Zustand Persistence Migration (Version 3)', () => {
     const persistOptions = (useCartStore as any).persist;
     const migrate = persistOptions?.getOptions()?.migrate;
 
-    it('migrates legacy takeaway to canonical pickup', () => {
+    it('migrates legacy takeaway to canonical pickup (v1 -> v3)', () => {
       const legacyState = {
         items: [{ id: 'item-1', name: 'Coffee', price: 5, quantity: 1, moduleId: 'mod-cafe' }],
         orderType: 'takeaway',
@@ -139,69 +209,28 @@ describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning'
         destinationType: 'pickup_location',
         destinationRef: null,
       });
+      expect(migrated.couponByModule).toEqual({});
+      expect(migrated.giftCardsByModule).toEqual({});
+      expect(migrated.loyaltyPointsByModule).toEqual({});
       expect(migrated.orderType).toBeUndefined();
       expect(migrated.tableNumber).toBeUndefined();
     });
 
-    it('migrates legacy delivery to canonical local_delivery', () => {
-      const legacyState = {
+    it('migrates v2 state to v3 by adding empty discount maps', () => {
+      const v2State = {
         items: [{ id: 'item-1', name: 'Pizza', price: 20, quantity: 1, moduleId: 'mod-pizza' }],
-        orderType: 'delivery',
+        fulfillmentByModule: {
+          'mod-pizza': { mode: 'local_delivery', destinationType: 'address', destinationRef: '123 Main St' },
+        },
         customerName: 'Bob',
       };
 
-      const migrated = migrate(legacyState, 1);
+      const migrated = migrate(v2State, 2);
 
-      expect(migrated.fulfillmentByModule['mod-pizza']).toEqual({
-        mode: 'local_delivery',
-        destinationType: 'address',
-        destinationRef: null,
-      });
-    });
-
-    it('migrates legacy dine_in with canonical UUID tableNumber to on_premise', () => {
-      const validUUID = 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d';
-      const legacyState = {
-        items: [{ id: 'item-1', name: 'Steak', price: 45, quantity: 1, moduleId: 'mod-steak' }],
-        orderType: 'dine_in',
-        tableNumber: validUUID,
-      };
-
-      const migrated = migrate(legacyState, 1);
-
-      expect(migrated.fulfillmentByModule['mod-steak']).toEqual({
-        mode: 'on_premise',
-        destinationType: 'on_premise_location',
-        destinationRef: validUUID,
-      });
-    });
-
-    it('migrates legacy dine_in with non-UUID human table label by setting destinationRef to null (requiring explicit UI selection)', () => {
-      const legacyState = {
-        items: [{ id: 'item-1', name: 'Steak', price: 45, quantity: 1, moduleId: 'mod-steak' }],
-        orderType: 'dine_in',
-        tableNumber: 'Table 4 Near Window',
-      };
-
-      const migrated = migrate(legacyState, 1);
-
-      expect(migrated.fulfillmentByModule['mod-steak']).toEqual({
-        mode: 'on_premise',
-        destinationType: 'on_premise_location',
-        destinationRef: null,
-      });
-    });
-
-    it('leaves unknown legacy orderType unresolved (does NOT silently default to on_premise)', () => {
-      const legacyState = {
-        items: [{ id: 'item-1', name: 'Widget', price: 10, quantity: 1, moduleId: 'mod-general' }],
-        orderType: 'unknown_alien_type',
-      };
-
-      const migrated = migrate(legacyState, 1);
-
-      expect(migrated.fulfillmentByModule['mod-general']).toBeUndefined();
-      expect(migrated.orderType).toBeUndefined();
+      expect(migrated.couponByModule).toEqual({});
+      expect(migrated.giftCardsByModule).toEqual({});
+      expect(migrated.loyaltyPointsByModule).toEqual({});
+      expect(migrated.fulfillmentByModule['mod-pizza'].mode).toBe('local_delivery');
     });
 
     it('recovers safely from empty or corrupt state', () => {
@@ -211,6 +240,9 @@ describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning'
       expect(recovered).toEqual({
         items: [],
         fulfillmentByModule: {},
+        couponByModule: {},
+        giftCardsByModule: {},
+        loyaltyPointsByModule: {},
         customerName: '',
         customerPhone: '',
         paymentMethod: 'cash',

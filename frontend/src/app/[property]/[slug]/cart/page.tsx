@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { useCartStore, calculateSubtotal } from '@/stores/cartStore';
+import { usePricingPreview } from '@/hooks/usePricingPreview';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { useAuth } from '@/lib/auth-context';
@@ -38,6 +39,8 @@ import {
   Store,
   Receipt,
   Tag,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { PaymentDiscounts } from '@/components/customer/PaymentDiscounts';
 import StripePayment from '@/components/payments/StripePayment';
@@ -61,7 +64,7 @@ export default function ModuleCartPage() {
   const propertyId = getStoredPropertyId();
 
   const { modules, loading: modulesLoading } = useSiteSettings();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   
   const normalizedSlug = slug ? decodeURIComponent(slug).toLowerCase() : '';
   const currentModule = modules.find((m) => m.slug.toLowerCase() === normalizedSlug);
@@ -95,6 +98,15 @@ export default function ModuleCartPage() {
 
   const rawSelection = useCartStore((s) => moduleKey ? s.getFulfillmentForModule(moduleKey) : undefined);
   const setFulfillmentForModule = useCartStore((s) => s.setFulfillmentForModule);
+
+  // Module-scoped discount state from cartStore
+  const couponCode = useCartStore((s) => moduleKey ? s.getCouponForModule(moduleKey) : null);
+  const giftCardCodes = useCartStore((s) => moduleKey ? s.getGiftCardsForModule(moduleKey) : []);
+  const loyaltyPoints = useCartStore((s) => moduleKey ? s.getLoyaltyPointsForModule(moduleKey) : 0);
+  const setCouponForModule = useCartStore((s) => s.setCouponForModule);
+  const addGiftCardForModule = useCartStore((s) => s.addGiftCardForModule);
+  const removeGiftCardForModule = useCartStore((s) => s.removeGiftCardForModule);
+  const setLoyaltyPointsForModule = useCartStore((s) => s.setLoyaltyPointsForModule);
 
   const capabilities = (currentModule ? resolveEngineACapabilities(currentModule) : null) || CANONICAL_ENGINE_A_CAPABILITIES;
   const fulfillmentOptions = capabilities?.fulfillment?.options || CANONICAL_ENGINE_A_CAPABILITIES.fulfillment.options;
@@ -133,25 +145,46 @@ export default function ModuleCartPage() {
   const [serviceLocations, setServiceLocations] = useState<Array<{ id: string; name: string; is_active: boolean; is_occupied?: boolean }>>([]);
   const [activeStep, setActiveStep] = useState(1);
 
-  // Discount tracking state
-  interface AppliedDiscount {
-    type: 'coupon' | 'giftcard' | 'loyalty';
-    code?: string;
-    amount: number;
-    details?: string;
-  }
-  const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
-  const [finalTotal, setFinalTotal] = useState(0);
-
   // Stripe payment state
   const [showStripePayment, setShowStripePayment] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
-  // Pricing breakdown state from backend
-  const [pricingBreakdown, setPricingBreakdown] = useState<any>(null);
-  const [loadingPricing, setLoadingPricing] = useState(false);
+  // Authoritative server-side pricing preview hook with stale invalidation
+  const {
+    pricing: serverPricing,
+    isLoading: loadingPricing,
+    isStale: isPricingStale,
+    isError: isPricingError,
+    error: pricingError,
+    refetch: refetchPricing,
+  } = usePricingPreview({
+    items: moduleItems,
+    moduleId,
+    propertyId,
+    fulfillmentMode: selectedMode,
+    paymentMethod,
+    couponCode,
+    giftCardCodes,
+    loyaltyPointsToRedeem: loyaltyPoints,
+    customerId: user?.id,
+    enabled: moduleItems.length > 0 && !!moduleId,
+  });
 
-  const subtotal = calculateSubtotal(moduleItems);
+  // Harmless local UI arithmetic for ephemeral presentation estimate
+  const localEstimatedSubtotal = calculateSubtotal(moduleItems);
+
+  // Authoritative money derivations strictly from server
+  const subtotal = serverPricing?.subtotal ?? localEstimatedSubtotal;
+  const tax = serverPricing?.taxAmount ?? 0;
+  const taxBreakdown = serverPricing?.taxBreakdown ?? [];
+  const feeBreakdown = serverPricing?.feeBreakdown ?? [];
+  const totalFees = feeBreakdown.reduce((sum: number, fee: any) => sum + fee.amount, 0);
+  const serviceCharge = serverPricing?.serviceCharge ?? 0;
+  const deliveryFee = serverPricing?.deliveryFee ?? 0;
+  const totalDiscount = serverPricing?.totalDiscount ?? 0;
+  const appliedDiscounts = serverPricing?.discounts ?? [];
+  const total = serverPricing?.totalAmount ?? Math.max(0, localEstimatedSubtotal);
+  const resolvedCurrency = serverPricing?.currency || currency || 'USD';
 
   // Fetch service locations for this module & auto-fill from URL query param
   useEffect(() => {
@@ -176,66 +209,6 @@ export default function ModuleCartPage() {
       }
     }).catch(() => {});
   }, [slug]);
-
-  // Stable key for pricing deps — avoids infinite re-render from .filter() creating new array refs
-  const pricingKey = JSON.stringify(
-    moduleItems.map(i => ({ id: i.id, qty: i.quantity, p: i.price, mt: i.modifierTotal || 0 }))
-  );
-
-  // Fetch pricing breakdown from backend (debounced to avoid request storms)
-  useEffect(() => {
-    if (moduleItems.length === 0 || !moduleId) {
-      setPricingBreakdown(null);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setLoadingPricing(true);
-      try {
-        const response = await api.post('/pricing/preview', {
-          items: moduleItems.map(item => ({
-            itemId: item.id,
-            name: item.name,
-            unitPrice: item.price + (item.modifierTotal || 0),
-            quantity: item.quantity,
-            taxCategory: item.category,
-            moduleId: item.moduleId || moduleId,
-            metadata: item.selectedModifiers && item.selectedModifiers.length > 0
-              ? { selectedModifiers: item.selectedModifiers }
-              : undefined,
-          })),
-          moduleId,
-          conditions: { fulfillmentMode: selectedMode, paymentMethod },
-          applyTax: true,
-          applyFees: true,
-          propertyId
-        });
-        setPricingBreakdown(response.data?.data);
-      } catch (error: any) {
-        console.warn('[Cart] Pricing preview fallback:', error?.response?.data?.error || error?.message);
-        setPricingBreakdown(null);
-      } finally {
-        setLoadingPricing(false);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pricingKey, moduleId, selectedMode, paymentMethod]);
-
-  // Tax comes entirely from the backend pricing preview (CMS tax_configuration rates).
-  const tax = pricingBreakdown?.taxAmount ?? 0;
-  const taxBreakdown = pricingBreakdown?.taxBreakdown ?? [];
-  const feeBreakdown = pricingBreakdown?.feeBreakdown ?? [];
-  const totalFees = feeBreakdown.reduce((sum: number, fee: any) => sum + fee.amount, 0);
-  const preDiscountTotal = subtotal + tax + totalFees;
-  const totalDiscount = appliedDiscounts.reduce((sum, d) => sum + d.amount, 0);
-  const total = Math.max(0, preDiscountTotal - totalDiscount);
-
-  // Update final total when discounts change
-  useEffect(() => {
-    setFinalTotal(total);
-  }, [total]);
 
   interface MutationError {
     response?: { data?: { error?: string } };
@@ -333,8 +306,18 @@ export default function ModuleCartPage() {
       return;
     }
 
+    if (isPricingStale || loadingPricing) {
+      toast.info('Pricing is recalculating, please wait a moment...');
+      return;
+    }
+
+    if (isPricingError || !serverPricing) {
+      toast.error('Unable to verify order pricing. Please try again.');
+      return;
+    }
+
     const couponDiscount = appliedDiscounts.find(d => d.type === 'coupon');
-    const giftCardDiscounts = appliedDiscounts.filter(d => d.type === 'giftcard');
+    const giftCardDiscounts = appliedDiscounts.filter(d => d.type === 'gift_card');
     const loyaltyDiscount = appliedDiscounts.find(d => d.type === 'loyalty');
 
     const idempotencyKey = `chk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
@@ -360,13 +343,11 @@ export default function ModuleCartPage() {
           : undefined,
       })),
       moduleId,
-      couponCode: couponDiscount?.code,
-      giftCardRedemptions: giftCardDiscounts.length > 0 
-        ? giftCardDiscounts.map(gc => ({ code: gc.code!, amount: gc.amount }))
+      couponCode: couponCode || undefined,
+      giftCardRedemptions: giftCardCodes.length > 0 
+        ? giftCardCodes.map(code => ({ code, amount: giftCardDiscounts.find(g => g.code === code)?.amount || 0 }))
         : undefined,
-      loyaltyPointsToRedeem: loyaltyDiscount 
-        ? parseInt(loyaltyDiscount.details?.replace(/[^\d]/g, '') || '0')
-        : undefined,
+      loyaltyPointsToRedeem: loyaltyPoints > 0 ? loyaltyPoints : undefined,
       loyaltyPointsDollarValue: loyaltyDiscount?.amount,
       previewTotal: total,
     });
@@ -421,7 +402,7 @@ export default function ModuleCartPage() {
               {t('cartEmpty') || 'Your cart is empty'}
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-8 text-lg">
-              Add some delicious items to get started!
+              Add some items to get started!
             </p>
             
             <Link href={`/${propertySlug}/${slug}`}>
@@ -441,6 +422,14 @@ export default function ModuleCartPage() {
     { id: 2, title: 'Your Details', icon: User },
     { id: 3, title: 'Payment', icon: CreditCard },
   ];
+
+  const isCheckoutDisabled =
+    orderMutation.isPending ||
+    authLoading ||
+    loadingPricing ||
+    isPricingStale ||
+    isPricingError ||
+    !serverPricing;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -499,226 +488,144 @@ export default function ModuleCartPage() {
         <div className="grid lg:grid-cols-5 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Step 1: Order Review */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              key={activeStep}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/50 dark:border-slate-800/50 overflow-hidden transition-opacity ${activeStep !== 1 ? 'opacity-60' : ''}`}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 shadow-xl border border-white/50 dark:border-slate-800/50 space-y-6"
             >
-              <div 
-                className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                onClick={() => setActiveStep(1)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activeStep >= 1 ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                    <ShoppingCart className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Your Order</h2>
-                    <p className="text-sm text-slate-500">{moduleItems.length} items • {formatCurrency(subtotal, currency)}</p>
-                  </div>
-                </div>
-                {activeStep > 1 && <CheckCircle2 className="w-6 h-6 text-green-500" />}
-              </div>
-
-              <AnimatePresence>
+              <AnimatePresence mode="wait">
                 {activeStep === 1 && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="p-6 space-y-4"
-                  >
-                    {moduleItems.map((item, index) => (
-                      <motion.div
-                        key={item.uniqueKey || item.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="group relative bg-gradient-to-r from-slate-50 to-white dark:from-slate-800/50 dark:to-slate-800 rounded-2xl p-4 hover:shadow-lg transition-all duration-300 border border-slate-100 dark:border-slate-700/50"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 flex items-center justify-center flex-shrink-0">
-                            {item.imageUrl ? (
-                              <span className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${item.imageUrl})` }} />
-                            ) : (
-                              <UtensilsCrossed className="w-8 h-8 text-orange-400" />
-                            )}
-                          </div>
+                  <motion.div key="step1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
+                    <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
+                      <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Review Your Cart</h2>
+                      <Button variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => moduleKey && clearModuleItems(moduleKey)}>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Clear {currentModule.name} Items
+                      </Button>
+                    </div>
 
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold text-slate-900 dark:text-white text-lg truncate">{item.name}</h3>
-                            <p className="text-orange-600 dark:text-orange-400 font-medium">
-                              {formatCurrency(item.price + (item.modifierTotal || 0), currency)} each
-                              {(item.modifierTotal || 0) > 0 && (
-                                <span className="text-xs text-slate-400 ml-1 font-normal">
-                                  (base {formatCurrency(item.price, currency)} + {formatCurrency(item.modifierTotal!, currency)} extras)
-                                </span>
-                              )}
-                            </p>
+                    {/* Cart Items List */}
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {moduleItems.map((item) => (
+                        <div key={item.uniqueKey || item.id} className="py-4 flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-slate-900 dark:text-white">{item.name}</h3>
+                            <p className="text-sm text-slate-500">{formatCurrency(item.price + (item.modifierTotal || 0), resolvedCurrency)} each</p>
                             {item.selectedModifiers && item.selectedModifiers.length > 0 && (
-                              <div className="mt-1.5 flex flex-wrap gap-1">
+                              <div className="mt-1 flex flex-wrap gap-1">
                                 {item.selectedModifiers.map((mod, i) => (
                                   <span
                                     key={i}
-                                    className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium ${
+                                    className={`text-xs px-2 py-0.5 rounded-full ${
                                       mod.modifierType === 'remove'
-                                        ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+                                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                         : mod.modifierType === 'swap'
-                                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
-                                        : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                        : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                     }`}
                                   >
-                                    {mod.modifierType === 'remove' ? '−' : mod.modifierType === 'swap' ? '⇄' : '+'}
-                                    {' '}{mod.optionName}
-                                    {mod.modifierType !== 'remove' && mod.priceAdjustment > 0 && (
-                                      <span className="ml-0.5 opacity-75">+{formatCurrency(mod.priceAdjustment, currency)}</span>
-                                    )}
+                                    {mod.modifierType === 'remove' ? 'No ' : mod.modifierType === 'swap' ? 'Swap: ' : '+'}
+                                    {mod.optionName}
                                   </span>
                                 ))}
                               </div>
                             )}
-                            {item.specialInstructions && (
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 italic truncate">
-                                "{item.specialInstructions}"
-                              </p>
-                            )}
                           </div>
 
-                          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700/50 rounded-full p-1">
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => {
-                                if (item.quantity === 1) {
-                                  removeItem(item.id, item.uniqueKey);
-                                } else {
-                                  addItem({ ...item, quantity: -1 });
-                                }
-                              }}
-                              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-white dark:hover:bg-slate-600 text-slate-600 dark:text-slate-400 hover:text-red-500 transition-colors"
-                            >
-                              {item.quantity === 1 ? <Trash2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
-                            </motion.button>
-                            <span className="w-10 text-center font-bold text-slate-900 dark:text-white">{item.quantity}</span>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => addItem({ ...item, quantity: 1 })}
-                              className="w-9 h-9 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white flex items-center justify-center hover:shadow-lg hover:shadow-orange-500/30 transition-all"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </motion.button>
-                          </div>
-
-                          <div className="hidden sm:block text-right pl-4 border-l border-slate-200 dark:border-slate-700">
-                            <p className="text-xl font-bold text-slate-900 dark:text-white">
-                              {/* FIX Iter-6: Include modifier costs in line total */}
-                              {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, currency)}
-                            </p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-lg p-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                onClick={() => removeItem(item.id, item.uniqueKey)}
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <span className="w-8 text-center text-sm font-semibold">{item.quantity}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                onClick={() => addItem(item)}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            <span className="font-bold w-20 text-right">
+                              {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, resolvedCurrency)}
+                            </span>
                           </div>
                         </div>
-                      </motion.div>
-                    ))}
+                      ))}
+                    </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => setActiveStep(2)} className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 px-8">
+                      <Button onClick={() => setActiveStep(2)}>
                         Continue to Details
-                        <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+                        <CheckCircle2 className="w-4 h-4 ml-2" />
                       </Button>
                     </div>
                   </motion.div>
                 )}
-              </AnimatePresence>
-            </motion.div>
 
-            {/* Step 2: Customer Details */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/50 dark:border-slate-800/50 overflow-hidden transition-opacity ${activeStep !== 2 ? 'opacity-60' : ''}`}
-            >
-              <div 
-                className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                onClick={() => setActiveStep(2)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activeStep >= 2 ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                    <User className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Your Details</h2>
-                    <p className="text-sm text-slate-500">Contact & order type</p>
-                  </div>
-                </div>
-                {activeStep > 2 && <CheckCircle2 className="w-6 h-6 text-green-500" />}
-              </div>
-
-              <AnimatePresence>
                 {activeStep === 2 && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="p-6 space-y-6"
-                  >
-                    <FulfillmentModeSelector
-                      options={fulfillmentOptions}
-                      selectedMode={selectedMode}
-                      onSelectMode={handleSelectMode}
-                      loading={modulesLoading}
-                    />
+                  <motion.div key="step2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Fulfillment & Details</h2>
 
-                    <DestinationRequirementsEditor
-                      mode={selectedMode}
-                      destinationType={selectedDestinationType}
-                      destinationRef={selectedDestinationRef}
-                      onChange={handleDestinationChange}
-                      serviceLocations={serviceLocations}
-                    />
+                    {/* Canonical Fulfillment Selection */}
+                    <div className="space-y-4">
+                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        How would you like to receive your order?
+                      </label>
+                      <FulfillmentModeSelector
+                        options={fulfillmentOptions}
+                        selectedMode={selectedMode}
+                        onSelectMode={handleSelectMode}
+                      />
+                      <DestinationRequirementsEditor
+                        mode={selectedMode}
+                        destinationType={selectedDestinationType}
+                        destinationRef={selectedDestinationRef}
+                        serviceLocations={serviceLocations}
+                        onChange={handleDestinationChange}
+                      />
+                    </div>
 
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                          <User className="w-4 h-4 text-orange-500" />
-                          Your Name
-                        </label>
+                    {/* Customer Info */}
+                    <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Your Name *</label>
                         <input
                           type="text"
                           value={customerName}
                           onChange={(e) => setCustomerName(e.target.value)}
                           placeholder="Enter your full name"
-                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all outline-none text-slate-900 dark:text-white placeholder:text-slate-400"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-orange-500" />
-                          Phone Number
-                        </label>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Phone Number *</label>
                         <input
                           type="tel"
                           value={customerPhone}
                           onChange={(e) => setCustomerPhone(e.target.value)}
                           placeholder="Enter your phone number"
-                          className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all outline-none text-slate-900 dark:text-white placeholder:text-slate-400"
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-orange-500" />
-                        Special Requests
-                        <span className="text-xs font-normal text-slate-400">(Optional)</span>
-                      </label>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Special Notes</label>
                       <textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Any allergies, preferences, or special requests..."
-                        rows={3}
-                        className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all outline-none text-slate-900 dark:text-white placeholder:text-slate-400 resize-none"
+                        placeholder="Any dietary restrictions or instructions..."
+                        rows={2}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                       />
                     </div>
 
@@ -727,52 +634,25 @@ export default function ModuleCartPage() {
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         Back
                       </Button>
-                      <Button onClick={() => setActiveStep(3)} className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-lg shadow-orange-500/25 px-8">
+                      <Button onClick={() => setActiveStep(3)}>
                         Continue to Payment
-                        <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+                        <CheckCircle2 className="w-4 h-4 ml-2" />
                       </Button>
                     </div>
                   </motion.div>
                 )}
-              </AnimatePresence>
-            </motion.div>
 
-            {/* Step 3: Payment */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/50 dark:border-slate-800/50 overflow-hidden transition-opacity ${activeStep !== 3 ? 'opacity-60' : ''}`}
-            >
-              <div 
-                className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                onClick={() => setActiveStep(3)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activeStep >= 3 ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                    <CreditCard className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Payment Method</h2>
-                    <p className="text-sm text-slate-500">Choose how to pay</p>
-                  </div>
-                </div>
-              </div>
-
-              <AnimatePresence>
                 {activeStep === 3 && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="p-6 space-y-6"
-                  >
-                    <div className="grid grid-cols-2 gap-4">
+                  <motion.div key="step3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Payment Method & Discounts</h2>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
                       <motion.button
-                        whileHover={{ scale: 1.02, y: -2 }}
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setPaymentMethod('cash')}
-                        className={`relative p-6 rounded-2xl border-2 transition-all ${
+                        className={`relative p-6 rounded-2xl border-2 text-left transition-all ${
                           paymentMethod === 'cash'
                             ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 shadow-lg shadow-orange-500/20'
                             : 'border-slate-200 dark:border-slate-700 hover:border-orange-300'
@@ -789,14 +669,15 @@ export default function ModuleCartPage() {
                         <p className={`font-semibold text-lg text-center ${paymentMethod === 'cash' ? 'text-orange-600 dark:text-orange-400' : 'text-slate-700 dark:text-slate-300'}`}>
                           Pay with Cash
                         </p>
-                        <p className="text-sm text-slate-500 mt-1 text-center">Pay when you receive</p>
+                        <p className="text-sm text-slate-500 mt-1 text-center">Pay at counter or on delivery</p>
                       </motion.button>
 
                       <motion.button
-                        whileHover={{ scale: 1.02, y: -2 }}
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setPaymentMethod('card')}
-                        className={`relative p-6 rounded-2xl border-2 transition-all ${
+                        className={`relative p-6 rounded-2xl border-2 text-left transition-all ${
                           paymentMethod === 'card'
                             ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 shadow-lg shadow-orange-500/20'
                             : 'border-slate-200 dark:border-slate-700 hover:border-orange-300'
@@ -813,7 +694,7 @@ export default function ModuleCartPage() {
                         <p className={`font-semibold text-lg text-center ${paymentMethod === 'card' ? 'text-orange-600 dark:text-orange-400' : 'text-slate-700 dark:text-slate-300'}`}>
                           Pay with Card
                         </p>
-                        <p className="text-sm text-slate-500 mt-1 text-center">Credit or debit</p>
+                        <p className="text-sm text-slate-500 mt-1 text-center">Credit or debit card</p>
                       </motion.button>
                     </div>
 
@@ -824,13 +705,22 @@ export default function ModuleCartPage() {
                         <h3 className="font-semibold text-slate-900 dark:text-white">Apply Discounts</h3>
                       </div>
                       <PaymentDiscounts
-                        orderTotal={preDiscountTotal}
+                        orderTotal={subtotal}
                         orderType={selectedMode}
                         moduleId={moduleId}
                         moduleSlug={currentModule?.slug}
-                        onTotalChange={(newTotal, discounts) => {
-                          setAppliedDiscounts(discounts);
-                          setFinalTotal(newTotal);
+                        onTotalChange={(_ignored, discounts) => {
+                          if (!moduleKey) return;
+                          const c = discounts.find(d => d.type === 'coupon');
+                          setCouponForModule(moduleKey, c?.code || null);
+
+                          const gcs = discounts.filter(d => d.type === 'giftcard');
+                          gcs.forEach(gc => {
+                            if (gc.code) addGiftCardForModule(moduleKey, gc.code);
+                          });
+
+                          const l = discounts.find(d => d.type === 'loyalty');
+                          setLoyaltyPointsForModule(moduleKey, l?.pointsUsed || 0);
                         }}
                         className="mt-2"
                       />
@@ -857,15 +747,37 @@ export default function ModuleCartPage() {
                     <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '20px 20px' }} />
                   </div>
                   <div className="relative">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Receipt className="w-6 h-6" />
-                      <h2 className="text-xl font-bold">Order Summary</h2>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <Receipt className="w-6 h-6" />
+                        <h2 className="text-xl font-bold">Order Summary</h2>
+                      </div>
+                      {(loadingPricing || isPricingStale) && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-xs backdrop-blur-sm">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Updating...</span>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-orange-100 text-sm">Review your order before placing</p>
+                    <p className="text-orange-100 text-sm">Authoritative pricing from server</p>
                   </div>
                 </div>
 
                 <div className="p-6 space-y-6">
+                  {/* Pricing Error Banner */}
+                  {isPricingError && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-semibold">Pricing update failed</p>
+                        <p className="text-xs">{pricingError || 'Please retry or check cart items.'}</p>
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => refetchPricing()} className="h-7 px-2">
+                        <RefreshCw className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="space-y-3 max-h-48 overflow-y-auto">
                     {moduleItems.map((item) => (
                       <div key={item.uniqueKey || item.id} className="text-sm">
@@ -877,7 +789,7 @@ export default function ModuleCartPage() {
                             <span className="text-slate-700 dark:text-slate-300 line-clamp-1">{item.name}</span>
                           </div>
                           <span className="font-medium text-slate-900 dark:text-white flex-shrink-0 ml-2">
-                            {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, currency)}
+                            {formatCurrency((item.price + (item.modifierTotal || 0)) * item.quantity, resolvedCurrency)}
                           </span>
                         </div>
                         {item.selectedModifiers && item.selectedModifiers.length > 0 && (
@@ -907,30 +819,45 @@ export default function ModuleCartPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-500">Subtotal</span>
-                      <span className="text-slate-700 dark:text-slate-300">{formatCurrency(subtotal, currency)}</span>
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">
+                        {formatCurrency(subtotal, resolvedCurrency)}
+                      </span>
                     </div>
+
                     {/* Show individual tax lines from backend breakdown */}
                     {taxBreakdown.length > 0 ? (
                       taxBreakdown.map((taxItem: any, index: number) => (
                         <div key={index} className="flex justify-between text-sm">
                           <span className="text-slate-500">{taxItem.name} ({taxItem.rate}%)</span>
-                          <span className="text-slate-700 dark:text-slate-300">{formatCurrency(taxItem.amount, currency)}</span>
+                          <span className="text-slate-700 dark:text-slate-300">{formatCurrency(taxItem.amount, resolvedCurrency)}</span>
                         </div>
                       ))
-                    ) : (
+                    ) : tax > 0 ? (
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-500">Tax</span>
-                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, currency)}</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(tax, resolvedCurrency)}</span>
+                      </div>
+                    ) : null}
+
+                    {/* Fees and service charges from backend */}
+                    {serviceCharge > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Service Charge</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(serviceCharge, resolvedCurrency)}</span>
                       </div>
                     )}
-                    {/* All fees (service charge, delivery fee, resort fee, custom) come from
-                        the CMS tax configuration — configure them from Admin > Settings > Tax */}
+                    {deliveryFee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Delivery Fee</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(deliveryFee, resolvedCurrency)}</span>
+                      </div>
+                    )}
                     {feeBreakdown.map((fee: any, index: number) => (
                       <div key={fee.id ?? index} className="flex justify-between text-sm">
                         <span className="text-slate-500">
                           {fee.name}{fee.rate !== undefined ? ` (${fee.rate}%)` : ''}
                         </span>
-                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(fee.amount, currency)}</span>
+                        <span className="text-slate-700 dark:text-slate-300">{formatCurrency(fee.amount, resolvedCurrency)}</span>
                       </div>
                     ))}
                     
@@ -942,20 +869,18 @@ export default function ModuleCartPage() {
                           <div key={index} className="flex justify-between text-sm">
                             <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
                               {discount.type === 'coupon' && <Tag className="w-3 h-3" />}
-                              {discount.type === 'giftcard' && <CreditCard className="w-3 h-3" />}
+                              {discount.type === 'gift_card' && <CreditCard className="w-3 h-3" />}
                               {discount.type === 'loyalty' && <Sparkles className="w-3 h-3" />}
-                              {discount.type === 'coupon' && `Coupon: ${discount.code}`}
-                              {discount.type === 'giftcard' && `Gift Card: ${discount.code}`}
-                              {discount.type === 'loyalty' && `Loyalty Points`}
+                              {discount.name || (discount.type === 'coupon' ? `Coupon: ${discount.code}` : discount.type === 'gift_card' ? `Gift Card: ${discount.code}` : 'Loyalty Reward')}
                             </span>
                             <span className="text-green-600 dark:text-green-400 font-medium">
-                              -{formatCurrency(discount.amount, currency)}
+                              -{formatCurrency(discount.amount, resolvedCurrency)}
                             </span>
                           </div>
                         ))}
                         <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-semibold">
                           <span>Total Savings</span>
-                          <span>-{formatCurrency(totalDiscount, currency)}</span>
+                          <span>-{formatCurrency(totalDiscount, resolvedCurrency)}</span>
                         </div>
                       </>
                     )}
@@ -966,11 +891,11 @@ export default function ModuleCartPage() {
                         <div className="text-right">
                           {totalDiscount > 0 && (
                             <span className="text-sm text-slate-400 line-through mr-2">
-                              {formatCurrency(preDiscountTotal, currency)}
+                              {formatCurrency(subtotal + tax + totalFees + serviceCharge + deliveryFee, resolvedCurrency)}
                             </span>
                           )}
                           <span className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-rose-600 bg-clip-text text-transparent">
-                            {formatCurrency(total, currency)}
+                            {formatCurrency(total, resolvedCurrency)}
                           </span>
                         </div>
                       </div>
@@ -1013,10 +938,10 @@ export default function ModuleCartPage() {
                   </div>
 
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={{ scale: isCheckoutDisabled ? 1 : 1.02 }}
+                    whileTap={{ scale: isCheckoutDisabled ? 1 : 0.98 }}
                     onClick={handlePlaceOrder}
-                    disabled={orderMutation.isPending || authLoading}
+                    disabled={isCheckoutDisabled}
                     className="w-full py-4 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-500 hover:from-orange-600 hover:via-amber-600 hover:to-orange-600 text-white font-bold text-lg rounded-2xl shadow-xl shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
                   >
                     {orderMutation.isPending ? (
@@ -1024,15 +949,25 @@ export default function ModuleCartPage() {
                         <Loader2 className="w-5 h-5 animate-spin" />
                         Processing...
                       </>
-                    ) : authLoading ? (
+                    ) : authLoading || loadingPricing ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Loading...
+                        Calculating Price...
+                      </>
+                    ) : isPricingStale ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Updating Price...
+                      </>
+                    ) : isPricingError ? (
+                      <>
+                        <AlertCircle className="w-5 h-5" />
+                        Pricing Error
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-5 h-5" />
-                        Place Order • {formatCurrency(total, currency)}
+                        Place Order • {formatCurrency(total, resolvedCurrency)}
                       </>
                     )}
                   </motion.button>

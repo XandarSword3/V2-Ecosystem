@@ -40,6 +40,9 @@ export interface CanonicalFulfillmentSelection {
 export interface CartState {
   items: CartItem[];
   fulfillmentByModule: Record<string, CanonicalFulfillmentSelection>;
+  couponByModule: Record<string, string | null>;
+  giftCardsByModule: Record<string, string[]>;
+  loyaltyPointsByModule: Record<string, number>;
   customerName: string;
   customerPhone: string;
   paymentMethod: 'cash' | 'card';
@@ -61,6 +64,16 @@ export interface CartState {
   setFulfillmentForModule: (moduleIdOrSlug: string, selection: CanonicalFulfillmentSelection) => void;
   clearFulfillmentForModule: (moduleIdOrSlug: string) => void;
 
+  // Discount & loyalty operations per module
+  getCouponForModule: (moduleIdOrSlug: string) => string | null | undefined;
+  setCouponForModule: (moduleIdOrSlug: string, code: string | null) => void;
+  getGiftCardsForModule: (moduleIdOrSlug: string) => string[];
+  addGiftCardForModule: (moduleIdOrSlug: string, code: string) => void;
+  removeGiftCardForModule: (moduleIdOrSlug: string, code: string) => void;
+  getLoyaltyPointsForModule: (moduleIdOrSlug: string) => number;
+  setLoyaltyPointsForModule: (moduleIdOrSlug: string, points: number) => void;
+  clearDiscountsForModule: (moduleIdOrSlug: string) => void;
+
   // Customer details
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
@@ -72,6 +85,7 @@ export interface CartState {
 // Single source of truth for "sum of items" math on the client. Any screen that
 // needs a subtotal — full cart, a per-module slice of the cart, etc. — should call
 // this instead of writing its own reduce, so a fix here fixes every screen at once.
+// NOTE: This is harmless local UI arithmetic only; authoritative pricing derives from server.
 export function calculateSubtotal(items: CartItem[]): number {
   return items.reduce(
     (sum, item) => sum + (item.price + (item.modifierTotal || 0)) * item.quantity,
@@ -93,6 +107,9 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       fulfillmentByModule: {},
+      couponByModule: {},
+      giftCardsByModule: {},
+      loyaltyPointsByModule: {},
       customerName: '',
       customerPhone: '',
       paymentMethod: 'cash',
@@ -143,14 +160,33 @@ export const useCartStore = create<CartState>()(
         ),
       })),
 
-      clearCart: () => set({ items: [], fulfillmentByModule: {} }),
+      clearCart: () => set({
+        items: [],
+        fulfillmentByModule: {},
+        couponByModule: {},
+        giftCardsByModule: {},
+        loyaltyPointsByModule: {},
+      }),
 
       clearModuleCheckoutState: (moduleIdOrSlug) => set((state) => {
         const nextFulfillment = { ...state.fulfillmentByModule };
         delete nextFulfillment[moduleIdOrSlug];
+
+        const nextCoupon = { ...state.couponByModule };
+        delete nextCoupon[moduleIdOrSlug];
+
+        const nextGiftCards = { ...state.giftCardsByModule };
+        delete nextGiftCards[moduleIdOrSlug];
+
+        const nextLoyalty = { ...state.loyaltyPointsByModule };
+        delete nextLoyalty[moduleIdOrSlug];
+
         return {
           items: state.items.filter((i) => i.moduleId !== moduleIdOrSlug && i.moduleSlug !== moduleIdOrSlug),
           fulfillmentByModule: nextFulfillment,
+          couponByModule: nextCoupon,
+          giftCardsByModule: nextGiftCards,
+          loyaltyPointsByModule: nextLoyalty,
         };
       }),
 
@@ -181,6 +217,72 @@ export const useCartStore = create<CartState>()(
         return { fulfillmentByModule: next };
       }),
 
+      getCouponForModule: (moduleIdOrSlug) => {
+        return get().couponByModule[moduleIdOrSlug];
+      },
+
+      setCouponForModule: (moduleIdOrSlug, code) => set((state) => ({
+        couponByModule: {
+          ...state.couponByModule,
+          [moduleIdOrSlug]: code ? code.trim().toUpperCase() : null,
+        },
+      })),
+
+      getGiftCardsForModule: (moduleIdOrSlug) => {
+        return get().giftCardsByModule[moduleIdOrSlug] || [];
+      },
+
+      addGiftCardForModule: (moduleIdOrSlug, code) => set((state) => {
+        const clean = code.trim().toUpperCase();
+        if (!clean) return state;
+        const current = state.giftCardsByModule[moduleIdOrSlug] || [];
+        if (current.includes(clean)) return state;
+        return {
+          giftCardsByModule: {
+            ...state.giftCardsByModule,
+            [moduleIdOrSlug]: [...current, clean],
+          },
+        };
+      }),
+
+      removeGiftCardForModule: (moduleIdOrSlug, code) => set((state) => {
+        const current = state.giftCardsByModule[moduleIdOrSlug] || [];
+        return {
+          giftCardsByModule: {
+            ...state.giftCardsByModule,
+            [moduleIdOrSlug]: current.filter((c) => c !== code.trim().toUpperCase()),
+          },
+        };
+      }),
+
+      getLoyaltyPointsForModule: (moduleIdOrSlug) => {
+        return get().loyaltyPointsByModule[moduleIdOrSlug] || 0;
+      },
+
+      setLoyaltyPointsForModule: (moduleIdOrSlug, points) => set((state) => ({
+        loyaltyPointsByModule: {
+          ...state.loyaltyPointsByModule,
+          [moduleIdOrSlug]: Math.max(0, Math.floor(points)),
+        },
+      })),
+
+      clearDiscountsForModule: (moduleIdOrSlug) => set((state) => {
+        const nextCoupon = { ...state.couponByModule };
+        delete nextCoupon[moduleIdOrSlug];
+
+        const nextGiftCards = { ...state.giftCardsByModule };
+        delete nextGiftCards[moduleIdOrSlug];
+
+        const nextLoyalty = { ...state.loyaltyPointsByModule };
+        delete nextLoyalty[moduleIdOrSlug];
+
+        return {
+          couponByModule: nextCoupon,
+          giftCardsByModule: nextGiftCards,
+          loyaltyPointsByModule: nextLoyalty,
+        };
+      }),
+
       setCustomerName: (name) => set({ customerName: name }),
       setCustomerPhone: (phone) => set({ customerPhone: phone }),
       setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
@@ -194,18 +296,23 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'v2-ecosystem-cart',
-      version: 2,
+      version: 3,
       migrate: (persistedState: any, version: number) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return {
             items: [],
             fulfillmentByModule: {},
+            couponByModule: {},
+            giftCardsByModule: {},
+            loyaltyPointsByModule: {},
             customerName: '',
             customerPhone: '',
             paymentMethod: 'cash',
             notes: '',
           };
         }
+
+        let state = { ...persistedState };
 
         if (version < 2) {
           const legacy = persistedState;
@@ -227,8 +334,6 @@ export const useCartStore = create<CartState>()(
               destinationRef: null,
             };
           } else if (legacyOrderType === 'dine_in') {
-            // Only preserve destinationRef if tableNumber is a canonical UUID.
-            // Text strings like "Table 4" are display labels, not canonical IDs — leave null so UI forces explicit selection.
             const isUUID = typeof legacy.tableNumber === 'string' &&
               /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(legacy.tableNumber);
 
@@ -238,7 +343,6 @@ export const useCartStore = create<CartState>()(
               destinationRef: isUUID ? legacy.tableNumber : null,
             };
           }
-          // Any unknown or corrupt legacy value leaves mappedSelection undefined (unresolved)
 
           if (mappedSelection && Array.isArray(legacy.items)) {
             legacy.items.forEach((item: any) => {
@@ -249,7 +353,7 @@ export const useCartStore = create<CartState>()(
             });
           }
 
-          return {
+          state = {
             items: legacy.items || [],
             fulfillmentByModule,
             customerName: legacy.customerName || '',
@@ -259,7 +363,16 @@ export const useCartStore = create<CartState>()(
           };
         }
 
-        return persistedState;
+        if (version < 3) {
+          state = {
+            ...state,
+            couponByModule: state.couponByModule || {},
+            giftCardsByModule: state.giftCardsByModule || {},
+            loyaltyPointsByModule: state.loyaltyPointsByModule || {},
+          };
+        }
+
+        return state;
       },
     }
   )
