@@ -374,7 +374,33 @@ async function claimIdempotency(supabase: any, key: string, leaseSeconds: number
 }
 
 /**
+ * Assert that the active lease is still valid and held by this worker (Phase F4).
+ * Fences every business mutation against stale/expired leases.
+ */
+async function assertActiveLease(supabase: any, key: string | null, claimToken: string | null): Promise<boolean> {
+  if (!key || !claimToken) return true; // not idempotency-tracked request
+  try {
+    const { data: valid, error } = await supabase.rpc('assert_active_lease', {
+      p_key: key,
+      p_claim_token: claimToken,
+    });
+    if (!error && typeof valid === 'boolean') {
+      return valid;
+    }
+  } catch (_) {}
+
+  const { data } = await supabase
+    .from('idempotency_records')
+    .select('claim_token, status')
+    .eq('key', key)
+    .maybeSingle();
+
+  return Boolean(data && data.claim_token === claimToken && data.status === 'in_progress');
+}
+
+/**
  * Durable compensating rollback for failed order creation (Phase F4).
+ * Executes each compensation step independently so failures in one step do not skip others.
  */
 async function rollbackFailedOrder(
   supabase: any,
@@ -385,9 +411,9 @@ async function rollbackFailedOrder(
   claimToken: string | null,
   userId?: string | null,
 ) {
-  try {
-    // 1. Compensate base inventory if deducted
-    if (baseInventoryItems && baseInventoryItems.length > 0) {
+  // 1. Compensate base inventory if deducted (independent step)
+  if (baseInventoryItems && baseInventoryItems.length > 0) {
+    try {
       const restorePayload = baseInventoryItems.map((oi: any) => ({
         catalog_item_id: oi.catalog_item_id,
         quantity: oi.quantity,
@@ -396,43 +422,60 @@ async function rollbackFailedOrder(
         p_items: restorePayload,
         p_user_id: userId ?? null,
       });
+    } catch (invErr) {
+      logger.error('[Dynamic Router Rollback] Failed to restore inventory:', invErr);
     }
+  }
 
-    // 2. Reverse discounts if any were applied
-    if (discounts && discounts.length > 0) {
+  // 2. Reverse discounts if any were applied (independent step)
+  if (discounts && discounts.length > 0) {
+    try {
       await reverseDiscounts(supabase, discounts, { userId: userId ?? undefined, orderId: transactionId ?? undefined });
+    } catch (discErr) {
+      logger.error('[Dynamic Router Rollback] Failed to reverse discounts:', discErr);
     }
+  }
 
-    // 3. Delete order_items
-    if (transactionId) {
+  // 3. Delete order_items (independent step)
+  if (transactionId) {
+    try {
       await supabase.from('order_items').delete().eq('transaction_id', transactionId);
-      await supabase.from('transactions').delete().eq('id', transactionId);
+    } catch (oiErr) {
+      logger.error('[Dynamic Router Rollback] Failed to delete order_items:', oiErr);
     }
+    // 4. Delete transactions (independent step)
+    try {
+      await supabase.from('transactions').delete().eq('id', transactionId);
+    } catch (txErr) {
+      logger.error('[Dynamic Router Rollback] Failed to delete transaction:', txErr);
+    }
+  }
 
-    // 4. Mark idempotency failed with owner token check
-    if (scopedIdempotencyKey && claimToken) {
-      try {
-        const { data: rpcFailed } = await supabase.rpc('fail_idempotency_key', {
-          p_key: scopedIdempotencyKey,
-          p_claim_token: claimToken,
-        });
-        if (!rpcFailed) {
-          await supabase
-            .from('idempotency_records')
-            .update({ status: 'failed', updated_at: new Date().toISOString() })
-            .eq('key', scopedIdempotencyKey)
-            .eq('claim_token', claimToken);
-        }
-      } catch (_) {
+  // 5. Mark idempotency failed with owner token check (independent step)
+  if (scopedIdempotencyKey && claimToken) {
+    try {
+      const { data: rpcFailed } = await supabase.rpc('fail_idempotency_key', {
+        p_key: scopedIdempotencyKey,
+        p_claim_token: claimToken,
+      });
+      if (!rpcFailed) {
         await supabase
           .from('idempotency_records')
           .update({ status: 'failed', updated_at: new Date().toISOString() })
           .eq('key', scopedIdempotencyKey)
           .eq('claim_token', claimToken);
       }
+    } catch (failErr) {
+      try {
+        await supabase
+          .from('idempotency_records')
+          .update({ status: 'failed', updated_at: new Date().toISOString() })
+          .eq('key', scopedIdempotencyKey)
+          .eq('claim_token', claimToken);
+      } catch (updateErr) {
+        logger.error('[Dynamic Router Rollback] Failed to mark idempotency record failed:', updateErr);
+      }
     }
-  } catch (err) {
-    logger.error('[Dynamic Router] Failed during order rollback compensation:', err);
   }
 }
 
@@ -1038,6 +1081,7 @@ function buildInstantTransactionRouter(router: Router): void {
     let baseInventoryRestorePayload: any[] = [];
     let appliedDiscounts: any[] | undefined = undefined;
     let insertedOrderItems: any[] = [];
+    let heartbeatTimer: NodeJS.Timeout | null = null;
     const supabase = getSupabase();
     try {
       const mounted = getMountedModule(req);
@@ -1218,6 +1262,18 @@ function buildInstantTransactionRouter(router: Router): void {
         } else {
           claimToken = claimResult.claim_token ?? null;
         }
+
+        if (scopedIdempotencyKey && claimToken) {
+          heartbeatTimer = setInterval(async () => {
+            try {
+              await supabase.rpc('heartbeat_idempotency_key', {
+                p_key: scopedIdempotencyKey,
+                p_claim_token: claimToken,
+                p_extension_seconds: 60,
+              });
+            } catch (_) {}
+          }, 10000);
+        }
       }
 
       // Resolve the authoritative currency before pricing (DOMAIN.md F2).
@@ -1350,6 +1406,17 @@ function buildInstantTransactionRouter(router: Router): void {
         },
       };
 
+      // Phase F4: Fencing check — verify active lease before mutating transaction state
+      const isLeaseValidForTx = await assertActiveLease(supabase, scopedIdempotencyKey, claimToken);
+      if (!isLeaseValidForTx) {
+        logger.warn('[Dynamic Router] Aborting order creation: lease expired/lost to another worker', {
+          key: scopedIdempotencyKey,
+          claimToken,
+        });
+        await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+        return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
+      }
+
       const { data: createdData, error: createError } = await supabase
         .from('transactions')
         .insert(insertPayload)
@@ -1411,6 +1478,13 @@ function buildInstantTransactionRouter(router: Router): void {
         baseInventoryRestorePayload = inventoryItemsPayload;
 
         // ── PATH A: AUTHORITATIVE stock deduction (Phase 5) ─────────────────
+        const isLeaseValidForInv = await assertActiveLease(supabase, scopedIdempotencyKey, claimToken);
+        if (!isLeaseValidForInv) {
+          logger.warn('[Dynamic Router] Aborting inventory deduction: lease expired/lost to another worker', { key: scopedIdempotencyKey, claimToken });
+          await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
+        }
+
         const { error: deductErr } = await supabase.rpc('deduct_inventory_for_order_items', {
           p_items: inventoryItemsPayload,
           p_user_id: req.user?.userId ?? null,
@@ -1456,6 +1530,21 @@ function buildInstantTransactionRouter(router: Router): void {
 
       // CRITICAL: persist order_items
       try {
+        const isLeaseValidForItems = await assertActiveLease(supabase, scopedIdempotencyKey, claimToken);
+        if (!isLeaseValidForItems) {
+          logger.warn('[Dynamic Router] Aborting order items: lease expired/lost to another worker', { key: scopedIdempotencyKey, claimToken });
+          await rollbackFailedOrder(
+            supabase,
+            created.id,
+            baseInventoryDeducted ? baseInventoryRestorePayload : [],
+            appliedDiscounts,
+            scopedIdempotencyKey,
+            claimToken,
+            req.user?.userId,
+          );
+          return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
+        }
+
         const orderItemRows = catalogResult.resolvedItems.map((item, index) => {
           const currentItem = items[index] as {
             catalog_item_id?: string; menuItemId?: string; itemId?: string;
@@ -1703,6 +1792,10 @@ function buildInstantTransactionRouter(router: Router): void {
         );
       }
       res.status(500).json({ success: false, error: 'Failed to create order' });
+    } finally {
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+      }
     }
   });
   // Add item(s) to an already-created order. Distinct from POST /orders

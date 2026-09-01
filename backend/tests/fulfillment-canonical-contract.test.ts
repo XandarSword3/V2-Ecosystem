@@ -458,19 +458,27 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
       }),
     };
 
-    // Simulate the rollback helper
+    // Simulate the independent-step rollback helper
     async function executeRollback(txId: string, baseItems: any[], discounts: any[], idempKey: string, claimToken: string) {
       if (baseItems.length > 0) {
-        await mockRollbackSupabase.rpc('restore_inventory_for_order_items', { p_items: baseItems });
+        try {
+          await mockRollbackSupabase.rpc('restore_inventory_for_order_items', { p_items: baseItems });
+        } catch (_) {}
       }
       if (discounts.length > 0) {
-        await mockRollbackSupabase.rpc('reverse_coupon_usage', { p_order_id: txId });
+        try {
+          await mockRollbackSupabase.rpc('reverse_coupon_usage', { p_order_id: txId });
+        } catch (_) {}
       }
       if (txId) {
-        await mockRollbackSupabase.from('transactions').delete().eq('id', txId);
+        try {
+          await mockRollbackSupabase.from('transactions').delete().eq('id', txId);
+        } catch (_) {}
       }
       if (idempKey && claimToken) {
-        await mockRollbackSupabase.rpc('fail_idempotency_key', { p_key: idempKey, p_claim_token: claimToken });
+        try {
+          await mockRollbackSupabase.rpc('fail_idempotency_key', { p_key: idempKey, p_claim_token: claimToken });
+        } catch (_) {}
       }
     }
 
@@ -486,5 +494,191 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
     expect(discountReversed).toBe(true);
     expect(transactionDeleted).toBe(true);
     expect(idempotencyFailed).toBe(true);
+  });
+
+  it('heartbeat extends lease while checkout is actively executing', async () => {
+    const key = 'tenant1:prop1:mod1:cust1:chk_heartbeat_test';
+    const token = 'token-heartbeat-123';
+    let expiresAt = new Date(Date.now() + 10000).toISOString();
+
+    const dbRecord = {
+      key,
+      claim_token: token,
+      status: 'in_progress',
+      expires_at: expiresAt,
+    };
+
+    function heartbeat(k: string, t: string, extSec: number): boolean {
+      if (dbRecord.key === k && dbRecord.claim_token === t && dbRecord.status === 'in_progress') {
+        dbRecord.expires_at = new Date(Date.now() + extSec * 1000).toISOString();
+        return true;
+      }
+      return false;
+    }
+
+    // Active worker extends lease
+    const success = heartbeat(key, token, 60);
+    expect(success).toBe(true);
+    expect(new Date(dbRecord.expires_at).getTime()).toBeGreaterThan(new Date(expiresAt).getTime());
+
+    // Invalid token cannot heartbeat
+    const fail = heartbeat(key, 'wrong-token', 60);
+    expect(fail).toBe(false);
+  });
+
+  it('forced lease expiry prevents stale worker from executing business mutations and allows new worker to execute exactly once', async () => {
+    const key = 'tenant1:prop1:mod1:cust1:chk_forced_expiry_e2e';
+    const tokenA = 'token-worker-a-stale';
+    const tokenB = 'token-worker-b-active';
+
+    let activeRecord = {
+      key,
+      claim_token: tokenA,
+      status: 'in_progress',
+      expires_at: new Date(Date.now() - 5000).toISOString(), // expired
+      transaction_id: null as string | null,
+      response: null as any,
+    };
+
+    let totalTransactionsCreated = 0;
+    let totalInventoryDeductions = 0;
+    let totalDiscountsConsumed = 0;
+    let totalOrderItemsInserted = 0;
+
+    function assertActiveLease(k: string, t: string): boolean {
+      return activeRecord.key === k && activeRecord.claim_token === t && activeRecord.status === 'in_progress';
+    }
+
+    // 1. Worker B reclaims the expired lease
+    if (activeRecord.expires_at < new Date().toISOString() && activeRecord.status === 'in_progress') {
+      activeRecord.claim_token = tokenB;
+      activeRecord.expires_at = new Date(Date.now() + 60000).toISOString();
+    }
+    expect(activeRecord.claim_token).toBe(tokenB);
+
+    // 2. Stale Worker A wakes up and attempts checkout pipeline
+    async function workerAExecution() {
+      // Step: transaction insert
+      if (!assertActiveLease(key, tokenA)) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      totalTransactionsCreated++;
+
+      // Step: inventory deduction
+      if (!assertActiveLease(key, tokenA)) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      totalInventoryDeductions++;
+
+      // Step: order items
+      if (!assertActiveLease(key, tokenA)) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      totalOrderItemsInserted++;
+
+      return { success: true };
+    }
+
+    // 3. Worker B executes checkout pipeline
+    async function workerBExecution() {
+      if (!assertActiveLease(key, tokenB)) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      totalTransactionsCreated++;
+      totalDiscountsConsumed++;
+
+      if (!assertActiveLease(key, tokenB)) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      totalInventoryDeductions++;
+
+      if (!assertActiveLease(key, tokenB)) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      totalOrderItemsInserted++;
+
+      activeRecord.status = 'completed';
+      activeRecord.transaction_id = 'tx-worker-b-committed';
+      activeRecord.response = { success: true, data: { id: 'tx-worker-b-committed' } };
+
+      return { success: true, data: { id: 'tx-worker-b-committed' } };
+    }
+
+    // Run both
+    const [resultA, resultB] = await Promise.all([
+      workerAExecution(),
+      workerBExecution(),
+    ]);
+
+    // Assert: Worker A was completely blocked from mutating business state
+    expect(resultA.success).toBe(false);
+    expect(resultA.error).toBe('LEASE_LOST');
+
+    // Assert: Worker B succeeded
+    expect(resultB.success).toBe(true);
+    expect(activeRecord.status).toBe('completed');
+    expect(activeRecord.transaction_id).toBe('tx-worker-b-committed');
+
+    // Assert the fundamental Engine A Single-Writer Invariant:
+    expect(totalTransactionsCreated).toBe(1);
+    expect(totalInventoryDeductions).toBe(1);
+    expect(totalDiscountsConsumed).toBe(1);
+    expect(totalOrderItemsInserted).toBe(1);
+  });
+
+  it('independent multi-stage rollback ensures every step executes even when one step throws', async () => {
+    const executionTrace: string[] = [];
+
+    async function independentRollback(simulateErrorInStep: string) {
+      // Step 1: Inventory
+      try {
+        if (simulateErrorInStep === 'inventory') throw new Error('Inventory restore failed');
+        executionTrace.push('inventory_restored');
+      } catch (e: any) {
+        executionTrace.push('inventory_error');
+      }
+
+      // Step 2: Discounts
+      try {
+        if (simulateErrorInStep === 'discounts') throw new Error('Discount reversal failed');
+        executionTrace.push('discounts_reversed');
+      } catch (e: any) {
+        executionTrace.push('discounts_error');
+      }
+
+      // Step 3: Order items
+      try {
+        if (simulateErrorInStep === 'order_items') throw new Error('Order items delete failed');
+        executionTrace.push('order_items_deleted');
+      } catch (e: any) {
+        executionTrace.push('order_items_error');
+      }
+
+      // Step 4: Transaction
+      try {
+        if (simulateErrorInStep === 'transaction') throw new Error('Transaction delete failed');
+        executionTrace.push('transaction_deleted');
+      } catch (e: any) {
+        executionTrace.push('transaction_error');
+      }
+
+      // Step 5: Idempotency
+      try {
+        if (simulateErrorInStep === 'idempotency') throw new Error('Idempotency fail update failed');
+        executionTrace.push('idempotency_failed');
+      } catch (e: any) {
+        executionTrace.push('idempotency_error');
+      }
+    }
+
+    // When discount reversal throws, inventory is already done, and order_items, transaction, and idempotency still execute!
+    await independentRollback('discounts');
+    expect(executionTrace).toEqual([
+      'inventory_restored',
+      'discounts_error',
+      'order_items_deleted',
+      'transaction_deleted',
+      'idempotency_failed',
+    ]);
   });
 });

@@ -324,6 +324,12 @@ export async function migrate() {
         END IF;
 
         IF v_record.status = 'failed' OR (v_record.status = 'in_progress' AND v_record.expires_at < v_now) THEN
+          -- Clean up uncompleted transactions from dead/expired attempts
+          IF v_record.transaction_id IS NOT NULL THEN
+            DELETE FROM order_items WHERE transaction_id = v_record.transaction_id;
+            DELETE FROM transactions WHERE id = v_record.transaction_id;
+          END IF;
+
           UPDATE idempotency_records
           SET claim_token = v_token,
               status = 'in_progress',
@@ -341,6 +347,23 @@ export async function migrate() {
           'status', 'in_progress',
           'expires_at', v_record.expires_at
         );
+      END;
+      $$;
+
+      CREATE OR REPLACE FUNCTION assert_active_lease(
+        p_key TEXT,
+        p_claim_token UUID
+      ) RETURNS BOOLEAN
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        v_count INTEGER;
+      BEGIN
+        SELECT COUNT(*) INTO v_count
+        FROM idempotency_records
+        WHERE key = p_key AND claim_token = p_claim_token AND status = 'in_progress';
+
+        RETURN v_count > 0;
       END;
       $$;
 
