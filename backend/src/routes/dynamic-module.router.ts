@@ -1464,38 +1464,28 @@ function buildInstantTransactionRouter(router: Router): void {
           p_transaction: insertPayload,
         });
 
-        if (!rpcErr && atomicResult) {
-          if (!atomicResult.success) {
-            if (atomicResult.error === 'LEASE_LOST') {
-              logger.warn('[Dynamic Router] Aborting order creation: lease expired/lost to another worker (atomic boundary)', {
-                key: scopedIdempotencyKey,
-                claimToken,
-              });
-              await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
-              return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
-            }
-            if (atomicResult.error === 'LOCATION_OCCUPIED') {
-              await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
-              return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
-            }
-            createError = new Error(atomicResult.message || atomicResult.error);
-          } else {
-            createdData = atomicResult.data;
-          }
-        } else {
-          // Direct fallback if RPC is not deployed in current environment
-          const isLeaseValidForTx = await assertActiveLease(supabase, scopedIdempotencyKey, claimToken);
-          if (!isLeaseValidForTx) {
+        if (rpcErr || !atomicResult) {
+          logger.error('[Dynamic Router] Infrastructure error during atomic order creation:', rpcErr);
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          return res.status(500).json({ success: false, error: 'INFRASTRUCTURE_ERROR', message: 'Order checkout service unavailable.' });
+        }
+
+        if (!atomicResult.success) {
+          if (atomicResult.error === 'LEASE_LOST') {
+            logger.warn('[Dynamic Router] Aborting order creation: lease expired/lost to another worker (atomic boundary)', {
+              key: scopedIdempotencyKey,
+              claimToken,
+            });
             await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
             return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
           }
-          const { data: inserted, error: insertErr } = await supabase
-            .from('transactions')
-            .insert(insertPayload)
-            .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
-            .single();
-          createdData = inserted;
-          createError = insertErr;
+          if (atomicResult.error === 'LOCATION_OCCUPIED') {
+            await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+            return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
+          }
+          createError = new Error(atomicResult.message || atomicResult.error);
+        } else {
+          createdData = atomicResult.data;
         }
       } catch (e) {
         createError = e;
@@ -1540,7 +1530,7 @@ function buildInstantTransactionRouter(router: Router): void {
       }
       created = createdData;
 
-      // Deduct inventory atomically with audit trail; roll back transaction on stock failure
+      // Deduct inventory atomically with audit trail and active lease fencing
       try {
         const inventoryItemsPayload = catalogResult.resolvedItems.map((item, index) => {
           const currentItem = items[index] as {
@@ -1555,27 +1545,36 @@ function buildInstantTransactionRouter(router: Router): void {
         });
         baseInventoryRestorePayload = inventoryItemsPayload;
 
-        // ── PATH A: AUTHORITATIVE stock deduction (Phase 5) ─────────────────
-        const isLeaseValidForInv = await assertActiveLease(supabase, scopedIdempotencyKey, claimToken);
-        if (!isLeaseValidForInv) {
-          logger.warn('[Dynamic Router] Aborting inventory deduction: lease expired/lost to another worker', { key: scopedIdempotencyKey, claimToken });
-          await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
-          return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
-        }
-
-        const { error: deductErr } = await supabase.rpc('deduct_inventory_for_order_items', {
+        // ── PATH A: AUTHORITATIVE stock deduction with lease fencing ─────────────────
+        const { data: deductResult, error: deductErr } = await supabase.rpc('deduct_inventory_for_checkout_atomic', {
+          p_key: scopedIdempotencyKey,
+          p_claim_token: claimToken,
           p_items: inventoryItemsPayload,
           p_user_id: req.user?.userId ?? null,
           p_order_id: created.id,
         });
 
-        if (deductErr) {
-          logger.warn('[Dynamic Router] Inventory deduction failed, rolling back order:', deductErr.message);
+        if (deductErr || !deductResult) {
+          logger.error('[Dynamic Router] Infrastructure error during inventory deduction RPC:', deductErr);
+          await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          return res.status(500).json({ success: false, error: 'INFRASTRUCTURE_ERROR', message: 'Failed to process inventory reservation' });
+        }
+
+        if (!deductResult.success) {
+          if (deductResult.error === 'LEASE_LOST') {
+            logger.warn('[Dynamic Router] Aborting inventory deduction: lease expired/lost to another worker (atomic boundary)', {
+              key: scopedIdempotencyKey,
+              claimToken,
+            });
+            await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+            return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
+          }
+          logger.warn('[Dynamic Router] Inventory deduction failed, rolling back order:', deductResult.message);
           await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
           return res.status(400).json({
             success: false,
             error: 'INSUFFICIENT_STOCK',
-            message: 'One or more items in your order are out of stock',
+            message: deductResult.message || 'One or more items in your order are out of stock',
           });
         }
         baseInventoryDeducted = true;
@@ -1606,7 +1605,7 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'Failed to process discounts for order' });
       }
 
-      // CRITICAL: persist order_items
+      // CRITICAL: persist order_items atomically under lease ownership boundary
       try {
         const orderItemRows = catalogResult.resolvedItems.map((item, index) => {
           const currentItem = items[index] as {
@@ -1637,7 +1636,6 @@ function buildInstantTransactionRouter(router: Router): void {
           };
         });
 
-        let orderItemsData: any = null;
         let orderItemsError: any = null;
 
         try {
@@ -1648,31 +1646,26 @@ function buildInstantTransactionRouter(router: Router): void {
             p_items: orderItemRows,
           });
 
-          if (!rpcItemsErr && atomicItemsResult) {
-            if (!atomicItemsResult.success) {
-              if (atomicItemsResult.error === 'LEASE_LOST') {
-                logger.warn('[Dynamic Router] Aborting order items: lease expired/lost to another worker (atomic boundary)', {
-                  key: scopedIdempotencyKey,
-                  claimToken,
-                });
-                await rollbackFailedOrder(
-                  supabase,
-                  created.id,
-                  baseInventoryDeducted ? baseInventoryRestorePayload : [],
-                  appliedDiscounts,
-                  scopedIdempotencyKey,
-                  claimToken,
-                  req.user?.userId,
-                );
-                return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
-              }
-              orderItemsError = new Error(atomicItemsResult.message || atomicItemsResult.error);
-            } else {
-              orderItemsData = atomicItemsResult.data;
-            }
-          } else {
-            const isLeaseValidForItems = await assertActiveLease(supabase, scopedIdempotencyKey, claimToken);
-            if (!isLeaseValidForItems) {
+          if (rpcItemsErr || !atomicItemsResult) {
+            logger.error('[Dynamic Router] Infrastructure error during atomic order_items persistence:', rpcItemsErr);
+            await rollbackFailedOrder(
+              supabase,
+              created.id,
+              baseInventoryDeducted ? baseInventoryRestorePayload : [],
+              appliedDiscounts,
+              scopedIdempotencyKey,
+              claimToken,
+              req.user?.userId,
+            );
+            return res.status(500).json({ success: false, error: 'INFRASTRUCTURE_ERROR', message: 'Order item recording failed' });
+          }
+
+          if (!atomicItemsResult.success) {
+            if (atomicItemsResult.error === 'LEASE_LOST') {
+              logger.warn('[Dynamic Router] Aborting order items: lease expired/lost to another worker (atomic boundary)', {
+                key: scopedIdempotencyKey,
+                claimToken,
+              });
               await rollbackFailedOrder(
                 supabase,
                 created.id,
@@ -1684,12 +1677,9 @@ function buildInstantTransactionRouter(router: Router): void {
               );
               return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
             }
-            const { data: insertedItems, error: directItemsErr } = await supabase
-              .from('order_items')
-              .insert(orderItemRows)
-              .select('id, catalog_item_id, quantity, metadata');
-            orderItemsData = insertedItems;
-            orderItemsError = directItemsErr;
+            orderItemsError = new Error(atomicItemsResult.message || atomicItemsResult.error);
+          } else {
+            insertedOrderItems = atomicItemsResult.data || [];
           }
         } catch (e) {
           orderItemsError = e;
@@ -1711,7 +1701,6 @@ function buildInstantTransactionRouter(router: Router): void {
           );
           return res.status(500).json({ success: false, error: 'Failed to record order items' });
         }
-        insertedOrderItems = orderItemsData || [];
       } catch (orderItemsErr) {
         logger.error('[Dynamic Router] Unexpected error persisting order_items, rolling back:', {
           orderId: created.id,
@@ -1729,7 +1718,7 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'Failed to record order items' });
       }
 
-      // Process customization inventory for items with selectedModifiers
+      // Process customization inventory for items with selectedModifiers atomically
       if (insertedOrderItems.length > 0) {
         try {
           for (const orderItem of insertedOrderItems) {
@@ -1744,7 +1733,9 @@ function buildInstantTransactionRouter(router: Router): void {
               quantity: mod.quantity || 1,
             }));
 
-            const { error: customizationError } = await supabase.rpc('create_order_customization_snapshot', {
+            const { data: customResult, error: customizationError } = await supabase.rpc('create_order_customization_snapshot_atomic', {
+              p_key: scopedIdempotencyKey,
+              p_claim_token: claimToken,
               p_order_type: 'instant_transaction',
               p_order_id: created.id,
               p_order_item_id: orderItem.id,
@@ -1756,10 +1747,28 @@ function buildInstantTransactionRouter(router: Router): void {
               p_performed_by: req.user?.userId ?? null,
             });
 
-            if (customizationError) {
+            if (customizationError || !customResult || !customResult.success) {
+              const errCode = customResult?.error;
+              if (errCode === 'LEASE_LOST') {
+                logger.warn('[Dynamic Router] Aborting customization inventory: lease lost (atomic boundary)', {
+                  key: scopedIdempotencyKey,
+                  claimToken,
+                });
+                await rollbackFailedOrder(
+                  supabase,
+                  created.id,
+                  baseInventoryDeducted ? baseInventoryRestorePayload : [],
+                  appliedDiscounts,
+                  scopedIdempotencyKey,
+                  claimToken,
+                  req.user?.userId,
+                );
+                return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
+              }
+
               logger.error('[Dynamic Router] Customization inventory deduction failed, rolling back order:', {
-                error: customizationError,
-                message: customizationError.message,
+                error: customizationError || customResult?.error,
+                message: customResult?.message,
                 selections: selections,
               });
               
@@ -1776,7 +1785,7 @@ function buildInstantTransactionRouter(router: Router): void {
               return res.status(400).json({
                 success: false,
                 error: 'INSUFFICIENT_STOCK_CUSTOMIZATION',
-                message: 'One or more customizations in your order are out of stock',
+                message: customResult?.message || 'One or more customizations in your order are out of stock',
               });
             }
           }

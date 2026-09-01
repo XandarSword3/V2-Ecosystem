@@ -756,6 +756,17 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
       return { success: true, data: tx };
     }
 
+    // Atomic deduct_inventory_for_checkout_atomic implementation
+    let baseInventoryDeductions = 0;
+    function deductInventoryAtomic(k: string, claimToken: string, items: any[]): { success: boolean; error?: string } {
+      const lease = idempotencyTable.get(k);
+      if (!lease || lease.claim_token !== claimToken || lease.status !== 'in_progress' || new Date(lease.expires_at).getTime() <= Date.now()) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      baseInventoryDeductions += items.length;
+      return { success: true };
+    }
+
     // Atomic persist_order_items_atomic implementation
     function persistOrderItemsAtomic(k: string, claimToken: string, txId: string, items: any[]): { success: boolean; data?: any; error?: string } {
       const lease = idempotencyTable.get(k);
@@ -767,33 +778,66 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
       return { success: true, data: inserted };
     }
 
-    // Stale Worker A attempts atomic mutations
+    // Atomic create_order_customization_snapshot_atomic implementation
+    let customizationDeductions = 0;
+    function createCustomizationSnapshotAtomic(k: string, claimToken: string, selections: any[]): { success: boolean; error?: string } {
+      const lease = idempotencyTable.get(k);
+      if (!lease || lease.claim_token !== claimToken || lease.status !== 'in_progress' || new Date(lease.expires_at).getTime() <= Date.now()) {
+        return { success: false, error: 'LEASE_LOST' };
+      }
+      customizationDeductions += selections.length;
+      return { success: true };
+    }
+
+    // Stale Worker A attempts all 4 atomic mutations
     const resultOrderA = createOrderAtomic(key, tokenA, { amount: 100 });
     expect(resultOrderA.success).toBe(false);
     expect(resultOrderA.error).toBe('LEASE_LOST');
+
+    const resultInvA = deductInventoryAtomic(key, tokenA, [{ catalog_item_id: 'item-1', quantity: 2 }]);
+    expect(resultInvA.success).toBe(false);
+    expect(resultInvA.error).toBe('LEASE_LOST');
 
     const resultItemsA = persistOrderItemsAtomic(key, tokenA, 'tx-phantom', [{ quantity: 2 }]);
     expect(resultItemsA.success).toBe(false);
     expect(resultItemsA.error).toBe('LEASE_LOST');
 
-    // Active Worker B executes atomic mutations
+    const resultCustomA = createCustomizationSnapshotAtomic(key, tokenA, [{ groupId: 'g1', optionId: 'o1' }]);
+    expect(resultCustomA.success).toBe(false);
+    expect(resultCustomA.error).toBe('LEASE_LOST');
+
+    // Active Worker B executes all 4 atomic mutations
     const resultOrderB = createOrderAtomic(key, tokenB, { amount: 100 });
     expect(resultOrderB.success).toBe(true);
     expect(resultOrderB.data).toBeDefined();
 
     const txIdB = resultOrderB.data.id;
+
+    const resultInvB = deductInventoryAtomic(key, tokenB, [{ catalog_item_id: 'item-1', quantity: 2 }]);
+    expect(resultInvB.success).toBe(true);
+
     const resultItemsB = persistOrderItemsAtomic(key, tokenB, txIdB, [{ catalog_item_id: 'item-1', quantity: 2 }]);
     expect(resultItemsB.success).toBe(true);
     expect(resultItemsB.data.length).toBe(1);
 
-    // Database assertions: exactly 1 transaction and 1 order items set
+    const resultCustomB = createCustomizationSnapshotAtomic(key, tokenB, [{ groupId: 'g1', optionId: 'o1' }]);
+    expect(resultCustomB.success).toBe(true);
+
+    // Database assertions: exactly 1 transaction, 1 base inventory deduction, 1 customization deduction, 1 order_items set
     expect(transactionsTable.size).toBe(1);
+    expect(baseInventoryDeductions).toBe(1);
+    expect(customizationDeductions).toBe(1);
     expect(orderItemsTable.length).toBe(1);
     expect(orderItemsTable[0].transaction_id).toBe(txIdB);
   });
 
-  it('durable compensation failure queue records all failed compensation steps for asynchronous recovery', async () => {
+  it('durable compensation failure queue records and processes all 5 compensation operations', async () => {
     const compensationQueue: any[] = [];
+    const restoredInventory: any[] = [];
+    const reversedDiscounts: string[] = [];
+    const deletedOrderItems: string[] = [];
+    const deletedTransactions: string[] = [];
+    const failedIdempotencyKeys: string[] = [];
 
     async function queueCompensation(key: string, txId: string, op: string, payload: any, err: string) {
       compensationQueue.push({
@@ -803,6 +847,7 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
         operation: op,
         payload,
         status: 'pending',
+        attempts: 0,
         last_error: err,
         created_at: new Date().toISOString(),
       });
@@ -811,7 +856,7 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
     const key = 'tenant1:prop1:mod1:cust1:chk_queue_test';
     const txId = 'tx-fail-123';
 
-    // Test each failure mode produces a queued recovery record
+    // 1. Queue all 5 failure modes
     await queueCompensation(key, txId, 'restore_inventory', [{ catalog_item_id: 'item-1', quantity: 1 }], 'Database connection timed out');
     await queueCompensation(key, txId, 'reverse_discounts', [{ code: 'SUMMER20' }], 'Gift card service 503');
     await queueCompensation(key, txId, 'delete_order_items', { transaction_id: txId }, 'Lock timeout on order_items');
@@ -819,14 +864,47 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
     await queueCompensation(key, txId, 'fail_idempotency_key', { key, claim_token: 'token-1' }, 'RPC connection reset');
 
     expect(compensationQueue.length).toBe(5);
-    expect(compensationQueue.map(q => q.operation)).toEqual([
-      'restore_inventory',
-      'reverse_discounts',
-      'delete_order_items',
-      'delete_transaction',
-      'fail_idempotency_key',
-    ]);
     expect(compensationQueue.every(q => q.status === 'pending')).toBe(true);
-    expect(compensationQueue.every(q => Boolean(q.last_error))).toBe(true);
+
+    // 2. Worker processor executing the queue
+    async function processQueue(): Promise<{ processed: number; failed: number }> {
+      let processed = 0;
+      let failed = 0;
+      for (const item of compensationQueue) {
+        if (item.status !== 'pending') continue;
+        try {
+          if (item.operation === 'restore_inventory') {
+            restoredInventory.push(...item.payload);
+          } else if (item.operation === 'reverse_discounts') {
+            reversedDiscounts.push(item.transaction_id);
+          } else if (item.operation === 'delete_order_items') {
+            deletedOrderItems.push(item.transaction_id);
+          } else if (item.operation === 'delete_transaction') {
+            deletedTransactions.push(item.transaction_id);
+          } else if (item.operation === 'fail_idempotency_key') {
+            failedIdempotencyKeys.push(item.idempotency_key);
+          }
+          item.status = 'completed';
+          processed++;
+        } catch (e: any) {
+          item.attempts += 1;
+          item.last_error = e.message;
+          if (item.attempts >= 5) item.status = 'failed';
+          failed++;
+        }
+      }
+      return { processed, failed };
+    }
+
+    const { processed, failed } = await processQueue();
+
+    expect(processed).toBe(5);
+    expect(failed).toBe(0);
+    expect(compensationQueue.every(q => q.status === 'completed')).toBe(true);
+    expect(restoredInventory.length).toBe(1);
+    expect(reversedDiscounts).toContain(txId);
+    expect(deletedOrderItems).toContain(txId);
+    expect(deletedTransactions).toContain(txId);
+    expect(failedIdempotencyKeys).toContain(key);
   });
 });

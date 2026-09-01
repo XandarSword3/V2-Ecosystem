@@ -520,6 +520,123 @@ export async function migrate() {
       END;
       $$;
 
+      CREATE OR REPLACE FUNCTION deduct_inventory_for_checkout_atomic(
+        p_key TEXT,
+        p_claim_token UUID,
+        p_items JSONB,
+        p_user_id UUID DEFAULT NULL::UUID,
+        p_order_id UUID DEFAULT NULL::UUID
+      ) RETURNS JSONB
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        v_lease RECORD;
+        v_item JSONB;
+        v_catalog_item_id UUID;
+        v_quantity NUMERIC;
+        v_ingredient RECORD;
+        v_required NUMERIC;
+        v_deduct_result JSONB;
+        v_deducted_count INTEGER := 0;
+      BEGIN
+        IF p_key IS NOT NULL AND p_claim_token IS NOT NULL THEN
+          SELECT * INTO v_lease
+          FROM idempotency_records
+          WHERE key = p_key
+          FOR UPDATE;
+
+          IF NOT FOUND OR v_lease.claim_token != p_claim_token OR v_lease.status != 'in_progress' OR v_lease.expires_at <= NOW() THEN
+            RETURN jsonb_build_object('success', false, 'error', 'LEASE_LOST', 'message', 'Active checkout lease expired or taken over.');
+          END IF;
+        END IF;
+
+        IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
+          RETURN jsonb_build_object('success', true, 'ingredients_deducted', 0);
+        END IF;
+
+        FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
+        LOOP
+          v_catalog_item_id := (v_item->>'catalog_item_id')::UUID;
+          v_quantity := (v_item->>'quantity')::NUMERIC;
+
+          IF v_quantity IS NULL OR v_quantity <= 0 THEN
+            CONTINUE;
+          END IF;
+
+          FOR v_ingredient IN
+            SELECT inventory_item_id, quantity_required
+            FROM menu_item_ingredients
+            WHERE catalog_item_id = v_catalog_item_id
+          LOOP
+            v_required := v_ingredient.quantity_required * v_quantity;
+
+            v_deduct_result := "public"."deduct_stock_fifo"(
+              v_ingredient.inventory_item_id,
+              v_required,
+              'order'::character varying,
+              p_user_id
+            );
+
+            IF NOT COALESCE((v_deduct_result->>'success')::boolean, false) THEN
+              RETURN jsonb_build_object('success', false, 'error', 'INSUFFICIENT_STOCK', 'message', 'One or more items in your order are out of stock', 'details', v_deduct_result);
+            END IF;
+
+            v_deducted_count := v_deducted_count + 1;
+          END LOOP;
+        END LOOP;
+
+        RETURN jsonb_build_object('success', true, 'ingredients_deducted', v_deducted_count);
+      END;
+      $$;
+
+      CREATE OR REPLACE FUNCTION create_order_customization_snapshot_atomic(
+        p_key TEXT,
+        p_claim_token UUID,
+        p_order_type TEXT,
+        p_order_id UUID,
+        p_order_item_id UUID,
+        p_entity_type TEXT,
+        p_entity_id UUID,
+        p_selections JSONB,
+        p_base_quantity NUMERIC DEFAULT 1,
+        p_execute_inventory BOOLEAN DEFAULT TRUE,
+        p_performed_by UUID DEFAULT NULL::UUID
+      ) RETURNS JSONB
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        v_lease RECORD;
+        v_res JSONB;
+      BEGIN
+        IF p_key IS NOT NULL AND p_claim_token IS NOT NULL THEN
+          SELECT * INTO v_lease
+          FROM idempotency_records
+          WHERE key = p_key
+          FOR UPDATE;
+
+          IF NOT FOUND OR v_lease.claim_token != p_claim_token OR v_lease.status != 'in_progress' OR v_lease.expires_at <= NOW() THEN
+            RETURN jsonb_build_object('success', false, 'error', 'LEASE_LOST', 'message', 'Active checkout lease expired or taken over.');
+          END IF;
+        END IF;
+
+        SELECT create_order_customization_snapshot(
+          p_order_type,
+          p_order_id,
+          p_order_item_id,
+          p_entity_type,
+          p_entity_id,
+          p_selections,
+          p_base_quantity,
+          p_execute_inventory,
+          p_performed_by
+        ) INTO v_res;
+
+        RETURN jsonb_build_object('success', true, 'data', v_res);
+      EXCEPTION WHEN OTHERS THEN
+        RETURN jsonb_build_object('success', false, 'error', 'CUSTOMIZATION_ERROR', 'message', SQLERRM);
+      END;
+      $$;
+
       CREATE TABLE IF NOT EXISTS checkout_compensation_queue (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         idempotency_key TEXT,
@@ -562,6 +679,69 @@ export async function migrate() {
         RETURNING id INTO v_id;
 
         RETURN v_id;
+      END;
+      $$;
+
+      CREATE OR REPLACE FUNCTION process_checkout_compensation_queue(
+        p_batch_size INTEGER DEFAULT 10
+      ) RETURNS JSONB
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        v_row RECORD;
+        v_processed INTEGER := 0;
+        v_failed INTEGER := 0;
+      BEGIN
+        FOR v_row IN
+          SELECT * FROM checkout_compensation_queue
+          WHERE status = 'pending'
+          ORDER BY created_at ASC
+          LIMIT p_batch_size
+          FOR UPDATE SKIP LOCKED
+        LOOP
+          BEGIN
+            IF v_row.operation = 'restore_inventory' THEN
+              PERFORM restore_inventory_for_order_items(v_row.payload);
+            ELSIF v_row.operation = 'reverse_discounts' THEN
+              IF v_row.transaction_id IS NOT NULL THEN
+                PERFORM reverse_coupon_usage(v_row.transaction_id);
+              END IF;
+            ELSIF v_row.operation = 'delete_order_items' THEN
+              IF v_row.transaction_id IS NOT NULL THEN
+                DELETE FROM order_items WHERE transaction_id = v_row.transaction_id;
+              END IF;
+            ELSIF v_row.operation = 'delete_transaction' THEN
+              IF v_row.transaction_id IS NOT NULL THEN
+                DELETE FROM transactions WHERE id = v_row.transaction_id;
+              END IF;
+            ELSIF v_row.operation = 'fail_idempotency_key' THEN
+              IF v_row.idempotency_key IS NOT NULL THEN
+                UPDATE idempotency_records
+                SET status = 'failed',
+                    updated_at = NOW()
+                WHERE key = v_row.idempotency_key;
+              END IF;
+            END IF;
+
+            UPDATE checkout_compensation_queue
+            SET status = 'completed',
+                updated_at = NOW()
+            WHERE id = v_row.id;
+
+            v_processed := v_processed + 1;
+          EXCEPTION WHEN OTHERS THEN
+            UPDATE checkout_compensation_queue
+            SET attempts = attempts + 1,
+                last_error = SQLERRM,
+                status = CASE WHEN attempts + 1 >= 5 THEN 'failed' ELSE 'pending' END,
+                updated_at = NOW()
+            WHERE id = v_row.id;
+
+            v_failed := v_failed + 1;
+          END;
+        END LOOP;
+
+        RETURN jsonb_build_object('processed', v_processed, 'failed', v_failed);
       END;
       $$;
 
