@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Container } from '@/components/layout/Container';
 import { Section } from '@/components/layout/Section';
+import { CustomerShell } from '@/components/shells/CustomerShell';
 import {
   CheckCircle2,
   Calendar,
@@ -900,12 +901,14 @@ function ConfirmationContent() {
 
 export default function UnifiedConfirmationPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
-    }>
-      <ConfirmationContent />
-    </Suspense>
+    <CustomerShell>
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+        </div>
+      }>
+        <ConfirmationContent />
+      </Suspense>
+    </CustomerShell>
   );
 }

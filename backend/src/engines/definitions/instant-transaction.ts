@@ -193,8 +193,7 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
         { mode: 'digital_delivery', destinations: ['digital_account'] },
         { mode: 'shipment', destinations: ['address'] },
         { mode: 'service_execution', destinations: ['service_location'] },
-        // 'none' mode is handled as a special case in the controller:
-        // no fulfillment machine, no destination, no allocation.
+        { mode: 'none', destinations: ['none'] },
       ],
       groups: false,
       tracking: false,

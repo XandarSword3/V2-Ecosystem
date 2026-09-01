@@ -7,6 +7,7 @@ import { asyncHandler } from '../middleware/async-handler.js';
 import { getSupabase } from '../database/connection.js';
 import { getEngineService } from '../engines/engine-service.js';
 import { resolveModuleCurrency } from '../engines/currency-resolver.js';
+import { CURRENCY_DECIMALS } from '../engines/money.js';
 import { logger } from '../utils/logger.js';
 import { requirePropertyAccess } from '../middleware/propertyAccess.middleware.js';
 import { purchaseSharedCapacityAtomic } from '../services/shared-capacity-purchase.js';
@@ -961,11 +962,11 @@ function buildInstantTransactionRouter(router: Router): void {
       const giftCardCodes = giftCardRedemptions
         .map((r: unknown) => (r as { code?: string }).code)
         .filter((code: unknown): code is string => typeof code === 'string' && code.length > 0);
-      const resolvedOrderType = req.body?.orderType ?? req.body?.metadata?.order_type ?? req.body?.order_type ?? 'dine_in';
       const resolvedCustomerName = req.body?.customerName ?? req.body?.metadata?.customer_name ?? req.body?.customer_name ?? null;
       const resolvedCustomerPhone = req.body?.customerPhone ?? req.body?.metadata?.customer_phone ?? req.body?.customer_phone ?? null;
       const resolvedTableNumber = req.body?.tableNumber ?? req.body?.metadata?.table_number ?? req.body?.table_number ?? null;
       const resolvedPaymentMethod = req.body?.paymentMethod ?? req.body?.metadata?.payment_method ?? req.body?.payment_method ?? 'cash';
+      
       // Resolve property_id: mounted module → request context — NO fallbacks
       // Must be resolved BEFORE calculatePricing so tax/fees use property settings
       const propertyId = mounted.property_id
@@ -990,8 +991,31 @@ function buildInstantTransactionRouter(router: Router): void {
         });
         return res.status(500).json({ success: false, error: 'tenant_id is required but could not be resolved for this module' });
       }
+
+      // Check customer checkout idempotency (Phase F4)
+      const idempotencyKey = (req.body?.idempotencyKey || req.headers['idempotency-key']) as string | undefined;
+      if (idempotencyKey && typeof idempotencyKey === 'string') {
+        const { data: existingTx } = await supabase
+          .from('transactions')
+          .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')
+          .eq('module_id', mounted.id)
+          .contains('metadata', { idempotency_key: idempotencyKey })
+          .maybeSingle();
+
+        if (existingTx) {
+          logger.info('[Dynamic Router] Idempotent checkout hit: returning existing order', {
+            orderId: existingTx.id,
+            idempotencyKey,
+          });
+          return res.json({ success: true, data: existingTx });
+        }
+      }
+
       // Resolve the authoritative currency before pricing (DOMAIN.md F2).
       const currency = await resolveModuleCurrency(mounted.id, propertyId);
+      const rawFulfillmentSelection = req.body?.fulfillmentSelection;
+      const legacyOrderType = req.body?.orderType ?? req.body?.metadata?.order_type ?? req.body?.order_type;
+
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
         propertyId: propertyId,
@@ -1000,33 +1024,48 @@ function buildInstantTransactionRouter(router: Router): void {
         couponCode: typeof req.body?.couponCode === 'string' ? req.body.couponCode : undefined,
         giftCardCodes: giftCardCodes.length > 0 ? giftCardCodes : undefined,
         loyaltyPointsToRedeem: typeof req.body?.loyaltyPointsToRedeem === 'number' ? req.body.loyaltyPointsToRedeem : undefined,
-        conditions: { orderType: resolvedOrderType, paymentMethod: resolvedPaymentMethod },
+        conditions: {
+          fulfillmentMode: rawFulfillmentSelection?.mode,
+          orderType: legacyOrderType || rawFulfillmentSelection?.mode,
+          paymentMethod: resolvedPaymentMethod,
+        },
       });
-      // Validate pricing matches preview if provided (protects against pricing drift)
+
+      // Validate pricing matches preview if provided (currency-aware exact normalization)
       const previewTotal = typeof req.body?.previewTotal === 'number' ? req.body.previewTotal : null;
       if (previewTotal !== null) {
-        const tolerance = 0.01; // 1 cent tolerance for rounding differences
-        const diff = Math.abs(pricing.totalAmount - previewTotal);
-        if (diff > tolerance) {
+        const decimals = CURRENCY_DECIMALS[currency.toUpperCase()] ?? 2;
+        const normalizedPreview = Number(previewTotal.toFixed(decimals));
+        const normalizedServer = Number(pricing.totalAmount.toFixed(decimals));
+        const diff = Math.abs(normalizedServer - normalizedPreview);
+        if (diff > 0) {
           logger.error('[Dynamic Router] POST /orders rejected - pricing mismatch with preview', {
             previewTotal,
+            normalizedPreview,
             calculatedTotal: pricing.totalAmount,
-            difference: diff,
+            normalizedServer,
+            currency,
             moduleId: mounted.id,
           });
           return res.status(400).json({
             success: false,
             error: 'Pricing mismatch detected',
-            message: `The total amount has changed since preview. Preview: $${previewTotal.toFixed(2)}, Current: $${pricing.totalAmount.toFixed(2)}. Please refresh and try again.`,
+            message: `The total amount has changed since preview. Preview: ${previewTotal}, Current: ${pricing.totalAmount} (${currency}). Please refresh and try again.`,
             previewTotal,
             calculatedTotal: pricing.totalAmount,
+            currency,
           });
         }
       }
+
       // Validate service_location_id belongs to this module before trusting it —
       // otherwise a caller could tag an order to another module's location.
       let serviceLocationId: string | null = null;
-      const requestedLocationId = req.body?.service_location_id || req.body?.serviceLocationId;
+      const requestedLocationId =
+        rawFulfillmentSelection?.destinationType === 'on_premise_location'
+          ? (rawFulfillmentSelection.destinationRef || req.body?.service_location_id || req.body?.serviceLocationId)
+          : (req.body?.service_location_id || req.body?.serviceLocationId);
+
       if (typeof requestedLocationId === 'string' && requestedLocationId.length > 0) {
         const { data: locationRow, error: locationError } = await supabase
           .from('service_locations')
@@ -1038,15 +1077,8 @@ function buildInstantTransactionRouter(router: Router): void {
         if (!locationRow) {
           return res.status(400).json({ success: false, error: 'service_location_id does not belong to this module' });
         }
-        // FIX: nothing previously stopped a second order landing on a table
-        // that already had an open one — the staff UI would then only show
-        // whichever order was created first, and the second was invisible.
-        // Same non-terminal-status check as fetchServiceLocationsWithOccupancy,
-        // scoped to this one location, done at insert time to close the race.
-        // .limit(1) + array check rather than .maybeSingle(): existing bad
-        // data (tables that already ended up with >1 open order, i.e. the
-        // exact bug this closes) would make maybeSingle() throw instead of
-        // correctly reporting "occupied".
+        
+        // Concurrent occupancy check: atomic check for non-terminal open order at this location
         const { data: existingOrders, error: occupancyError } = await supabase
           .from('transactions')
           .select('id')
@@ -1056,7 +1088,7 @@ function buildInstantTransactionRouter(router: Router): void {
           .limit(1);
         if (occupancyError) throw occupancyError;
         if (existingOrders && existingOrders.length > 0) {
-          return res.status(409).json({ success: false, error: 'This table already has an open order' });
+          return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
         }
         serviceLocationId = locationRow.id;
       }
@@ -1064,15 +1096,13 @@ function buildInstantTransactionRouter(router: Router): void {
       const staffId = isStaffUser ? (req.user?.userId ?? null) : null;
       const customerId = isStaffUser ? null : (req.user?.userId ?? null);
 
-      // Stage 6 fix: the fulfillment selection is MANDATORY before
-      // confirmation and is snapshotted at creation — it is part of the
-      // immutable commercial record, never left NULL to be decided later.
-      // The confirm trigger copies it into the fulfillment row verbatim and
-      // refuses to confirm an order without it. Capability-validated here
-      // (typed domain values against the engine's declared options); an
-      // unresolvable selection fails the order creation.
+      // Phase F4: Canonical fulfillment selection is primary API contract
       const fulfillmentSelection = resolveFulfillmentSelection('instant_transaction', {
-        orderType: resolvedOrderType,
+        mode: rawFulfillmentSelection?.mode,
+        destinationType: rawFulfillmentSelection?.destinationType,
+        destinationRef: rawFulfillmentSelection?.destinationRef,
+        fulfillmentSelection: rawFulfillmentSelection,
+        orderType: legacyOrderType,
         serviceLocationId,
         tableNumber: resolvedTableNumber,
         address: req.body?.address ?? req.body?.deliveryAddress ?? req.body?.metadata?.address ?? null,
@@ -1091,27 +1121,23 @@ function buildInstantTransactionRouter(router: Router): void {
           amount: pricing.totalAmount,
           discount_amount: pricing.totalDiscount ?? 0,
           tax_amount: pricing.taxAmount ?? 0,
-          // FIX: service_charge column already existed on transactions but
-          // was never populated at creation — every order with a service
-          // charge silently showed $0 for it downstream.
           service_charge: pricing.serviceCharge ?? 0,
           currency,
           service_location_id: serviceLocationId,
           metadata: {
-            // FIX: order_number was never written on this (customer-facing)
-            // creation path, unlike the staff "New Order" path — every
-            // customer-placed order showed a blank order number downstream.
             order_number: `ORD-${Date.now().toString(36).toUpperCase().slice(-5)}`,
             notes: req.body?.notes ?? req.body?.metadata?.notes ?? null,
             payment_method: resolvedPaymentMethod,
-            order_type: resolvedOrderType,
+            order_type: legacyOrderType || fulfillmentSelection.mode,
             table_number: resolvedTableNumber,
             customer_name: resolvedCustomerName,
             customer_phone: resolvedCustomerPhone,
-            // Typed fulfillment selection snapshot (see resolver above).
+            // Typed canonical fulfillment snapshot
             fulfillment_mode: fulfillmentSelection.mode,
             fulfillment_destination_type: fulfillmentSelection.destinationType,
             fulfillment_destination_ref: fulfillmentSelection.destinationRef,
+            // Idempotency tracking
+            ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
           },
         })
         .select('id, module_id, customer_id, status, amount, service_location_id, created_at, metadata')

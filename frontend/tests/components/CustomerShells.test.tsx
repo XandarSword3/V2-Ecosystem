@@ -111,7 +111,7 @@ describe('F3: Customer Application Shell Modernization', () => {
       const caps = resolveEngineACapabilities(module);
       expect(caps).not.toBeNull();
       expect(caps?.fulfillment.required).toBe(true);
-      expect(caps?.fulfillment.options).toHaveLength(6);
+      expect(caps?.fulfillment.options).toHaveLength(7);
       
       const modes = caps?.fulfillment.options.map(o => o.mode);
       expect(modes).toContain('on_premise');
@@ -120,6 +120,7 @@ describe('F3: Customer Application Shell Modernization', () => {
       expect(modes).toContain('digital_delivery');
       expect(modes).toContain('shipment');
       expect(modes).toContain('service_execution');
+      expect(modes).toContain('none');
     });
 
     it('returns null capability projection for non-instant_transaction engines', () => {

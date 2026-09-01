@@ -513,10 +513,19 @@ export function isFulfillmentMode(value: string): value is FulfillmentMode {
   );
 }
 
+export type DestinationType =
+  | 'none'
+  | 'pickup_location'
+  | 'on_premise_location'
+  | 'room'
+  | 'address'
+  | 'digital_account'
+  | 'service_location';
+
 /** A legal mode/destination combination (capability options, never a free string). */
 export interface FulfillmentOption {
   mode: FulfillmentMode;
-  destinations: readonly string[];
+  destinations: readonly (DestinationType | string)[];
 }
 
 export interface FulfillmentCapability {
@@ -548,6 +557,7 @@ export const CANONICAL_ENGINE_A_CAPABILITIES: EngineACapabilities = {
       { mode: 'digital_delivery', destinations: ['digital_account'] },
       { mode: 'shipment', destinations: ['address'] },
       { mode: 'service_execution', destinations: ['service_location'] },
+      { mode: 'none', destinations: ['none'] },
     ],
   },
 };

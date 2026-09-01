@@ -42,6 +42,12 @@ import {
 import { PaymentDiscounts } from '@/components/customer/PaymentDiscounts';
 import StripePayment from '@/components/payments/StripePayment';
 import { Container } from '@/components/layout/Container';
+import { FulfillmentModeSelector } from '@/components/customer/FulfillmentModeSelector';
+import { DestinationRequirementsEditor } from '@/components/customer/DestinationRequirementsEditor';
+import { CANONICAL_ENGINE_A_CAPABILITIES, type FulfillmentMode, type DestinationType } from '@/lib/engine-a/types';
+import { CustomerShell } from '@/components/shells/CustomerShell';
+import { ModuleShell } from '@/components/shells/ModuleShell';
+import { ModuleProvider, resolveEngineACapabilities } from '@/components/shells/ModuleContext';
 
 export default function ModuleCartPage() {
   const t = useTranslations('common');
@@ -70,24 +76,60 @@ export default function ModuleCartPage() {
   }, []);
 
   const items = useCartStore((s) => s.items);
-  const moduleItems = moduleId ? items.filter(i => i.moduleId === moduleId) : [];
+  const moduleKey = moduleId || normalizedSlug;
+  const moduleItems = moduleId
+    ? items.filter(i => i.moduleId === moduleId || i.moduleSlug === normalizedSlug)
+    : items.filter(i => i.moduleSlug === normalizedSlug);
   
   const addItem = useCartStore((s) => s.addItem);
   const removeItem = useCartStore((s) => s.removeItem);
+  const clearModuleItems = useCartStore((s) => s.clearModuleItems);
   const customerName = useCartStore((s) => s.customerName);
   const customerPhone = useCartStore((s) => s.customerPhone);
-  const tableNumber = useCartStore((s) => s.tableNumber);
-  const orderType = useCartStore((s) => s.orderType);
   const paymentMethod = useCartStore((s) => s.paymentMethod);
   const notes = useCartStore((s) => s.notes);
   const setCustomerName = useCartStore((s) => s.setCustomerName);
   const setCustomerPhone = useCartStore((s) => s.setCustomerPhone);
-  const setTableNumber = useCartStore((s) => s.setTableNumber);
-  const setOrderType = useCartStore((s) => s.setOrderType);
   const setPaymentMethod = useCartStore((s) => s.setPaymentMethod);
   const setNotes = useCartStore((s) => s.setNotes);
 
-  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const rawSelection = useCartStore((s) => moduleKey ? s.getFulfillmentForModule(moduleKey) : undefined);
+  const setFulfillmentForModule = useCartStore((s) => s.setFulfillmentForModule);
+
+  const capabilities = (currentModule ? resolveEngineACapabilities(currentModule) : null) || CANONICAL_ENGINE_A_CAPABILITIES;
+  const fulfillmentOptions = capabilities?.fulfillment?.options || CANONICAL_ENGINE_A_CAPABILITIES.fulfillment.options;
+
+  const selectedMode: FulfillmentMode = rawSelection?.mode || (fulfillmentOptions[0]?.mode ?? 'on_premise');
+  const selectedDestinationType: DestinationType = rawSelection?.destinationType || (selectedMode === 'none' ? 'none' : 'on_premise_location');
+  const selectedDestinationRef = rawSelection?.destinationRef ?? null;
+
+  const handleSelectMode = (mode: FulfillmentMode) => {
+    let destType: DestinationType = 'none';
+    if (mode === 'on_premise') destType = 'on_premise_location';
+    else if (mode === 'pickup') destType = 'pickup_location';
+    else if (mode === 'local_delivery' || mode === 'shipment') destType = 'address';
+    else if (mode === 'digital_delivery') destType = 'digital_account';
+    else if (mode === 'service_execution') destType = 'service_location';
+
+    if (moduleKey) {
+      setFulfillmentForModule(moduleKey, {
+        mode,
+        destinationType: destType,
+        destinationRef: mode === selectedMode ? selectedDestinationRef : null,
+      });
+    }
+  };
+
+  const handleDestinationChange = (destType: DestinationType, destRef: string | null) => {
+    if (moduleKey) {
+      setFulfillmentForModule(moduleKey, {
+        mode: selectedMode,
+        destinationType: destType,
+        destinationRef: destRef,
+      });
+    }
+  };
+
   const [serviceLocations, setServiceLocations] = useState<Array<{ id: string; name: string; is_active: boolean; is_occupied?: boolean }>>([]);
   const [activeStep, setActiveStep] = useState(1);
 
@@ -124,15 +166,10 @@ export default function ModuleCartPage() {
           const urlLoc = urlParams.get('location') || urlParams.get('table') || urlParams.get('service_location_id');
           if (urlLoc) {
             const matched = activeLocs.find((l: any) => l.id === urlLoc || l.name.toLowerCase() === urlLoc.toLowerCase());
-            // FIX: a table QR code or link shouldn't silently pre-select a
-            // table that already has an open order — that's exactly how
-            // one table ended up with two live orders. Fall back to
-            // manual selection instead so the customer sees it's occupied.
             if (matched && !matched.is_occupied) {
-              setSelectedLocationId(matched.id);
-              setTableNumber(matched.name);
+              handleDestinationChange('on_premise_location', matched.id);
             } else if (!matched) {
-              setTableNumber(urlLoc);
+              handleDestinationChange('on_premise_location', urlLoc);
             }
           }
         }
@@ -163,19 +200,15 @@ export default function ModuleCartPage() {
             quantity: item.quantity,
             taxCategory: item.category,
             moduleId: item.moduleId || moduleId,
-            // Must match the shape /orders sends: resolveAndPriceCatalogItems only
-            // computes modifierAdjustment from metadata.selectedModifiers — without
-            // this, preview silently reprices every item at base price only.
             metadata: item.selectedModifiers && item.selectedModifiers.length > 0
               ? { selectedModifiers: item.selectedModifiers }
               : undefined,
           })),
           moduleId,
-          orderType,
-          conditions: { orderType, paymentMethod },
+          conditions: { fulfillmentMode: selectedMode, paymentMethod },
           applyTax: true,
           applyFees: true,
-          propertyId // Pass propertyId for tax configuration resolution
+          propertyId
         });
         setPricingBreakdown(response.data?.data);
       } catch (error: any) {
@@ -188,17 +221,11 @@ export default function ModuleCartPage() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pricingKey, moduleId, orderType, paymentMethod]);
+  }, [pricingKey, moduleId, selectedMode, paymentMethod]);
 
   // Tax comes entirely from the backend pricing preview (CMS tax_configuration rates).
-  // No local guess — if the backend call hasn't returned yet, tax is 0 rather than a
-  // stale/wrong hardcoded rate. Same treatment as feeBreakdown below.
   const tax = pricingBreakdown?.taxAmount ?? 0;
   const taxBreakdown = pricingBreakdown?.taxBreakdown ?? [];
-  // Fees (service charge, delivery fee, resort fee, custom) come entirely from the CMS
-  // tax configuration via feeBreakdown — nothing here is hardcoded, and there is no
-  // dine-in/delivery gating. If the backend call hasn't returned yet, no fees are shown
-  // rather than guessing at a default.
   const feeBreakdown = pricingBreakdown?.feeBreakdown ?? [];
   const totalFees = feeBreakdown.reduce((sum: number, fee: any) => sum + fee.amount, 0);
   const preDiscountTotal = subtotal + tax + totalFees;
@@ -210,32 +237,13 @@ export default function ModuleCartPage() {
     setFinalTotal(total);
   }, [total]);
 
-  interface OrderData {
-    customerName: string;
-    customerPhone: string;
-    tableNumber?: string;
-    service_location_id?: string;
-    orderType: 'dine_in' | 'takeaway' | 'delivery';
-    paymentMethod: 'cash' | 'card';
-    notes?: string;
-    items: Array<{ catalog_item_id?: string; menuItemId: string; quantity: number; specialInstructions?: string; metadata?: { selectedModifiers: unknown[] } }>;
-    moduleId?: string;
-    // Discount integration fields
-    couponCode?: string;
-    giftCardRedemptions?: Array<{ code: string; amount: number }>;
-    loyaltyPointsToRedeem?: number;
-    loyaltyPointsDollarValue?: number;
-    // FIX 4: Preview total for server-side validation
-    previewTotal?: number;
-  }
-
   interface MutationError {
     response?: { data?: { error?: string } };
     message?: string;
   }
 
   const orderMutation = useMutation({
-    mutationFn: (data: OrderData) => api.post(`/${slug}/orders`, data),
+    mutationFn: (data: any) => api.post(`/${slug}/orders`, data),
     onSuccess: (response) => {
       const order = response?.data?.data;
       const orderId = order?.id || order?.order_id || '';
@@ -246,14 +254,12 @@ export default function ModuleCartPage() {
         setShowStripePayment(true);
         toast.info('Complete your card payment');
       } else {
-        // For cash payments or zero total, redirect directly
-        moduleItems.forEach(item => removeItem(item.id));
+        if (moduleKey) clearModuleItems(moduleKey);
         toast.success('Order placed successfully!');
         router.push(`/${propertySlug}/${slug}/confirmation?type=order&id=${orderId}`);
       }
     },
     onError: (err: MutationError) => {
-      // Handle 401 errors by showing auth modal
       if ((err as any).response?.status === 401) {
         setShowAuthModal(true);
         toast.error('Session expired. Please log in again.');
@@ -266,7 +272,7 @@ export default function ModuleCartPage() {
 
   // Stripe payment handlers
   const handleStripePaymentSuccess = () => {
-    moduleItems.forEach(item => removeItem(item.id));
+    if (moduleKey) clearModuleItems(moduleKey);
     toast.success(t('orderPlaced') || 'Order placed successfully!');
     router.push(`/${propertySlug}/${slug}/confirmation?type=order&id=${pendingOrderId}`);
   };
@@ -281,7 +287,6 @@ export default function ModuleCartPage() {
   };
 
   const handlePlaceOrder = () => {
-    // Check authentication status - only show modal if auth is fully loaded
     if (!authLoading && !isAuthenticated) {
       setShowAuthModal(true);
       return;
@@ -297,28 +302,51 @@ export default function ModuleCartPage() {
       setActiveStep(2);
       return;
     }
-    if (orderType === 'dine_in' && !tableNumber.trim()) {
-      toast.error(t('enterTableNumber') || 'Please enter your table number');
+
+    // Destination requirements validation per canonical mode
+    if (selectedMode === 'on_premise' && (!selectedDestinationRef || !selectedDestinationRef.trim())) {
+      toast.error(t('selectLocationOrTable') || 'Please select your table or service location');
       setActiveStep(2);
       return;
     }
+    if ((selectedMode === 'local_delivery' || selectedMode === 'shipment') && (!selectedDestinationRef || !selectedDestinationRef.trim())) {
+      toast.error(t('enterAddress') || 'Please enter your delivery/shipping address');
+      setActiveStep(2);
+      return;
+    }
+    if (selectedMode === 'digital_delivery' && (!selectedDestinationRef || !selectedDestinationRef.trim())) {
+      toast.error(t('enterDigitalAccount') || 'Please enter your email or digital account handle');
+      setActiveStep(2);
+      return;
+    }
+    if (selectedMode === 'service_execution' && (!selectedDestinationRef || !selectedDestinationRef.trim())) {
+      toast.error(t('enterServiceStation') || 'Please enter your service station/chair identifier');
+      setActiveStep(2);
+      return;
+    }
+
     if (moduleItems.length === 0) {
       toast.error(t('cartEmpty') || 'Your cart is empty');
       return;
     }
 
-    // Build discount data from applied discounts
     const couponDiscount = appliedDiscounts.find(d => d.type === 'coupon');
     const giftCardDiscounts = appliedDiscounts.filter(d => d.type === 'giftcard');
     const loyaltyDiscount = appliedDiscounts.find(d => d.type === 'loyalty');
 
+    const idempotencyKey = `chk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+
     orderMutation.mutate({
+      idempotencyKey,
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
-      tableNumber: orderType === 'dine_in' ? tableNumber.trim() : undefined,
-      orderType,
       paymentMethod,
       notes: notes.trim(),
+      fulfillmentSelection: {
+        mode: selectedMode,
+        destinationType: selectedDestinationType,
+        destinationRef: selectedDestinationRef,
+      },
       items: moduleItems.map((item) => ({
         catalog_item_id: item.id,
         menuItemId: item.id,
@@ -328,9 +356,7 @@ export default function ModuleCartPage() {
           ? { selectedModifiers: item.selectedModifiers }
           : undefined,
       })),
-      service_location_id: selectedLocationId || undefined,
       moduleId,
-      // Pass discount information to backend
       couponCode: couponDiscount?.code,
       giftCardRedemptions: giftCardDiscounts.length > 0 
         ? giftCardDiscounts.map(gc => ({ code: gc.code!, amount: gc.amount }))
@@ -339,7 +365,6 @@ export default function ModuleCartPage() {
         ? parseInt(loyaltyDiscount.details?.replace(/[^\d]/g, '') || '0')
         : undefined,
       loyaltyPointsDollarValue: loyaltyDiscount?.amount,
-      // FIX 4: Send previewTotal for server-side validation
       previewTotal: total,
     });
   };
@@ -407,12 +432,6 @@ export default function ModuleCartPage() {
       </div>
     );
   }
-
-  const orderTypeOptions = [
-    { value: 'dine_in', label: t('dineIn') || 'Dine In', icon: Store, description: 'Enjoy at our venue' },
-    { value: 'takeaway', label: t('takeaway') || 'Takeaway', icon: ShoppingCart, description: 'Pick up when ready' },
-    { value: 'delivery', label: t('delivery') || 'Delivery', icon: Truck, description: 'Delivered to your door' },
-  ];
 
   const steps = [
     { id: 1, title: 'Review Order', icon: ShoppingCart },
@@ -641,37 +660,19 @@ export default function ModuleCartPage() {
                     exit={{ height: 0, opacity: 0 }}
                     className="p-6 space-y-6"
                   >
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 block">
-                        How would you like to receive your order?
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {orderTypeOptions.map((option) => (
-                          <motion.button
-                            key={option.value}
-                            whileHover={{ scale: 1.02, y: -2 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setOrderType(option.value as typeof orderType)}
-                            className={`relative p-5 rounded-2xl border-2 text-left transition-all ${
-                              orderType === option.value
-                                ? 'border-orange-500 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 shadow-lg shadow-orange-500/20'
-                                : 'border-slate-200 dark:border-slate-700 hover:border-orange-300 dark:hover:border-orange-700'
-                            }`}
-                          >
-                            {orderType === option.value && (
-                              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute top-2 right-2">
-                                <CheckCircle2 className="w-5 h-5 text-orange-500" />
-                              </motion.div>
-                            )}
-                            <option.icon className={`w-8 h-8 mb-3 ${orderType === option.value ? 'text-orange-500' : 'text-slate-400'}`} />
-                            <p className={`font-semibold ${orderType === option.value ? 'text-orange-600 dark:text-orange-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                              {option.label}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">{option.description}</p>
-                          </motion.button>
-                        ))}
-                      </div>
-                    </div>
+                    <FulfillmentModeSelector
+                      options={fulfillmentOptions}
+                      selectedMode={selectedMode}
+                      onSelectMode={handleSelectMode}
+                    />
+
+                    <DestinationRequirementsEditor
+                      mode={selectedMode}
+                      destinationType={selectedDestinationType}
+                      destinationRef={selectedDestinationRef}
+                      onChange={handleDestinationChange}
+                      serviceLocations={serviceLocations}
+                    />
 
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -701,41 +702,6 @@ export default function ModuleCartPage() {
                         />
                       </div>
                     </div>
-
-                    {orderType === 'dine_in' && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-orange-500" />
-                          Service Location / Table
-                        </label>
-                        {serviceLocations.length > 0 ? (
-                          <select
-                            value={selectedLocationId}
-                            onChange={(e) => {
-                              setSelectedLocationId(e.target.value);
-                              const loc = serviceLocations.find(l => l.id === e.target.value);
-                              if (loc) setTableNumber(loc.name);
-                            }}
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all outline-none text-slate-900 dark:text-white"
-                          >
-                            <option value="">Select location / table</option>
-                            {serviceLocations.map((loc) => (
-                              <option key={loc.id} value={loc.id} disabled={loc.is_occupied}>
-                                {loc.name}{loc.is_occupied ? ' (Occupied)' : ''}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={tableNumber}
-                            onChange={(e) => setTableNumber(e.target.value)}
-                            placeholder="Enter your table or location number"
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 transition-all outline-none text-slate-900 dark:text-white placeholder:text-slate-400"
-                          />
-                        )}
-                      </motion.div>
-                    )}
 
                     <div className="space-y-2">
                       <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -855,7 +821,7 @@ export default function ModuleCartPage() {
                       </div>
                       <PaymentDiscounts
                         orderTotal={preDiscountTotal}
-                        orderType={orderType}
+                        orderType={selectedMode}
                         moduleId={moduleId}
                         moduleSlug={currentModule?.slug}
                         onTotalChange={(newTotal, discounts) => {
@@ -1007,7 +973,7 @@ export default function ModuleCartPage() {
                     </div>
                   </div>
 
-                  {(customerName || orderType) && (
+                  {(customerName || selectedMode) && (
                     <>
                       <div className="border-t border-slate-200 dark:border-slate-700" />
                       <div className="space-y-2 text-sm">
@@ -1018,11 +984,11 @@ export default function ModuleCartPage() {
                           </div>
                         )}
                         <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                          {orderType === 'dine_in' && <Store className="w-4 h-4" />}
-                          {orderType === 'takeaway' && <ShoppingCart className="w-4 h-4" />}
-                          {orderType === 'delivery' && <Truck className="w-4 h-4" />}
-                          <span>{orderTypeOptions.find(o => o.value === orderType)?.label}</span>
-                          {orderType === 'dine_in' && tableNumber && <span>• Table {tableNumber}</span>}
+                          {selectedMode === 'on_premise' && <Store className="w-4 h-4" />}
+                          {selectedMode === 'pickup' && <ShoppingCart className="w-4 h-4" />}
+                          {(selectedMode === 'local_delivery' || selectedMode === 'shipment') && <Truck className="w-4 h-4" />}
+                          <span className="capitalize">{selectedMode.replace('_', ' ')}</span>
+                          {selectedDestinationRef && <span>• {selectedDestinationRef}</span>}
                         </div>
                         <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                           {paymentMethod === 'cash' ? <Banknote className="w-4 h-4" /> : <CreditCard className="w-4 h-4" />}

@@ -129,7 +129,7 @@ export function assertValidFulfillmentCapabilities(
   }
   if (fulfillment.required) {
     for (const option of fulfillment.options) {
-      if (!claimedModes.has(option.mode)) {
+      if (option.mode !== 'none' && !claimedModes.has(option.mode)) {
         throw new FulfillmentContractError(
           `Fulfillment mode '${option.mode}' is required but has no machine binding — the transaction could never complete for it`,
         );

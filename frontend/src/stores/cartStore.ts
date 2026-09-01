@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { FulfillmentMode, DestinationType } from '@/lib/engine-a/types';
 
 export interface SelectedModifier {
   optionId: string;
@@ -13,7 +14,7 @@ export interface SelectedModifier {
   inventoryQuantity?: number;
 }
 
-interface CartItem {
+export interface CartItem {
   id: string;
   name: string;
   price: number;
@@ -30,26 +31,38 @@ interface CartItem {
   uniqueKey?: string;
 }
 
-interface CartState {
+export interface CanonicalFulfillmentSelection {
+  mode: FulfillmentMode;
+  destinationType: DestinationType;
+  destinationRef: string | null;
+}
+
+export interface CartState {
   items: CartItem[];
+  fulfillmentByModule: Record<string, CanonicalFulfillmentSelection>;
   customerName: string;
   customerPhone: string;
-  tableNumber: string;
-  orderType: 'dine_in' | 'takeaway' | 'delivery';
   paymentMethod: 'cash' | 'card';
   notes: string;
 
+  // Cart operations
   addItem: (item: CartItem) => void;
   removeItem: (itemId: string, uniqueKey?: string) => void;
   updateQuantity: (itemId: string, quantity: number, uniqueKey?: string) => void;
   updateInstructions: (itemId: string, instructions: string, uniqueKey?: string) => void;
   clearCart: () => void;
+  clearModuleItems: (moduleId: string) => void;
   getTotal: () => number;
   getCount: () => number;
+
+  // Fulfillment operations per module
+  getFulfillmentForModule: (moduleIdOrSlug: string) => CanonicalFulfillmentSelection | undefined;
+  setFulfillmentForModule: (moduleIdOrSlug: string, selection: CanonicalFulfillmentSelection) => void;
+  clearFulfillmentForModule: (moduleIdOrSlug: string) => void;
+
+  // Customer details
   setCustomerName: (name: string) => void;
   setCustomerPhone: (phone: string) => void;
-  setTableNumber: (tableNumber: string) => void;
-  setOrderType: (orderType: 'dine_in' | 'takeaway' | 'delivery') => void;
   setPaymentMethod: (paymentMethod: 'cash' | 'card') => void;
   setNotes: (notes: string) => void;
   clearOrderDetails: () => void;
@@ -78,23 +91,22 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      fulfillmentByModule: {},
       customerName: '',
       customerPhone: '',
-      tableNumber: '',
-      orderType: 'dine_in',
       paymentMethod: 'cash',
       notes: '',
 
       addItem: (item) => set((state) => {
         const uniqueKey = item.uniqueKey || generateUniqueKey(item.id, item.selectedModifiers);
         const existing = state.items.find((i) =>
-          i.uniqueKey === uniqueKey && i.moduleId === item.moduleId
+          i.uniqueKey === uniqueKey && (i.moduleId === item.moduleId || i.moduleSlug === item.moduleSlug)
         );
 
         if (existing) {
           return {
             items: state.items.map((i) =>
-              (i.uniqueKey === uniqueKey && i.moduleId === item.moduleId)
+              (i.uniqueKey === uniqueKey && (i.moduleId === item.moduleId || i.moduleSlug === item.moduleSlug))
                 ? { ...i, quantity: i.quantity + (item.quantity || 1) }
                 : i
             ),
@@ -130,7 +142,11 @@ export const useCartStore = create<CartState>()(
         ),
       })),
 
-      clearCart: () => set({ items: [] }),
+      clearCart: () => set({ items: [], fulfillmentByModule: {} }),
+
+      clearModuleItems: (moduleIdOrSlug) => set((state) => ({
+        items: state.items.filter((i) => i.moduleId !== moduleIdOrSlug && i.moduleSlug !== moduleIdOrSlug),
+      })),
 
       getTotal: () => calculateSubtotal(get().items),
 
@@ -138,23 +154,103 @@ export const useCartStore = create<CartState>()(
         return get().items.reduce((sum, item) => sum + item.quantity, 0);
       },
 
+      getFulfillmentForModule: (moduleIdOrSlug) => {
+        return get().fulfillmentByModule[moduleIdOrSlug];
+      },
+
+      setFulfillmentForModule: (moduleIdOrSlug, selection) => set((state) => ({
+        fulfillmentByModule: {
+          ...state.fulfillmentByModule,
+          [moduleIdOrSlug]: selection,
+        },
+      })),
+
+      clearFulfillmentForModule: (moduleIdOrSlug) => set((state) => {
+        const next = { ...state.fulfillmentByModule };
+        delete next[moduleIdOrSlug];
+        return { fulfillmentByModule: next };
+      }),
+
       setCustomerName: (name) => set({ customerName: name }),
       setCustomerPhone: (phone) => set({ customerPhone: phone }),
-      setTableNumber: (tableNumber) => set({ tableNumber }),
-      setOrderType: (orderType) => set({ orderType }),
       setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
       setNotes: (notes) => set({ notes }),
       clearOrderDetails: () => set({
         customerName: '',
         customerPhone: '',
-        tableNumber: '',
-        orderType: 'dine_in',
         paymentMethod: 'cash',
         notes: '',
       }),
     }),
     {
       name: 'v2-ecosystem-cart',
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (!persistedState || typeof persistedState !== 'object') {
+          return {
+            items: [],
+            fulfillmentByModule: {},
+            customerName: '',
+            customerPhone: '',
+            paymentMethod: 'cash',
+            notes: '',
+          };
+        }
+
+        if (version < 2) {
+          const legacy = persistedState;
+          const legacyOrderType = legacy.orderType;
+          const fulfillmentByModule: Record<string, CanonicalFulfillmentSelection> = {};
+
+          let mappedSelection: CanonicalFulfillmentSelection | undefined = undefined;
+
+          if (legacyOrderType === 'takeaway') {
+            mappedSelection = {
+              mode: 'pickup',
+              destinationType: 'pickup_location',
+              destinationRef: null,
+            };
+          } else if (legacyOrderType === 'delivery') {
+            mappedSelection = {
+              mode: 'local_delivery',
+              destinationType: 'address',
+              destinationRef: null,
+            };
+          } else if (legacyOrderType === 'dine_in') {
+            // Only preserve destinationRef if tableNumber is a canonical UUID.
+            // Text strings like "Table 4" are display labels, not canonical IDs — leave null so UI forces explicit selection.
+            const isUUID = typeof legacy.tableNumber === 'string' &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(legacy.tableNumber);
+
+            mappedSelection = {
+              mode: 'on_premise',
+              destinationType: 'on_premise_location',
+              destinationRef: isUUID ? legacy.tableNumber : null,
+            };
+          }
+          // Any unknown or corrupt legacy value leaves mappedSelection undefined (unresolved)
+
+          if (mappedSelection && Array.isArray(legacy.items)) {
+            legacy.items.forEach((item: any) => {
+              const modKey = item.moduleId || item.moduleSlug;
+              if (modKey && !fulfillmentByModule[modKey]) {
+                fulfillmentByModule[modKey] = mappedSelection!;
+              }
+            });
+          }
+
+          return {
+            items: legacy.items || [],
+            fulfillmentByModule,
+            customerName: legacy.customerName || '',
+            customerPhone: legacy.customerPhone || '',
+            paymentMethod: legacy.paymentMethod || 'cash',
+            notes: legacy.notes || '',
+          };
+        }
+
+        return persistedState;
+      },
     }
   )
 );

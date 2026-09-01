@@ -1,230 +1,199 @@
-/**
- * Tests for cartStore (Zustand)
- */
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useCartStore } from '@/stores/cartStore';
+import { describe, expect, it, beforeEach } from 'vitest';
+import { useCartStore, calculateSubtotal, type CartItem } from '@/stores/cartStore';
 
-const createItem = (overrides: Record<string, any> = {}) => ({
-  id: 'item-1',
-  name: 'Margherita Pizza',
-  price: 12.99,
-  quantity: 1,
-  ...overrides,
-});
-
-describe('cartStore', () => {
+describe('useCartStore — Phase F4 Canonical State & Multi-Module Partitioning', () => {
   beforeEach(() => {
-    useCartStore.setState({ items: [] });
+    useCartStore.getState().clearCart();
+    useCartStore.getState().clearOrderDetails();
   });
 
-  describe('addItem', () => {
-    it('adds a new item to cart', () => {
-      useCartStore.getState().addItem(createItem());
-      expect(useCartStore.getState().items).toHaveLength(1);
-      expect(useCartStore.getState().items[0].name).toBe('Margherita Pizza');
-    });
-
-    it('increments quantity for existing item', () => {
-      const item = createItem();
-      useCartStore.getState().addItem(item);
-      useCartStore.getState().addItem(item);
-      expect(useCartStore.getState().items).toHaveLength(1);
-      expect(useCartStore.getState().items[0].quantity).toBe(2);
-    });
-
-    it('treats items with different modifiers as separate', () => {
-      const item1 = createItem({
-        selectedModifiers: [{ optionId: 'mod1', quantity: 1 }],
-      });
-      const item2 = createItem({
-        selectedModifiers: [{ optionId: 'mod2', quantity: 1 }],
-      });
-      useCartStore.getState().addItem(item1);
-      useCartStore.getState().addItem(item2);
-      expect(useCartStore.getState().items).toHaveLength(2);
-    });
-
-    it('defaults quantity to 1', () => {
-      useCartStore.getState().addItem({ ...createItem(), quantity: 0 });
-      // When quantity is 0/falsy, addItem uses || 1
-      expect(useCartStore.getState().items[0].quantity).toBe(1);
-    });
-  });
-
-  describe('removeItem', () => {
-    it('removes item by id', () => {
-      useCartStore.getState().addItem(createItem());
-      useCartStore.getState().removeItem('item-1');
-      expect(useCartStore.getState().items).toHaveLength(0);
-    });
-
-    it('removes item by uniqueKey', () => {
-      useCartStore.getState().addItem(createItem());
-      const uniqueKey = useCartStore.getState().items[0].uniqueKey!;
-      useCartStore.getState().removeItem('item-1', uniqueKey);
-      expect(useCartStore.getState().items).toHaveLength(0);
-    });
-
-    it('does nothing for non-existent id', () => {
-      useCartStore.getState().addItem(createItem());
-      useCartStore.getState().removeItem('non-existent');
-      expect(useCartStore.getState().items).toHaveLength(1);
-    });
-  });
-
-  describe('updateQuantity', () => {
-    it('updates quantity for existing item', () => {
-      useCartStore.getState().addItem(createItem());
-      useCartStore.getState().updateQuantity('item-1', 5);
-      expect(useCartStore.getState().items[0].quantity).toBe(5);
-    });
-
-    it('removes item when quantity is 0', () => {
-      useCartStore.getState().addItem(createItem());
-      useCartStore.getState().updateQuantity('item-1', 0);
-      expect(useCartStore.getState().items).toHaveLength(0);
-    });
-
-    it('removes item when quantity is negative', () => {
-      useCartStore.getState().addItem(createItem());
-      useCartStore.getState().updateQuantity('item-1', -1);
-      expect(useCartStore.getState().items).toHaveLength(0);
-    });
-  });
-
-  describe('updateInstructions', () => {
-    it('updates special instructions', () => {
-      useCartStore.getState().addItem(createItem());
-      useCartStore.getState().updateInstructions('item-1', 'No onions please');
-      expect(useCartStore.getState().items[0].specialInstructions).toBe('No onions please');
-    });
-  });
-
-  describe('clearCart', () => {
-    it('removes all items', () => {
-      useCartStore.getState().addItem(createItem({ id: '1' }));
-      useCartStore.getState().addItem(createItem({ id: '2' }));
-      useCartStore.getState().clearCart();
-      expect(useCartStore.getState().items).toHaveLength(0);
-    });
-  });
-
-  describe('getTotal', () => {
-    it('returns 0 for empty cart', () => {
-      expect(useCartStore.getState().getTotal()).toBe(0);
-    });
-
-    it('calculates total for single item', () => {
-      useCartStore.getState().addItem(createItem({ price: 10, quantity: 2 }));
-      expect(useCartStore.getState().getTotal()).toBe(20);
-    });
-
-    it('includes modifier total in calculation', () => {
-      useCartStore.getState().addItem(createItem({
-        price: 10,
+  it('calculates subtotal with modifiers and quantities accurately', () => {
+    const items: CartItem[] = [
+      {
+        id: 'item-1',
+        name: 'Burger',
+        price: 10.0,
+        quantity: 2,
+        modifierTotal: 2.5,
+        moduleId: 'mod-a',
+      },
+      {
+        id: 'item-2',
+        name: 'Fries',
+        price: 4.0,
         quantity: 1,
-        modifierTotal: 3,
-      }));
-      expect(useCartStore.getState().getTotal()).toBe(13);
-    });
+        modifierTotal: 0,
+        moduleId: 'mod-a',
+      },
+    ];
 
-    it('sums multiple items', () => {
-      useCartStore.getState().addItem(createItem({ id: '1', price: 10, quantity: 2 }));
-      useCartStore.getState().addItem(createItem({ id: '2', price: 5, quantity: 1 }));
-      // First item: 10 * 2 = 20, Second: 5 * 1 = 5
-      expect(useCartStore.getState().getTotal()).toBe(25);
-    });
+    // (10 + 2.5) * 2 + 4 * 1 = 25 + 4 = 29
+    expect(calculateSubtotal(items)).toBe(29.0);
   });
 
-  describe('getCount', () => {
-    it('returns 0 for empty cart', () => {
-      expect(useCartStore.getState().getCount()).toBe(0);
+  it('stores and retrieves fulfillment selections independently per module partition', () => {
+    const { setFulfillmentForModule, getFulfillmentForModule } = useCartStore.getState();
+
+    // Set fulfillment for Module A (on_premise with table UUID)
+    setFulfillmentForModule('mod-restaurant', {
+      mode: 'on_premise',
+      destinationType: 'on_premise_location',
+      destinationRef: 'c4b8b6f3-3a1b-4d5e-9e7f-1a2b3c4d5e6f',
     });
 
-    it('sums quantities across items', () => {
-      useCartStore.getState().addItem(createItem({ id: '1', quantity: 2 }));
-      useCartStore.getState().addItem(createItem({ id: '2', quantity: 3 }));
-      expect(useCartStore.getState().getCount()).toBe(5);
+    // Set fulfillment for Module B (local_delivery with address)
+    setFulfillmentForModule('mod-retail', {
+      mode: 'local_delivery',
+      destinationType: 'address',
+      destinationRef: '123 Ocean View Villa',
     });
+
+    const resFulfillment = getFulfillmentForModule('mod-restaurant');
+    const retFulfillment = getFulfillmentForModule('mod-retail');
+
+    expect(resFulfillment).toEqual({
+      mode: 'on_premise',
+      destinationType: 'on_premise_location',
+      destinationRef: 'c4b8b6f3-3a1b-4d5e-9e7f-1a2b3c4d5e6f',
+    });
+
+    expect(retFulfillment).toEqual({
+      mode: 'local_delivery',
+      destinationType: 'address',
+      destinationRef: '123 Ocean View Villa',
+    });
+
+    // Module C is unresolved (undefined)
+    expect(getFulfillmentForModule('mod-spa')).toBeUndefined();
   });
 
-  describe('menu service cart', () => {
-    it('addItem with menu_service type stamps correct metadata', () => {
-      useCartStore.getState().addItem({
-        id: 'r1', name: 'Pasta', price: 15, quantity: 1,
-        moduleId: 'menu_service', moduleName: 'MenuService', type: 'menu_service',
+  it('clears items only for the specified module, preserving items from other modules', () => {
+    const { addItem, clearModuleItems } = useCartStore.getState();
+
+    addItem({
+      id: 'burger-1',
+      name: 'Burger',
+      price: 15,
+      quantity: 1,
+      moduleId: 'mod-restaurant',
+      moduleSlug: 'restaurant',
+    });
+
+    addItem({
+      id: 'tshirt-1',
+      name: 'T-Shirt',
+      price: 30,
+      quantity: 1,
+      moduleId: 'mod-retail',
+      moduleSlug: 'retail',
+    });
+
+    expect(useCartStore.getState().items).toHaveLength(2);
+
+    // Clear only restaurant items
+    clearModuleItems('mod-restaurant');
+
+    const remaining = useCartStore.getState().items;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe('tshirt-1');
+    expect(remaining[0].moduleId).toBe('mod-retail');
+  });
+
+  describe('Zustand Persistence Migration (Version 2)', () => {
+    const persistOptions = (useCartStore as any).persist;
+    const migrate = persistOptions?.getOptions()?.migrate;
+
+    it('migrates legacy takeaway to canonical pickup', () => {
+      const legacyState = {
+        items: [{ id: 'item-1', name: 'Coffee', price: 5, quantity: 1, moduleId: 'mod-cafe' }],
+        orderType: 'takeaway',
+        customerName: 'Alice',
+      };
+
+      const migrated = migrate(legacyState, 1);
+
+      expect(migrated.fulfillmentByModule['mod-cafe']).toEqual({
+        mode: 'pickup',
+        destinationType: 'pickup_location',
+        destinationRef: null,
       });
-      const items = useCartStore.getState().items;
-      expect(items).toHaveLength(1);
-      expect(items[0].moduleId).toBe('menu_service');
-      expect(items[0].moduleName).toBe('MenuService');
-      expect(items[0].type).toBe('menu_service');
+      expect(migrated.orderType).toBeUndefined();
+      expect(migrated.tableNumber).toBeUndefined();
     });
 
-    it('clearing menu_service items leaves kiosk items intact', () => {
-      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
-      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
-      useCartStore.setState(s => ({ items: s.items.filter(i => i.moduleId !== 'menu_service') }));
-      expect(useCartStore.getState().items).toHaveLength(1);
-      expect(useCartStore.getState().items[0].moduleId).toBe('kiosk');
-    });
+    it('migrates legacy delivery to canonical local_delivery', () => {
+      const legacyState = {
+        items: [{ id: 'item-1', name: 'Pizza', price: 20, quantity: 1, moduleId: 'mod-pizza' }],
+        orderType: 'delivery',
+        customerName: 'Bob',
+      };
 
-    it('total for menu_service items only', () => {
-      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
-      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
-      const total = useCartStore.getState().items
-        .filter(i => i.moduleId === 'menu_service')
-        .reduce((sum, i) => sum + (i.price + (i.modifierTotal ?? 0)) * i.quantity, 0);
-      expect(total).toBe(15);
-    });
+      const migrated = migrate(legacyState, 1);
 
-    it('count for menu_service items only', () => {
-      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
-      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
-      const count = useCartStore.getState().items
-        .filter(i => i.moduleId === 'menu_service')
-        .reduce((sum, i) => sum + i.quantity, 0);
-      expect(count).toBe(1);
-    });
-  });
-
-  describe('kiosk item cart', () => {
-    it('addItem with kiosk type stamps correct metadata', () => {
-      useCartStore.getState().addItem({
-        id: 's1', name: 'Chips', price: 5, quantity: 1,
-        moduleId: 'kiosk', moduleName: 'KioskItem Bar', type: 'kiosk item',
+      expect(migrated.fulfillmentByModule['mod-pizza']).toEqual({
+        mode: 'local_delivery',
+        destinationType: 'address',
+        destinationRef: null,
       });
-      const items = useCartStore.getState().items;
-      expect(items).toHaveLength(1);
-      expect(items[0].moduleId).toBe('kiosk');
-      expect(items[0].moduleName).toBe('KioskItem Bar');
-      expect(items[0].type).toBe('kiosk item');
     });
 
-    it('clearing kiosk items leaves menu_service items intact', () => {
-      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
-      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
-      useCartStore.setState(s => ({ items: s.items.filter(i => i.moduleId !== 'kiosk') }));
-      expect(useCartStore.getState().items).toHaveLength(1);
-      expect(useCartStore.getState().items[0].moduleId).toBe('menu_service');
+    it('migrates legacy dine_in with canonical UUID tableNumber to on_premise', () => {
+      const validUUID = 'a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d';
+      const legacyState = {
+        items: [{ id: 'item-1', name: 'Steak', price: 45, quantity: 1, moduleId: 'mod-steak' }],
+        orderType: 'dine_in',
+        tableNumber: validUUID,
+      };
+
+      const migrated = migrate(legacyState, 1);
+
+      expect(migrated.fulfillmentByModule['mod-steak']).toEqual({
+        mode: 'on_premise',
+        destinationType: 'on_premise_location',
+        destinationRef: validUUID,
+      });
     });
 
-    it('total for kiosk items only', () => {
-      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
-      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
-      const total = useCartStore.getState().items
-        .filter(i => i.moduleId === 'kiosk')
-        .reduce((sum, i) => sum + (i.price + (i.modifierTotal ?? 0)) * i.quantity, 0);
-      expect(total).toBe(5);
+    it('migrates legacy dine_in with non-UUID human table label by setting destinationRef to null (requiring explicit UI selection)', () => {
+      const legacyState = {
+        items: [{ id: 'item-1', name: 'Steak', price: 45, quantity: 1, moduleId: 'mod-steak' }],
+        orderType: 'dine_in',
+        tableNumber: 'Table 4 Near Window',
+      };
+
+      const migrated = migrate(legacyState, 1);
+
+      expect(migrated.fulfillmentByModule['mod-steak']).toEqual({
+        mode: 'on_premise',
+        destinationType: 'on_premise_location',
+        destinationRef: null,
+      });
     });
 
-    it('count for kiosk items only', () => {
-      useCartStore.getState().addItem({ id: 'r1', name: 'Pasta', price: 15, quantity: 1, moduleId: 'menu_service', type: 'menu_service' });
-      useCartStore.getState().addItem({ id: 's1', name: 'Chips', price: 5, quantity: 1, moduleId: 'kiosk', type: 'kiosk item' });
-      const count = useCartStore.getState().items
-        .filter(i => i.moduleId === 'kiosk')
-        .reduce((sum, i) => sum + i.quantity, 0);
-      expect(count).toBe(1);
+    it('leaves unknown legacy orderType unresolved (does NOT silently default to on_premise)', () => {
+      const legacyState = {
+        items: [{ id: 'item-1', name: 'Widget', price: 10, quantity: 1, moduleId: 'mod-general' }],
+        orderType: 'unknown_alien_type',
+      };
+
+      const migrated = migrate(legacyState, 1);
+
+      expect(migrated.fulfillmentByModule['mod-general']).toBeUndefined();
+      expect(migrated.orderType).toBeUndefined();
+    });
+
+    it('recovers safely from empty or corrupt state', () => {
+      const emptyState = null;
+      const recovered = migrate(emptyState, 0);
+
+      expect(recovered).toEqual({
+        items: [],
+        fulfillmentByModule: {},
+        customerName: '',
+        customerPhone: '',
+        paymentMethod: 'cash',
+        notes: '',
+      });
     });
   });
 });

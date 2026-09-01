@@ -47,10 +47,8 @@ describe('resolveFulfillmentSelection (Stage 6 fix)', () => {
     expect(s).toEqual({ mode: 'local_delivery', destinationType: 'address', destinationRef: '12 Harbor St' });
   });
 
-  it('defaults to dine_in (on_premise) when no order type is given', () => {
-    const s = resolveFulfillmentSelection('instant_transaction', {});
-    expect(s.mode).toBe('on_premise');
-    expect(s.destinationType).toBe('on_premise_location');
+  it('fails closed when no fulfillment selection or order type is given (no silent fallback to on_premise)', () => {
+    expect(() => resolveFulfillmentSelection('instant_transaction', {})).toThrow(FulfillmentContractError);
   });
 
   it('rejects an order type that cannot map to a fulfillment mode', () => {
