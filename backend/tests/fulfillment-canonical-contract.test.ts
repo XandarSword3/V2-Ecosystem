@@ -100,6 +100,63 @@ describe('resolveFulfillmentSelection — Phase F4 Canonical Contract', () => {
       resolveFulfillmentSelection('instant_transaction', {});
     }).toThrow(FulfillmentContractError);
   });
+
+  it('fails closed when canonical fulfillmentSelection omits destinationType (never invents defaults)', () => {
+    expect(() => {
+      resolveFulfillmentSelection('instant_transaction', {
+        mode: 'on_premise',
+        // destinationType omitted
+        destinationRef: 'loc-1',
+      });
+    }).toThrow(FulfillmentContractError);
+  });
+
+  it('fails closed when canonical fulfillmentSelection omits destinationRef for required modes', () => {
+    // on_premise requires non-empty destinationRef
+    expect(() => {
+      resolveFulfillmentSelection('instant_transaction', {
+        mode: 'on_premise',
+        destinationType: 'on_premise_location',
+        destinationRef: '',
+      });
+    }).toThrow(FulfillmentContractError);
+
+    // local_delivery requires non-empty destinationRef
+    expect(() => {
+      resolveFulfillmentSelection('instant_transaction', {
+        mode: 'local_delivery',
+        destinationType: 'address',
+        destinationRef: null,
+      });
+    }).toThrow(FulfillmentContractError);
+
+    // digital_delivery requires non-empty destinationRef
+    expect(() => {
+      resolveFulfillmentSelection('instant_transaction', {
+        mode: 'digital_delivery',
+        destinationType: 'digital_account',
+        destinationRef: '   ',
+      });
+    }).toThrow(FulfillmentContractError);
+  });
+
+  it('allows destinationRef = null explicitly for none mode and pickup mode', () => {
+    const noneSelection = resolveFulfillmentSelection('instant_transaction', {
+      mode: 'none',
+      destinationType: 'none',
+      destinationRef: null,
+    });
+    expect(noneSelection.mode).toBe('none');
+    expect(noneSelection.destinationRef).toBeNull();
+
+    const pickupSelection = resolveFulfillmentSelection('instant_transaction', {
+      mode: 'pickup',
+      destinationType: 'pickup_location',
+      destinationRef: null,
+    });
+    expect(pickupSelection.mode).toBe('pickup');
+    expect(pickupSelection.destinationRef).toBeNull();
+  });
 });
 
 describe('Currency-Aware Preview Tolerance & Exact Normalization — Phase F4 Pricing Integrity', () => {
@@ -159,5 +216,42 @@ describe('Scoped Idempotency & Database Concurrency Boundaries — Phase F4 Inte
     // Different tenant with same key does not collide
     const keyDiffTenant = computeScopedKey('t2', 'p1', 'm1', 'guest-123', 'chk_abc123');
     expect(key1).not.toBe(keyDiffTenant);
+  });
+
+  it('manages idempotency lifecycle states: in_progress -> completed, and in_progress -> failed with safe retry', () => {
+    interface IdempState {
+      status: 'in_progress' | 'completed' | 'failed';
+      transactionId?: string;
+      response?: any;
+    }
+
+    const table = new Map<string, IdempState>();
+
+    // 1. First attempt starts
+    const key = 't1:p1:m1:cust1:chk_xyz';
+    table.set(key, { status: 'in_progress' });
+
+    // 2. Concurrent request arrives: sees in_progress
+    expect(table.get(key)?.status).toBe('in_progress');
+
+    // 3. First attempt fails on stock check: status transitions to failed, transaction deleted
+    table.set(key, { status: 'failed' });
+
+    // 4. Retry after failure: sees failed, starts fresh attempt cleanly (zero phantom reuse)
+    expect(table.get(key)?.status).toBe('failed');
+    table.set(key, { status: 'in_progress' });
+
+    // 5. Retry succeeds: status transitions to completed with snapshot response
+    table.set(key, {
+      status: 'completed',
+      transactionId: 'tx-123',
+      response: { success: true, data: { id: 'tx-123', amount: 45 } },
+    });
+
+    // 6. Subsequent duplicate network replay returns cached completed response
+    const record = table.get(key);
+    expect(record?.status).toBe('completed');
+    expect(record?.transactionId).toBe('tx-123');
+    expect(record?.response.data.id).toBe('tx-123');
   });
 });

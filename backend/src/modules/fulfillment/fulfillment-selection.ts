@@ -81,6 +81,12 @@ const LEGACY_ORDER_TYPE_TO_SELECTION: Readonly<
  *
  * Canonical fulfillment selection is prioritized. Legacy orderType is consulted
  * only as a compatibility fallback.
+ *
+ * Canonical Invariants (Phase F4):
+ *   - Canonical selection MUST explicitly specify both `mode` and `destinationType`.
+ *   - Canonical `destinationRef` is mandatory for on_premise, local_delivery, shipment, digital_delivery, and service_execution.
+ *   - Non-fulfillment mode (`none`) enforces `destinationType: 'none'` and `destinationRef: null`.
+ *   - No default destinationType or destinationRef is invented in the canonical path.
  */
 export function resolveFulfillmentSelection(
   engineType: keyof EngineRegistry,
@@ -89,38 +95,55 @@ export function resolveFulfillmentSelection(
   const engine = getEngine(engineType);
 
   // 1. Check for canonical fulfillment selection input (primary path)
-  const canonicalInput = input.fulfillmentSelection || input;
-  const canonicalMode = canonicalInput.mode;
+  const canonicalInput = input.fulfillmentSelection || (input.mode ? input : null);
 
-  if (canonicalMode) {
-    const mode = canonicalMode;
-    const destinationType: DestinationType =
-      canonicalInput.destinationType || DEFAULT_DESTINATION_TYPE_PER_MODE[mode] || 'none';
+  if (canonicalInput && canonicalInput.mode) {
+    const mode = canonicalInput.mode;
     
-    let destinationRef: string | null = null;
-    if (mode !== 'none') {
-      destinationRef =
-        canonicalInput.destinationRef ??
-        input.serviceLocationId ??
-        input.address ??
-        input.tableNumber ??
-        null;
+    // Invariant: Canonical path must explicitly provide destinationType — never invented.
+    if (!canonicalInput.destinationType) {
+      throw new FulfillmentContractError(
+        `Canonical fulfillmentSelection must explicitly specify 'destinationType' for mode '${mode}'`,
+      );
     }
 
-    const selection: FulfillmentSelection = {
+    const destinationType = canonicalInput.destinationType;
+
+    // Validate capability against engine definition
+    assertValidFulfillmentSelection(
+      engine.capabilities.fulfillment,
+      mode,
+      destinationType,
+    );
+
+    let destinationRef: string | null = null;
+
+    if (mode === 'none') {
+      destinationRef = null;
+    } else if (
+      mode === 'on_premise' ||
+      mode === 'local_delivery' ||
+      mode === 'shipment' ||
+      mode === 'digital_delivery' ||
+      mode === 'service_execution'
+    ) {
+      const rawRef = canonicalInput.destinationRef;
+      if (!rawRef || typeof rawRef !== 'string' || !rawRef.trim()) {
+        throw new FulfillmentContractError(
+          `Canonical fulfillmentSelection for mode '${mode}' requires a non-empty 'destinationRef'`,
+        );
+      }
+      destinationRef = rawRef.trim();
+    } else {
+      // pickup: optional instructions / notes
+      destinationRef = canonicalInput.destinationRef ? String(canonicalInput.destinationRef).trim() : null;
+    }
+
+    return {
       mode,
       destinationType,
       destinationRef,
     };
-
-    // Capability validation against THIS engine's declared options
-    assertValidFulfillmentSelection(
-      engine.capabilities.fulfillment,
-      selection.mode,
-      selection.destinationType,
-    );
-
-    return selection;
   }
 
   // 2. Legacy fallback path (isolated backward-compatibility adapter)
@@ -128,7 +151,7 @@ export function resolveFulfillmentSelection(
   if (!legacyOrderType) {
     throw new FulfillmentContractError(
       `Fulfillment selection is required on engine '${engine.type}' — ` +
-        `provide canonical 'fulfillmentSelection' or legacy 'orderType'`,
+        `provide canonical 'fulfillmentSelection' with 'mode', 'destinationType', and 'destinationRef'`,
     );
   }
 

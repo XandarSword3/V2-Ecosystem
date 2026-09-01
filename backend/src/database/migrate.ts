@@ -239,6 +239,8 @@ export async function migrate() {
         net_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
         currency VARCHAR(3) NOT NULL DEFAULT 'USD',
         customer_id UUID,
+        staff_id UUID,
+        service_location_id UUID,
         reference_id UUID,
         reference_table VARCHAR(50),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -247,6 +249,8 @@ export async function migrate() {
         metadata JSONB DEFAULT '{}'
       );
 
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS service_location_id UUID;
+      ALTER TABLE transactions ADD COLUMN IF NOT EXISTS staff_id UUID;
       ALTER TABLE transactions ALTER COLUMN property_id DROP NOT NULL;
       ALTER TABLE transactions ALTER COLUMN reference_id DROP NOT NULL;
       ALTER TABLE transactions ALTER COLUMN reference_table DROP NOT NULL;
@@ -258,6 +262,16 @@ export async function migrate() {
       CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_scoped_idempotency ON transactions ((metadata->>'scoped_idempotency_key')) WHERE (metadata->>'scoped_idempotency_key') IS NOT NULL;
       CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_active_service_location ON transactions (service_location_id) WHERE service_location_id IS NOT NULL AND engine_type = 'instant_transaction' AND status NOT IN ('completed', 'cancelled');
+
+      CREATE TABLE IF NOT EXISTS idempotency_records (
+        key VARCHAR(255) PRIMARY KEY,
+        status VARCHAR(50) NOT NULL DEFAULT 'in_progress',
+        transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
+        response JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_idempotency_records_status ON idempotency_records(status);
 
       -- Support inquiries table
       CREATE TABLE IF NOT EXISTS support_inquiries (
