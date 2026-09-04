@@ -363,4 +363,92 @@ describe('GenericCheckoutWorkflow — 5-Step Workflow & Authoritative Payment (F
     // Expect KWD formatting (e.g. KWD 12.500 or KD 12.500)
     expect(screen.getByRole('button', { name: /Place Order • (KWD|KD)\s*12\.500/i })).toBeDefined();
   });
+
+  it('authoritative currency precedence: serverPricing.currency overrides client-supplied currency prop', async () => {
+    const eurPricing: PricingResult = {
+      ...mockServerPricing,
+      currency: 'EUR',
+      totalAmount: 42.0,
+      subtotal: 42.0,
+    };
+
+    render(
+      <GenericCheckoutWorkflow
+        {...defaultProps}
+        serverPricing={eurPricing}
+        currency="USD" // Client prop specifies USD, but server says EUR
+      />
+    );
+
+    // Navigate to payment step
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Customer Details/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Fulfillment/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Payment/i }));
+
+    // Verify EUR formatting is used everywhere based on server pricing
+    expect(screen.getByRole('button', { name: /Place Order • (EUR|€)\s*38\.64/i })).toBeDefined();
+  });
+
+  it('room-charge qualification: disabled without active booking; posts room charge when active booking is provided', async () => {
+    const { paymentsApi } = await import('@/lib/api');
+    (paymentsApi.postRoomCharge as any).mockResolvedValueOnce({
+      data: { success: true },
+    });
+
+    const onOrderConfirmed = vi.fn();
+    const createOrder = vi.fn().mockResolvedValue({ id: 'ord-room-123' });
+
+    // 1. Without activeBookingId, room charge button is disabled
+    const { unmount } = render(
+      <GenericCheckoutWorkflow
+        {...defaultProps}
+        availablePaymentMethods={['cash', 'card', 'room_charge']}
+        activeBookingId={undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Customer Details/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Fulfillment/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Payment/i }));
+
+    const roomChargeDisabledBtn = screen.getByRole('button', { name: /Charge to Room/i });
+    expect(roomChargeDisabledBtn).toHaveProperty('disabled', true);
+    unmount();
+
+    // 2. With activeBookingId, room charge is enabled and submits to backend
+    render(
+      <GenericCheckoutWorkflow
+        {...defaultProps}
+        availablePaymentMethods={['cash', 'card', 'room_charge']}
+        activeBookingId="booking-hotel-789"
+        createOrder={createOrder}
+        onOrderConfirmed={onOrderConfirmed}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Customer Details/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Fulfillment/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Payment/i }));
+
+    const roomChargeEnabledBtn = screen.getByRole('button', { name: /Charge to Room/i });
+    expect(roomChargeEnabledBtn).not.toHaveProperty('disabled', true);
+    fireEvent.click(roomChargeEnabledBtn);
+
+    const submitBtn = screen.getByRole('button', { name: /Place Order/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(createOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentMethod: 'room_charge',
+        })
+      );
+      expect(paymentsApi.postRoomCharge).toHaveBeenCalledWith({
+        orderId: 'ord-room-123',
+        bookingId: 'booking-hotel-789',
+      });
+      expect(onOrderConfirmed).toHaveBeenCalledWith('ord-room-123');
+      expect(screen.getByText('Order Confirmed!')).toBeDefined();
+    });
+  });
 });

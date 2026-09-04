@@ -349,4 +349,60 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
       })
     );
   });
+
+  it('fails closed with 404 when authoritative DB record is missing, even if client supplies amount', async () => {
+    // Database has NO records for this referenceId
+    tableData.transactions = [];
+    tableData.orders = [];
+    tableData.bookings = [];
+    tableData.tickets = [];
+    setupSupabase();
+
+    const req = mockReq({
+      body: {
+        amount: 99.99, // Client attempts to supply money without DB record
+        currency: 'usd',
+        referenceType: 'instant_transaction',
+        referenceId: 'non-existent-order-id',
+      },
+    });
+    const res = mockRes();
+
+    await (createPaymentIntent as Function)(req, res, vi.fn());
+
+    // Invariant check: Must fail closed with 404; NO fallback to clientAmount
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.stringMatching(/Authoritative record not found/i),
+      })
+    );
+    expect(mockStripePaymentIntentsCreate).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with 404 when authoritative DB record is missing and client omits amount', async () => {
+    tableData.transactions = [];
+    tableData.orders = [];
+    setupSupabase();
+
+    const req = mockReq({
+      body: {
+        referenceType: 'instant_transaction',
+        referenceId: 'missing-id-no-amount',
+      },
+    });
+    const res = mockRes();
+
+    await (createPaymentIntent as Function)(req, res, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.stringMatching(/Authoritative record not found/i),
+      })
+    );
+    expect(mockStripePaymentIntentsCreate).not.toHaveBeenCalled();
+  });
 });

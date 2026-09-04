@@ -38,7 +38,7 @@ import { updateModuleBookingStatus } from '../../../../src/modules/staff/module-
 const VALID_ORDER_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 const VALID_BOOKING_ID = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22';
 
-function mockReq(body = {}, params = {}, user = { userId: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33' }): Request {
+function mockReq(body = {}, params = {}, user: any = { userId: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', tenantId: 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44' }): Request {
   return {
     body,
     params,
@@ -190,6 +190,18 @@ describe('Room Charge Folio Controller', () => {
   describe('getFolioBalance', () => {
     it('should correctly calculate net folio balance', async () => {
       mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'transactions') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { id: VALID_BOOKING_ID, tenant_id: 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44' },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
         if (table === 'payment_ledger') {
           return {
             select: vi.fn().mockReturnValue({

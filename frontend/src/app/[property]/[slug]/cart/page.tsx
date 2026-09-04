@@ -46,6 +46,7 @@ export default function ModuleCartPage() {
   const moduleId = currentModule?.id;
 
   const currency = useSettingsStore((s) => s.currency);
+  const activeBookingId = searchParams.get('bookingId') || searchParams.get('activeBookingId') || undefined;
 
   const [isHydrated, setIsHydrated] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -338,6 +339,7 @@ export default function ModuleCartPage() {
           }
           serverPricing={serverPricing}
           currency={resolvedCurrency}
+          activeBookingId={activeBookingId}
           isPricingStale={isPricingStale}
           isLoadingPricing={loadingPricing}
           isPricingError={isPricingError}

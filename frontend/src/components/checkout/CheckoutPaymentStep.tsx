@@ -18,6 +18,8 @@ export interface CheckoutPaymentStepProps {
   isPricingError: boolean;
   paymentState: PaymentLifecycleState;
   onSelectPaymentMethod: (method: PaymentMethodType) => void;
+  availablePaymentMethods?: PaymentMethodType[];
+  activeBookingId?: string;
   // Discount props
   couponCode: string | null;
   giftCardCodes: string[];
@@ -47,6 +49,8 @@ export default function CheckoutPaymentStep({
   isPricingError,
   paymentState,
   onSelectPaymentMethod,
+  availablePaymentMethods,
+  activeBookingId,
   couponCode,
   giftCardCodes,
   loyaltyPoints,
@@ -65,7 +69,10 @@ export default function CheckoutPaymentStep({
   onBack,
   disabled = false,
 }: CheckoutPaymentStepProps) {
+  // Authoritative server currency invariant: always prefer serverPricing.currency
+  const activeCurrency = serverPricing?.currency || currency || 'USD';
   const isPricingBlocked = isPricingStale || isLoadingPricing || isPricingError || !serverPricing;
+  const isRoomChargeBlocked = paymentState.method === 'room_charge' && !activeBookingId;
   const isActionInProgress = isSubmittingOrder || paymentState.status === 'creating_intent' || paymentState.status === 'processing';
 
   return (
@@ -79,8 +86,20 @@ export default function CheckoutPaymentStep({
       <PaymentMethodSelector
         selectedMethod={paymentState.method}
         onSelectMethod={onSelectPaymentMethod}
+        availableMethods={availablePaymentMethods}
+        activeBookingId={activeBookingId}
         disabled={isActionInProgress || disabled}
       />
+
+      {/* Room Charge Unavailability Warning */}
+      {paymentState.method === 'room_charge' && !activeBookingId && (
+        <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 dark:text-amber-300">
+            Room charge requires an active room reservation. Please select cash or card, or access checkout with your room booking details.
+          </p>
+        </div>
+      )}
 
       {/* Discounts Section */}
       <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
@@ -96,7 +115,7 @@ export default function CheckoutPaymentStep({
           pricingDiscounts={serverPricing?.discounts}
           isPricingStale={isPricingStale}
           isLoadingPricing={isLoadingPricing}
-          currency={currency}
+          currency={activeCurrency}
           moduleId={moduleId}
           moduleSlug={moduleSlug}
         />
@@ -119,7 +138,7 @@ export default function CheckoutPaymentStep({
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600 dark:text-slate-400">Subtotal</span>
                 <span className="font-medium text-slate-900 dark:text-white">
-                  {formatCurrency(serverPricing.subtotal, currency)}
+                  {formatCurrency(serverPricing.subtotal, activeCurrency)}
                 </span>
               </div>
 
@@ -128,7 +147,7 @@ export default function CheckoutPaymentStep({
                 <div key={i} className="flex justify-between text-sm">
                   <span className="text-slate-600 dark:text-slate-400">{taxLine.name} ({taxLine.rate}%)</span>
                   <span className="text-slate-900 dark:text-white">
-                    {formatCurrency(taxLine.amount, currency)}
+                    {formatCurrency(taxLine.amount, activeCurrency)}
                   </span>
                 </div>
               ))}
@@ -138,7 +157,7 @@ export default function CheckoutPaymentStep({
                 <div key={i} className="flex justify-between text-sm">
                   <span className="text-slate-600 dark:text-slate-400">{feeLine.name}</span>
                   <span className="text-slate-900 dark:text-white">
-                    {formatCurrency(feeLine.amount, currency)}
+                    {formatCurrency(feeLine.amount, activeCurrency)}
                   </span>
                 </div>
               ))}
@@ -147,7 +166,7 @@ export default function CheckoutPaymentStep({
               {(serverPricing.discounts || []).map((discount, i) => (
                 <div key={i} className="flex justify-between text-sm text-green-600 dark:text-green-400">
                   <span>{discount.name || 'Discount'}</span>
-                  <span>-{formatCurrency(discount.amount, currency)}</span>
+                  <span>-{formatCurrency(discount.amount, activeCurrency)}</span>
                 </div>
               ))}
 
@@ -158,11 +177,11 @@ export default function CheckoutPaymentStep({
                     serverPricing.preDiscountTotal !== undefined &&
                     serverPricing.preDiscountTotal > serverPricing.totalAmount && (
                       <span className="text-xs text-slate-400 line-through mr-2 font-normal">
-                        {formatCurrency(serverPricing.preDiscountTotal, currency)}
+                        {formatCurrency(serverPricing.preDiscountTotal, activeCurrency)}
                       </span>
                     )}
                   <span className="text-primary-600 dark:text-primary-400 text-lg">
-                    {formatCurrency(serverPricing.totalAmount, currency)}
+                    {formatCurrency(serverPricing.totalAmount, activeCurrency)}
                   </span>
                 </div>
               </div>
@@ -208,7 +227,7 @@ export default function CheckoutPaymentStep({
 
         <Button
           onClick={onSubmitOrder}
-          disabled={disabled || isPricingBlocked || isActionInProgress}
+          disabled={disabled || isPricingBlocked || isActionInProgress || isRoomChargeBlocked}
           className="px-8 py-3 text-base font-semibold"
         >
           {isActionInProgress ? (
@@ -223,7 +242,7 @@ export default function CheckoutPaymentStep({
           ) : isPricingStale || isLoadingPricing ? (
             'Recalculating...'
           ) : (
-            `Place Order • ${serverPricing ? formatCurrency(serverPricing.totalAmount, currency) : '—'}`
+            `Place Order • ${serverPricing ? formatCurrency(serverPricing.totalAmount, activeCurrency) : '—'}`
           )}
         </Button>
       </div>
@@ -238,7 +257,7 @@ export default function CheckoutPaymentStep({
           <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800">
             <StripePayment
               amount={serverPricing?.totalAmount || 0}
-              currency={currency}
+              currency={activeCurrency}
               clientSecret={paymentState.clientSecret}
               onSuccess={onStripePaymentSuccess}
               onError={onStripePaymentError}

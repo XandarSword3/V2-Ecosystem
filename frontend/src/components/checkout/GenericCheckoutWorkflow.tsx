@@ -43,6 +43,8 @@ export interface GenericCheckoutWorkflowProps {
 
   serverPricing: PricingResult | null;
   currency: string;
+  availablePaymentMethods?: PaymentMethodType[];
+  activeBookingId?: string;
   isPricingStale: boolean;
   isLoadingPricing: boolean;
   isPricingError: boolean;
@@ -79,6 +81,8 @@ export default function GenericCheckoutWorkflow({
   onChangeDestination,
   serverPricing,
   currency,
+  availablePaymentMethods,
+  activeBookingId,
   isPricingStale,
   isLoadingPricing,
   isPricingError,
@@ -100,6 +104,9 @@ export default function GenericCheckoutWorkflow({
   const [activeStep, setActiveStep] = useState<CheckoutStepId>('review');
   const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+
+  // Authoritative server currency invariant: always prefer serverPricing.currency
+  const authoritativeCurrency = serverPricing?.currency || currency || 'USD';
 
   // Canonical payment state machine (F6 Invariant)
   const paymentLifecycle = usePaymentLifecycle({
@@ -216,8 +223,9 @@ export default function GenericCheckoutWorkflow({
         referenceType: 'instant_transaction',
         referenceId: orderId,
         amount: serverPricing.totalAmount,
-        currency,
+        currency: authoritativeCurrency,
         method: paymentLifecycle.method,
+        roomChargeBookingId: activeBookingId,
         notes: customer.notes?.trim() || undefined,
       });
     } catch (err: any) {
@@ -241,7 +249,8 @@ export default function GenericCheckoutWorkflow({
     couponCode,
     giftCardCodes,
     loyaltyPoints,
-    currency,
+    authoritativeCurrency,
+    activeBookingId,
   ]);
 
   const stepDefinitions = [
@@ -343,7 +352,9 @@ export default function GenericCheckoutWorkflow({
             <motion.div key="payment" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
               <CheckoutPaymentStep
                 serverPricing={serverPricing}
-                currency={currency}
+                currency={authoritativeCurrency}
+                activeBookingId={activeBookingId}
+                availablePaymentMethods={availablePaymentMethods}
                 isPricingStale={isPricingStale}
                 isLoadingPricing={isLoadingPricing}
                 isPricingError={isPricingError}
@@ -376,7 +387,7 @@ export default function GenericCheckoutWorkflow({
                 customer={customer}
                 fulfillment={fulfillment}
                 serverPricing={serverPricing}
-                currency={currency}
+                currency={authoritativeCurrency}
                 propertySlug={propertySlug}
                 moduleSlug={moduleSlug}
               />

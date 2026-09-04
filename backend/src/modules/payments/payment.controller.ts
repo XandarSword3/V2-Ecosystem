@@ -76,6 +76,7 @@ async function resolveAuthoritativePayableAmount(
   referenceId: string,
 ): Promise<{ amount: number; currency: string; paymentStatus?: string }> {
   const supabase = getSupabase();
+  const canonicalType = normalizeReferenceType(referenceType);
 
   // 1. First look up the canonical transactions row
   const { data: tx } = await supabase
@@ -93,7 +94,12 @@ async function resolveAuthoritativePayableAmount(
   }
 
   // 2. Fall back to reference-specific tables
-  if (referenceType === 'instant_transaction' || referenceType === 'order') {
+  if (
+    canonicalType === 'instant_transaction' ||
+    referenceType === 'instant_transaction' ||
+    referenceType === 'order' ||
+    referenceType === 'menu_service_order'
+  ) {
     const { data: order } = await supabase
       .from('orders')
       .select('total_amount, final_total, total, currency, payment_status')
@@ -107,9 +113,28 @@ async function resolveAuthoritativePayableAmount(
         paymentStatus: order.payment_status,
       };
     }
+
+    const { data: legacyOrder } = await supabase
+      .from('menu_service_orders')
+      .select('total_amount, final_total, total, currency, payment_status')
+      .eq('id', referenceId)
+      .maybeSingle();
+    if (legacyOrder) {
+      const amount = Number(legacyOrder.total_amount ?? legacyOrder.final_total ?? legacyOrder.total ?? 0);
+      return {
+        amount,
+        currency: (legacyOrder.currency || 'USD').toUpperCase(),
+        paymentStatus: legacyOrder.payment_status,
+      };
+    }
   }
 
-  if (referenceType === 'time_exclusive_reservation' || referenceType === 'booking') {
+  if (
+    canonicalType === 'time_exclusive_reservation' ||
+    referenceType === 'time_exclusive_reservation' ||
+    referenceType === 'booking' ||
+    referenceType === 'room_booking'
+  ) {
     const { data: booking } = await supabase
       .from('bookings')
       .select('total_amount, currency, payment_status')
@@ -124,7 +149,12 @@ async function resolveAuthoritativePayableAmount(
     }
   }
 
-  if (referenceType === 'shared_capacity_access' || referenceType === 'ticket') {
+  if (
+    canonicalType === 'shared_capacity_access' ||
+    referenceType === 'shared_capacity_access' ||
+    referenceType === 'ticket' ||
+    referenceType === 'facility_access'
+  ) {
     const { data: ticket } = await supabase
       .from('tickets')
       .select('total_amount, currency, payment_status')
@@ -144,26 +174,24 @@ async function resolveAuthoritativePayableAmount(
 
 export const createPaymentIntent = asyncHandler(async (req: Request, res: Response) => {
   const validatedData = validateBody(createPaymentIntentSchema, req.body);
-  const { amount: clientAmount, currency: clientCurrency = 'usd', referenceType, referenceId } = validatedData;
+  const { amount: clientAmount, currency: clientCurrency, referenceType, referenceId } = validatedData;
 
-  // Resolve authoritative payable amount and currency directly from DB record (F6 invariant)
+  // Resolve authoritative payable amount and currency directly from DB record (F6 invariant).
+  // Strictly FAIL-CLOSED: if no authoritative record exists in DB, reject immediately.
+  // Never fall back to client-supplied money or currency.
   let authRecord: { amount: number; currency: string; paymentStatus?: string };
   try {
     authRecord = await resolveAuthoritativePayableAmount(referenceType, referenceId);
   } catch (err: any) {
-    if (clientAmount !== undefined && clientAmount !== null) {
-      logger.warn('[PaymentController] Authoritative record not found in DB; falling back to client amount', {
-        referenceType,
-        referenceId,
-        clientAmount,
-      });
-      authRecord = {
-        amount: Number(clientAmount),
-        currency: (clientCurrency || 'USD').toUpperCase(),
-      };
-    } else {
-      throw err;
-    }
+    logger.warn('[PaymentController] Rejected payment intent: authoritative record missing in DB', {
+      referenceType,
+      referenceId,
+      clientAmount,
+    });
+    return res.status(404).json({
+      success: false,
+      error: `Authoritative record not found for reference ${referenceType}:${referenceId}`,
+    });
   }
 
   if (authRecord.paymentStatus === 'paid') {
@@ -183,7 +211,7 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
   }
 
   const payableAmount = authRecord.amount;
-  const currencyCode = (authRecord.currency || clientCurrency).toUpperCase();
+  const currencyCode = (authRecord.currency || clientCurrency || 'USD').toUpperCase();
   const decimals = (CURRENCY_DECIMALS as Record<string, number>)[currencyCode] ?? 2;
   const multiplier = decimals === 0 ? 1 : (decimals === 3 ? 1000 : 100);
   const stripeMinorUnits = Math.round(payableAmount * multiplier);

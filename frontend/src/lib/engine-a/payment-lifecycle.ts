@@ -144,17 +144,23 @@ export function usePaymentLifecycle(options: UsePaymentLifecycleOptions = {}) {
     // Card / Online: create PaymentIntent on backend
     transitionTo('creating_intent', { target, error: null });
     try {
+      // Structural Invariant (F6): Do NOT send client money to backend.
+      // Backend resolves amount & currency directly from authoritative DB record.
       const response = await paymentsApi.createPaymentIntent({
-        amount: target.amount,
-        currency: target.currency,
         referenceType: target.referenceType,
         referenceId: target.referenceId,
       });
 
       if (response.data?.success && response.data?.data?.clientSecret) {
+        const { clientSecret, paymentIntentId, amount: authAmount, currency: authCurrency } = response.data.data;
         transitionTo('awaiting_action', {
-          clientSecret: response.data.data.clientSecret,
-          paymentIntentId: response.data.data.paymentIntentId,
+          clientSecret,
+          paymentIntentId,
+          target: {
+            ...target,
+            amount: authAmount !== undefined ? authAmount : target.amount,
+            currency: authCurrency || target.currency,
+          },
           error: null,
         });
       } else {

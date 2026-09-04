@@ -128,6 +128,8 @@ function createQueryMock(mockDataFn: () => unknown[]) {
 
 const PAYMENT = {
   id: 'pay-1',
+  tenant_id: 'tenant-1',
+  property_id: 'prop-1',
   reference_type: 'menu_service_order',
   reference_id: 'order-1',
   amount: '45.00',
@@ -147,7 +149,7 @@ function mockReq(overrides: Record<string, unknown> = {}): Record<string, unknow
     body: {},
     headers: {},
     rawBody: Buffer.from('{}'),
-    user: { userId: 'admin-1', id: 'admin-1', roles: ['super_admin'] },
+    user: { userId: 'admin-1', id: 'admin-1', roles: ['super_admin'], scope: 'super_admin', tenantId: 'tenant-1' },
     ip: '127.0.0.1',
     get: vi.fn(),
     ...overrides,
@@ -184,7 +186,12 @@ describe('PaymentController', () => {
       site_settings: [{ key: 'payments', value: { stripeSecretKey: 'sk_test_fake', stripeWebhookSecret: 'whsec_test', currency: 'usd' } }],
       payments: [PAYMENT],
       payment_ledger: [],
-      menu_service_orders: [],
+      menu_service_orders: [
+        { id: 'order-1', total_amount: 50, currency: 'usd', payment_status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1' },
+      ],
+      transactions: [
+        { id: 'order-1', total_amount: 50, currency: 'USD', payment_status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1' },
+      ],
     };
   });
 
@@ -211,6 +218,9 @@ describe('PaymentController', () => {
     });
 
     it('should convert amount to cents', async () => {
+      tableData.transactions = [
+        { id: 'order-1', total_amount: 99.99, currency: 'USD', payment_status: 'pending' },
+      ];
       setupSupabase();
       mockStripePaymentIntentsCreate.mockResolvedValue({ id: 'pi_test_2', client_secret: 'cs_2' });
 

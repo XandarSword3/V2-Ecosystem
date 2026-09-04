@@ -93,6 +93,8 @@ describe('PaymentLifecycle State Machine (F6 Invariant)', () => {
         data: {
           clientSecret: 'sec_test_secret_123',
           paymentIntentId: 'pi_test_123',
+          amount: 50.0,
+          currency: 'USD',
         },
       },
     });
@@ -104,11 +106,11 @@ describe('PaymentLifecycle State Machine (F6 Invariant)', () => {
     });
 
     expect(paymentsApi.createPaymentIntent).toHaveBeenCalledWith({
-      amount: 50.0,
-      currency: 'USD',
       referenceType: 'instant_transaction',
       referenceId: 'order-123',
     });
+    expect(result.current.state.target?.amount).toBe(50.0);
+    expect(result.current.state.target?.currency).toBe('USD');
     expect(result.current.status).toBe('awaiting_action');
     expect(result.current.clientSecret).toBe('sec_test_secret_123');
 
@@ -199,6 +201,44 @@ describe('PaymentLifecycle State Machine (F6 Invariant)', () => {
     });
     expect(result.current.status).toBe('awaiting_action');
     expect(result.current.clientSecret).toBe('sec_retry_456');
+  });
+
+  it('structural invariant: createPaymentIntent does not send client amount/currency and adopts server authoritative pricing', async () => {
+    (paymentsApi.createPaymentIntent as any).mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: {
+          clientSecret: 'sec_auth_789',
+          paymentIntentId: 'pi_auth_789',
+          amount: 145.50, // Authoritative server calculated amount
+          currency: 'EUR', // Authoritative server currency
+        },
+      },
+    });
+
+    const { result } = renderHook(() => usePaymentLifecycle());
+
+    await act(async () => {
+      await result.current.startPayment({
+        method: 'card',
+        referenceType: 'time_exclusive_reservation',
+        referenceId: 'booking-abc-123',
+        amount: 999.99, // Stale/divergent client amount
+        currency: 'USD',
+      });
+    });
+
+    // Verify client money is NEVER transmitted to createPaymentIntent
+    expect(paymentsApi.createPaymentIntent).toHaveBeenCalledWith({
+      referenceType: 'time_exclusive_reservation',
+      referenceId: 'booking-abc-123',
+    });
+
+    // Verify state.target adopts the server's authoritative amount and currency
+    expect(result.current.state.target?.amount).toBe(145.50);
+    expect(result.current.state.target?.currency).toBe('EUR');
+    expect(result.current.status).toBe('awaiting_action');
+    expect(result.current.clientSecret).toBe('sec_auth_789');
   });
 
   it('throws on illegal state transitions', () => {
