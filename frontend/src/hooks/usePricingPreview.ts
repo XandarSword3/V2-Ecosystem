@@ -41,6 +41,7 @@ export interface PricingResult {
   discounts: PricingDiscount[];
   totalAmount: number;
   currency: string;
+  depositAmount?: number;
   preDiscountTotal?: number;
   lineItems?: PricingLineItemResult[];
   breakdown?: PricingLineItemResult[];

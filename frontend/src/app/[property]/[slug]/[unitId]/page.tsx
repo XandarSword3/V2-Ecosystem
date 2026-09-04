@@ -211,6 +211,8 @@ export default function DynamicUnitDetailPage() {
     enabled: !!unit && nights > 0 && !!moduleId,
   });
 
+  const resolvedCurrency = serverPricing?.currency || currency || 'USD';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unit || nights <= 0 || !serverPricing || isPricingStale || isPricingError || loadingPricing) {
@@ -497,7 +499,7 @@ export default function DynamicUnitDetailPage() {
                           pricingDiscounts={serverPricing?.discounts}
                           isPricingStale={isPricingStale}
                           isLoadingPricing={loadingPricing}
-                          currency={serverPricing?.currency || currency}
+                          currency={resolvedCurrency}
                           moduleId={moduleId}
                           moduleSlug={currentModule?.slug}
                         />
@@ -520,7 +522,7 @@ export default function DynamicUnitDetailPage() {
                             <div className="flex justify-between text-sm">
                               <span className="text-slate-500">{nights} night{nights > 1 ? 's' : ''}</span>
                               <span className="font-medium text-slate-700 dark:text-slate-300">
-                                {formatCurrency(serverPricing.subtotal, serverPricing.currency || currency)}
+                                {formatCurrency(serverPricing.subtotal, resolvedCurrency)}
                               </span>
                             </div>
 
@@ -529,7 +531,7 @@ export default function DynamicUnitDetailPage() {
                               <div key={idx} className="flex justify-between text-sm">
                                 <span className="text-slate-500">{t.name} ({t.rate}%)</span>
                                 <span className="text-slate-700 dark:text-slate-300">
-                                  {formatCurrency(t.amount, serverPricing.currency || currency)}
+                                  {formatCurrency(t.amount, resolvedCurrency)}
                                 </span>
                               </div>
                             ))}
@@ -539,7 +541,7 @@ export default function DynamicUnitDetailPage() {
                               <div key={idx} className="flex justify-between text-sm">
                                 <span className="text-slate-500">{f.name}</span>
                                 <span className="text-slate-700 dark:text-slate-300">
-                                  {formatCurrency(f.amount, serverPricing.currency || currency)}
+                                  {formatCurrency(f.amount, resolvedCurrency)}
                                 </span>
                               </div>
                             ))}
@@ -548,7 +550,7 @@ export default function DynamicUnitDetailPage() {
                             {(serverPricing.discounts || []).map((d, idx) => (
                               <div key={idx} className="flex justify-between text-sm text-green-600 dark:text-green-400">
                                 <span>{d.name || (d.type === 'coupon' ? `Coupon: ${d.code}` : d.type === 'gift_card' ? `Gift Card: ${d.code}` : 'Loyalty Reward')}</span>
-                                <span>-{formatCurrency(d.amount, serverPricing.currency || currency)}</span>
+                                <span>-{formatCurrency(d.amount, resolvedCurrency)}</span>
                               </div>
                             ))}
 
@@ -557,17 +559,19 @@ export default function DynamicUnitDetailPage() {
                               <div className="text-right">
                                 {serverPricing.totalDiscount > 0 && serverPricing.preDiscountTotal !== undefined && serverPricing.preDiscountTotal > serverPricing.totalAmount && (
                                   <span className="text-xs text-slate-400 line-through mr-2 font-normal">
-                                    {formatCurrency(serverPricing.preDiscountTotal, serverPricing.currency || currency)}
+                                    {formatCurrency(serverPricing.preDiscountTotal, resolvedCurrency)}
                                   </span>
                                 )}
                                 <span className="text-primary-600">
-                                  {formatCurrency(serverPricing.totalAmount, serverPricing.currency || currency)}
+                                  {formatCurrency(serverPricing.totalAmount, resolvedCurrency)}
                                 </span>
                               </div>
                             </div>
-                            <p className="text-xs text-slate-500">
-                              Deposit: {formatCurrency(serverPricing.totalAmount * 0.3, serverPricing.currency || currency)} (30%)
-                            </p>
+                            {serverPricing.depositAmount !== undefined && serverPricing.depositAmount > 0 && (
+                              <p className="text-xs text-slate-500">
+                                Deposit: {formatCurrency(serverPricing.depositAmount, resolvedCurrency)}
+                              </p>
+                            )}
                           </>
                         )}
                       </div>
@@ -635,7 +639,7 @@ export default function DynamicUnitDetailPage() {
                       ) : isPricingError ? (
                         <>Pricing Error</>
                       ) : (
-                        <>Book Now • {formatCurrency(serverPricing?.totalAmount ?? 0, serverPricing?.currency || currency)}</>
+                        <>Book Now • {formatCurrency(serverPricing?.totalAmount ?? 0, resolvedCurrency)}</>
                       )}
                     </Button>
                   </form>
@@ -664,7 +668,7 @@ export default function DynamicUnitDetailPage() {
 
             <StripePayment
               amount={serverPricing?.totalAmount || 0}
-              currency="USD"
+              currency={resolvedCurrency}
               referenceType="time_exclusive_reservation"
               referenceId={pendingBookingId}
               onSuccess={handleStripePaymentSuccess}
