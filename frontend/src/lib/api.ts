@@ -491,8 +491,12 @@ export const inventoryApi = {
 
 // Payments API
 export const paymentsApi = {
-  createPaymentIntent: (data: { amount: number; referenceType: string; referenceId: string }) =>
+  createPaymentIntent: (data: { amount?: number; currency?: string; referenceType: string; referenceId: string }) =>
     api.post('/payments/create-intent', data),
+  recordCashPayment: (data: { referenceType: string; referenceId: string; amount: number; notes?: string }) =>
+    api.post('/payments/record-cash', data),
+  postRoomCharge: (data: { orderId: string; bookingId: string }) =>
+    api.post('/payments/room-charge', data),
 };
 
 // Support API

@@ -126,8 +126,9 @@ function PaymentForm({ clientSecret, onSuccess, onError, onCancel, amount, curre
 interface StripePaymentProps {
   amount: number;
   currency?: string;
-  referenceType: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
-  referenceId: string;
+  clientSecret?: string | null;
+  referenceType?: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
+  referenceId?: string;
   onSuccess: () => void;
   onError: (error: string) => void;
   onCancel?: () => void;
@@ -136,6 +137,7 @@ interface StripePaymentProps {
 export default function StripePayment({
   amount,
   currency = 'USD',
+  clientSecret: initialClientSecret = null,
   referenceType,
   referenceId,
   onSuccess,
@@ -143,26 +145,28 @@ export default function StripePayment({
   onCancel,
 }: StripePaymentProps) {
   const stableOnError = useCallback(onError, []);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [internalClientSecret, setInternalClientSecret] = useState<string | null>(null);
+  const clientSecret = initialClientSecret || internalClientSecret;
+  const [loading, setLoading] = useState(!initialClientSecret);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function createIntent() {
-      if (!isOnline()) return; // Don't create intent if offline
+      if (!isOnline() || !referenceType || !referenceId) return;
       try {
         setLoading(true);
         setError(null);
         const response = await paymentsApi.createPaymentIntent({
           amount,
+          currency,
           referenceType,
           referenceId,
         });
 
         if (response.data?.success && response.data?.data?.clientSecret) {
-          setClientSecret(response.data.data.clientSecret);
+          setInternalClientSecret(response.data.data.clientSecret);
         } else {
-          throw new Error('Failed to create payment intent');
+          throw new Error(response.data?.error || 'Failed to create payment intent');
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize payment';
@@ -173,10 +177,10 @@ export default function StripePayment({
       }
     }
 
-    if (amount > 0 && !clientSecret) {
+    if (amount > 0 && !clientSecret && referenceType && referenceId) {
       createIntent();
     }
-  }, [amount, referenceType, referenceId, clientSecret, stableOnError]);
+  }, [amount, currency, referenceType, referenceId, clientSecret, stableOnError]);
 
   if (!isOnline()) {
     return (

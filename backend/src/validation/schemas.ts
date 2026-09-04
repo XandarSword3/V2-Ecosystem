@@ -122,8 +122,8 @@ export const updateTransactionStatusSchema = z.object({
 // ============ PAYMENT SCHEMAS ============
 
 export const createPaymentIntentSchema = z.object({
-  amount: z.number().positive().max(100000, 'Amount exceeds maximum allowed'),
-  currency: z.enum(['usd', 'lbp', 'eur']).default('usd'),
+  amount: z.number().positive().max(100000, 'Amount exceeds maximum allowed').optional(),
+  currency: z.string().min(3).max(3).default('usd').optional(),
   referenceType: z.enum(['instant_transaction', 'time_exclusive_reservation', 'shared_capacity_access', 'ongoing_entitlement']),
   referenceId: uuidSchema,
 });
