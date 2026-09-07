@@ -114,7 +114,56 @@
     "customizations": "Customizations",
     "enterName": "Please enter your name",
     "free": "Free",
-    "selectUpTo": "Select up to"
+    "selectUpTo": "Select up to",
+    "fulfillmentModeOnPremise": "On Premise",
+    "fulfillmentDescOnPremise": "Enjoy at our location",
+    "fulfillmentModePickup": "Pickup",
+    "fulfillmentDescPickup": "Pick up your order",
+    "fulfillmentModeLocalDelivery": "Local Delivery",
+    "fulfillmentDescLocalDelivery": "We'll deliver to you",
+    "fulfillmentModeDigitalDelivery": "Digital Delivery",
+    "fulfillmentDescDigitalDelivery": "Receive digitally",
+    "fulfillmentModeShipment": "Shipment",
+    "fulfillmentDescShipment": "Ship to your address",
+    "fulfillmentModeServiceExecution": "Service Execution",
+    "fulfillmentDescServiceExecution": "Service at your location",
+    "fulfillmentModeNone": "None",
+    "fulfillmentDescNone": "No fulfillment needed",
+    "selectFulfillmentMode": "Select Fulfillment Method",
+    "noFulfillmentModesAvailable": "No fulfillment methods are currently offered for this module.",
+    "fulfillmentNoneNotice": "This transaction settles directly with no physical fulfillment required.",
+    "selectLocationOrTable": "Select Table / Location",
+    "loadingLocations": "Loading available locations...",
+    "occupied": "Occupied",
+    "selected": "Selected",
+    "available": "Available",
+    "noLocationsConfigured": "No service locations or tables are currently available for this module.",
+    "pickupNotes": "Pickup Instructions (Optional)",
+    "pickupNotesPlaceholder": "e.g. Will pick up in 20 minutes",
+    "shippingAddress": "Shipping Address",
+    "deliveryAddress": "Delivery Address",
+    "addressPlaceholder": "Street address, building/suite, city, postal code, special delivery directions",
+    "digitalDeliveryHandle": "Recipient Email or Digital Account",
+    "digitalAccountPlaceholder": "e.g. user@example.com",
+    "serviceStationRef": "Service Station / Room Identifier",
+    "serviceStationPlaceholder": "e.g. Spa Treatment Room 3, Station B",
+    "noCustomizationsAvailable": "No customization options available",
+    "popular": "Popular",
+    "outOfStock": "Out of stock",
+    "addedToCart": "Added {name} to cart",
+    "tryAgain": "Try Again",
+    "viewCart": "View Cart",
+    "orders": "Orders",
+    "orderTracking": "Live Tracking",
+    "loyalty": "Loyalty Rewards",
+    "giftCards": "Gift Cards",
+    "reviews": "Reviews",
+    "support": "Support",
+    "guestMode": "Viewing in Guest Mode",
+    "guestModePrompt": "Sign in to access your complete order history, earn rewards, and save preferences.",
+    "signIn": "Sign In",
+    "myAccount": "My Account",
+    "manageOrdersAndRewards": "Track your orders, view receipts, and manage your account."
   },
   "errors": {
     "pageNotFound": "Page Not Found",
@@ -129,7 +178,9 @@
     "bookingNotFound": "Booking not found",
     "ticketNotFound": "Ticket not found",
     "unableToDetermineCheckout": "Unable to determine checkout destination.",
-    "checkoutModulesSeparately": "Please checkout each module separately using the buttons provided."
+    "checkoutModulesSeparately": "Please checkout each module separately using the buttons provided.",
+    "somethingWentWrong": "Something went wrong",
+    "unexpectedErrorOccurred": "An unexpected error occurred while loading this service."
   },
   "nav": {
     "home": "Home",
@@ -734,7 +785,8 @@
       "completedOrders": "Completed",
       "liveUpdates": "Live Updates",
       "connected": "Connected",
-      "disconnected": "Disconnected"
+      "disconnected": "Disconnected",
+      "viewAndManage": "View and manage incoming orders"
     },
     "bookings": {
       "bookingNumber": "Booking #",
@@ -771,7 +823,8 @@
       "unit": "Unit",
       "dates": "Dates",
       "viewCalendar": "View booking calendar",
-      "bookingDetails": "Booking Details"
+      "bookingDetails": "Booking Details",
+      "specialRequests": "Special Requests"
     },
     "tickets": {
       "title": "Tickets",
@@ -816,7 +869,10 @@
       "ticketMarkedUsed": "Ticket marked as used",
       "failedToMarkUsed": "Failed to mark ticket as used",
       "ticketCancelled": "Ticket cancelled successfully",
-      "failedToCancel": "Failed to cancel ticket"
+      "failedToCancel": "Failed to cancel ticket",
+      "viewSoldTickets": "View and validate sold tickets",
+      "confirmCancel": "Are you sure you want to cancel this ticket?",
+      "ticketDetails": "Ticket Details"
     },
     "sessions": {
       "title": "Sessions",
@@ -852,7 +908,8 @@
       "avgPrice": "Avg. Price",
       "confirmDelete": "Are you sure you want to delete this session?",
       "availableDays": "Available Days",
-      "selectDays": "Select available days"
+      "selectDays": "Select available days",
+      "manageTimeSlots": "Manage time slots and availability"
     },
     "pricing": {
       "title": "Pricing Rules",
@@ -917,7 +974,18 @@
       "resetToDefault": "Reset to Default",
       "full": "Full",
       "nearCapacity": "Near Capacity",
-      "available": "Available"
+      "available": "Available",
+      "resetSuccess": "Capacity count reset successfully",
+      "manageSettings": "Manage and configure capacity limits",
+      "currentStatus": "Current Status",
+      "currentOccupancy": "Current Occupancy",
+      "resetCurrentCount": "Reset Current Count",
+      "capacitySettings": "Capacity Settings",
+      "maximumCapacity": "Maximum Capacity",
+      "totalAllowedGuests": "Total Allowed Guests",
+      "currentNumberOfGuests": "Current Number of Guests",
+      "warningThreshold": "Warning Threshold",
+      "showWarningAt": "Show Warning At"
     },
     "builder": {
       "title": "Module Builder",
@@ -927,6 +995,14 @@
       "saveLayout": "Save Layout",
       "preview": "Preview",
       "backToEdit": "Back to Edit"
+    },
+    "saveSettings": "Save Settings",
+    "menu": {
+      "items": "Items",
+      "manageMenu": "Manage Menu",
+      "addOrEdit": "Add or edit menu items",
+      "categories": "Categories",
+      "organizeMenu": "Organize menu into categories"
     }
   },
   "adminTranslations": {
@@ -1171,7 +1247,8 @@
     "errors": {
       "failedToLoad": "Failed to fetch reports data",
       "failedToExport": "Failed to export report"
-    }
+    },
+    "registeredAccounts": "Registered Accounts"
   },
   "adminAudit": {
     "title": "Audit Logs",
@@ -1386,7 +1463,11 @@
       "guest": "Guest",
       "autoRefreshOn": "Auto-refresh ON",
       "autoRefreshOff": "Auto-refresh OFF",
-      "connectionNote": "Each browser tab counts as a separate connection"
+      "connectionNote": "Each browser tab counts as a separate connection",
+      "todayRevenue": "Today's Revenue",
+      "activeBookings": "Active Bookings",
+      "poolVisitors": "Pool Visitors",
+      "vsYesterday": "vs yesterday"
     },
     "stats": {
       "totalRevenue": "Total Revenue",
@@ -1508,7 +1589,24 @@
       "insight_promo_3": "compared to non-promotional transactions.",
       "increase": "increase",
       "decrease": "decrease"
-    }
+    },
+    "modules": "Modules",
+    "activeModules": "Active Modules",
+    "availableTemplates": "Available Templates",
+    "noModules": "No modules configured",
+    "createModule": "Create Module",
+    "editModule": "Edit Module",
+    "deleteModule": "Delete Module",
+    "deleteModuleConfirm": "Are you sure you want to delete this module?",
+    "moduleName": "Module Name",
+    "moduleSlug": "Module Slug",
+    "moduleDescription": "Module Description",
+    "moduleType": "Module Type",
+    "moduleIcon": "Icon",
+    "moduleColor": "Color",
+    "moduleOrder": "Order",
+    "isActive": "Active",
+    "saveModule": "Save Module"
   },
   "moduleBuilder": {
     "title": "Module Builder",
@@ -1658,7 +1756,10 @@
       "pendingOrders": "Pending Orders",
       "completedToday": "Completed Today",
       "issues": "Issues",
-      "avgResponse": "Avg Response"
+      "avgResponse": "Avg Response",
+      "newTransactionReceived": "New order received",
+      "housekeeping": "Housekeeping",
+      "housekeepingDesc": "Manage room cleaning and maintenance requests"
     },
     "restaurant": {
       "title": "Kitchen Orders",
@@ -1799,7 +1900,8 @@
       "checkingOutToday": "Checking Out Today",
       "currentlyStaying": "Currently Staying",
       "todayBtn": "Today",
-      "noBookingsDate": "No bookings for this date"
+      "noBookingsDate": "No bookings for this date",
+      "guests": "Guests"
     },
     "statuses": {
       "pending": "Pending",
@@ -2166,7 +2268,10 @@
     "adult": "Adult",
     "child": "Child",
     "family": "Family",
-    "vip": "VIP"
+    "vip": "VIP",
+    "recordCheckIn": "Check-in",
+    "recordServed": "Mark as Served",
+    "failedRecordTransition": "Failed to record scan transition"
   },
   "order": {
     "title": "Restaurant",
@@ -2261,7 +2366,8 @@
       "addToOrder": "Add to Order",
       "submitting": "Submitting...",
       "submitOrder": "Submit Order",
-      "headerTitle": "{name} Restaurant"
+      "headerTitle": "{name} Restaurant",
+      "submittedOffline": "Order saved offline. It will sync once connection is restored."
     },
     "cart": {
       "title": "Shopping Cart",
@@ -2279,6 +2385,43 @@
       "ready": "Ready",
       "served": "Served",
       "cancelled": "Cancelled"
-    }
+    },
+    "submittedOffline": "Order saved offline. It will sync once connection is restored."
+  },
+  "install": {
+    "pageTitle": "V2 Ecosystem Setup",
+    "pageSubtitle": "Configure your root administrator account to get started.",
+    "migrationTitle": "Database Migration Required",
+    "migrationSubtitle": "Your database schema needs to be synchronized with this machine.",
+    "machineIdNote": "This instance is linked to your hardware fingerprint for offline integrity.",
+    "businessName": "Business Name",
+    "businessNamePlaceholder": "e.g. Grand Azure Resort & Spa",
+    "ownerAccount": "Owner Account Credentials",
+    "fullName": "Full Name",
+    "fullNamePlaceholder": "e.g. Jane Doe",
+    "emailAddress": "Email Address",
+    "emailPlaceholder": "admin@yourresort.com",
+    "password": "Master Password",
+    "passwordPlaceholder": "Create a strong master password",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Re-enter master password",
+    "passwordMismatch": "Passwords do not match",
+    "weakPassword": "Password is too weak. Must be at least Fair.",
+    "installButton": "Complete Installation",
+    "installing": "Setting up V2 Ecosystem...",
+    "installingDetails": "Provisioning database, creating tables, and registering owner account.",
+    "done": "Setup Complete",
+    "openingWizard": "Opening the configuration wizard...",
+    "footerNote": "Initial provisioning requires write access to the configured database.",
+    "strengthVeryWeak": "Very Weak",
+    "strengthWeak": "Weak",
+    "strengthFair": "Fair",
+    "strengthStrong": "Strong",
+    "strengthVeryStrong": "Very Strong"
+  },
+  "bookingService": {
+    "subtitle": "Experience our accommodations and luxury stays",
+    "luxuryStay": "Premium Stay",
+    "bookNow": "Book Now"
   }
 }
