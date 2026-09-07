@@ -172,6 +172,25 @@ async function resolveAuthoritativePayableAmount(
   throw new Error(`Authoritative record not found for reference ${referenceType}:${referenceId}`);
 }
 
+/**
+ * Convert Stripe minor units (e.g. cents, fils) into major currency units
+ * using authoritative ISO 4217 CURRENCY_DECIMALS precision:
+ * - 2 decimals: USD, EUR, etc. (divisor: 100) -> 4250 => 42.50
+ * - 3 decimals: KWD, BHD, etc. (divisor: 1000) -> 15250 => 15.250
+ * - 0 decimals: JPY, KRW, etc. (divisor: 1) -> 3500 => 3500
+ */
+export function convertStripeMinorUnitsToMajor(
+  minorUnits: number,
+  currency: string,
+): { majorAmount: number; formattedAmount: string; decimals: number; currency: string } {
+  const currencyCode = (currency || 'USD').toUpperCase();
+  const decimals = (CURRENCY_DECIMALS as Record<string, number>)[currencyCode] ?? 2;
+  const divisor = decimals === 0 ? 1 : (decimals === 3 ? 1000 : 100);
+  const majorAmount = minorUnits / divisor;
+  const formattedAmount = majorAmount.toFixed(decimals);
+  return { majorAmount, formattedAmount, decimals, currency: currencyCode };
+}
+
 export const createPaymentIntent = asyncHandler(async (req: Request, res: Response) => {
   const validatedData = validateBody(createPaymentIntentSchema, req.body);
   const { amount: clientAmount, currency: clientCurrency, referenceType, referenceId } = validatedData;
@@ -261,8 +280,12 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const referenceType = normalizeReferenceType(paymentIntent.metadata.referenceType);
-      const referenceId = paymentIntent.metadata.referenceId;
+      const referenceType = normalizeReferenceType(paymentIntent.metadata?.referenceType);
+      const referenceId = paymentIntent.metadata?.referenceId;
+      const { majorAmount, formattedAmount, currency: currencyCode } = convertStripeMinorUnitsToMajor(
+        paymentIntent.amount,
+        paymentIntent.currency || paymentIntent.metadata?.authoritativeCurrency || 'USD',
+      );
 
       // FIX BUG-01: Idempotency check via payment_ledger — only look for success entries.
       // We NEVER update payment_ledger (immutability trigger blocks it).
@@ -296,8 +319,8 @@ export async function handleStripeWebhook(req: Request, res: Response) {
             .insert({
               reference_type: referenceType,
               reference_id: referenceId,
-              amount: (paymentIntent.amount / 100).toFixed(2),
-              currency: paymentIntent.currency.toUpperCase(),
+              amount: formattedAmount,
+              currency: currencyCode,
               method: 'card',
               status: 'completed',
               stripe_payment_intent_id: paymentIntent.id,
@@ -313,16 +336,16 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         // Step 2: Update transaction/reference status
         await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
 
-        // Step 3: Award loyalty points
-        await awardLoyaltyPointsForPayment(referenceType, referenceId, paymentIntent.amount / 100);
+        // Step 3: Award loyalty points using currency-correct major amount
+        await awardLoyaltyPointsForPayment(referenceType, referenceId, majorAmount);
 
-        // Step 4: FIX BUG-01 — INSERT a success ledger entry (never UPDATE)
+        // Step 4: FIX BUG-01 — INSERT a success ledger entry (never UPDATE) with currency-correct amount
         await supabase.from('payment_ledger').insert({
           reference_type: referenceType,
           reference_id: referenceId,
           event_type: 'authorized',
-          amount: paymentIntent.amount / 100,
-          currency: paymentIntent.currency.toUpperCase(),
+          amount: majorAmount,
+          currency: currencyCode,
           gateway_reference_id: paymentIntent.id,
           webhook_id: event.id,
           status: 'success',
@@ -377,14 +400,18 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const referenceType = normalizeReferenceType(paymentIntent.metadata.referenceType);
-      const referenceId = paymentIntent.metadata.referenceId;
+      const referenceType = normalizeReferenceType(paymentIntent.metadata?.referenceType);
+      const referenceId = paymentIntent.metadata?.referenceId;
+      const { formattedAmount, currency: currencyCode } = convertStripeMinorUnitsToMajor(
+        paymentIntent.amount,
+        paymentIntent.currency || paymentIntent.metadata?.authoritativeCurrency || 'USD',
+      );
 
       await supabase.from('payments').insert({
         reference_type: referenceType,
         reference_id: referenceId,
-        amount: (paymentIntent.amount / 100).toFixed(2),
-        currency: paymentIntent.currency.toUpperCase(),
+        amount: formattedAmount,
+        currency: currencyCode,
         method: 'card',
         status: 'failed',
         stripe_payment_intent_id: paymentIntent.id,
@@ -407,8 +434,8 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     // FIX P3: Handle payment_intent.canceled — unblock stuck pending bookings
     case 'payment_intent.canceled': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const referenceType = normalizeReferenceType(paymentIntent.metadata.referenceType);
-      const referenceId = paymentIntent.metadata.referenceId;
+      const referenceType = normalizeReferenceType(paymentIntent.metadata?.referenceType);
+      const referenceId = paymentIntent.metadata?.referenceId;
 
       await supabase
         .from('transactions')
@@ -439,13 +466,18 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, 'refunded');
         }
 
+        const { majorAmount: refundAmount, currency: refundCurrency } = convertStripeMinorUnitsToMajor(
+          charge.amount_refunded || 0,
+          charge.currency || 'USD',
+        );
+
         // FIX BUG-01: INSERT only, never UPDATE
         await supabase.from('payment_ledger').insert({
           reference_type: payment?.reference_type || 'unknown',
           reference_id: payment?.reference_id || 'unknown',
           event_type: 'refund',
-          amount: (charge.amount_refunded || 0) / 100,
-          currency: charge.currency.toUpperCase(),
+          amount: refundAmount,
+          currency: refundCurrency,
           gateway_reference_id: paymentIntentId,
           webhook_id: event.id,
           status: 'success',
@@ -884,9 +916,12 @@ export async function processRefundById(
 
     if (!isTestPI) {
       const stripe = await getStripeInstance();
+      const refundCurrency = (payment.currency || 'USD').toUpperCase();
+      const refundDecimals = (CURRENCY_DECIMALS as Record<string, number>)[refundCurrency] ?? 2;
+      const refundMultiplier = refundDecimals === 0 ? 1 : (refundDecimals === 3 ? 1000 : 100);
       const stripeRefund = await stripe.refunds.create({
         payment_intent: payment.stripe_payment_intent_id,
-        amount: amount ? Math.round(amount * 100) : undefined,
+        amount: amount ? Math.round(amount * refundMultiplier) : undefined,
         reason: 'requested_by_customer',
       });
       refundDetails.notes = `${refundDetails.notes || ''} [Stripe Refund ID: ${stripeRefund.id}]`;

@@ -70,6 +70,7 @@ vi.mock('../../../../src/middleware/async-handler.js', () => ({
 }));
 
 import { getSupabase } from '../../../../src/database/connection.js';
+import { awardLoyaltyPointsForPayment } from '../../../../src/modules/payments/loyalty-integration.js';
 import {
   handleStripeWebhook,
   refundPayment,
@@ -79,11 +80,12 @@ import {
   createPaymentIntent,
   getTransactions,
   getTransaction,
+  convertStripeMinorUnitsToMajor,
 } from '../../../../src/modules/payments/payment.controller.js';
 
 // ── Chainable Supabase mock ──────────────────────────────────────────
 
-function createQueryMock(mockDataFn: () => unknown[]) {
+function createQueryMock(mockDataFn: () => unknown[], onInsert?: (row: unknown) => void) {
   const mockObj: Record<string, unknown> = {};
   const chainMethods = [
     'select', 'eq', 'neq', 'is', 'or', 'order', 'gte', 'lte', 'gt', 'lt',
@@ -107,6 +109,7 @@ function createQueryMock(mockDataFn: () => unknown[]) {
   });
   mockObj.insert = vi.fn().mockImplementation((rows: unknown) => {
     const obj = Array.isArray(rows) ? rows[0] : rows;
+    onInsert?.(obj);
     return {
       select: vi.fn().mockReturnValue({
         single: vi.fn().mockResolvedValue({ data: { id: 'pay-new', ...(obj as object) }, error: null }),
@@ -170,10 +173,17 @@ function mockNext(): NextFunction {
 
 describe('PaymentController', () => {
   let tableData: Record<string, unknown[]>;
+  let insertedRows: Record<string, any[]> = {};
 
   function setupSupabase() {
+    insertedRows = { payments: [], payment_ledger: [] };
     const supabase = {
-      from: vi.fn().mockImplementation((t: string) => createQueryMock(() => tableData[t] || [])),
+      from: vi.fn().mockImplementation((t: string) =>
+        createQueryMock(() => tableData[t] || [], (row) => {
+          if (!insertedRows[t]) insertedRows[t] = [];
+          insertedRows[t].push(row);
+        }),
+      ),
       rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     };
     (getSupabase as ReturnType<typeof vi.fn>).mockReturnValue(supabase);
@@ -333,6 +343,157 @@ describe('PaymentController', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
     });
+
+    describe('Cross-Currency Webhook Settlement Matrix (USD, KWD, BHD, JPY)', () => {
+      const currencyTestMatrix = [
+        {
+          currency: 'usd',
+          currencyUpper: 'USD',
+          stripeAmount: 4250,
+          expectedMajor: 42.50,
+          expectedFormatted: '42.50',
+          decimals: 2,
+        },
+        {
+          currency: 'kwd',
+          currencyUpper: 'KWD',
+          stripeAmount: 15250,
+          expectedMajor: 15.250,
+          expectedFormatted: '15.250',
+          decimals: 3,
+        },
+        {
+          currency: 'bhd',
+          currencyUpper: 'BHD',
+          stripeAmount: 15250,
+          expectedMajor: 15.250,
+          expectedFormatted: '15.250',
+          decimals: 3,
+        },
+        {
+          currency: 'jpy',
+          currencyUpper: 'JPY',
+          stripeAmount: 3500,
+          expectedMajor: 3500,
+          expectedFormatted: '3500',
+          decimals: 0,
+        },
+      ];
+
+      for (const tc of currencyTestMatrix) {
+        it(`correctly converts Stripe minor units to major amount on payment_intent.succeeded for ${tc.currencyUpper} (${tc.decimals} decimals)`, async () => {
+          tableData.payments = [];
+          tableData.payment_ledger = [];
+          setupSupabase();
+          (awardLoyaltyPointsForPayment as any).mockClear();
+
+          const stripeEvent = {
+            id: `evt_succ_${tc.currency}`,
+            type: 'payment_intent.succeeded',
+            data: {
+              object: {
+                id: `pi_succ_${tc.currency}`,
+                amount: tc.stripeAmount,
+                currency: tc.currency,
+                latest_charge: `ch_${tc.currency}`,
+                metadata: { referenceType: 'instant_transaction', referenceId: 'order-1' },
+              },
+            },
+          };
+          mockStripeWebhooksConstructEvent.mockReturnValue(stripeEvent);
+
+          const req = mockReq({
+            rawBody: Buffer.from('raw'),
+            headers: { 'stripe-signature': 'sig_test' },
+          });
+          const res = mockRes();
+          await handleStripeWebhook(req as any, res as any);
+
+          expect(res.json).toHaveBeenCalledWith({ received: true });
+
+          // 1. payments record must persist the correct major amount formatted per currency decimals
+          expect(insertedRows.payments).toHaveLength(1);
+          expect(insertedRows.payments[0].amount).toBe(tc.expectedFormatted);
+          expect(insertedRows.payments[0].currency).toBe(tc.currencyUpper);
+          expect(insertedRows.payments[0].status).toBe('completed');
+
+          // 2. payment_ledger entry must record the exact major amount number
+          expect(insertedRows.payment_ledger).toHaveLength(1);
+          expect(insertedRows.payment_ledger[0].amount).toBe(tc.expectedMajor);
+          expect(insertedRows.payment_ledger[0].currency).toBe(tc.currencyUpper);
+          expect(insertedRows.payment_ledger[0].event_type).toBe('authorized');
+          expect(insertedRows.payment_ledger[0].status).toBe('success');
+
+          // 3. awardLoyaltyPointsForPayment must be called with currency-correct major units (NOT unconditionally / 100)
+          expect(awardLoyaltyPointsForPayment).toHaveBeenCalledWith(
+            'instant_transaction',
+            'order-1',
+            tc.expectedMajor,
+          );
+        });
+
+        it(`correctly records major amount on payment_intent.payment_failed for ${tc.currencyUpper} (${tc.decimals} decimals)`, async () => {
+          setupSupabase();
+
+          const stripeEvent = {
+            id: `evt_fail_${tc.currency}`,
+            type: 'payment_intent.payment_failed',
+            data: {
+              object: {
+                id: `pi_fail_${tc.currency}`,
+                amount: tc.stripeAmount,
+                currency: tc.currency,
+                metadata: { referenceType: 'instant_transaction', referenceId: 'order-1' },
+                last_payment_error: { message: 'Insufficient funds' },
+              },
+            },
+          };
+          mockStripeWebhooksConstructEvent.mockReturnValue(stripeEvent);
+
+          const req = mockReq({
+            rawBody: Buffer.from('raw'),
+            headers: { 'stripe-signature': 'sig_test' },
+          });
+          const res = mockRes();
+          await handleStripeWebhook(req as any, res as any);
+
+          expect(res.json).toHaveBeenCalledWith({ received: true });
+
+          // payments record must record failed payment with correct major amount string
+          expect(insertedRows.payments).toHaveLength(1);
+          expect(insertedRows.payments[0].amount).toBe(tc.expectedFormatted);
+          expect(insertedRows.payments[0].currency).toBe(tc.currencyUpper);
+          expect(insertedRows.payments[0].status).toBe('failed');
+        });
+      }
+
+      it('convertStripeMinorUnitsToMajor unit helper precision matrix', () => {
+        expect(convertStripeMinorUnitsToMajor(4250, 'USD')).toEqual({
+          majorAmount: 42.50,
+          formattedAmount: '42.50',
+          decimals: 2,
+          currency: 'USD',
+        });
+        expect(convertStripeMinorUnitsToMajor(15250, 'KWD')).toEqual({
+          majorAmount: 15.250,
+          formattedAmount: '15.250',
+          decimals: 3,
+          currency: 'KWD',
+        });
+        expect(convertStripeMinorUnitsToMajor(15250, 'BHD')).toEqual({
+          majorAmount: 15.250,
+          formattedAmount: '15.250',
+          decimals: 3,
+          currency: 'BHD',
+        });
+        expect(convertStripeMinorUnitsToMajor(3500, 'JPY')).toEqual({
+          majorAmount: 3500,
+          formattedAmount: '3500',
+          decimals: 0,
+          currency: 'JPY',
+        });
+      });
+    });
   });
 
   // ── refundPayment ───────────────────────────────────────────────
@@ -381,6 +542,40 @@ describe('PaymentController', () => {
 
       expect(mockStripeRefundsCreate).not.toHaveBeenCalled();
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+    });
+
+    it('should call Stripe refunds.create with currency-correct minor units for non-test payment intents', async () => {
+      const refundTestCases = [
+        { currency: 'USD', amount: 42.50, expectedStripeAmount: 4250 },
+        { currency: 'KWD', amount: 15.250, expectedStripeAmount: 15250 },
+        { currency: 'JPY', amount: 3500, expectedStripeAmount: 3500 },
+      ];
+
+      for (const tc of refundTestCases) {
+        mockStripeRefundsCreate.mockReset();
+        mockStripeRefundsCreate.mockResolvedValue({ id: `re_${tc.currency}` });
+        tableData.payments = [{
+          ...PAYMENT,
+          stripe_payment_intent_id: 'pi_live_123',
+          currency: tc.currency,
+          amount: String(tc.amount),
+        }];
+        setupSupabase();
+
+        const req = mockReq({
+          params: { id: 'pay-1' },
+          body: { reason: 'Customer return', amount: tc.amount },
+        });
+        const res = mockRes();
+        await (refundPayment as Function)(req, res, mockNext());
+
+        expect(mockStripeRefundsCreate).toHaveBeenCalledWith({
+          payment_intent: 'pi_live_123',
+          amount: tc.expectedStripeAmount,
+          reason: 'requested_by_customer',
+        });
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+      }
     });
   });
 
