@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { CheckCircle2, ArrowRight, Receipt, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/lib/utils';
@@ -29,6 +30,7 @@ export default function CheckoutConfirmationStep({
   moduleSlug,
   onViewOrder,
 }: CheckoutConfirmationStepProps) {
+  const t = useTranslations('checkout');
   const confirmationUrl = `/${propertySlug}/${moduleSlug}/confirmation?type=order&id=${orderId}`;
 
   return (
@@ -38,12 +40,12 @@ export default function CheckoutConfirmationStep({
       </div>
 
       <div>
-        <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Order Confirmed!</h2>
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-white">{t('orderConfirmed')}</h2>
         <p className="text-slate-500 dark:text-slate-400 mt-1">
-          Thank you, <span className="font-semibold text-slate-900 dark:text-white">{customer.name}</span>. Your order has been placed.
+          {t('thankYou', { name: customer.name })}
         </p>
         <p className="text-xs text-slate-400 font-mono mt-1">
-          Reference ID: {orderId}
+          {t('referenceId', { id: orderId })}
         </p>
       </div>
 
@@ -51,28 +53,28 @@ export default function CheckoutConfirmationStep({
       <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-6 text-left max-w-lg mx-auto space-y-3 border border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2 text-slate-900 dark:text-white font-semibold text-sm">
           <MapPin className="w-4 h-4 text-primary-500" />
-          <span>Fulfillment Details</span>
+          <span>{t('fulfillmentDetails')}</span>
         </div>
         <div className="text-sm text-slate-600 dark:text-slate-300 space-y-1">
           <p>
-            <span className="text-slate-400">Mode:</span>{' '}
+            <span className="text-slate-400">{t('mode')}</span>{' '}
             <span className="capitalize font-medium">{fulfillment.mode.replace('_', ' ')}</span>
           </p>
           {fulfillment.destinationRef && (
             <p>
-              <span className="text-slate-400">Destination:</span>{' '}
+              <span className="text-slate-400">{t('destination')}</span>{' '}
               <span className="font-medium">{fulfillment.destinationRef}</span>
             </p>
           )}
           <p>
-            <span className="text-slate-400">Phone:</span>{' '}
+            <span className="text-slate-400">{t('phone')}</span>{' '}
             <span className="font-medium">{customer.phone}</span>
           </p>
         </div>
 
         {serverPricing && (
           <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-sm font-bold">
-            <span className="text-slate-700 dark:text-slate-300">Total Paid</span>
+            <span className="text-slate-700 dark:text-slate-300">{t('totalPaid')}</span>
             <span className="text-primary-600 dark:text-primary-400 text-base">
               {formatCurrency(serverPricing.totalAmount, currency)}
             </span>
@@ -84,12 +86,12 @@ export default function CheckoutConfirmationStep({
         <Link href={confirmationUrl} className="w-full sm:w-auto flex-1">
           <Button className="w-full" onClick={onViewOrder}>
             <Receipt className="w-4 h-4 mr-2" />
-            View Order Receipt & Tracking
+            {t('viewOrderReceipt')}
           </Button>
         </Link>
         <Link href={`/${propertySlug}/${moduleSlug}`} className="w-full sm:w-auto">
           <Button variant="outline" className="w-full">
-            Back to Store
+            {t('backToStore')}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </Link>

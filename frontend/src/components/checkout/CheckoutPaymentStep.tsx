@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import PaymentMethodSelector from '@/components/payments/PaymentMethodSelector';
@@ -69,6 +70,7 @@ export default function CheckoutPaymentStep({
   onBack,
   disabled = false,
 }: CheckoutPaymentStepProps) {
+  const t = useTranslations('checkout');
   // Authoritative server currency invariant: always prefer serverPricing.currency
   const activeCurrency = serverPricing?.currency || currency || 'USD';
   const isPricingBlocked = isPricingStale || isLoadingPricing || isPricingError || !serverPricing;
@@ -78,8 +80,8 @@ export default function CheckoutPaymentStep({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Payment & Discounts</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Select your payment method and apply any discounts or rewards.</p>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{t('paymentAndDiscounts')}</h2>
+        <p className="text-sm text-slate-500 mt-0.5">{t('paymentSubtitle')}</p>
       </div>
 
       {/* Payment Method Selector (pure capability-aware selector) */}
@@ -96,14 +98,14 @@ export default function CheckoutPaymentStep({
         <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-amber-800 dark:text-amber-300">
-            Room charge requires an active room reservation. Please select cash or card, or access checkout with your room booking details.
+            {t('roomChargeWarning')}
           </p>
         </div>
       )}
 
       {/* Discounts Section */}
       <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
-        <h3 className="font-semibold text-slate-900 dark:text-white mb-2 text-base">Promotions & Rewards</h3>
+        <h3 className="font-semibold text-slate-900 dark:text-white mb-2 text-base">{t('promotionsAndRewards')}</h3>
         <PaymentDiscounts
           couponCode={couponCode}
           giftCardCodes={giftCardCodes}
@@ -123,20 +125,20 @@ export default function CheckoutPaymentStep({
 
       {/* Authoritative Server Pricing Breakdown */}
       <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
-        <h3 className="font-semibold text-slate-900 dark:text-white mb-3 text-base">Order Total</h3>
+        <h3 className="font-semibold text-slate-900 dark:text-white mb-3 text-base">{t('orderTotal')}</h3>
         <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 space-y-2.5">
           {isLoadingPricing || isPricingStale ? (
             <div className="py-4 text-center text-sm text-slate-400 italic animate-pulse">
-              Calculating authoritative pricing...
+              {t('calculatingAuthoritativePricing')}
             </div>
           ) : isPricingError || !serverPricing ? (
             <div className="py-2 text-center text-sm text-red-500">
-              Pricing unavailable. Please try again.
+              {t('pricingUnavailable')}
             </div>
           ) : (
             <>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-600 dark:text-slate-400">Subtotal</span>
+                <span className="text-slate-600 dark:text-slate-400">{t('subtotal')}</span>
                 <span className="font-medium text-slate-900 dark:text-white">
                   {formatCurrency(serverPricing.subtotal, activeCurrency)}
                 </span>
@@ -171,7 +173,7 @@ export default function CheckoutPaymentStep({
               ))}
 
               <div className="flex justify-between font-bold pt-3 border-t border-slate-200 dark:border-slate-700 text-base">
-                <span className="text-slate-900 dark:text-white">Total Amount</span>
+                <span className="text-slate-900 dark:text-white">{t('totalAmount')}</span>
                 <div className="text-right">
                   {serverPricing.totalDiscount > 0 &&
                     serverPricing.preDiscountTotal !== undefined &&
@@ -195,7 +197,7 @@ export default function CheckoutPaymentStep({
         <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl space-y-2">
           <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-semibold text-sm">
             <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <span>Payment Failed</span>
+            <span>{t('paymentFailed')}</span>
           </div>
           <p className="text-sm text-red-600 dark:text-red-300">
             {paymentState.error || 'An unexpected error occurred during payment processing.'}
@@ -203,7 +205,7 @@ export default function CheckoutPaymentStep({
           {onRetryPayment && (
             <Button size="sm" variant="outline" onClick={onRetryPayment} className="mt-2 text-red-600 dark:text-red-400">
               <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-              Retry Payment
+              {t('retryPayment')}
             </Button>
           )}
         </div>
@@ -213,7 +215,7 @@ export default function CheckoutPaymentStep({
       {paymentState.status === 'cancelled' && (
         <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl">
           <p className="text-sm text-amber-800 dark:text-amber-300">
-            Payment was cancelled. Your order details are saved — please click below to complete your payment.
+            {t('paymentCancelled')}
           </p>
         </div>
       )}
@@ -222,7 +224,7 @@ export default function CheckoutPaymentStep({
       <div className="pt-4 flex justify-between items-center">
         <Button variant="outline" onClick={onBack} disabled={isActionInProgress || disabled}>
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Fulfillment
+          {t('backToFulfillment')}
         </Button>
 
         <Button
@@ -234,15 +236,15 @@ export default function CheckoutPaymentStep({
             <>
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
               {paymentState.status === 'creating_intent'
-                ? 'Initializing Gateway...'
+                ? t('initializingGateway')
                 : paymentState.status === 'processing'
-                ? 'Processing Payment...'
-                : 'Placing Order...'}
+                ? t('processingPayment')
+                : t('placingOrder')}
             </>
           ) : isPricingStale || isLoadingPricing ? (
-            'Recalculating...'
+            t('recalculating')
           ) : (
-            `Place Order • ${serverPricing ? formatCurrency(serverPricing.totalAmount, activeCurrency) : '—'}`
+            `${t('placeOrder')} • ${serverPricing ? formatCurrency(serverPricing.totalAmount, activeCurrency) : '—'}`
           )}
         </Button>
       </div>

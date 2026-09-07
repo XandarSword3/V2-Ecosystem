@@ -546,6 +546,7 @@ export function BlockRenderer({
   isEditing?: boolean;
   onUpdateProps?: (updates: Record<string, any>) => void;
 }) {
+  const tCommon = useTranslations('common');
   const { type, style } = block;
 
   // Validate Block Type - Added new glassmorphic components
@@ -794,7 +795,9 @@ export function BlockRenderer({
             {(props.subtitle || isEditing) && (
               <p className="text-xl text-white/90 mb-2">
                 <span {...ep(isEditing, (v) => onUpdateProps?.({ subtitle: v }))}>
-                  {props.subtitle || (isEditing ? 'Subtitle…' : '')}
+                  {props.subtitle === 'Discover our services'
+                    ? tCommon('discoverOurServices')
+                    : props.subtitle || (isEditing ? 'Subtitle…' : '')}
                 </span>
               </p>
             )}
@@ -819,7 +822,9 @@ export function BlockRenderer({
                     className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold rounded-lg transition-colors shadow-lg"
                   >
                     <span {...ep(isEditing, (v) => onUpdateProps?.({ primaryButton: v }))}>
-                      {props.primaryButton || (isEditing ? 'Primary Button' : '')}
+                      {props.primaryButton === 'Get Started'
+                        ? tCommon('getStarted')
+                        : props.primaryButton || (isEditing ? 'Primary Button' : '')}
                     </span>
                   </a>
                 )}
@@ -1308,7 +1313,7 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
                       className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                     >
                       {checkingCustomizations ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
-                      Add to Cart
+                      {tCommon('addToCart')}
                     </button>
                   )}
                 </div>
@@ -1320,7 +1325,7 @@ function MenuListComponent({ module, props }: { module: Module; props: BlockProp
 
       {filteredItems.length === 0 && (
         <div className="text-center py-12 text-slate-500">
-          No items available in this category
+          {tCommon('noItemsInCategory')}
         </div>
       )}
 

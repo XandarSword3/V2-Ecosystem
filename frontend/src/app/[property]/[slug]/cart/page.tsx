@@ -294,15 +294,15 @@ export default function ModuleCartPage() {
             className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to {currentModule.name}</span>
+            <span>{t('backTo', { name: currentModule.name })}</span>
           </Link>
           
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 via-amber-600 to-rose-600 bg-clip-text text-transparent">
-              {currentModule.name} Checkout
+              {t('moduleCheckout', { name: currentModule.name })}
             </h1>
             <p className="text-slate-600 dark:text-slate-400 mt-1">
-              Complete your order • {moduleItems.length} {moduleItems.length === 1 ? 'item' : 'items'}
+              {t('completeYourOrder', { count: moduleItems.length })}
             </p>
           </div>
         </motion.div>

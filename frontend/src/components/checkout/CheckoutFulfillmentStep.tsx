@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { ArrowLeft, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { FulfillmentModeSelector } from '@/components/customer/FulfillmentModeSelector';
@@ -36,19 +37,20 @@ export default function CheckoutFulfillmentStep({
   onContinue,
   disabled = false,
 }: CheckoutFulfillmentStepProps) {
+  const t = useTranslations('checkout');
   const isValid = isFulfillmentValid(fulfillment);
   const isPricingBlocked = isPricingStale || isLoadingPricing || isPricingError;
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Fulfillment Selection</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Select how you want to receive your order.</p>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{t('fulfillmentSelection')}</h2>
+        <p className="text-sm text-slate-500 mt-0.5">{t('fulfillmentSubtitle')}</p>
       </div>
 
       <div className="space-y-4">
         <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
-          Choose Delivery Mode
+          {t('chooseDeliveryMode')}
         </label>
         <FulfillmentModeSelector
           options={fulfillmentOptions}
@@ -70,21 +72,21 @@ export default function CheckoutFulfillmentStep({
       {isPricingStale && (
         <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 rounded-xl border border-amber-200 dark:border-amber-800 text-sm">
           <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
-          <span>Updating delivery pricing based on your fulfillment selection...</span>
+          <span>{t('updatingDeliveryPricing')}</span>
         </div>
       )}
 
       {isPricingError && (
         <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800 text-sm">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>Pricing calculation failed for this destination. Please verify the destination details.</span>
+          <span>{t('pricingFailedDestination')}</span>
         </div>
       )}
 
       <div className="pt-4 flex justify-between">
         <Button variant="outline" onClick={onBack} disabled={disabled}>
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Customer Details
+          {t('backToCustomerDetails')}
         </Button>
         <Button
           onClick={onContinue}
@@ -94,13 +96,13 @@ export default function CheckoutFulfillmentStep({
           {isPricingStale || isLoadingPricing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              Recalculating Pricing...
+              {t('recalculatingPricing')}
             </>
           ) : isPricingError ? (
-            'Pricing Error'
+            t('pricingError')
           ) : (
             <>
-              Continue to Payment
+              {t('continueToPayment')}
               <ArrowRight className="w-4 h-4 ml-2" />
             </>
           )}

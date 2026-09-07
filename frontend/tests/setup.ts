@@ -49,8 +49,18 @@ vi.mock('next/image', () => ({
 }));
 
 // Mock next-intl
+const enMessages = require('../messages/en.json');
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: (ns?: string) => (key: string, values?: any) => {
+    const dict = ns ? enMessages[ns] || enMessages.common || {} : enMessages.common || {};
+    let text = dict[key] || enMessages.checkout?.[key] || enMessages.common?.[key] || key;
+    if (typeof text === 'string' && values) {
+      for (const [k, v] of Object.entries(values)) {
+        text = text.replace(new RegExp(`\\{${k}[^}]*\\}`, 'g'), String(v));
+      }
+    }
+    return text;
+  },
   useLocale: () => 'en',
   useFormatter: () => ({
     number: (n: number) => n.toString(),

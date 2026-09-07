@@ -13,8 +13,10 @@
     "test:cov": "vitest run --coverage",
     "test:cov:critical": "vitest run --config vitest.critical.config.ts --coverage",
     "test:cov:quick": "vitest run tests/lib tests/components tests/hooks --coverage",
-    "check:translations": "node scripts/check-translations.js",
-    "translations:missing": "node scripts/check-translations.js --generate"
+    "check:translations": "node scripts/i18n-tool.cjs check-parity",
+    "i18n:scan": "node scripts/i18n-tool.cjs scan",
+    "i18n:scan:ci": "node scripts/i18n-tool.cjs scan --ci",
+    "i18n:autofix": "node scripts/i18n-tool.cjs autofix"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

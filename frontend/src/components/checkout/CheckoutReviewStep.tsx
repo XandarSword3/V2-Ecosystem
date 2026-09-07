@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations } from 'next-intl';
 import { Minus, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { CartItem } from '@/stores/cartStore';
@@ -26,10 +27,12 @@ export default function CheckoutReviewStep({
   onContinue,
   disabled = false,
 }: CheckoutReviewStepProps) {
+  const t = useTranslations('checkout');
+
   if (items.length === 0) {
     return (
       <div className="text-center py-12 space-y-3">
-        <p className="text-slate-500 dark:text-slate-400">Your cart is empty.</p>
+        <p className="text-slate-500 dark:text-slate-400">{t('cartEmpty')}</p>
       </div>
     );
   }
@@ -38,15 +41,15 @@ export default function CheckoutReviewStep({
     <div className="space-y-6">
       <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Review Your Cart</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{t('reviewYourCart')}</h2>
           <p className="text-sm text-slate-500 mt-0.5">
-            {items.length} {items.length === 1 ? 'item' : 'items'} in {moduleName}
+            {t('itemsInModule', { count: items.length, module: moduleName })}
           </p>
         </div>
         {onClearItems && (
           <Button variant="ghost" className="text-red-500 hover:text-red-600 text-sm" onClick={onClearItems}>
             <Trash2 className="w-4 h-4 mr-2" />
-            Clear
+            {t('clear')}
           </Button>
         )}
       </div>
@@ -111,7 +114,7 @@ export default function CheckoutReviewStep({
 
       <div className="pt-4 flex justify-end">
         <Button onClick={onContinue} disabled={disabled || items.length === 0} className="px-6">
-          Continue to Customer Details
+          {t('continueToCustomerDetails')}
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>

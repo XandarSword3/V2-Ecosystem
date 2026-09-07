@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { ShoppingCart, User, Truck, CreditCard, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -101,6 +102,7 @@ export default function GenericCheckoutWorkflow({
   onOrderConfirmed,
   className = '',
 }: GenericCheckoutWorkflowProps) {
+  const t = useTranslations('checkout');
   const [activeStep, setActiveStep] = useState<CheckoutStepId>('review');
   const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
@@ -115,13 +117,13 @@ export default function GenericCheckoutWorkflow({
       setConfirmedOrderId(target.referenceId);
       setActiveStep('confirmation');
       onOrderConfirmed?.(target.referenceId);
-      toast.success('Payment completed successfully!');
+      toast.success(t('orderConfirmed'));
     },
     onError: (error) => {
-      toast.error(`Payment failed: ${error}`);
+      toast.error(t('paymentFailedNotification', { error }));
     },
     onCancel: () => {
-      toast.info('Payment cancelled. Your order details are saved.');
+      toast.info(t('paymentCancelledNotification'));
     },
   });
 
@@ -157,11 +159,11 @@ export default function GenericCheckoutWorkflow({
   const handleSubmitOrder = useCallback(async () => {
     // 1. Guard against stale or invalid pricing
     if (isPricingStale || isLoadingPricing) {
-      toast.info('Pricing is recalculating. Please wait for authoritative pricing.');
+      toast.info(t('recalculatingPricing'));
       return;
     }
     if (isPricingError || !serverPricing) {
-      toast.error('Unable to verify order pricing. Please try again.');
+      toast.error(t('pricingUnavailable'));
       return;
     }
 
@@ -254,11 +256,11 @@ export default function GenericCheckoutWorkflow({
   ]);
 
   const stepDefinitions = [
-    { id: 'review' as CheckoutStepId, title: 'Review Order', icon: ShoppingCart },
-    { id: 'customer' as CheckoutStepId, title: 'Your Details', icon: User },
-    { id: 'fulfillment' as CheckoutStepId, title: 'Fulfillment', icon: Truck },
-    { id: 'payment' as CheckoutStepId, title: 'Payment', icon: CreditCard },
-    { id: 'confirmation' as CheckoutStepId, title: 'Confirmation', icon: CheckCircle2 },
+    { id: 'review' as CheckoutStepId, title: t('stepReview'), icon: ShoppingCart },
+    { id: 'customer' as CheckoutStepId, title: t('stepCustomer'), icon: User },
+    { id: 'fulfillment' as CheckoutStepId, title: t('stepFulfillment'), icon: Truck },
+    { id: 'payment' as CheckoutStepId, title: t('stepPayment'), icon: CreditCard },
+    { id: 'confirmation' as CheckoutStepId, title: t('stepConfirmation'), icon: CheckCircle2 },
   ];
 
   const currentStepIndex = CHECKOUT_STEP_ORDER.indexOf(activeStep);

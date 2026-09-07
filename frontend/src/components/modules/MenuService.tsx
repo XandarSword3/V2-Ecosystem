@@ -334,7 +334,7 @@ export function MenuService({ module }: MenuServiceProps) {
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Flame className="w-6 h-6 text-orange-500" />
                 <span className="bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 bg-clip-text text-transparent">
-                  Featured Dishes
+                  {tCommon('featuredDishes')}
                 </span>
               </h2>
               <button
@@ -357,7 +357,7 @@ export function MenuService({ module }: MenuServiceProps) {
                   onClick={() => handleItemClick(item)}
                 >
                   <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
-                    <Star className="w-3 h-3" /> Featured
+                    <Star className="w-3 h-3" /> {tCommon('featured')}
                   </div>
                   {item.image_url && (
                     <div className="h-40 overflow-hidden">
@@ -393,7 +393,7 @@ export function MenuService({ module }: MenuServiceProps) {
                   : 'bg-white dark:bg-slate-800 text-green-600 dark:text-green-400 border border-green-200 dark:border-slate-600'
               }`}
             >
-              <Leaf className="w-4 h-4" /> Vegetarian
+              <Leaf className="w-4 h-4" /> {tCommon('vegetarian')}
             </button>
             <button
               onClick={() => setDietaryFilters(prev => ({ ...prev, vegan: !prev.vegan }))}
@@ -403,7 +403,7 @@ export function MenuService({ module }: MenuServiceProps) {
                   : 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-slate-600'
               }`}
             >
-              <Sparkles className="w-4 h-4" /> Vegan
+              <Sparkles className="w-4 h-4" /> {tCommon('vegan')}
             </button>
             <button
               onClick={() => setDietaryFilters(prev => ({ ...prev, glutenFree: !prev.glutenFree }))}
@@ -413,7 +413,7 @@ export function MenuService({ module }: MenuServiceProps) {
                   : 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-slate-600'
               }`}
             >
-              <Wheat className="w-4 h-4" /> Gluten-Free
+              <Wheat className="w-4 h-4" /> {tCommon('glutenFree')}
             </button>
           </div>
         )}
@@ -454,7 +454,7 @@ export function MenuService({ module }: MenuServiceProps) {
                   </h3>
                   {outOfStock && (
                     <span className="flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                      Sold out
+                      {tCommon('soldOut')}
                     </span>
                   )}
                 </div>
@@ -467,7 +467,7 @@ export function MenuService({ module }: MenuServiceProps) {
               </p>
               {!outOfStock && item.track_inventory && item.available_stock !== null && item.available_stock !== undefined && item.available_stock <= 5 && item.available_stock > 0 && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-2">
-                  Only {item.available_stock} left
+                  {tCommon('onlyLeft', { count: item.available_stock })}
                 </p>
               )}
               
@@ -475,7 +475,7 @@ export function MenuService({ module }: MenuServiceProps) {
                 {outOfStock ? (
                   <div className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 rounded-xl font-semibold flex items-center justify-center gap-2 cursor-not-allowed">
                     <ShoppingCart className="w-5 h-5" />
-                    Unavailable
+                    {tCommon('unavailable')}
                   </div>
                 ) : getItemQuantity(item.id) > 0 ? (
                   <div className="flex items-center gap-3 bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
@@ -504,7 +504,7 @@ export function MenuService({ module }: MenuServiceProps) {
                     ) : (
                       <ShoppingCart className="w-5 h-5" />
                     )}
-                    {'Add to Cart'}
+                    {tCommon('addToCart')}
                   </button>
                 )}
               </div>
