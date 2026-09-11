@@ -17,13 +17,14 @@ import {
 import { useSiteSettings } from '@/lib/settings-context';
 import { usePathname, useParams } from 'next/navigation';
 import { Container } from '@/components/layout/Container';
+import { getTranslatedModuleName, translateDynamicString } from '@/lib/translate';
 
 export default function Footer() {
     const pathname = usePathname();
     const params = useParams();
     const propertySlug = (params?.property as string) || '';
     // useLocale() call triggers re-render on language change
-    useLocale();
+    const locale = useLocale();
     const tFooter = useTranslations('footer');
     const { settings, modules } = useSiteSettings();
     const activePropertySlug = propertySlug || settings.propertySlug || 'default';
@@ -50,7 +51,7 @@ export default function Footer() {
 
         // Build links from active modules
         const moduleLinks = activeModules.map(m => ({
-            label: m.name,
+            label: getTranslatedModuleName(m, locale),
             href: `/${activePropertySlug}/${m.slug}`,
             moduleSlug: m.slug
         }));
@@ -59,7 +60,7 @@ export default function Footer() {
         moduleLinks.push({ label: tFooter('giftCards') || 'Gift Cards', href: `/${activePropertySlug}/giftcards`, moduleSlug: '' });
 
         return moduleLinks;
-    }, [activeModules, tFooter, activePropertySlug]);
+    }, [activeModules, tFooter, activePropertySlug, locale]);
 
     // Don't show footer on admin or staff pages
     if (pathname && /\/(?:admin|staff)(\/?$|\/)/.test(pathname)) {
@@ -135,7 +136,9 @@ export default function Footer() {
         columns: settings.footer.columns?.map((col: FooterColumn) => ({
             ...col,
             // Translate column title if it matches known keys
-            title: col.titleKey ? tFooter(col.titleKey) : col.title,
+            title: col.titleKey
+                ? tFooter(col.titleKey)
+                : translateDynamicString(col.title || '', locale) || col.title,
             links: col.links?.map((link: FooterLink) => {
                 let href = link.href;
                 if (href && href.startsWith('/') && !href.startsWith('/#') && activePropertySlug) {
@@ -145,11 +148,15 @@ export default function Footer() {
                         href = `/${activePropertySlug}${href}`;
                     }
                 }
+                const rawLabel = link.label || link.moduleSlug || '';
                 return {
                     ...link,
                     href,
-                    label: link.moduleSlug ? (link.label || link.moduleSlug) :
-                        link.labelKey ? tFooter(link.labelKey) : link.label
+                    label: link.moduleSlug
+                        ? getTranslatedModuleName({ slug: link.moduleSlug, name: link.label }, locale)
+                        : link.labelKey
+                        ? tFooter(link.labelKey)
+                        : translateDynamicString(rawLabel, locale) || rawLabel
                 };
             })
         })) || defaultFooterConfig.columns,

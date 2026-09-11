@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { formatCurrency, formatNumber } from '@/lib/utils';
@@ -70,6 +71,7 @@ export function PaymentDiscounts({
   moduleSlug,
   className = '',
 }: PaymentDiscountsProps) {
+  const t = useTranslations('common');
   const { user, isAuthenticated } = useAuth();
   const [expanded, setExpanded] = useState(true);
 
@@ -153,10 +155,10 @@ export function PaymentDiscounts({
           </div>
           <div>
             <h4 className="font-semibold text-sm text-slate-900 dark:text-white">
-              Promotions & Discounts
+              {t('promotionsAndDiscounts')}
             </h4>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Apply coupons, gift cards, or loyalty rewards
+              {t('applyPromotionsHint')}
             </p>
           </div>
         </div>
@@ -175,7 +177,7 @@ export function PaymentDiscounts({
             {/* 1. Coupon Code Section */}
             <div className="space-y-2">
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Promo / Coupon Code
+                {t('promoCouponCode')}
               </label>
 
               {couponCode ? (
@@ -192,18 +194,18 @@ export function PaymentDiscounts({
                   <div className="flex items-center gap-3">
                     <span className="font-semibold text-green-700 dark:text-green-300">
                       {isPricingStale || isLoadingPricing ? (
-                        <span className="text-xs text-slate-400 animate-pulse">Calculating...</span>
+                        <span className="text-xs text-slate-400 animate-pulse">{t('calculating')}</span>
                       ) : serverCouponDiscount ? (
                         `-${formatCurrency(serverCouponDiscount.amount, currency)}`
                       ) : (
-                        <span className="text-xs text-slate-400">Applied</span>
+                        <span className="text-xs text-slate-400">{t('applied')}</span>
                       )}
                     </span>
                     <button
                       type="button"
                       onClick={handleRemoveCoupon}
                       className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
-                      title="Remove coupon"
+                      title={t('removeCoupon')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -213,13 +215,13 @@ export function PaymentDiscounts({
                 <form onSubmit={handleApplyCoupon} className="flex gap-2">
                   <Input
                     type="text"
-                    placeholder="Enter coupon code"
+                    placeholder={t('enterCouponCode')}
                     value={inputCoupon}
                     onChange={(e) => setInputCoupon(e.target.value)}
                     className="h-10 text-sm uppercase"
                   />
                   <Button type="submit" size="sm" variant="outline" className="h-10 px-4 shrink-0 font-medium">
-                    Apply
+                    {t('apply')}
                   </Button>
                 </form>
               )}
@@ -228,7 +230,7 @@ export function PaymentDiscounts({
             {/* 2. Gift Cards Section */}
             <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Gift Cards
+                {t('giftCards')}
               </label>
 
               {giftCardCodes.length > 0 && (
@@ -249,18 +251,18 @@ export function PaymentDiscounts({
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-blue-700 dark:text-blue-300">
                             {isPricingStale || isLoadingPricing ? (
-                              <span className="text-xs text-slate-400 animate-pulse">Calculating...</span>
+                              <span className="text-xs text-slate-400 animate-pulse">{t('calculating')}</span>
                             ) : matchingDiscount ? (
                               `-${formatCurrency(matchingDiscount.amount, currency)}`
                             ) : (
-                              <span className="text-xs text-slate-400">Pending</span>
+                              <span className="text-xs text-slate-400">{t('pending')}</span>
                             )}
                           </span>
                           <button
                             type="button"
                             onClick={() => onRemoveGiftCard?.(code)}
                             className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
-                            title="Remove gift card"
+                            title={t('removeGiftCard')}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -274,13 +276,13 @@ export function PaymentDiscounts({
               <form onSubmit={handleAddGiftCard} className="flex gap-2">
                 <Input
                   type="text"
-                  placeholder="Enter gift card code"
+                  placeholder={t('enterGiftCardCode')}
                   value={inputGiftCard}
                   onChange={(e) => setInputGiftCard(e.target.value)}
                   className="h-10 text-sm uppercase font-mono"
                 />
                 <Button type="submit" size="sm" variant="outline" className="h-10 px-4 shrink-0 font-medium">
-                  <Plus className="w-4 h-4 mr-1" /> Add
+                  <Plus className="w-4 h-4 mr-1" /> {t('add')}
                 </Button>
               </form>
             </div>
@@ -289,11 +291,11 @@ export function PaymentDiscounts({
             <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Loyalty Points
+                  {t('loyaltyPoints')}
                 </label>
                 {userLoyaltyPoints !== null && (
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Available: <strong className="text-slate-900 dark:text-white">{formatNumber(userLoyaltyPoints)}</strong> pts
+                    {t('available')}: <strong className="text-slate-900 dark:text-white">{formatNumber(userLoyaltyPoints)}</strong> {t('pts')}
                   </span>
                 )}
               </div>
@@ -303,7 +305,7 @@ export function PaymentDiscounts({
                   type="number"
                   min="0"
                   max={userLoyaltyPoints !== null ? userLoyaltyPoints : undefined}
-                  placeholder="Points to redeem"
+                  placeholder={t('pointsToRedeem')}
                   value={inputPoints}
                   onChange={(e) => setInputPoints(e.target.value)}
                   onBlur={handlePointsInputBlurOrSubmit}
@@ -322,7 +324,7 @@ export function PaymentDiscounts({
                   onClick={handlePointsInputBlurOrSubmit}
                   className="h-10 px-4 shrink-0 font-medium"
                 >
-                  Set Points
+                  {t('setPoints')}
                 </Button>
               </div>
 
@@ -331,17 +333,17 @@ export function PaymentDiscounts({
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                     <span className="text-xs font-medium text-amber-900 dark:text-amber-300">
-                      Redeeming {formatNumber(loyaltyPointsToRedeem)} points
+                      {t('redeemingPoints', { count: formatNumber(loyaltyPointsToRedeem) })}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-semibold text-amber-700 dark:text-amber-300">
                       {isPricingStale || isLoadingPricing ? (
-                        <span className="text-xs text-slate-400 animate-pulse">Calculating...</span>
+                        <span className="text-xs text-slate-400 animate-pulse">{t('calculating')}</span>
                       ) : serverLoyaltyDiscount ? (
                         `-${formatCurrency(serverLoyaltyDiscount.amount, currency)}`
                       ) : (
-                        <span className="text-xs text-slate-400">Pending</span>
+                        <span className="text-xs text-slate-400">{t('pending')}</span>
                       )}
                     </span>
                     <button
@@ -351,7 +353,7 @@ export function PaymentDiscounts({
                         onLoyaltyPointsChange?.(0);
                       }}
                       className="p-1 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
-                      title="Remove loyalty points"
+                      title={t('removeLoyaltyPoints')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

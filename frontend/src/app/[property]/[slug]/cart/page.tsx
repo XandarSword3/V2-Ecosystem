@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { getTranslatedModuleName } from '@/lib/translate';
 import { useCartStore } from '@/stores/cartStore';
 import { usePricingPreview } from '@/hooks/usePricingPreview';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -30,6 +31,7 @@ const EMPTY_GIFT_CARDS: string[] = [];
 
 export default function ModuleCartPage() {
   const t = useTranslations('common');
+  const locale = useLocale();
   const params = useParams();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -288,24 +290,29 @@ export default function ModuleCartPage() {
 
       <Container as="div" className="relative py-8 max-w-4xl">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <Link
-            href={`/${propertySlug}/${slug}`}
-            className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>{t('backTo', { name: currentModule.name })}</span>
-          </Link>
-          
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 via-amber-600 to-rose-600 bg-clip-text text-transparent">
-              {t('moduleCheckout', { name: currentModule.name })}
-            </h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-1">
-              {t('completeYourOrder', { count: moduleItems.length })}
-            </p>
-          </div>
-        </motion.div>
+        {(() => {
+          const localizedModuleName = getTranslatedModuleName(currentModule, locale);
+          return (
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+              <Link
+                href={`/${propertySlug}/${slug}`}
+                className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors mb-4"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>{t('backTo', { name: localizedModuleName })}</span>
+              </Link>
+              
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 via-amber-600 to-rose-600 bg-clip-text text-transparent">
+                  {t('moduleCheckout', { name: localizedModuleName })}
+                </h1>
+                <p className="text-slate-600 dark:text-slate-400 mt-1">
+                  {t('completeYourOrder', { count: moduleItems.length })}
+                </p>
+              </div>
+            </motion.div>
+          );
+        })()}
 
         {/* Canonical 5-Step Generic Checkout Workflow */}
         <GenericCheckoutWorkflow
@@ -361,7 +368,7 @@ export default function ModuleCartPage() {
           createOrder={handleCreateOrder}
           propertySlug={propertySlug}
           moduleSlug={slug || ''}
-          moduleName={currentModule.name}
+          moduleName={getTranslatedModuleName(currentModule, locale)}
           moduleId={moduleId}
           onOrderConfirmed={(_orderId) => {
             setHasConfirmedOrder(true);

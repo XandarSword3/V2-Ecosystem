@@ -7,6 +7,8 @@ import {
   translateItems,
   formatLocalizedPrice,
   createTranslatableItem,
+  translateDynamicString,
+  getTranslatedModuleName,
   type SupportedLocale,
 } from '@/lib/translate';
 
@@ -44,9 +46,14 @@ describe('getTranslatedField', () => {
     expect(getTranslatedField(item, 'price', 'en')).toBe('');
   });
 
-  it('returns empty string for empty translated field', () => {
-    const itemWithEmpty = { name: 'Test', name_ar: '  ' };
-    expect(getTranslatedField(itemWithEmpty, 'name', 'ar')).toBe('Test');
+  it('falls back to English for unmapped empty translated field', () => {
+    const itemWithEmpty = { name: 'UnmappedCustomItem', name_ar: '  ' };
+    expect(getTranslatedField(itemWithEmpty, 'name', 'ar')).toBe('UnmappedCustomItem');
+  });
+
+  it('falls back to dictionary for mapped item with missing translation', () => {
+    const itemWithoutAr = { name: 'Molten Belgian Dark Chocolate Lava Cake' };
+    expect(getTranslatedField(itemWithoutAr, 'name', 'ar')).toBe('كعكة الشوكولاتة البلجيكية الداكنة الذائبة');
   });
 
   it('falls back to English for unknown locale suffix', () => {
@@ -147,5 +154,56 @@ describe('createTranslatableItem', () => {
     expect(item.description).toBe('Delicious');
     expect(item.description_fr).toBe('Délicieux');
     expect(item.description_ar).toBeUndefined();
+  });
+});
+
+describe('translateDynamicString', () => {
+  it('translates known dish names to Arabic and French', () => {
+    expect(translateDynamicString('Molten Belgian Dark Chocolate Lava Cake', 'ar'))
+      .toBe('كعكة الشوكولاتة البلجيكية الداكنة الذائبة');
+    expect(translateDynamicString('Molten Belgian Dark Chocolate Lava Cake', 'fr'))
+      .toBe('Gâteau fondant au chocolat noir belge');
+    expect(translateDynamicString('Double Aged Cheddar Smash Burger', 'ar'))
+      .toBe('برجر سماش شيدر معتق مزدوج');
+    expect(translateDynamicString('Wood-Fired Margherita Royale Pizza', 'ar'))
+      .toBe('بيتزا مارغريتا رويال على الحطب');
+    expect(translateDynamicString('Classic Caesar Salad', 'ar'))
+      .toBe('سلطة سيزر كلاسيكية');
+  });
+
+  it('translates descriptions to Arabic and French', () => {
+    expect(translateDynamicString('Warm dark chocolate cake with a flowing molten lava core, served with vanilla bean gelato.', 'ar'))
+      .toBe('كعكة شوكولاتة داكنة دافئة بقلب شوكولاتة ذائب سائل، تقدم مع جيلاتو الفانيليا الطبيعية.');
+  });
+
+  it('translates categories and UI phrases', () => {
+    expect(translateDynamicString('Desserts', 'ar')).toBe('حلويات');
+    expect(translateDynamicString('Burgers', 'ar')).toBe('برجر');
+    expect(translateDynamicString('Welcome', 'ar')).toBe('أهلاً وسهلاً');
+    expect(translateDynamicString('Discover our services', 'ar')).toBe('اكتشف خدماتنا');
+    expect(translateDynamicString('Get Started', 'ar')).toBe('ابدأ الآن');
+  });
+
+  it('returns original string when in English or unmapped', () => {
+    expect(translateDynamicString('Desserts', 'en')).toBe('Desserts');
+    expect(translateDynamicString('Some completely unmapped dish', 'ar')).toBe('Some completely unmapped dish');
+  });
+});
+
+describe('getTranslatedModuleName', () => {
+  it('uses database columns if present', () => {
+    const mod = { name: 'Delete', slug: 'delete', name_ar: 'حذف مخصص' };
+    expect(getTranslatedModuleName(mod, 'ar')).toBe('حذف مخصص');
+  });
+
+  it('falls back to dictionary for known modules', () => {
+    expect(getTranslatedModuleName({ name: 'Delete', slug: 'delete' }, 'ar')).toBe('حذف');
+    expect(getTranslatedModuleName({ name: 'Nexus', slug: 'nexus' }, 'ar')).toBe('نيكسوس');
+    expect(getTranslatedModuleName({ name: 'Pricing', slug: 'pricing' }, 'ar')).toBe('الأسعار');
+    expect(getTranslatedModuleName({ name: 'The Ember Bar', slug: 'the-ember-bar' }, 'ar')).toBe('بار ذا إمبر');
+  });
+
+  it('returns module name in English when locale is en', () => {
+    expect(getTranslatedModuleName({ name: 'Delete', slug: 'delete' }, 'en')).toBe('Delete');
   });
 });

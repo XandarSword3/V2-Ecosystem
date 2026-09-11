@@ -26,6 +26,7 @@ import { useCartStore } from '@/stores/cartStore';
 import { cn } from '@/lib/cn';
 import { useTerminology } from '@/hooks/useTerminology';
 import { useSiteSettings } from '@/lib/settings-context';
+import { getTranslatedModuleName, translateDynamicString } from '@/lib/translate';
 import { Container } from './Container';
 
 // Magnetic Nav Item Component
@@ -192,9 +193,40 @@ export default function Header() {
     return icons[name] || Home;
   };
 
+  // Helper to convert strings to camelCase for translation key lookup
+  const toCamelCase = (str: string): string => {
+    return str
+      .replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => chr.toUpperCase())
+      .replace(/^[A-Z]/, (chr) => chr.toLowerCase());
+  };
+
   // Get translated name for module - dynamic lookup with fallback
-  const getModuleTranslatedName = (slug: string, fallbackName: string) => {
-    // Known translation keys mapping (generic slugs only — no hardcoded business types)
+  const getModuleTranslatedName = (
+    slug: string,
+    fallbackName: string,
+    mod?: { name?: string; slug?: string; name_ar?: string; name_fr?: string }
+  ) => {
+    // 1. Direct database column or dictionary via getTranslatedModuleName
+    if (mod) {
+      const translatedByDbOrDict = getTranslatedModuleName(mod, locale);
+      if (translatedByDbOrDict && translatedByDbOrDict !== fallbackName && translatedByDbOrDict !== slug) {
+        return translatedByDbOrDict;
+      }
+    }
+
+    // 2. Direct dictionary lookup for fallbackName or slug
+    const translatedByDict = translateDynamicString(fallbackName, locale);
+    if (translatedByDict && translatedByDict !== fallbackName) {
+      return translatedByDict;
+    }
+    if (slug) {
+      const slugDict = translateDynamicString(slug, locale);
+      if (slugDict && slugDict !== slug) {
+        return slugDict;
+      }
+    }
+
+    // 3. Known translation keys mapping (generic slugs only — no hardcoded business types)
     const knownKeys: Record<string, string> = {
       'gym': 'gym',
       'spa': 'spa',
@@ -202,17 +234,29 @@ export default function Header() {
       'chocolate-box': 'chocolateBox',
       'chocolate box': 'chocolateBox',
       'chocolatebox': 'chocolateBox',
+      'pricing': 'pricing',
+      'nexus': 'nexus',
+      'delete': 'delete',
+      'test': 'test',
     };
 
-    const translationKey = knownKeys[slug.toLowerCase()];
-    if (translationKey) {
-      try {
-        const translated = t(translationKey as any);
-        if (translated && translated !== translationKey) {
-          return translated;
+    const candidateKeys = [
+      knownKeys[slug.toLowerCase()],
+      slug.toLowerCase(),
+      toCamelCase(slug),
+      toCamelCase(fallbackName),
+    ];
+
+    for (const key of candidateKeys) {
+      if (key && t.has(key as any)) {
+        try {
+          const translated = t(key as any);
+          if (translated && translated !== key) {
+            return translated;
+          }
+        } catch {
+          // Ignore translation errors
         }
-      } catch {
-        // Ignore translation errors
       }
     }
 
@@ -249,7 +293,7 @@ export default function Header() {
             const module = activeModules.find(m => m.slug.toLowerCase() === link.moduleSlug?.toLowerCase());
             if (module) {
               return {
-                name: getModuleTranslatedName(module.slug, module.name),
+                name: getModuleTranslatedName(module.slug, module.name, module),
                 href: propertySlug ? `/${propertySlug}/${module.slug}` : `/${module.slug}`,
                 icon: getIconForModule(module)
               };
@@ -260,7 +304,7 @@ export default function Header() {
           // Non-module links (internal/external) - keep external as-is;
           // prepend property slug to internal relative paths so /profile → /myresort/profile.
           return {
-            name: link.label,
+            name: getModuleTranslatedName('', link.label),
             href: link.type !== 'external' && link.href?.startsWith('/') && propertySlug
               ? `/${propertySlug}${link.href}`
               : link.href,
@@ -276,7 +320,7 @@ export default function Header() {
       ...activeModules
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
       .map(m => ({
-      name: getModuleTranslatedName(m.slug, m.name),
+      name: getModuleTranslatedName(m.slug, m.name, m),
       href: propertySlug ? `/${propertySlug}/${m.slug}` : `/${m.slug}`,
       icon: getIconForModule(m)
       }))

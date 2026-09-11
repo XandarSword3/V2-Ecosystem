@@ -1,6 +1,6 @@
 {
   "common": {
-    "welcome": "Bienvenue à Iron Paradise Gym",
+    "welcome": "Bienvenue",
     "loading": "Chargement...",
     "error": "Une erreur s'est produite",
     "retry": "Réessayer",
@@ -175,7 +175,24 @@
     "vegetarian": "Végétarien",
     "vegan": "Végétalien",
     "glutenFree": "Sans gluten",
-    "onlyLeft": "Plus que {count} restants"
+    "onlyLeft": "Plus que {count} restants",
+    "promotionsAndDiscounts": "Promotions & Réductions",
+    "applyPromotionsHint": "Appliquez vos coupons, cartes-cadeaux ou récompenses de fidélité",
+    "promoCouponCode": "Code promo / Coupon",
+    "enterCouponCode": "Saisissez le code promo",
+    "apply": "Appliquer",
+    "applied": "Appliqué",
+    "enterGiftCardCode": "Saisissez le code de la carte-cadeau",
+    "loyaltyPoints": "Points de fidélité",
+    "pointsToRedeem": "Points à utiliser",
+    "setPoints": "Valider les points",
+    "redeemingPoints": "Utilisation de {count} points",
+    "removeCoupon": "Supprimer le coupon",
+    "removeGiftCard": "Supprimer la carte-cadeau",
+    "removeLoyaltyPoints": "Supprimer les points de fidélité",
+    "calculating": "Calcul en cours...",
+    "pending": "En attente",
+    "pts": "pts"
   },
   "errors": {
     "pageNotFound": "Page Non Trouvée",
@@ -210,7 +227,12 @@
     "settings": "Paramètres",
     "signIn": "Connexion",
     "myProfile": "Mon Profil",
-    "propertySettings": "Paramètres de l'établissement"
+    "propertySettings": "Paramètres de l'établissement",
+    "pricing": "Tarifs",
+    "nexus": "Nexus",
+    "test": "Test",
+    "delete": "Delete",
+    "theEmberBar": "The Ember Bar"
   },
   "home": {
     "hero": {

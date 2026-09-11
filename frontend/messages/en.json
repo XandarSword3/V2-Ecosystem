@@ -1,6 +1,6 @@
 {
   "common": {
-    "welcome": "Welcome to Iron Paradise Gym",
+    "welcome": "Welcome",
     "loading": "Loading...",
     "error": "An error occurred",
     "retry": "Retry",
@@ -175,7 +175,24 @@
     "vegetarian": "Vegetarian",
     "vegan": "Vegan",
     "glutenFree": "Gluten-Free",
-    "onlyLeft": "Only {count} left"
+    "onlyLeft": "Only {count} left",
+    "promotionsAndDiscounts": "Promotions & Discounts",
+    "applyPromotionsHint": "Apply coupons, gift cards, or loyalty rewards",
+    "promoCouponCode": "Promo / Coupon Code",
+    "enterCouponCode": "Enter coupon code",
+    "apply": "Apply",
+    "applied": "Applied",
+    "enterGiftCardCode": "Enter gift card code",
+    "loyaltyPoints": "Loyalty Points",
+    "pointsToRedeem": "Points to redeem",
+    "setPoints": "Set Points",
+    "redeemingPoints": "Redeeming {count} points",
+    "removeCoupon": "Remove coupon",
+    "removeGiftCard": "Remove gift card",
+    "removeLoyaltyPoints": "Remove loyalty points",
+    "calculating": "Calculating...",
+    "pending": "Pending",
+    "pts": "pts"
   },
   "errors": {
     "pageNotFound": "Page Not Found",
@@ -210,7 +227,12 @@
     "settings": "Settings",
     "propertySettings": "Property Settings",
     "signIn": "Sign In",
-    "myProfile": "My Profile"
+    "myProfile": "My Profile",
+    "pricing": "Pricing",
+    "nexus": "Nexus",
+    "test": "Test",
+    "delete": "Delete",
+    "theEmberBar": "The Ember Bar"
   },
   "home": {
     "hero": {

@@ -1,6 +1,6 @@
 {
   "common": {
-    "welcome": "مرحباً بكم في منتجعنا",
+    "welcome": "أهلاً بكم",
     "loading": "جاري التحميل...",
     "error": "خطأ",
     "retry": "إعادة المحاولة",
@@ -136,7 +136,7 @@
     "loadingLocations": "جارٍ تحميل المواقع المتاحة...",
     "occupied": "مشغول",
     "selected": "محدد",
-    "available": "متاح",
+    "available": "المتوفر",
     "noLocationsConfigured": "لا توجد مواقع خدمة أو طاولات مهيأة حالياً لهذا القسم.",
     "pickupNotes": "تعليمات الاستلام (اختياري)",
     "pickupNotesPlaceholder": "مثال: سأستلم الطلب خلال 20 دقيقة",
@@ -175,7 +175,24 @@
     "vegetarian": "نباتي",
     "vegan": "نباتي صرف",
     "glutenFree": "خالٍ من الغلوتين",
-    "onlyLeft": "متبقي {count} فقط"
+    "onlyLeft": "متبقي {count} فقط",
+    "promotionsAndDiscounts": "العروض والخصومات",
+    "applyPromotionsHint": "استخدم كوبونات الخصم، بطاقات الهدايا، أو مكافآت الولاء",
+    "promoCouponCode": "رمز الخصم / الكوبون",
+    "enterCouponCode": "أدخل رمز الكوبون",
+    "apply": "تطبيق",
+    "applied": "تم التطبيق",
+    "enterGiftCardCode": "أدخل رمز بطاقة الهدايا",
+    "loyaltyPoints": "نقاط الولاء",
+    "pointsToRedeem": "النقاط المراد استخدامها",
+    "setPoints": "تحديد النقاط",
+    "redeemingPoints": "استبدال {count} نقطة",
+    "removeCoupon": "إزالة الكوبون",
+    "removeGiftCard": "إزالة بطاقة الهدايا",
+    "removeLoyaltyPoints": "إزالة نقاط الولاء",
+    "calculating": "جاري الاحتساب...",
+    "pending": "قيد الانتظار",
+    "pts": "نقطة"
   },
   "errors": {
     "pageNotFound": "الصفحة غير موجودة",
@@ -210,7 +227,12 @@
     "settings": "الإعدادات",
     "signIn": "تسجيل الدخول",
     "myProfile": "ملفي الشخصي",
-    "propertySettings": "إعدادات المنشأة"
+    "propertySettings": "إعدادات المنشأة",
+    "pricing": "الأسعار",
+    "nexus": "نيكسوس",
+    "test": "تجربة",
+    "delete": "حذف",
+    "theEmberBar": "بار ذا إمبر"
   },
   "home": {
     "hero": {

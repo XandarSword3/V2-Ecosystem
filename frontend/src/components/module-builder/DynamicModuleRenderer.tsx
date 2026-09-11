@@ -6,8 +6,8 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { useTranslations } from 'next-intl';
-import { useContentTranslation } from '@/lib/translate';
+import { useTranslations, useLocale } from 'next-intl';
+import { useContentTranslation, getTranslatedModuleName, translateDynamicString } from '@/lib/translate';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCartStore } from '@/stores/cartStore';
 import { formatCurrency } from '@/lib/utils';
@@ -547,6 +547,7 @@ export function BlockRenderer({
   onUpdateProps?: (updates: Record<string, any>) => void;
 }) {
   const tCommon = useTranslations('common');
+  const locale = useLocale();
   const { type, style } = block;
 
   // Validate Block Type - Added new glassmorphic components
@@ -590,12 +591,20 @@ export function BlockRenderer({
           <div className="relative z-10 px-4 py-10 text-center w-full h-full flex flex-col items-center justify-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               <span {...ep(isEditing, (v) => onUpdateProps?.({ title: v }))}>
-                {props.title || module.name}
+                {props.title?.trim().toLowerCase() === 'hero title'
+                  ? getTranslatedModuleName(module, locale)
+                  : props.title
+                  ? (translateDynamicString(props.title, locale) || props.title)
+                  : getTranslatedModuleName(module, locale)}
               </span>
             </h1>
             <p className="text-xl md:text-2xl opacity-90">
               <span {...ep(isEditing, (v) => onUpdateProps?.({ subtitle: v }))}>
-                {props.subtitle || module.description}
+                {props.subtitle === 'Discover our services'
+                  ? tCommon('discoverOurServices')
+                  : props.subtitle
+                  ? (translateDynamicString(props.subtitle, locale) || props.subtitle)
+                  : (translateDynamicString(module.description, locale) || module.description)}
               </span>
             </p>
           </div>
@@ -772,7 +781,13 @@ export function BlockRenderer({
             >
               <Sparkles className="w-4 h-4" />
               <span {...ep(isEditing, (v) => onUpdateProps?.({ eyebrow: v }))}>
-                {props.eyebrow || props.badgeText || (isEditing ? 'Eyebrow…' : '')}
+                {props.eyebrow?.trim().toLowerCase() === 'welcome'
+                  ? tCommon('welcome')
+                  : props.eyebrow
+                  ? (translateDynamicString(props.eyebrow, locale) || props.eyebrow)
+                  : props.badgeText
+                  ? (translateDynamicString(props.badgeText, locale) || props.badgeText)
+                  : (isEditing ? 'Eyebrow…' : '')}
               </span>
             </motion.div>
           )}
@@ -786,7 +801,11 @@ export function BlockRenderer({
           >
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
               <span {...ep(isEditing, (v) => onUpdateProps?.({ title: v }))}>
-                {props.title || module.name}
+                {props.title?.trim().toLowerCase() === 'hero title'
+                  ? getTranslatedModuleName(module, locale)
+                  : props.title
+                  ? (translateDynamicString(props.title, locale) || props.title)
+                  : getTranslatedModuleName(module, locale)}
               </span>
               {props.highlight && (
                 <span className="text-amber-400"> {props.highlight}</span>
@@ -797,13 +816,15 @@ export function BlockRenderer({
                 <span {...ep(isEditing, (v) => onUpdateProps?.({ subtitle: v }))}>
                   {props.subtitle === 'Discover our services'
                     ? tCommon('discoverOurServices')
-                    : props.subtitle || (isEditing ? 'Subtitle…' : '')}
+                    : props.subtitle
+                    ? (translateDynamicString(props.subtitle, locale) || props.subtitle)
+                    : (isEditing ? 'Subtitle…' : '')}
                 </span>
               </p>
             )}
             {props.description && (
               <p className="text-lg text-white/80 max-w-2xl mx-auto mb-8">
-                {props.description}
+                {translateDynamicString(props.description, locale) || props.description}
               </p>
             )}
 
@@ -824,7 +845,9 @@ export function BlockRenderer({
                     <span {...ep(isEditing, (v) => onUpdateProps?.({ primaryButton: v }))}>
                       {props.primaryButton === 'Get Started'
                         ? tCommon('getStarted')
-                        : props.primaryButton || (isEditing ? 'Primary Button' : '')}
+                        : props.primaryButton
+                        ? (translateDynamicString(props.primaryButton, locale) || props.primaryButton)
+                        : (isEditing ? 'Primary Button' : '')}
                     </span>
                   </a>
                 )}
@@ -835,7 +858,9 @@ export function BlockRenderer({
                     className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-lg border border-white/30 transition-colors backdrop-blur-sm"
                   >
                     <span {...ep(isEditing, (v) => onUpdateProps?.({ secondaryButton: v }))}>
-                      {props.secondaryButton || (isEditing ? 'Secondary Button' : '')}
+                      {props.secondaryButton
+                        ? (translateDynamicString(props.secondaryButton, locale) || props.secondaryButton)
+                        : (isEditing ? 'Secondary Button' : '')}
                     </span>
                   </a>
                 )}
