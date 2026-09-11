@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 
 import { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, Loader2 } from 'lucide-react';
@@ -92,6 +93,7 @@ export function TurnstileCaptcha({
   theme = 'auto',
   className = '',
 }: TurnstileCaptchaProps) {
+  const t = useTranslations('auth');
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const onVerifyRef = useRef(onVerify);
@@ -172,22 +174,19 @@ export function TurnstileCaptcha({
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
           <ShieldCheck className="w-4 h-4 text-emerald-500" />
-          Security Verification
-        </span>
-        <span className="text-[10px] text-slate-400">Protected by Turnstile</span>
+          {t('securityVerification')}</span>
+        <span className="text-[10px] text-slate-400">{t('protectedByTurnstile')}</span>
       </div>
 
       {loadError ? (
         <p className="text-xs text-red-600 dark:text-red-400">
-          Security verification is unavailable. Check the Turnstile site key and network access.
-        </p>
+          {t('securityVerificationIsUnavailableCh')}</p>
       ) : (
         <div ref={containerRef} className="min-h-[65px] flex items-center justify-center">
           {!scriptLoaded && (
             <div className="flex items-center gap-2 text-xs text-slate-400">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Loading security challenge...
-            </div>
+              {t('loadingSecurityChallenge')}</div>
           )}
         </div>
       )}

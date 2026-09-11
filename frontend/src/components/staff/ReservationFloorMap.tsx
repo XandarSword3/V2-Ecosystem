@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 
 /**
  * Reservation floor map — host-stand view for seating, check-ins, and walk-ins.
@@ -45,6 +46,7 @@ export interface ReservationFloorMapProps {
 }
 
 export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
+  const t = useTranslations('staff');
   const [locations, setLocations] = useState<ServiceLocation[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
@@ -191,17 +193,14 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
             <MapPin className="h-6 w-6 text-primary" />
-            Floor Map
-          </h2>
+            {t('floorMap')}</h2>
           <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-            Manage seating, reservations, and staff assignments
-          </p>
+            {t('manageSeatingReservationsAndStaffAs')}</p>
         </div>
         <div className="flex items-center gap-3">
           <Button onClick={() => setShowWalkInDialog(true)}>
             <UserPlus className="h-4 w-4 mr-2" />
-            Walk-in
-          </Button>
+            {t('walkIn')}</Button>
           <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-2">
             <Clock className="h-4 w-4 text-primary" />
             <span className="font-mono font-medium">
@@ -235,7 +234,7 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
 
               <div className="space-y-3 mb-6">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Status</span>
+                  <span className="text-sm text-gray-500">{t('status')}</span>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${
                     getLocationStatus(selectedLocation) === 'free' ? 'bg-green-100 text-green-700' :
                     getLocationStatus(selectedLocation) === 'occupied' ? 'bg-red-100 text-red-700' :
@@ -246,7 +245,7 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Assigned Staff</span>
+                  <span className="text-sm text-gray-500">{t('assignedStaff')}</span>
                   <span className="text-sm font-medium">
                     {selectedLocation.assigned_staff_id ? 'Assigned' : 'Unassigned'}
                   </span>
@@ -264,8 +263,8 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
                         <span className="font-semibold text-sm">{reservation.guest_name}</span>
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                        <p>Party: {reservation.party_size}</p>
-                        <p>Time: {new Date(reservation.reserved_for).toLocaleTimeString()}</p>
+                        <p>{t('party')}{reservation.party_size}</p>
+                        <p>{t('time')}{new Date(reservation.reserved_for).toLocaleTimeString()}</p>
                       </div>
                       <Button
                         className="w-full mt-3 bg-green-600 hover:bg-green-700"
@@ -273,8 +272,7 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
                         onClick={() => handleCheckIn(reservation.id)}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Check In
-                      </Button>
+                        {t('checkIn')}</Button>
                     </div>
                   );
                 }
@@ -283,19 +281,17 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
 
               <div className="space-y-2">
                 <Button variant="outline" className="w-full" size="sm" onClick={handleReassignStaff}>
-                  Reassign Staff
-                </Button>
+                  {t('reassignStaff')}</Button>
                 {selectedLocation.is_occupied && (
                   <Button variant="outline" className="w-full" size="sm" onClick={handleFreeTable}>
                     <XCircle className="h-4 w-4 mr-2" />
-                    Free Table
-                  </Button>
+                    {t('freeTable')}</Button>
                 )}
               </div>
             </div>
           ) : (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <p className="text-gray-500 text-sm">Select a location to view details</p>
+              <p className="text-gray-500 text-sm">{t('selectALocationToViewDetails')}</p>
             </div>
           )}
         </div>
@@ -305,10 +301,10 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
       {showWalkInDialog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold mb-4">Seat Walk-in</h2>
+            <h2 className="text-xl font-bold mb-4">{t('seatWalkIn')}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Select Table</label>
+                <label className="block text-sm font-medium mb-1">{t('selectTable')}</label>
                 <select
                   value={walkInTableId}
                   onChange={(e) => setWalkInTableId(e.target.value)}
@@ -320,7 +316,7 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Party Size</label>
+                <label className="block text-sm font-medium mb-1">{t('partySize')}</label>
                 <input
                   type="number"
                   min="1"
@@ -330,10 +326,10 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Guest Name</label>
+                <label className="block text-sm font-medium mb-1">{t('guestName')}</label>
                 <input
                   type="text"
-                  placeholder="Guest Name (e.g. John)"
+                  placeholder={t('guestNameEgJohn')}
                   value={walkInGuestName}
                   onChange={(e) => setWalkInGuestName(e.target.value)}
                   className="w-full border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
@@ -342,11 +338,9 @@ export function ReservationFloorMap({ slug }: ReservationFloorMapProps) {
             </div>
             <div className="flex gap-3 mt-6">
               <Button variant="outline" className="flex-1" onClick={() => setShowWalkInDialog(false)}>
-                Cancel
-              </Button>
+                {t('cancel')}</Button>
               <Button className="flex-1" onClick={handleSeatWalkIn}>
-                Seat
-              </Button>
+                {t('seat')}</Button>
             </div>
           </div>
         </div>

@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -34,6 +35,7 @@ interface LoyaltyDisplayProps {
 }
 
 export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyDisplayProps) {
+  const t = useTranslations('common');
   const { user, isAuthenticated } = useAuth();
   const [account, setAccount] = useState<LoyaltyAccount | null>(null);
   const [loading, setLoading] = useState(true);
@@ -103,7 +105,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
           </div>
           <div className="flex-1 text-white">
             <p className="text-sm opacity-80">{account.tier?.name || 'Member'}</p>
-            <p className="text-2xl font-bold">{formatNumber(account.available_points || 0)} pts</p>
+            <p className="text-2xl font-bold">{formatNumber(account.available_points || 0)} {t('pts')}</p>
           </div>
           <ChevronRight className="w-5 h-5 text-white/60" />
         </motion.div>
@@ -126,7 +128,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
       >
         <div className="flex items-start justify-between mb-6">
           <div>
-            <p className="text-sm opacity-80">Loyalty Program</p>
+            <p className="text-sm opacity-80">{t('loyaltyProgram')}</p>
             <h3 className="text-xl font-bold">{account.tier?.name || 'Member'}</h3>
           </div>
           <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
@@ -136,13 +138,13 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
         
         <div className="text-center py-4">
           <p className="text-5xl font-bold">{formatNumber(account.available_points || 0)}</p>
-          <p className="text-sm opacity-80">Available Points</p>
+          <p className="text-sm opacity-80">{t('availablePoints')}</p>
         </div>
         
         {account.tier && account.tier.points_multiplier && account.tier.points_multiplier > 1 && (
           <div className="flex items-center justify-center gap-2 mt-2 text-sm">
             <TrendingUp className="w-4 h-4" />
-            <span>{account.tier.points_multiplier}x points on all purchases</span>
+            <span>{account.tier.points_multiplier}{t('xPointsOnAllPurchases')}</span>
           </div>
         )}
       </div>
@@ -151,8 +153,8 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
         {account.nextTier && (
           <div className="mb-6">
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-slate-500">Progress to {account.nextTier.name}</span>
-              <span className="font-medium">{formatNumber(account.nextTier.pointsNeeded)} pts needed</span>
+              <span className="text-slate-500">{t('progressTo')}{account.nextTier.name}</span>
+              <span className="font-medium">{formatNumber(account.nextTier.pointsNeeded)} {t('ptsNeeded')}</span>
             </div>
             <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
               <motion.div 
@@ -171,19 +173,19 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
             <p className="text-2xl font-bold text-slate-900 dark:text-white">
               {formatNumber(account.lifetime_points || 0)}
             </p>
-            <p className="text-xs text-slate-500">Total Earned</p>
+            <p className="text-xs text-slate-500">{t('totalEarned')}</p>
           </div>
           <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
             <p className="text-2xl font-bold text-slate-900 dark:text-white">
               {formatNumber(Math.max(0, (account.lifetime_points || 0) - (account.available_points || 0)))}
             </p>
-            <p className="text-xs text-slate-500">Total Redeemed</p>
+            <p className="text-xs text-slate-500">{t('totalRedeemed')}</p>
           </div>
         </div>
         
         {account.tier?.benefits && account.tier.benefits.length > 0 && (
           <div className="mt-6">
-            <p className="text-sm font-medium text-slate-900 dark:text-white mb-3">Your Benefits</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-white mb-3">{t('yourBenefits')}</p>
             <div className="space-y-2">
               {account.tier.benefits.slice(0, 3).map((benefit, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
@@ -203,8 +205,7 @@ export function LoyaltyDisplay({ variant = 'compact', className = '' }: LoyaltyD
             color: tierColor
           }}
         >
-          View Full Details
-        </Link>
+          {t('viewFullDetails')}</Link>
       </div>
     </motion.div>
   );
@@ -217,6 +218,7 @@ interface PointsPreviewProps {
 }
 
 export function PointsPreview({ amount, className = '' }: PointsPreviewProps) {
+  const t = useTranslations('common');
   const { isAuthenticated } = useAuth();
   const [pointsRate, setPointsRate] = useState(1);
 
@@ -241,8 +243,7 @@ export function PointsPreview({ amount, className = '' }: PointsPreviewProps) {
     <div className={`flex items-center gap-1.5 text-sm ${className}`}>
       <Award className="w-4 h-4 text-amber-500" />
       <span className="text-slate-600 dark:text-slate-400">
-        Earn <span className="font-semibold text-amber-600">{formatNumber(pointsToEarn)}</span> loyalty points
-      </span>
+        {t('earn')}<span className="font-semibold text-amber-600">{formatNumber(pointsToEarn)}</span> {t('loyaltyPoints')}</span>
     </div>
   );
 }

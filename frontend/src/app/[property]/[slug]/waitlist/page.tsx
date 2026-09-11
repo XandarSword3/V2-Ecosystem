@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 
 import { useState, useCallback, Suspense } from 'react';
 import { useParams } from 'next/navigation';
@@ -23,6 +24,7 @@ interface WaitlistEntry {
 }
 
 function WaitlistContent() {
+  const t = useTranslations('common');
   const params = useParams();
   const searchParams = useSearchParams();
   const rawSlug = params?.slug;
@@ -99,8 +101,8 @@ function WaitlistContent() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-bold mb-2">Module Not Found</h2>
-          <Link href={`/${propertySlug}`} className="text-primary hover:underline">Return Home</Link>
+          <h2 className="text-xl font-bold mb-2">{t('moduleNotFound')}</h2>
+          <Link href={`/${propertySlug}`} className="text-primary hover:underline">{t('returnHome')}</Link>
         </div>
       </div>
     );
@@ -124,29 +126,29 @@ function WaitlistContent() {
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
             <Clock className="w-10 h-10 text-amber-600 dark:text-amber-400" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Waitlist Status</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{t('waitlistStatus')}</h1>
           <p className="text-slate-600 dark:text-slate-400 mb-6">{moduleName}</p>
 
           <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 mb-6">
             <div className="space-y-3 text-left">
               <div className="flex justify-between">
-                <span className="text-slate-500">Name</span>
+                <span className="text-slate-500">{t('name')}</span>
                 <span className="font-medium text-slate-900 dark:text-white">{activeEntry.guest_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Party Size</span>
-                <span className="font-medium text-slate-900 dark:text-white">{activeEntry.party_size} guests</span>
+                <span className="text-slate-500">{t('partySize')}</span>
+                <span className="font-medium text-slate-900 dark:text-white">{activeEntry.party_size} {t('guests')}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Position</span>
+                <span className="text-slate-500">{t('position')}</span>
                 <span className="font-bold text-2xl text-primary">#{activeEntry.position || '-'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Est. Wait</span>
-                <span className="font-medium text-slate-900 dark:text-white">{activeEntry.estimated_wait || '~15'} min</span>
+                <span className="text-slate-500">{t('estWait')}</span>
+                <span className="font-medium text-slate-900 dark:text-white">{activeEntry.estimated_wait || '~15'} {t('min')}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">Status</span>
+                <span className="text-slate-500">{t('status')}</span>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${statusColor[activeEntry.status as keyof typeof statusColor] || 'text-slate-600 bg-slate-100'}`}>
                   {activeEntry.status}
                 </span>
@@ -161,8 +163,7 @@ function WaitlistContent() {
           )}
 
           <button onClick={() => refetchStatus()} className="w-full py-3 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
-            Refresh Status
-          </button>
+            {t('refreshStatus')}</button>
         </div>
       </div>
     );
@@ -173,30 +174,27 @@ function WaitlistContent() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Join the Waitlist</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">No reservation? Join the waitlist for {moduleName}</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{t('joinTheWaitlist')}</h1>
+          <p className="text-slate-600 dark:text-slate-400 mt-2">{t('noReservationJoinTheWaitlistFor')}{moduleName}</p>
         </div>
       </div>
       <div className="max-w-md mx-auto px-4 py-8">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 space-y-6">
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              <User className="w-4 h-4" /> Your Name *
-            </label>
-            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Smith" className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
+              <User className="w-4 h-4" /> {t('yourName')}</label>
+            <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t('johnSmith')} className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
           </div>
 
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              <Phone className="w-4 h-4" /> Phone Number *
-            </label>
+              <Phone className="w-4 h-4" /> {t('phoneNumber')}</label>
             <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 (555) 000-0000" className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white" />
           </div>
 
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-4">
-              <Users className="w-4 h-4" /> Party Size
-            </label>
+              <Users className="w-4 h-4" /> {t('partySize')}</label>
             <div className="flex gap-2 flex-wrap">
               {[1, 2, 3, 4, 5, 6].map((size) => (
                 <button key={size} onClick={() => setForm({ ...form, partySize: size })} className={`px-4 py-2.5 rounded-lg font-medium transition-colors ${form.partySize === size ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>
@@ -207,13 +205,13 @@ function WaitlistContent() {
           </div>
 
           <button onClick={() => joinMutation.mutate({ name: form.name, phone: form.phone, partySize: form.partySize })} disabled={!form.name || !form.phone || joinMutation.isPending} className="w-full py-4 bg-primary text-white font-semibold rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
-            {joinMutation.isPending ? <><Loader2 className="w-5 h-5 animate-spin" /> Joining...</> : 'Join Waitlist'}
+            {joinMutation.isPending ? <><Loader2 className="w-5 h-5 animate-spin" /> {t('joining')}</> : t('joinTheWaitlist')}
           </button>
         </div>
 
         <div className="mt-4 text-center">
           <Link href={`/${propertySlug}/${slug}`} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-sm">
-            Back to {moduleName}
+            {t('backTo')}{moduleName}
           </Link>
         </div>
       </div>
@@ -222,6 +220,7 @@ function WaitlistContent() {
 }
 
 export default function ModuleWaitlistPage() {
+  const t = useTranslations('common');
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>}>
       <WaitlistContent />

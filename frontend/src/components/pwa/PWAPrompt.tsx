@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,6 +7,7 @@ import { Download, X, Bell, BellOff, RefreshCw } from 'lucide-react';
 import { usePWA } from '@/lib/usePWA';
 
 export function PWAPrompt() {
+  const t = useTranslations('common');
   const {
     isSupported,
     isInstalled,
@@ -83,16 +85,14 @@ export function PWAPrompt() {
               <div className="flex items-center gap-3">
                 <RefreshCw className="w-5 h-5" />
                 <span className="text-sm font-medium">
-                  A new version is available!
-                </span>
+                  {t('aNewVersionIsAvailable')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={refresh}
                   className="px-4 py-1.5 bg-white text-primary-600 text-sm font-semibold rounded-lg hover:bg-primary-50 transition-colors"
                 >
-                  Update Now
-                </button>
+                  {t('updateNow')}</button>
                 <button
                   onClick={() => setShowUpdateBanner(false)}
                   className="p-1.5 hover:bg-primary-500 rounded-lg transition-colors"
@@ -128,25 +128,21 @@ export function PWAPrompt() {
 
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  Install This App
-                </h3>
+                  {t('installThisApp')}</h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  Add to your home screen for faster access and offline support.
-                </p>
+                  {t('addToYourHomeScreenForFasterAccessA')}</p>
 
                 <div className="flex items-center gap-3 mt-4">
                   <button
                     onClick={handleInstall}
                     className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-sm"
                   >
-                    Install App
-                  </button>
+                    {t('installApp')}</button>
                   <button
                     onClick={handleDismiss}
                     className="px-4 py-2.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium transition-colors text-sm"
                   >
-                    Not Now
-                  </button>
+                    {t('notNow')}</button>
                 </div>
               </div>
             </div>
@@ -159,8 +155,7 @@ export function PWAPrompt() {
                   className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                 >
                   <Bell className="w-4 h-4" />
-                  Enable notifications for booking updates
-                </button>
+                  {t('enableNotificationsForBookingUpdate')}</button>
               </div>
             )}
           </motion.div>

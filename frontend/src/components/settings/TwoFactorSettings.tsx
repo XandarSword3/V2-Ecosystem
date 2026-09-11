@@ -173,8 +173,7 @@ export function TwoFactorSettings() {
                     {status.backupCodesRemaining !== undefined && (
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                         <KeyRound className="w-3 h-3 inline mr-1" />
-                        {status.backupCodesRemaining} backup codes remaining
-                      </p>
+                        {status.backupCodesRemaining} {t('backupCodesRemaining')}</p>
                     )}
                   </div>
                 </>
@@ -235,7 +234,7 @@ export function TwoFactorSettings() {
             <div className="flex justify-center p-4 bg-white rounded-lg">
               <img
                 src={setupData.qrCodeDataUrl}
-                alt="2FA QR Code"
+                alt={t('2faQrCode')}
                 className="w-48 h-48"
               />
             </div>
@@ -273,8 +272,7 @@ export function TwoFactorSettings() {
                 }}
                 className="flex-1"
               >
-                Cancel
-              </Button>
+                {t('cancel')}</Button>
               <Button
                 onClick={enableTwoFactor}
                 disabled={processing || verificationCode.length !== 6}
@@ -285,8 +283,7 @@ export function TwoFactorSettings() {
                 ) : (
                   <Check className="w-4 h-4 mr-2" />
                 )}
-                Verify & Enable
-              </Button>
+                {t('verifyEnable')}</Button>
             </div>
           </div>
         )}
@@ -338,8 +335,7 @@ export function TwoFactorSettings() {
             </Button>
 
             <Button onClick={finishSetup} className="w-full">
-              I've saved my codes
-            </Button>
+              {t('iveSavedMyCodes')}</Button>
           </div>
         )}
 
@@ -386,8 +382,7 @@ export function TwoFactorSettings() {
                 }}
                 className="flex-1"
               >
-                Cancel
-              </Button>
+                {t('cancel')}</Button>
               <Button
                 variant="danger"
                 onClick={disableTwoFactor}
@@ -399,8 +394,7 @@ export function TwoFactorSettings() {
                 ) : (
                   <ShieldOff className="w-4 h-4 mr-2" />
                 )}
-                Disable 2FA
-              </Button>
+                {t('disable2fa')}</Button>
             </div>
           </div>
         )}

@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,6 +53,7 @@ export function CouponInput({
   className = '',
   appliedCoupon: externalAppliedCoupon,
 }: CouponInputProps) {
+  const t = useTranslations('common');
   const [code, setCode] = useState('');
   const [validating, setValidating] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(externalAppliedCoupon || null);
@@ -163,12 +165,10 @@ export function CouponInput({
                 </span>
                 {appliedCoupon.discountType === 'percentage' ? (
                   <span className="text-xs bg-green-200 dark:bg-green-700 text-green-800 dark:text-green-200 px-2 py-0.5 rounded">
-                    {appliedCoupon.discountValue}% OFF
-                  </span>
+                    {appliedCoupon.discountValue}{t('off')}</span>
                 ) : (
                   <span className="text-xs bg-green-200 dark:bg-green-700 text-green-800 dark:text-green-200 px-2 py-0.5 rounded">
-                    {formatCurrency(appliedCoupon.discountValue)} OFF
-                  </span>
+                    {formatCurrency(appliedCoupon.discountValue)} {t('off')}</span>
                 )}
               </div>
               {appliedCoupon.description && (
@@ -177,7 +177,7 @@ export function CouponInput({
                 </p>
               )}
               <p className="text-lg font-bold text-green-700 dark:text-green-300 mt-1">
-                You save {formatCurrency(appliedCoupon.discountAmount)}
+                {t('youSave')}{formatCurrency(appliedCoupon.discountAmount)}
               </p>
             </div>
           </div>
@@ -201,7 +201,7 @@ export function CouponInput({
         <div className="relative flex-1">
           <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
-            placeholder="Enter coupon code"
+            placeholder={t('enterCouponCode')}
             value={code}
             onChange={(e) => { 
               setCode(e.target.value.toUpperCase()); 
@@ -247,7 +247,7 @@ export function CouponInput({
             onClick={() => { setCode(suggestion); setSuggestion(''); }}
             className="text-sm text-blue-500 hover:underline mt-1"
           >
-            Did you mean: {suggestion}?
+            {t('didYouMean')}{suggestion}?
           </motion.button>
         )}
       </AnimatePresence>
@@ -278,6 +278,7 @@ export function AvailableCoupons({
   onSelect,
   className = '' 
 }: AvailableCouponsProps) {
+  const t = useTranslations('common');
   const [coupons, setCoupons] = useState<AvailableCoupon[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -307,8 +308,7 @@ export function AvailableCoupons({
   return (
     <div className={className}>
       <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-        Available Coupons
-      </p>
+        {t('availableCoupons')}</p>
       <div className="grid gap-2">
         {coupons.map((coupon) => (
           <motion.button

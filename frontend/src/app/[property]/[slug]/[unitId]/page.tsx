@@ -82,7 +82,7 @@ export default function DynamicUnitDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const tCommon = useTranslations('common');
+  const t = useTranslations('common');
   const currency = useSettingsStore((s) => s.currency);
   const { translateContent } = useContentTranslation();
   const { modules } = useSiteSettings();
@@ -291,9 +291,9 @@ export default function DynamicUnitDetailPage() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Unit not found</h2>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{t('unitNotFound')}</h2>
           <Link href={`/${propertySlug}/${slug}`}>
-            <Button className="mt-4">Back to {moduleName}</Button>
+            <Button className="mt-4">{t('backTo')}{moduleName}</Button>
           </Link>
         </div>
       </div>
@@ -311,7 +311,7 @@ export default function DynamicUnitDetailPage() {
           className="inline-flex items-center text-slate-600 dark:text-slate-400 hover:text-primary-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to {moduleName}
+          {t('backTo')}{moduleName}
         </Link>
       </div>
 
@@ -363,24 +363,24 @@ export default function DynamicUnitDetailPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                     <Users className="w-5 h-5 text-primary-600" />
-                    <span>{unit.capacity} Guests</span>
+                    <span>{unit.capacity} {t('guests')}</span>
                   </div>
                   {unit.bedroom_count && (
                     <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                       <Bed className="w-5 h-5 text-primary-600" />
-                      <span>{unit.bedroom_count} Bedrooms</span>
+                      <span>{unit.bedroom_count} {t('bedrooms')}</span>
                     </div>
                   )}
                   {unit.bathroom_count && (
                     <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
                       <Bath className="w-5 h-5 text-primary-600" />
-                      <span>{unit.bathroom_count} Bathrooms</span>
+                      <span>{unit.bathroom_count} {t('bathrooms')}</span>
                     </div>
                   )}
                 </div>
                 {unit.amenities && unit.amenities.length > 0 && (
                   <div>
-                    <h3 className="font-semibold mb-3">Amenities</h3>
+                    <h3 className="font-semibold mb-3">{t('amenities')}</h3>
                     <div className="flex flex-wrap gap-2">
                       {unit.amenities.map((amenity) => {
                         const Icon = amenityIcons[amenity] || Check;
@@ -395,16 +395,16 @@ export default function DynamicUnitDetailPage() {
                   </div>
                 )}
                 <div>
-                  <h3 className="font-semibold mb-2">Pricing</h3>
+                  <h3 className="font-semibold mb-2">{t('pricing')}</h3>
                   <div className="flex gap-6">
                     <div>
-                      <p className="text-sm text-slate-500">Weekday</p>
-                      <p className="text-xl font-bold text-primary-600">{formatCurrency(unit.base_price, currency)}<span className="text-sm font-normal text-slate-500">/night</span></p>
+                      <p className="text-sm text-slate-500">{t('weekday')}</p>
+                      <p className="text-xl font-bold text-primary-600">{formatCurrency(unit.base_price, currency)}<span className="text-sm font-normal text-slate-500">{t('night')}</span></p>
                     </div>
                     {unit.weekend_price && unit.weekend_price !== unit.base_price && (
                       <div>
-                        <p className="text-sm text-slate-500">Weekend</p>
-                        <p className="text-xl font-bold text-orange-600">{formatCurrency(unit.weekend_price, currency)}<span className="text-sm font-normal text-slate-500">/night</span></p>
+                        <p className="text-sm text-slate-500">{t('weekend')}</p>
+                        <p className="text-xl font-bold text-orange-600">{formatCurrency(unit.weekend_price, currency)}<span className="text-sm font-normal text-slate-500">{t('night')}</span></p>
                       </div>
                     )}
                   </div>
@@ -420,43 +420,43 @@ export default function DynamicUnitDetailPage() {
                 <CardHeader className="bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-t-xl">
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="w-5 h-5" />
-                    Book {translateContent(unit, 'name')}
+                    {t('book')}{translateContent(unit, 'name')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Check-in</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('checkIn')}</label>
                         <input type="date" value={checkInDate} onChange={(e) => setCheckInDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm" required />
                       </div>
                       <div>
-                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Check-out</label>
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('checkOut')}</label>
                         <input type="date" value={checkOutDate} onChange={(e) => setCheckOutDate(e.target.value)} min={checkInDate || new Date().toISOString().split('T')[0]} className="w-full mt-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm" required />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Guests</label>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('guests')}</label>
                       <div className="flex items-center gap-3 mt-1">
                         <button type="button" onClick={() => setNumberOfGuests(Math.max(1, numberOfGuests - 1))} className="w-8 h-8 rounded-full border flex items-center justify-center"><Minus className="w-4 h-4" /></button>
                         <span className="font-medium w-8 text-center">{numberOfGuests}</span>
                         <button type="button" onClick={() => setNumberOfGuests(Math.min(unit.capacity, numberOfGuests + 1))} className="w-8 h-8 rounded-full border flex items-center justify-center"><Plus className="w-4 h-4" /></button>
-                        <span className="text-sm text-slate-500">/ {unit.capacity} max</span>
+                        <span className="text-sm text-slate-500">/ {unit.capacity} {t('max')}</span>
                       </div>
                     </div>
 
                     <div className="border-t pt-4 space-y-3">
-                      <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Full Name *" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm" required />
-                      <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="Email *" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm" required />
-                      <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="Phone Number *" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm" required />
-                      <textarea value={specialRequests} onChange={(e) => setSpecialRequests(e.target.value)} placeholder="Special requests (optional)" rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm resize-none" />
+                      <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder={t('fullName')} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm" required />
+                      <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder={t('email')} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm" required />
+                      <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder={t('phoneNumber')} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm" required />
+                      <textarea value={specialRequests} onChange={(e) => setSpecialRequests(e.target.value)} placeholder={t('specialRequestsOptional')} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-sm resize-none" />
                     </div>
 
                     {/* Add-Ons */}
                     {addOns.length > 0 && (
                       <div className="border-t pt-4">
-                        <h3 className="font-semibold mb-3">Add-Ons</h3>
+                        <h3 className="font-semibold mb-3">{t('addOns')}</h3>
                         <div className="space-y-2">
                           {addOns.filter(a => a.is_active).map((addOn) => {
                             const selected = selectedAddOns.find(a => a.addOnId === addOn.id);
@@ -511,8 +511,7 @@ export default function DynamicUnitDetailPage() {
                       <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 space-y-2">
                         {loadingPricing || isPricingStale ? (
                           <div className="py-4 text-center text-sm text-slate-400 italic animate-pulse">
-                            Calculating pricing...
-                          </div>
+                            {t('calculatingPricing')}</div>
                         ) : isPricingError || !serverPricing ? (
                           <div className="py-2 text-center text-sm text-red-500">
                             {pricingError || 'Pricing unavailable'}
@@ -520,7 +519,7 @@ export default function DynamicUnitDetailPage() {
                         ) : (
                           <>
                             <div className="flex justify-between text-sm">
-                              <span className="text-slate-500">{nights} night{nights > 1 ? 's' : ''}</span>
+                              <span className="text-slate-500">{nights} {t('night')}{nights > 1 ? 's' : ''}</span>
                               <span className="font-medium text-slate-700 dark:text-slate-300">
                                 {formatCurrency(serverPricing.subtotal, resolvedCurrency)}
                               </span>
@@ -555,7 +554,7 @@ export default function DynamicUnitDetailPage() {
                             ))}
 
                             <div className="flex justify-between font-bold pt-2 border-t">
-                              <span>Total</span>
+                              <span>{t('total')}</span>
                               <div className="text-right">
                                 {serverPricing.totalDiscount > 0 && serverPricing.preDiscountTotal !== undefined && serverPricing.preDiscountTotal > serverPricing.totalAmount && (
                                   <span className="text-xs text-slate-400 line-through mr-2 font-normal">
@@ -569,7 +568,7 @@ export default function DynamicUnitDetailPage() {
                             </div>
                             {serverPricing.depositAmount !== undefined && serverPricing.depositAmount > 0 && (
                               <p className="text-xs text-slate-500">
-                                Deposit: {formatCurrency(serverPricing.depositAmount, resolvedCurrency)}
+                                {t('deposit')}{formatCurrency(serverPricing.depositAmount, resolvedCurrency)}
                               </p>
                             )}
                           </>
@@ -579,7 +578,7 @@ export default function DynamicUnitDetailPage() {
 
                     {/* Payment Method Selector */}
                     <div className="border-t pt-4">
-                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3 block">Payment Method</label>
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3 block">{t('paymentMethod')}</label>
                       <div className="grid grid-cols-2 gap-3">
                         <button
                           type="button"
@@ -599,8 +598,7 @@ export default function DynamicUnitDetailPage() {
                             <Banknote className={`w-5 h-5 ${paymentMethod === 'cash' ? 'text-green-600' : 'text-slate-400'}`} />
                           </div>
                           <p className={`text-sm font-medium text-center ${paymentMethod === 'cash' ? 'text-primary-600 dark:text-primary-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                            Pay with Cash
-                          </p>
+                            {t('payWithCash')}</p>
                         </button>
 
                         <button
@@ -621,8 +619,7 @@ export default function DynamicUnitDetailPage() {
                             <CreditCard className={`w-5 h-5 ${paymentMethod === 'card' ? 'text-blue-600' : 'text-slate-400'}`} />
                           </div>
                           <p className={`text-sm font-medium text-center ${paymentMethod === 'card' ? 'text-primary-600 dark:text-primary-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                            Pay with Card
-                          </p>
+                            {t('payWithCard')}</p>
                         </button>
                       </div>
                     </div>
@@ -633,13 +630,13 @@ export default function DynamicUnitDetailPage() {
                       disabled={isSubmitting || !serverPricing || isPricingStale || isPricingError || loadingPricing || nights <= 0}
                     >
                       {isSubmitting ? (
-                        <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Submitting...</>
+                        <><Loader2 className="w-4 h-4 animate-spin mr-2" /> {t('submitting')}</>
                       ) : loadingPricing || isPricingStale ? (
-                        <>Calculating pricing...</>
+                        <>{t('calculatingPricing')}</>
                       ) : isPricingError ? (
-                        <>Pricing Error</>
+                        <>{t('pricingError')}</>
                       ) : (
-                        <>Book Now • {formatCurrency(serverPricing?.totalAmount ?? 0, resolvedCurrency)}</>
+                        <>{t('bookNow')}{formatCurrency(serverPricing?.totalAmount ?? 0, resolvedCurrency)}</>
                       )}
                     </Button>
                   </form>
@@ -659,11 +656,9 @@ export default function DynamicUnitDetailPage() {
                 <CreditCard className="w-8 h-8 text-blue-600" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                Complete Payment
-              </h3>
+                {t('completePayment')}</h3>
               <p className="text-slate-500 dark:text-slate-400 mt-1">
-                Enter your card details to complete your booking
-              </p>
+                {t('enterYourCardDetailsToCompleteYourB')}</p>
             </div>
 
             <StripePayment

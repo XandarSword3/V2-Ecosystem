@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,6 +31,7 @@ interface GiftCardPurchaseProps {
 }
 
 export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchaseProps) {
+  const t = useTranslations('common');
   const { isAuthenticated } = useAuth();
   const [templates, setTemplates] = useState<GiftCardTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,11 +146,9 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
           >
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                Send a Gift Card
-              </h2>
+                {t('sendAGiftCard')}</h2>
               <p className="text-slate-500 mt-1">
-                Choose an amount or create a custom gift
-              </p>
+                {t('chooseAnAmountOrCreateACustomGift')}</p>
             </div>
 
             {/* Template Options */}
@@ -180,8 +180,7 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
             {/* Custom Amount */}
             <div className="border-t dark:border-slate-700 pt-6">
               <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                Or enter a custom amount
-              </p>
+                {t('orEnterACustomAmount')}</p>
               <div className="flex gap-3">
                 <div className="relative flex-1">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">{currencySymbols.USD}</span>
@@ -199,11 +198,10 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
                   onClick={() => handleSelectAmount(null, parseFloat(customAmount))}
                   disabled={!customAmount || parseFloat(customAmount) < 10}
                 >
-                  Continue
-                  <ChevronRight className="w-4 h-4 ml-1" />
+                  {t('continue')}<ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </div>
-              <p className="text-xs text-slate-500 mt-2">Minimum {formatCurrency(10)}, Maximum {formatCurrency(1000)}</p>
+              <p className="text-xs text-slate-500 mt-2">{t('minimum')}{formatCurrency(10)}{t('maximum')}{formatCurrency(1000)}</p>
             </div>
           </motion.div>
         )}
@@ -225,19 +223,18 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
             >
               <Gift className="w-10 h-10 mx-auto mb-2 opacity-80" />
               <p className="text-3xl font-bold">{formatCurrency(currentAmount)}</p>
-              <p className="text-sm opacity-80">Gift Card</p>
+              <p className="text-sm opacity-80">{t('giftCard')}</p>
             </div>
 
             {/* Gift Details Form */}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Your Name *
-                </label>
+                  {t('yourName')}</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <Input
-                    placeholder="Your name (will appear on card)"
+                    placeholder={t('yourNameWillAppearOnCard')}
                     value={giftDetails.senderName}
                     onChange={(e) => setGiftDetails(d => ({ ...d, senderName: e.target.value }))}
                     className="pl-10"
@@ -247,12 +244,11 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Recipient's Name
-                </label>
+                  {t('recipientsName')}</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <Input
-                    placeholder="Who is this gift for?"
+                    placeholder={t('whoIsThisGiftFor')}
                     value={giftDetails.recipientName}
                     onChange={(e) => setGiftDetails(d => ({ ...d, recipientName: e.target.value }))}
                     className="pl-10"
@@ -262,13 +258,12 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Recipient's Email *
-                </label>
+                  {t('recipientsEmail')}</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <Input
                     type="email"
-                    placeholder="Where should we send the gift card?"
+                    placeholder={t('whereShouldWeSendTheGiftCard')}
                     value={giftDetails.recipientEmail}
                     onChange={(e) => setGiftDetails(d => ({ ...d, recipientEmail: e.target.value }))}
                     className="pl-10"
@@ -278,10 +273,9 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Personal Message (optional)
-                </label>
+                  {t('personalMessageOptional')}</label>
                 <textarea
-                  placeholder="Add a personal message..."
+                  placeholder={t('addAPersonalMessage')}
                   value={giftDetails.message}
                   onChange={(e) => setGiftDetails(d => ({ ...d, message: e.target.value }))}
                   className="w-full p-3 border rounded-lg dark:bg-slate-800 dark:border-slate-700"
@@ -294,8 +288,7 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
 
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => setStep('select')} className="flex-1">
-                Back
-              </Button>
+                {t('back')}</Button>
               <Button 
                 onClick={handlePurchase} 
                 disabled={purchasing || !giftDetails.recipientEmail || !giftDetails.senderName}
@@ -304,12 +297,11 @@ export function GiftCardPurchase({ onSuccess, className = '' }: GiftCardPurchase
                 {purchasing ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
+                    {t('processing')}</>
                 ) : (
                   <>
                     <CreditCard className="w-4 h-4 mr-2" />
-                    Purchase {formatCurrency(currentAmount)}
+                    {t('purchase')}{formatCurrency(currentAmount)}
                   </>
                 )}
               </Button>
@@ -327,6 +319,7 @@ interface GiftCardBalanceProps {
 }
 
 export function GiftCardBalance({ className = '' }: GiftCardBalanceProps) {
+  const t = useTranslations('common');
   const [code, setCode] = useState('');
   const [checking, setChecking] = useState(false);
   const [balance, setBalance] = useState<{ balance: number; expiresAt?: string } | null>(null);
@@ -354,11 +347,11 @@ export function GiftCardBalance({ className = '' }: GiftCardBalanceProps) {
   return (
     <Card className={className}>
       <CardContent className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Check Gift Card Balance</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('checkGiftCardBalance')}</h3>
         
         <div className="flex gap-3">
           <Input
-            placeholder="Enter gift card code"
+            placeholder={t('enterGiftCardCode')}
             value={code}
             onChange={(e) => { setCode(e.target.value.toUpperCase()); setBalance(null); setError(''); }}
             className="font-mono uppercase"
@@ -383,7 +376,7 @@ export function GiftCardBalance({ className = '' }: GiftCardBalanceProps) {
                 <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Available Balance</p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">{t('availableBalance')}</p>
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                   {formatCurrency(balance.balance)}
                 </p>
@@ -391,7 +384,7 @@ export function GiftCardBalance({ className = '' }: GiftCardBalanceProps) {
             </div>
             {balance.expiresAt && (
               <p className="text-xs text-slate-500 mt-2">
-                Expires: {new Date(balance.expiresAt).toLocaleDateString()}
+                {t('expires')}{new Date(balance.expiresAt).toLocaleDateString()}
               </p>
             )}
           </motion.div>

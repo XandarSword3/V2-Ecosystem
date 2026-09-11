@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations } from 'next-intl';
 
 import { useEffect, useState } from 'react';
 import { useSocket } from '@/lib/socket';
@@ -67,6 +68,7 @@ function ElapsedTimer({ since }: { since: string }) {
 const UNASSIGNED_LABEL = 'No destination on file';
 
 export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps) {
+  const t = useTranslations('staff');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingOrderIds, setPendingOrderIds] = useState<Set<string>>(new Set());
@@ -219,11 +221,9 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
             <Truck className="h-8 w-8 text-primary" />
-            {moduleName} Dispatch
-          </h1>
+            {moduleName} {t('dispatch')}</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Waiting for hand-off, grouped by destination
-          </p>
+            {t('waitingForHandOffGroupedByDestinati')}</p>
         </div>
         <Button variant="outline" size="icon" onClick={() => loadOrders()}>
           <RefreshCw className="h-4 w-4" />
@@ -233,7 +233,7 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
       {orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-gray-400 dark:text-gray-600">
           <CheckCircle2 className="h-12 w-12 mb-3" />
-          <p className="text-lg font-medium">Nothing waiting on dispatch</p>
+          <p className="text-lg font-medium">{t('nothingWaitingOnDispatch')}</p>
         </div>
       ) : (
         <div className="space-y-8">
@@ -271,7 +271,7 @@ export function DispatchBoard({ slug, moduleName, moduleId }: DispatchBoardProps
                           </div>
                         </div>
                         <p className="text-xs text-gray-400">
-                          Order #{order.orderNumber ?? order.id.slice(0, 8)} · {formatCurrency(order.totalAmount)}
+                          {t('order')}{order.orderNumber ?? order.id.slice(0, 8)} · {formatCurrency(order.totalAmount)}
                         </p>
                       </div>
 

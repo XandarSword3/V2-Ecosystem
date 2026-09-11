@@ -376,6 +376,170 @@ const KNOWN_TRANSLATIONS = {
   'cookie policy': { fr: 'Politique relative aux cookies', ar: 'سياسة ملفات تعريف الارتباط' },
   'get started': { fr: 'Commencer', ar: 'ابدأ الآن' },
   'discover our services': { fr: 'Découvrez nos services', ar: 'اكتشف خدماتنا' },
+
+  // Coupons & Discounts
+  '% off': { fr: '% de réduction', ar: 'خصم %' },
+  'off': { fr: 'de réduction', ar: 'خصم' },
+  'you save': { fr: 'Vous économisez', ar: 'توفر' },
+  'enter coupon code': { fr: 'Entrez le code promo', ar: 'أدخل رمز الكوبون' },
+  'did you mean:': { fr: 'Vouliez-vous dire :', ar: 'هل تقصد:' },
+  'available coupons': { fr: 'Coupons disponibles', ar: 'الكوبونات المتاحة' },
+
+  // Gift Cards
+  'send a gift card': { fr: 'Offrir une carte-cadeau', ar: 'إرسال بطاقة هدية' },
+  'choose an amount or create a custom gift': { fr: 'Choisissez un montant ou personnalisez votre cadeau', ar: 'اختر مبلغاً أو حدد هدية مخصصة' },
+  'or enter a custom amount': { fr: 'Ou entrez un montant personnalisé', ar: 'أو أدخل مبلغاً مخصصاً' },
+  'continue': { fr: 'Continuer', ar: 'متابعة' },
+  'minimum': { fr: 'Minimum', ar: 'الحد الأدنى' },
+  ', maximum': { fr: ', Maximum', ar: '، الحد الأقصى' },
+  'gift card': { fr: 'Carte-cadeau', ar: 'بطاقة هدية' },
+  'your name *': { fr: 'Votre nom *', ar: 'اسمك *' },
+  'your name (will appear on card)': { fr: 'Votre nom (apparaîtra sur la carte)', ar: 'اسمك (سيظهر على البطاقة)' },
+  "recipient's name": { fr: 'Nom du destinataire', ar: 'اسم المستلم' },
+  'who is this gift for?': { fr: 'À qui est destiné ce cadeau ?', ar: 'لمن هذه الهدية؟' },
+  "recipient's email *": { fr: 'Email du destinataire *', ar: 'البريد الإلكتروني للمستلم *' },
+  'where should we send the gift card?': { fr: 'Où devons-nous envoyer la carte-cadeau ?', ar: 'أين نرسل بطاقة الهدية؟' },
+  'personal message (optional)': { fr: 'Message personnalisé (optionnel)', ar: 'رسالة شخصية (اختياري)' },
+  'add a personal message...': { fr: 'Ajoutez un message personnel...', ar: 'أضف رسالة شخصية...' },
+  'back': { fr: 'Retour', ar: 'رجوع' },
+  'processing...': { fr: 'Traitement en cours...', ar: 'جاري المعالجة...' },
+  'purchase': { fr: 'Acheter', ar: 'شراء' },
+  'check gift card balance': { fr: 'Consulter le solde de la carte', ar: 'التحقق من رصيد بطاقة الهدية' },
+  'enter gift card code': { fr: 'Entrez le code de la carte-cadeau', ar: 'أدخل رمز بطاقة الهدية' },
+  'available balance': { fr: 'Solde disponible', ar: 'الرصيد المتاح' },
+  'expires:': { fr: 'Expire le :', ar: 'تاريخ الانتهاء:' },
+
+  // Loyalty
+  'pts': { fr: 'pts', ar: 'نقطة' },
+  'loyalty program': { fr: 'Programme de fidélité', ar: 'برنامج الولاء' },
+  'available points': { fr: 'Points disponibles', ar: 'النقاط المتاحة' },
+  'x points on all purchases': { fr: 'x points sur tous les achats', ar: 'ضعف النقاط على جميع المشتريات' },
+  'progress to': { fr: 'Progression vers', ar: 'التقدم نحو' },
+  'pts needed': { fr: 'pts requis', ar: 'نقطة متبقية' },
+  'total earned': { fr: 'Total cumulé', ar: 'إجمالي المكتسب' },
+  'total redeemed': { fr: 'Total utilisé', ar: 'إجمالي المستبدل' },
+  'your benefits': { fr: 'Vos avantages', ar: 'مزاياك' },
+  'view full details': { fr: 'Voir tous les détails', ar: 'عرض كافة التفاصيل' },
+  'earn': { fr: 'Gagnez', ar: 'اكسب' },
+  'loyalty points': { fr: 'points de fidélité', ar: 'نقاط ولاء' },
+
+  // Auth & Security
+  'login required': { fr: 'Connexion requise', ar: 'تسجيل الدخول مطلوب' },
+  'please log in to place your order. your cart will be preserved.': { fr: 'Veuillez vous connecter pour finaliser votre commande. Votre panier sera conservé.', ar: 'يرجى تسجيل الدخول لإتمام طلبك. سيتم حفظ سلتك.' },
+  'email': { fr: 'Email', ar: 'البريد الإلكتروني' },
+  'enter your email': { fr: 'Entrez votre email', ar: 'أدخل بريدك الإلكتروني' },
+  'password': { fr: 'Mot de passe', ar: 'كلمة المرور' },
+  'enter your password': { fr: 'Entrez votre mot de passe', ar: 'أدخل كلمة المرور' },
+  'logging in...': { fr: 'Connexion en cours...', ar: 'جاري تسجيل الدخول...' },
+  'log in': { fr: 'Se connecter', ar: 'تسجيل الدخول' },
+  "don't have an account?": { fr: "Vous n'avez pas de compte ?", ar: 'ليس لديك حساب؟' },
+  'sign up': { fr: 'Créer un compte', ar: 'إنشاء حساب' },
+  'security verification': { fr: 'Vérification de sécurité', ar: 'التحقق الأمني' },
+  'protected by turnstile': { fr: 'Protégé par Turnstile', ar: 'محمي بواسطة Turnstile' },
+  'security verification is unavailable. check the turnstile site key and network access.': { fr: 'Vérification de sécurité indisponible. Vérifiez la clé du site et la connexion.', ar: 'التحقق الأمني غير متوفر. يرجى التحقق من المفتاح والاتصال بالشبكة.' },
+  'loading security challenge...': { fr: 'Chargement du défi de sécurité...', ar: 'جاري تحميل التحقق الأمني...' },
+
+  // Settings & 2FA
+  'backup codes remaining': { fr: 'codes de secours restants', ar: 'رموز أمان متبقية' },
+  '2fa qr code': { fr: 'Code QR 2FA', ar: 'رمز QR للتحقق بخطوتين' },
+  'cancel': { fr: 'Annuler', ar: 'إلغاء' },
+  'verify & enable': { fr: 'Vérifier et activer', ar: 'تأكيد وتفعيل' },
+  "i've saved my codes": { fr: "J'ai enregistré mes codes", ar: 'لقد حفظت الرموز' },
+  'disable 2fa': { fr: 'Désactiver la 2FA', ar: 'تعطيل التحقق بخطوتين' },
+  'user preferences': { fr: 'Préférences utilisateur', ar: 'تفضيلات المستخدم' },
+  'close preferences': { fr: 'Fermer les préférences', ar: 'إغلاق التفضيلات' },
+
+  // PWA
+  'a new version is available!': { fr: 'Une nouvelle version est disponible !', ar: 'تحديث جديد متوفر!' },
+  'update now': { fr: 'Mettre à jour maintenant', ar: 'تحديث الآن' },
+  'install this app': { fr: 'Installer cette application', ar: 'تثبيت هذا التطبيق' },
+  'add to your home screen for faster access and offline support.': { fr: "Ajoutez à votre écran d'accueil pour un accès rapide et hors-ligne.", ar: 'أضف إلى الشاشة الرئيسية لسرعة الوصول والعمل دون اتصال.' },
+  'install app': { fr: "Installer l'application", ar: 'تثبيت التطبيق' },
+  'not now': { fr: 'Pas maintenant', ar: 'ليس الآن' },
+  'enable notifications for booking updates': { fr: 'Activer les notifications pour les mises à jour', ar: 'تفعيل الإشعارات لتحديثات الحجز' },
+
+  // Waitlist & Unit Booking
+  'module not found': { fr: 'Module introuvable', ar: 'الخدمة غير موجودة' },
+  'return home': { fr: "Retour à l'accueil", ar: 'العودة للرئيسية' },
+  'waitlist status': { fr: "Statut de la liste d'attente", ar: 'حالة قائمة الانتظار' },
+  'name': { fr: 'Nom', ar: 'الاسم' },
+  'party size': { fr: 'Nombre de personnes', ar: 'عدد الأفراد' },
+  'guests': { fr: 'personnes', ar: 'ضيوف' },
+  'position': { fr: 'Position', ar: 'الترتيب' },
+  'est. wait': { fr: 'Attente estimée', ar: 'الانتظار المتوقع' },
+  'min': { fr: 'min', ar: 'دقيقة' },
+  'status': { fr: 'Statut', ar: 'الحالة' },
+  'refresh status': { fr: 'Actualiser le statut', ar: 'تحديث الحالة' },
+  'join the waitlist': { fr: "Rejoindre la liste d'attente", ar: 'الانضمام لقائمة الانتظار' },
+  'no reservation? join the waitlist for': { fr: 'Pas de réservation ? Rejoignez la liste pour', ar: 'لا يوجد حجز؟ انضم لقائمة الانتظار لـ' },
+  'joining...': { fr: 'Inscription en cours...', ar: 'جاري الانضمام...' },
+  'back to': { fr: 'Retour à', ar: 'العودة إلى' },
+  'unit not found': { fr: 'Hébergement introuvable', ar: 'الوحدة غير موجودة' },
+  'bedrooms': { fr: 'Chambres', ar: 'غرف النوم' },
+  'bathrooms': { fr: 'Salles de bain', ar: 'دورات المياه' },
+  'amenities': { fr: 'Équipements', ar: 'المرافق والمزايا' },
+  'pricing': { fr: 'Tarifs', ar: 'الأسعار' },
+  'weekday': { fr: 'En semaine', ar: 'أيام الأسبوع' },
+  '/night': { fr: '/nuit', ar: '/ليلة' },
+  'weekend': { fr: 'Week-end', ar: 'عطلة نهاية الأسبوع' },
+  'book': { fr: 'Réserver', ar: 'حجز' },
+  'check-in': { fr: 'Arrivée', ar: 'تسجيل الوصول' },
+  'check-out': { fr: 'Départ', ar: 'تسجيل المغادرة' },
+  'max': { fr: 'max', ar: 'الحد الأقصى' },
+  'full name *': { fr: 'Nom complet *', ar: 'الاسم الكامل *' },
+  'add-ons': { fr: 'Suppléments', ar: 'إضافات' },
+  'night': { fr: 'nuit', ar: 'ليلة' },
+  'total': { fr: 'Total', ar: 'الإجمالي' },
+  'deposit:': { fr: 'Acompte :', ar: 'العربون:' },
+  'payment method': { fr: 'Moyen de paiement', ar: 'طريقة الدفع' },
+  'pay with cash': { fr: 'Payer en espèces', ar: 'الدفع نقداً' },
+  'pay with card': { fr: 'Payer par carte', ar: 'الدفع بالبطاقة' },
+  'submitting...': { fr: 'Envoi en cours...', ar: 'جاري الإرسال...' },
+  'book now •': { fr: 'Réserver maintenant •', ar: 'احجز الآن •' },
+  'complete payment': { fr: 'Finaliser le paiement', ar: 'إتمام الدفع' },
+  'enter your card details to complete your booking': { fr: 'Entrez vos coordonnées bancaires pour finaliser votre réservation', ar: 'أدخل بيانات بطاقتك لإتمام الحجز' },
+
+  // Staff Operations
+  'dispatch': { fr: 'Expédition', ar: 'إرسال وتوزيع' },
+  'waiting for hand-off, grouped by destination': { fr: 'En attente de remise, groupé par destination', ar: 'في انتظار التسليم، مجمعة حسب الوجهة' },
+  'nothing waiting on dispatch': { fr: "Aucune commande en attente d'expédition", ar: 'لا توجد طلبات في انتظار التوزيع' },
+  'order #': { fr: 'Commande n°', ar: 'طلب رقم' },
+  'split bill': { fr: "Diviser l'addition", ar: 'تقسيم الفاتورة' },
+  'no split': { fr: 'Sans division', ar: 'بدون تقسيم' },
+  'equal split': { fr: 'Parts égales', ar: 'تقسيم متساوٍ' },
+  'itemized': { fr: 'Par article', ar: 'حسب العناصر' },
+  'split into:': { fr: 'Diviser en :', ar: 'تقسيم إلى:' },
+  'parts': { fr: 'parts', ar: 'أجزاء' },
+  'payment shares': { fr: 'Quotes-parts de paiement', ar: 'حصص الدفع' },
+  'paid': { fr: 'Payé', ar: 'تم الدفع' },
+  'pay': { fr: 'Payer', ar: 'دفع' },
+  'cash': { fr: 'Espèces', ar: 'نقداً' },
+  'card': { fr: 'Carte', ar: 'بطاقة' },
+  'room charge': { fr: 'Facturation sur chambre', ar: 'تحميل على الغرفة' },
+  'select checked-in guest / room': { fr: 'Sélectionnez un client enregistré / une chambre', ar: 'اختر نزيلاً مسجلاً / غرفة' },
+  'search room number or guest name...': { fr: 'Rechercher par numéro de chambre ou nom...', ar: 'ابحث برقم الغرفة أو اسم النزيل...' },
+  'searching checked-in rooms...': { fr: 'Recherche des chambres occupées...', ar: 'جاري البحث عن الغرف المسجلة...' },
+  'no active checked-in rooms found': { fr: 'Aucune chambre occupée trouvée', ar: 'لم يتم العثور على غرف مشغولة' },
+  'folio balance': { fr: 'Solde du compte', ar: 'رصيد الفاتورة' },
+  'selected:': { fr: 'Sélectionné :', ar: 'المحدد:' },
+  'total paid': { fr: 'Total réglé', ar: 'إجمالي المدفوع' },
+  'remaining': { fr: 'Reste à payer', ar: 'المتبقي' },
+  'complete order': { fr: 'Finaliser la commande', ar: 'إتمام الطلب' },
+  'floor map': { fr: 'Plan de salle', ar: 'مخطط الصالة' },
+  'manage seating, reservations, and staff assignments': { fr: 'Gérez le placement, les réservations et les affectations du personnel', ar: 'إدارة الجلوس والحجوزات وتعيينات الموظفين' },
+  'walk-in': { fr: 'Client sans réservation', ar: 'نزيل بدون حجز' },
+  'assigned staff': { fr: 'Personnel assigné', ar: 'الموظف المسؤول' },
+  'party:': { fr: 'Groupe :', ar: 'العدد:' },
+  'time:': { fr: 'Heure :', ar: 'الوقت:' },
+  'check in': { fr: "Enregistrer l'arrivée", ar: 'تسجيل الحضور' },
+  'reassign staff': { fr: 'Réassigner le serveur', ar: 'إعادة تعيين الموظف' },
+  'free table': { fr: 'Libérer la table', ar: 'إخلاء الطاولة' },
+  'select a location to view details': { fr: 'Sélectionnez un emplacement pour afficher les détails', ar: 'اختر موقعاً لعرض التفاصيل' },
+  'seat walk-in': { fr: 'Installer le client', ar: 'إجلاس ضيف مباشر' },
+  'select table': { fr: 'Choisir la table', ar: 'تحديد الطاولة' },
+  'guest name': { fr: 'Nom du client', ar: 'اسم الضيف' },
+  'guest name (e.g. john)': { fr: 'Nom du client (ex. Jean)', ar: 'اسم الضيف (مثال: أحمد)' },
+  'seat': { fr: 'Installer', ar: 'إجلاس' },
 };
 
 function resolveTranslation(text, lang) {
@@ -454,8 +618,10 @@ function commandAutofix(targetPath, options = {}) {
     }
 
     // Ensure import { useTranslations } from 'next-intl'; is present
-    if (!updatedContent.includes("from 'next-intl'") && !updatedContent.includes('from "next-intl"')) {
-      if (updatedContent.startsWith("'use client';") || updatedContent.startsWith('"use client";')) {
+    if (!updatedContent.includes('useTranslations')) {
+      if (updatedContent.includes("from 'next-intl'") || updatedContent.includes('from "next-intl"')) {
+        updatedContent = updatedContent.replace(/(import\s*\{)([^}]+)(\}\s*from\s*['"]next-intl['"])/, '$1 useTranslations, $2$3');
+      } else if (updatedContent.startsWith("'use client';") || updatedContent.startsWith('"use client";')) {
         const clientLineEnd = updatedContent.indexOf('\n') + 1;
         updatedContent =
           updatedContent.slice(0, clientLineEnd) +
@@ -466,15 +632,21 @@ function commandAutofix(targetPath, options = {}) {
       }
     }
 
-    // Ensure const t = useTranslations('...'); is present in the main component
-    if (!updatedContent.includes(`useTranslations(`)) {
-      const match = updatedContent.match(/(export\s+default\s+function\s+[A-Za-z0-9_]+\s*\([^)]*\)\s*\{)/);
-      if (match) {
-        const insertPos = updatedContent.indexOf(match[0]) + match[0].length;
+    // Ensure const t = useTranslations('...'); is present in any component function using t(
+    const compRegex = /(export\s+(?:default\s+)?function\s+[A-Za-z0-9_]+\s*(?:<[^>]+>)?\s*\([^)]*\)\s*(?::\s*[^{]+)?\{|export\s+const\s+[A-Za-z0-9_]+\s*=\s*(?:React\.memo\()?\(?[^)]*\)?\s*(?:=>)?\s*\{)/g;
+    let compMatch;
+    const matches = [];
+    while ((compMatch = compRegex.exec(updatedContent)) !== null) {
+      matches.push({ index: compMatch.index + compMatch[0].length });
+    }
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const pos = matches[i].index;
+      const sample = updatedContent.slice(pos, pos + 250);
+      if (!sample.includes('useTranslations(')) {
         updatedContent =
-          updatedContent.slice(0, insertPos) +
+          updatedContent.slice(0, pos) +
           `\n  const t = useTranslations('${namespace}');` +
-          updatedContent.slice(insertPos);
+          updatedContent.slice(pos);
       }
     }
 
