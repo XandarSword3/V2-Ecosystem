@@ -1313,7 +1313,15 @@
       "inventory": "Inventario",
       "navbar": "Navigation",
       "memberships": "Iscrizioni",
-      "members": "Membri"
+      "members": "Membri",
+      "business": "Attività",
+      "products": "Prodotti",
+      "pricing": "Prezzi",
+      "fulfillment": "Evasione",
+      "resources": "Risorse",
+      "fiscal": "Fiscale",
+      "paymentsNav": "Pagamenti",
+      "analytics": "Analisi"
     },
     "messages": {
       "loggedOutSuccessfully": "Disconnesso con successo"

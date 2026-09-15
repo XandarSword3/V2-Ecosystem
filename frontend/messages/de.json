@@ -1313,7 +1313,15 @@
       "inventory": "Inventar",
       "navbar": "Navigation",
       "memberships": "Mitgliedschaften",
-      "members": "Mitglieder"
+      "members": "Mitglieder",
+      "business": "Geschäft",
+      "products": "Produkte",
+      "pricing": "Preise",
+      "fulfillment": "Erfüllung",
+      "resources": "Ressourcen",
+      "fiscal": "Finanzamt",
+      "paymentsNav": "Zahlungen",
+      "analytics": "Analysen"
     },
     "messages": {
       "loggedOutSuccessfully": "Erfolgreich abgemeldet"

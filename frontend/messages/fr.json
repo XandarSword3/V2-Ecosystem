@@ -1651,7 +1651,15 @@
       "system": "Système & Réglages",
       "reservations": "Réservations",
       "waitlist": "Liste d'attente",
-      "modifiers": "Modificateurs & Options"
+      "modifiers": "Modificateurs & Options",
+      "business": "Commerce",
+      "products": "Produits",
+      "pricing": "Tarification",
+      "fulfillment": "Exécution",
+      "resources": "Ressources",
+      "fiscal": "Fiscal",
+      "paymentsNav": "Paiements",
+      "analytics": "Analytique"
     },
     "messages": {
       "loggedOutSuccessfully": "Déconnexion réussie"

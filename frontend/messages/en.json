@@ -1651,7 +1651,15 @@
       "waitlist": "Waitlist",
       "modifiers": "Modifiers",
       "memberships": "Memberships",
-      "members": "Members"
+      "members": "Members",
+      "business": "Business",
+      "products": "Products",
+      "pricing": "Pricing",
+      "fulfillment": "Fulfillment",
+      "resources": "Resources",
+      "fiscal": "Fiscal",
+      "paymentsNav": "Payments",
+      "analytics": "Analytics"
     },
     "messages": {
       "loggedOutSuccessfully": "Logged out successfully"

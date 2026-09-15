@@ -1643,7 +1643,15 @@
       "waitlist": "قائمة الانتظار",
       "modifiers": "خيارات التعديل والإضافات",
       "memberships": "العضويات",
-      "members": "الأعضاء"
+      "members": "الأعضاء",
+      "business": "الأعمال",
+      "products": "المنتجات",
+      "pricing": "التسعير",
+      "fulfillment": "التنفيذ",
+      "resources": "الموارد",
+      "fiscal": "المالية",
+      "paymentsNav": "المدفوعات",
+      "analytics": "التحليلات"
     },
     "messages": {
       "loggedOutSuccessfully": "تم تسجيل الخروج بنجاح"
