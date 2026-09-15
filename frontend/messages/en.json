@@ -1671,7 +1671,8 @@
       "integrations": "Integrations",
       "channelManager": "Channel Manager",
       "guestMessaging": "Guest Messaging",
-      "rateParity": "Rate Parity"
+      "rateParity": "Rate Parity",
+      "overview": "Overview"
     },
     "messages": {
       "loggedOutSuccessfully": "Logged out successfully"

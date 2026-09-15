@@ -1663,7 +1663,8 @@
       "integrations": "التكاملات",
       "channelManager": "مدير القنوات",
       "guestMessaging": "رسائل الضيوف",
-      "rateParity": "تكافؤ الأسعار"
+      "rateParity": "تكافؤ الأسعار",
+      "overview": "نظرة عامة"
     },
     "messages": {
       "loggedOutSuccessfully": "تم تسجيل الخروج بنجاح"

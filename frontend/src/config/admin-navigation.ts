@@ -188,6 +188,14 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
       translationKey: 'nav.business',
       icon: ShoppingBag,
       items: [
+        // ── Overview: capability dashboard (F11 home) ───────────────
+        {
+          name: t('nav.overview') || 'Overview',
+          href: `${base}/business`,
+          icon: LayoutDashboard,
+          translationKey: 'nav.overview',
+        },
+
         // ── Orders: cross-module transaction operations surface ─────
         {
           name: t('nav.orders') || 'Orders',

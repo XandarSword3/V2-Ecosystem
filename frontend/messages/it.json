@@ -1333,7 +1333,8 @@
       "integrations": "Integrazioni",
       "channelManager": "Gestione canali",
       "guestMessaging": "Messaggi agli ospiti",
-      "rateParity": "Parità tariffe"
+      "rateParity": "Parità tariffe",
+      "overview": "Panoramica"
     },
     "messages": {
       "loggedOutSuccessfully": "Disconnesso con successo"

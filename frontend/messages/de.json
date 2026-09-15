@@ -1333,7 +1333,8 @@
       "integrations": "Integrationen",
       "channelManager": "Kanalmanager",
       "guestMessaging": "Gästekommunikation",
-      "rateParity": "Ratenparität"
+      "rateParity": "Ratenparität",
+      "overview": "Übersicht"
     },
     "messages": {
       "loggedOutSuccessfully": "Erfolgreich abgemeldet"

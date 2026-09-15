@@ -1671,7 +1671,8 @@
       "integrations": "Intégrations",
       "channelManager": "Gestionnaire de canaux",
       "guestMessaging": "Messagerie client",
-      "rateParity": "Parité tarifaire"
+      "rateParity": "Parité tarifaire",
+      "overview": "Aperçu"
     },
     "messages": {
       "loggedOutSuccessfully": "Déconnexion réussie"
