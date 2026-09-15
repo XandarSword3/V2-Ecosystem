@@ -12,6 +12,9 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 // Canonical fulfillment state (plan F1) — the status pill and the
 // rate-your-server gate key off it, never legacy composites.
 import { canonicalFulfillmentState } from '@/types';
+import type { FulfillmentMode } from '@/lib/engine-a/types';
+import { FulfillmentTimeline } from '@/components/customer/FulfillmentTimeline';
+import { FulfillmentSummary } from '@/components/customer/FulfillmentSummary';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSiteSettings } from '@/lib/settings-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -468,6 +471,26 @@ function ConfirmationContent() {
 
         {/* ========== ORDER CONFIRMATION (menu_service) ========== */}
         {order && (() => {
+          const rawMode: string = order.fulfillmentMode || order.order_type || 'on_premise';
+          const canonicalMode: FulfillmentMode =
+            rawMode === 'delivery' || rawMode === 'local_delivery'
+              ? 'local_delivery'
+              : rawMode === 'takeaway' || rawMode === 'pickup'
+              ? 'pickup'
+              : rawMode === 'digital' || rawMode === 'digital_delivery'
+              ? 'digital_delivery'
+              : rawMode === 'shipment'
+              ? 'shipment'
+              : rawMode === 'service' || rawMode === 'service_execution'
+              ? 'service_execution'
+              : rawMode === 'none'
+              ? 'none'
+              : 'on_premise';
+          const canonicalState =
+            canonicalFulfillmentState(order, canonicalMode) ?? order.fulfillment_status ?? order.status;
+          const isCancelled = order.status === 'cancelled' || canonicalState === 'cancelled';
+          const isCompleted = order.status === 'completed' || canonicalState === 'completed';
+
           const OrderTypeIcon = orderTypeIcon(order.order_type);
           const PaymentIcon = paymentMethodIcon(order.payment_method);
           const hasBreakdown = typeof order.subtotal === 'number';
@@ -692,10 +715,36 @@ function ConfirmationContent() {
                     </p>
                   )}
 
-                  <div className="pt-2">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${orderStatusStyle(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status)}`}>
-                      {(canonicalFulfillmentState(order, order.fulfillmentMode) ?? order.status ?? 'pending').toUpperCase()}
-                    </span>
+                  {/* Phase F7: Canonical Live Fulfillment Timeline */}
+                  {canonicalMode !== 'none' && (
+                    <div className="pt-4 border-t border-border/60">
+                      <FulfillmentTimeline
+                        mode={canonicalMode}
+                        currentState={canonicalState}
+                        isCancelled={isCancelled}
+                        isCompleted={isCompleted}
+                      />
+                    </div>
+                  )}
+
+                  {/* Fallback status pill if mode is none */}
+                  {canonicalMode === 'none' && (
+                    <div className="pt-2">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${orderStatusStyle(canonicalState)}`}>
+                        {(canonicalState ?? 'completed').toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Link to dedicated live tracking page */}
+                  <div className="pt-2 flex justify-end">
+                    <Link
+                      href={`/${propertySlug}/${slug}/order/${order.id}`}
+                      className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      View Full Live Tracking & Details →
+                    </Link>
                   </div>
                 </div>
 
