@@ -11,7 +11,7 @@
  * - Shift workflow
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -51,12 +51,20 @@ import {
   ChevronRight,
   ShoppingCart,
   Trash2,
+  Search,
+  UserCheck,
+  Award,
+  Tag,
+  Sparkles,
+  CheckCircle2,
+  RotateCcw,
 } from 'lucide-react';
 import { ReservationFloorMap } from '@/components/staff/ReservationFloorMap';
 import { DispatchBoard } from '@/components/staff/DispatchBoard';
 import type { ItemStatus, FulfillmentState, FulfillmentMode } from '@/components/staff/types';
 import { itemStatusFlow, canonicalFulfillmentState, FULFILLMENT_LAYER_STATES } from '@/components/staff/types';
 import { getModeStateConfig, resolveColumnKey, type ModeStateConfig } from '@/lib/engine-a/types';
+import { usePricingPreview } from '@/hooks/usePricingPreview';
 
 // Types
 interface Table {
@@ -127,6 +135,15 @@ interface QuickCartItem {
   price: number; // base unit price
   quantity: number;
   selectedModifiers?: QuickModifier[];
+}
+
+interface StaffCustomer {
+  id: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  loyaltyPoints?: number;
+  tierName?: string;
 }
 
 interface StaffPOSTemplateProps {
@@ -283,6 +300,92 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   // option selections (groupId → optionId → quantity).
   const [modifierItem, setModifierItem] = useState<any | null>(null);
   const [modifierSelections, setModifierSelections] = useState<Record<string, Record<string, number>>>({});
+
+  // F9: Customer lookup & association
+  const [selectedCustomer, setSelectedCustomer] = useState<StaffCustomer | null>(null);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [customerSearchResults, setCustomerSearchResults] = useState<StaffCustomer[]>([]);
+  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+
+  // F9: Discounts & loyalty
+  const [quickCouponCode, setQuickCouponCode] = useState('');
+  const [quickLoyaltyPointsToRedeem, setQuickLoyaltyPointsToRedeem] = useState(0);
+  const [quickServiceLocationId, setQuickServiceLocationId] = useState<string | null>(null);
+
+  // F9: Tender types, cash change calculation & receipt
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'cash' | 'gift_card' | 'split' | 'room_charge'>('card');
+  const [cashTendered, setCashTendered] = useState<string>('');
+  const [giftCardCodeInput, setGiftCardCodeInput] = useState<string>('');
+  const [roomNumberInput, setRoomNumberInput] = useState<string>('');
+  const [completedPaidOrder, setCompletedPaidOrder] = useState<{
+    order: Order;
+    paymentMethod: string;
+    changeDue?: number;
+    paidAmount: number;
+  } | null>(null);
+
+  // Customer search debounced effect
+  useEffect(() => {
+    if (!customerSearchQuery.trim() || customerSearchQuery.trim().length < 2) {
+      setCustomerSearchResults([]);
+      setShowCustomerDropdown(false);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingCustomer(true);
+      try {
+        const q = customerSearchQuery.trim();
+        const res = await api.get('/staff/customers/search', { params: { q, query: q, type: 'all' } });
+        const users = res.data?.data || [];
+        setCustomerSearchResults(users.map((u: any) => ({
+          id: u.id,
+          fullName: u.fullName || u.full_name || u.name || 'Customer',
+          email: u.email,
+          phone: u.phone,
+          loyaltyPoints: u.loyaltyPoints ?? u.loyalty_points ?? 0,
+          tierName: u.tierName || u.tier_name,
+        })));
+        setShowCustomerDropdown(true);
+      } catch (err) {
+        console.error('Customer search failed:', err);
+      } finally {
+        setIsSearchingCustomer(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearchQuery]);
+
+  // F9 / F5: Server-authoritative pricing preview hook for Quick Order cart
+  const pricingCartItems = useMemo(() => quickCart.map(c => ({
+    id: c.id,
+    name: c.name,
+    price: c.price,
+    quantity: c.quantity,
+    selectedModifiers: c.selectedModifiers?.map(m => ({
+      groupId: m.groupId,
+      optionId: m.optionId,
+      optionName: m.name,
+      groupName: m.groupName,
+      modifierType: 'add' as const,
+      priceAdjustment: m.priceAdjustment,
+      quantity: m.quantity,
+    })),
+  })), [quickCart]);
+
+  const {
+    pricing: serverPricing,
+    isLoading: isPricingLoading,
+    isStale: isPricingStale,
+  } = usePricingPreview({
+    items: pricingCartItems,
+    moduleId,
+    propertyId: (auth as any)?.propertyId || null,
+    customerId: selectedCustomer?.id || null,
+    couponCode: quickCouponCode ? quickCouponCode.trim() : null,
+    loyaltyPointsToRedeem: quickLoyaltyPointsToRedeem || 0,
+    enabled: viewMode === 'quick-order' && quickCart.length > 0,
+  });
 
   // Fetch data
   const fetchData = useCallback(async () => {
@@ -441,16 +544,35 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
         ));
       };
 
+      // Socket handler for order:updated (sent on order creation, item addition, payment)
+      const handleOrderUpdated = (payload: any) => {
+        const orderId = payload.orderId || payload.id;
+        if (!orderId) return;
+        const status = payload.status;
+        const fulfillmentStatus = payload.fulfillmentStatus;
+        handleStatusUpdate({ id: orderId, status: status || 'confirmed', fulfillmentStatus });
+      };
+
+      // Handler for table:update (supports both table object and partials)
+      const handleTableUpdate = (payload: any) => {
+        if (!payload || !payload.id) return;
+        setTables(prev => prev.map(t => t.id === payload.id ? { ...t, ...payload } : t));
+      };
+
       socket.on('order:new', handleNewOrder);
       socket.on('order:status', handleStatusUpdate);
+      socket.on('order:updated', handleOrderUpdated);
       socket.on('order:item:status', handleItemStatusUpdate);
       socket.on('table:freed', handleTableFreed);
+      socket.on('table:update', handleTableUpdate);
 
       return () => {
         socket.off('order:new', handleNewOrder);
         socket.off('order:status', handleStatusUpdate);
+        socket.off('order:updated', handleOrderUpdated);
         socket.off('order:item:status', handleItemStatusUpdate);
         socket.off('table:freed', handleTableFreed);
+        socket.off('table:update', handleTableUpdate);
       };
     }
   }, [socket, moduleId, orders]);
@@ -700,14 +822,20 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
             ? { selectedModifiers: c.selectedModifiers.map(m => ({ groupId: m.groupId, optionId: m.optionId, quantity: m.quantity })) }
             : {}),
         })),
-        customerName: quickCustomerName.trim() || 'Walk-in',
-        orderType: 'counter',
+        customerName: selectedCustomer ? selectedCustomer.fullName : (quickCustomerName.trim() || 'Walk-in'),
+        customerId: selectedCustomer?.id,
+        couponCode: quickCouponCode ? quickCouponCode.trim() : undefined,
+        loyaltyPointsToRedeem: quickLoyaltyPointsToRedeem > 0 ? quickLoyaltyPointsToRedeem : undefined,
+        orderType: quickServiceLocationId ? 'dine_in' : 'counter',
+        serviceLocationId: quickServiceLocationId || undefined,
+        tableId: quickServiceLocationId || undefined,
       });
       const created = res.data.data;
+      const effectiveTotal = serverPricing?.totalAmount ?? quickCartTotal;
       const newOrder: Order = {
         id: created.id,
         orderNumber: created.orderNumber,
-        tableNumber: created.tableNumber || undefined,
+        tableNumber: created.tableNumber || (quickServiceLocationId ? tables.find(t => t.id === quickServiceLocationId)?.number : undefined),
         status: created.status || 'confirmed',
         fulfillmentStatus: created.fulfillmentStatus ?? 'queued',
         items: (quickCart as any[]).map(c => ({
@@ -718,10 +846,10 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
           status: 'pending',
           ...(c.selectedModifiers?.length ? { modifiers: c.selectedModifiers.map((m: any) => `${m.groupName}: ${m.name}`), selectedModifiers: c.selectedModifiers.map((m: any) => ({ groupId: m.groupId, optionId: m.optionId, quantity: m.quantity, name: m.name, groupName: m.groupName })) } : {}),
         })),
-        totalAmount: created.totalAmount ?? quickCartTotal,
+        totalAmount: created.totalAmount ?? effectiveTotal,
         createdAt: created.createdAt || new Date().toISOString(),
-        customerName: created.customerName || quickCustomerName.trim() || 'Walk-in',
-        orderType: 'counter',
+        customerName: created.customerName || (selectedCustomer ? selectedCustomer.fullName : (quickCustomerName.trim() || 'Walk-in')),
+        orderType: quickServiceLocationId ? 'dine_in' : 'counter',
         paymentStatus: 'unpaid',
       };
       setOrders(prev => [newOrder, ...prev]);
@@ -732,6 +860,10 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
       setShowPaymentModal(true);
       setQuickCart([]);
       setQuickCustomerName('');
+      setSelectedCustomer(null);
+      setQuickCouponCode('');
+      setQuickLoyaltyPointsToRedeem(0);
+      setQuickServiceLocationId(null);
     } catch (error) {
       toast.error('Failed to start order');
     }
@@ -793,13 +925,24 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   };
 
   // Process payment
-  const processPayment = async (orderId: string, method: string, amount: number, tip?: number) => {
+  const processPayment = async (
+    orderId: string,
+    method: string,
+    amount: number,
+    tip?: number,
+    extra?: { cashTendered?: number; changeDue?: number; giftCardCode?: string; roomNumber?: string }
+  ) => {
     try {
       const res = await api.post(`/staff/modules/${moduleSlug}/orders/${orderId}/pay`, {
         paymentMethod: method,
         amountPaid: amount,
+        amount,
         tipAmount: tip,
+        tip,
+        ...(extra?.giftCardCode ? { giftCardCode: extra.giftCardCode } : {}),
+        ...(extra?.roomNumber ? { roomNumber: extra.roomNumber } : {}),
       });
+      const currentTarget = orders.find(o => o.id === orderId) || selectedOrder;
       // Update local order state so Cashier view reflects the payment immediately
       setOrders(prev => prev.map(o =>
         o.id === orderId
@@ -807,14 +950,26 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
           : o
       ));
       // Release the table if the order was for a table
-      const paidOrder = orders.find(o => o.id === orderId);
-      if (paidOrder?.tableNumber) {
+      if (currentTarget?.tableNumber) {
         setTables(prev => prev.map(t =>
-          t.number === paidOrder.tableNumber ? { ...t, status: 'available', currentOrder: undefined } : t
+          t.number === currentTarget.tableNumber ? { ...t, status: 'available', currentOrder: undefined } : t
         ));
       }
       toast.success('Payment processed');
       setShowPaymentModal(false);
+      if (currentTarget) {
+        setCompletedPaidOrder({
+          order: {
+            ...currentTarget,
+            status: res.data.data?.status || 'completed',
+            paymentMethod: method,
+            paymentStatus: 'paid',
+          },
+          paymentMethod: method,
+          paidAmount: amount,
+          changeDue: extra?.changeDue,
+        });
+      }
       setSelectedOrder(null);
     } catch (error) {
       toast.error('Payment failed');
@@ -1139,7 +1294,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                     if (statusFilter === 'active') {
                       // Mode-aware: active = not terminal and not completed/cancelled
                       if (o.status === 'completed' || o.status === 'cancelled') return false;
-                      return isKitchenActive(o);
+                      return o.status === 'pending' || isKitchenActive(o);
                     }
                     // For named fulfillment states, check fulfillmentStatus;
                     // for transaction states, check status.
@@ -1345,14 +1500,136 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
 
             {/* Cart */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 flex flex-col overflow-y-auto">
-              <h3 className="text-lg font-bold mb-4">Current Order</h3>
-              <input
-                type="text"
-                placeholder="Customer name (optional)"
-                value={quickCustomerName}
-                onChange={(e) => setQuickCustomerName(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg mb-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              />
+              <h3 className="text-lg font-bold mb-3">Current Order</h3>
+
+              {/* F9: Customer lookup & association */}
+              {selectedCustomer ? (
+                <div className="p-2.5 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg mb-3 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 font-medium text-sm text-purple-900 dark:text-purple-200">
+                      <UserCheck className="w-4 h-4 text-purple-600" />
+                      <span>{selectedCustomer.fullName}</span>
+                      {selectedCustomer.tierName && (
+                        <span className="text-xs bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200 px-1.5 py-0.5 rounded">
+                          {selectedCustomer.tierName}
+                        </span>
+                      )}
+                    </div>
+                    {selectedCustomer.email && (
+                      <p className="text-xs text-purple-600 dark:text-purple-400">{selectedCustomer.email}</p>
+                    )}
+                    {typeof selectedCustomer.loyaltyPoints === 'number' && (
+                      <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        <Award className="w-3.5 h-3.5" />
+                        <span>{selectedCustomer.loyaltyPoints} points available</span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedCustomer(null); setQuickLoyaltyPointsToRedeem(0); }}
+                    className="text-xs text-purple-600 hover:text-purple-800 font-semibold px-2 py-1 rounded hover:bg-purple-100 dark:hover:bg-purple-900"
+                    title="Clear customer"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <div className="relative mb-3">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search customer (name, phone, email)..."
+                      value={customerSearchQuery}
+                      onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    />
+                    <Search className="w-4 h-4 absolute left-2.5 top-3 text-gray-400" />
+                    {isSearchingCustomer && (
+                      <div className="absolute right-2.5 top-3 w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    )}
+                  </div>
+
+                  {showCustomerDropdown && customerSearchResults.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                      {customerSearchResults.map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomer(c);
+                            setCustomerSearchQuery('');
+                            setShowCustomerDropdown(false);
+                          }}
+                          className="w-full text-left p-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b last:border-0"
+                        >
+                          <div className="font-medium text-sm">{c.fullName}</div>
+                          <div className="text-xs text-gray-500 flex items-center justify-between">
+                            <span>{c.email || c.phone || 'No contact info'}</span>
+                            {typeof c.loyaltyPoints === 'number' && c.loyaltyPoints > 0 && (
+                              <span className="text-amber-600 font-semibold">{c.loyaltyPoints} pts</span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <input
+                    type="text"
+                    placeholder="Or enter walk-in name (optional)"
+                    value={quickCustomerName}
+                    onChange={(e) => setQuickCustomerName(e.target.value)}
+                    className="w-full px-3 py-1.5 text-sm border rounded-lg mt-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+              )}
+
+              {/* F9: Loyalty redemption & promo / table selection */}
+              <div className="space-y-2 mb-3">
+                {selectedCustomer && (selectedCustomer.loyaltyPoints || 0) > 0 && (
+                  <div className="p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg text-xs">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-medium text-amber-900 dark:text-amber-200 flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5" /> Redeem Points
+                      </span>
+                      <span className="text-amber-700 dark:text-amber-300 font-bold">{quickLoyaltyPointsToRedeem} pts</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={selectedCustomer.loyaltyPoints}
+                      step={10}
+                      value={quickLoyaltyPointsToRedeem}
+                      onChange={(e) => setQuickLoyaltyPointsToRedeem(Number(e.target.value))}
+                      className="w-full cursor-pointer accent-amber-600"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Promo / Coupon code"
+                    value={quickCouponCode}
+                    onChange={(e) => setQuickCouponCode(e.target.value)}
+                    className="flex-1 px-3 py-1 text-xs uppercase border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                  {tables.length > 0 && (
+                    <select
+                      value={quickServiceLocationId || ''}
+                      onChange={(e) => setQuickServiceLocationId(e.target.value || null)}
+                      className="px-2 py-1 text-xs border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    >
+                      <option value="">Counter / Takeaway</option>
+                      {tables.map(t => (
+                        <option key={t.id} value={t.id}>Table {t.number}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
               {quickCart.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">Tap items to add them to the order</p>
               ) : (
@@ -1403,13 +1680,34 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                   ))}
                 </div>
               )}
-              <div className="border-t pt-4 mt-4 space-y-3">
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total</span>
-                  <span>{formatCurrency(quickCartTotal)}</span>
+
+              {/* Server-Authoritative Pricing Breakdown */}
+              <div className="border-t pt-3 mt-3 space-y-2">
+                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                  <span>Subtotal</span>
+                  <span>{formatCurrency(serverPricing?.subtotal ?? quickCartTotal)}</span>
+                </div>
+                {(serverPricing?.totalDiscount ?? 0) > 0 && (
+                  <div className="flex justify-between text-sm text-green-600 font-medium">
+                    <span>Discount</span>
+                    <span>-{formatCurrency(serverPricing!.totalDiscount)}</span>
+                  </div>
+                )}
+                {(serverPricing?.taxAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                    <span>Taxes</span>
+                    <span>+{formatCurrency(serverPricing!.taxAmount)}</span>
+                  </div>
+                )}
+                <div className="border-t pt-2 flex justify-between font-bold text-lg items-center">
+                  <div className="flex items-center gap-1.5">
+                    <span>Total</span>
+                    {isPricingLoading && <span className="text-xs text-primary animate-pulse font-normal">(pricing...)</span>}
+                  </div>
+                  <span>{formatCurrency(serverPricing?.totalAmount ?? quickCartTotal)}</span>
                 </div>
                 <Button className="w-full" onClick={checkoutQuickOrder} disabled={quickCart.length === 0}>
-                  <CreditCard className="h-4 w-4 mr-2" /> Checkout & Pay
+                  <CreditCard className="h-4 w-4 mr-2" /> Checkout & Settle
                 </Button>
               </div>
             </div>
@@ -1643,37 +1941,216 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="staff-payment-title" onKeyDown={(e) => { if (e.key === 'Escape') { setShowPaymentModal(false); setSelectedOrder(null); } }}>
           <Card className="max-w-md w-full">
             <CardHeader>
-              <CardTitle>Process Payment</CardTitle>
+              <CardTitle><span id="staff-payment-title">Process Payment</span></CardTitle>
               <p className="text-sm text-gray-500">
-                Order #{selectedOrder.orderNumber} - {formatCurrency(selectedOrder.totalAmount)}
+                Order #{selectedOrder.orderNumber} - <span className="font-bold text-gray-800 dark:text-gray-100">{formatCurrency(selectedOrder.totalAmount)}</span>
               </p>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {(cashHandlingEnabled ? ['card', 'cash', 'gift_card', 'split'] : ['card', 'gift_card', 'split']).map(method => (
+            <CardContent className="space-y-4">
+              {/* Payment Method Selector */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'card' as const, label: 'Credit Card', icon: CreditCard, color: 'text-primary' },
+                  ...(cashHandlingEnabled ? [{ id: 'cash' as const, label: 'Cash', icon: DollarSign, color: 'text-green-600' }] : []),
+                  { id: 'gift_card' as const, label: 'Gift Card', icon: Receipt, color: 'text-purple-600' },
+                  { id: 'room_charge' as const, label: 'Room Charge', icon: UtensilsCrossed, color: 'text-indigo-600' },
+                  { id: 'split' as const, label: 'Split Bill', icon: Split, color: 'text-blue-600' },
+                ].map(({ id, label, icon: Icon, color }) => (
                   <button
-                    key={method}
-                    onClick={() => processPayment(selectedOrder.id, method, selectedOrder.totalAmount)}
-                    className="w-full flex items-center gap-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedPaymentMethod(id)}
+                    className={`flex items-center gap-2.5 p-3 border rounded-lg text-sm font-medium transition ${
+                      selectedPaymentMethod === id
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                        : 'border-slate-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
                   >
-                    {method === 'card' && <CreditCard className="h-5 w-5 text-primary" />}
-                    {method === 'cash' && <DollarSign className="h-5 w-5 text-green-600" />}
-                    {method === 'gift_card' && <Receipt className="h-5 w-5 text-purple-600" />}
-                    {method === 'split' && <Split className="h-5 w-5 text-blue-600" />}
-                    <span className="capitalize">{method.replace('_', ' ')}</span>
+                    <Icon className={`h-4 w-4 ${color}`} />
+                    <span>{label}</span>
                   </button>
                 ))}
               </div>
-              <Button
-                variant="outline"
-                className="w-full mt-4"
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setSelectedOrder(null);
-                }}
-              >
-                Cancel
-              </Button>
+
+              {/* Cash specific: Tender & Change Due */}
+              {selectedPaymentMethod === 'cash' && (
+                <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg space-y-2.5">
+                  <div className="flex justify-between items-center text-xs font-semibold text-green-900 dark:text-green-200">
+                    <span>Cash Tendered</span>
+                    <span>Total Due: {formatCurrency(selectedOrder.totalAmount)}</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={cashTendered}
+                    onChange={(e) => setCashTendered(e.target.value)}
+                    className="w-full px-3 py-2 text-base font-mono border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[
+                      { label: 'Exact', value: selectedOrder.totalAmount.toFixed(2) },
+                      { label: '$20', value: '20' },
+                      { label: '$50', value: '50' },
+                      { label: '$100', value: '100' },
+                    ].map(pill => (
+                      <button
+                        key={pill.label}
+                        type="button"
+                        onClick={() => setCashTendered(pill.value)}
+                        className="text-xs px-2.5 py-1 bg-white dark:bg-gray-800 border rounded font-medium hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        {pill.label}
+                      </button>
+                    ))}
+                  </div>
+                  {(() => {
+                    const tendered = parseFloat(cashTendered) || 0;
+                    const changeDue = Math.max(0, tendered - selectedOrder.totalAmount);
+                    return tendered >= selectedOrder.totalAmount ? (
+                      <div className="pt-1.5 border-t border-green-200 dark:border-green-800 flex justify-between text-sm font-bold text-green-700 dark:text-green-300">
+                        <span>Change Due:</span>
+                        <span>{formatCurrency(changeDue)}</span>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              )}
+
+              {/* Gift Card specific */}
+              {selectedPaymentMethod === 'gift_card' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Gift Card Code</label>
+                  <input
+                    type="text"
+                    placeholder="Enter gift card code..."
+                    value={giftCardCodeInput}
+                    onChange={(e) => setGiftCardCodeInput(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border rounded-lg uppercase dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+              )}
+
+              {/* Room charge specific */}
+              {selectedPaymentMethod === 'room_charge' && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium">Room Number / Guest Folio</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Room 204"
+                    value={roomNumberInput}
+                    onChange={(e) => setRoomNumberInput(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setSelectedOrder(null);
+                    setCashTendered('');
+                    setGiftCardCodeInput('');
+                    setRoomNumberInput('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    const tendered = parseFloat(cashTendered) || selectedOrder.totalAmount;
+                    const changeDue = selectedPaymentMethod === 'cash' ? Math.max(0, tendered - selectedOrder.totalAmount) : 0;
+                    processPayment(selectedOrder.id, selectedPaymentMethod, selectedOrder.totalAmount, undefined, {
+                      cashTendered: tendered,
+                      changeDue,
+                      giftCardCode: giftCardCodeInput.trim() || undefined,
+                      roomNumber: roomNumberInput.trim() || undefined,
+                    });
+                  }}
+                >
+                  Confirm Settle
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* F9: Itemized Receipt Modal */}
+      {completedPaidOrder && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="staff-receipt-title"
+          onKeyDown={(e) => { if (e.key === 'Escape') setCompletedPaidOrder(null); }}
+        >
+          <Card className="max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <CardHeader className="text-center border-b pb-4">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-full flex items-center justify-center mx-auto mb-2">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <CardTitle className="text-lg"><span id="staff-receipt-title">Payment Successful</span></CardTitle>
+              <p className="text-xs text-gray-500 font-mono">
+                Order #{completedPaidOrder.order.orderNumber} • {formatTime(completedPaidOrder.order.createdAt)}
+              </p>
+              {completedPaidOrder.order.customerName && (
+                <p className="text-xs font-medium text-primary mt-1">
+                  Customer: {completedPaidOrder.order.customerName}
+                </p>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              {/* Line items breakdown */}
+              <div className="space-y-2 border-b pb-3">
+                {completedPaidOrder.order.items.map((item, idx) => (
+                  <div key={idx} className="text-sm">
+                    <div className="flex justify-between font-medium">
+                      <span>{item.quantity}x {item.name}</span>
+                      <span>{formatCurrency(item.unitPrice * item.quantity)}</span>
+                    </div>
+                    {item.modifiers && item.modifiers.length > 0 && (
+                      <p className="text-xs text-gray-500 pl-4">+ {item.modifiers.join(', ')}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Economic breakdown */}
+              <div className="space-y-1.5 text-sm border-b pb-3">
+                <div className="flex justify-between font-bold text-base">
+                  <span>Amount Paid</span>
+                  <span>{formatCurrency(completedPaidOrder.paidAmount)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span className="capitalize">Method: {completedPaidOrder.paymentMethod.replace('_', ' ')}</span>
+                  {completedPaidOrder.changeDue !== undefined && completedPaidOrder.changeDue > 0 && (
+                    <span className="text-green-600 font-bold">Change: {formatCurrency(completedPaidOrder.changeDue)}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => printReceipt(completedPaidOrder.order.id)}
+                >
+                  <Printer className="w-4 h-4 mr-1.5" /> Print Receipt
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => setCompletedPaidOrder(null)}
+                >
+                  New Order
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

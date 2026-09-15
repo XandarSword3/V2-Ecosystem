@@ -69,6 +69,8 @@ vi.mock('@/lib/translate', () => ({
     translateContent: (item: Record<string, string | undefined>, field: 'name' | 'description') =>
       item?.[field] || item?.[`${field}_ar`] || '',
   }),
+  getTranslatedModuleName: (mod: any, _locale: string) => mod?.name || 'Module One',
+  translateDynamicString: (str: string) => str,
 }));
 
 vi.mock('sonner', () => ({
@@ -236,7 +238,7 @@ describe('DynamicModuleRenderer behavior', () => {
     await user.click(screen.getByRole('button', { name: 'Main' }));
     expect(screen.queryByText('Cola')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'all' }));
+    await user.click(screen.getByRole('button', { name: /all/i }));
     expect(screen.getByText('Cola')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /add to cart/i }));
@@ -324,5 +326,74 @@ describe('DynamicModuleRenderer behavior', () => {
     await waitFor(() => {
       expect(toastErrorMock).toHaveBeenCalledWith('Submit failed');
     });
+  });
+
+  it('switches to responsive stack mode on mobile viewports (< 1024px) when layout has positioned blocks', () => {
+    const positionedLayout = [
+      {
+        id: 'hero-pos',
+        type: 'hero',
+        props: { title: 'Mobile Friendly Hero' },
+        position: { x: 0, y: 0, z: 1, width: '1440px', height: '400px' },
+      },
+      {
+        id: 'text-pos',
+        type: 'text_block',
+        props: { content: 'Mobile Content Below Hero' },
+        position: { x: 120, y: 450, z: 2, width: '1200px', height: '300px' },
+      },
+    ];
+
+    // Mock mobile viewport width
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 375 });
+
+    const { container } = render(
+      <DynamicModuleRenderer layout={positionedLayout as never} module={moduleData as never} />
+    );
+
+    // In responsive stack mode (< 1024px), it should NOT have the 1440px fixed canvas
+    expect(screen.getByText('Mobile Friendly Hero')).toBeInTheDocument();
+    expect(screen.getByText('Mobile Content Below Hero')).toBeInTheDocument();
+
+    const fixedCanvas = container.querySelector('div[style*="width: 1440px"]');
+    expect(fixedCanvas).toBeNull();
+
+    // Restore original width
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: originalInnerWidth });
+  });
+
+  it('renders freeform canvas on desktop viewports (>= 1024px) when layout has positioned blocks', () => {
+    const positionedLayout = [
+      {
+        id: 'hero-pos',
+        type: 'hero',
+        props: { title: 'Desktop Canvas Hero' },
+        position: { x: 0, y: 0, z: 1, width: '1440px', height: '400px' },
+      },
+      {
+        id: 'text-pos',
+        type: 'text_block',
+        props: { content: 'Desktop Canvas Content' },
+        position: { x: 120, y: 450, z: 2, width: '1200px', height: '300px' },
+      },
+    ];
+
+    // Mock desktop viewport width
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1440 });
+
+    const { container } = render(
+      <DynamicModuleRenderer layout={positionedLayout as never} module={moduleData as never} />
+    );
+
+    expect(screen.getByText('Desktop Canvas Hero')).toBeInTheDocument();
+    expect(screen.getByText('Desktop Canvas Content')).toBeInTheDocument();
+
+    const fixedCanvas = container.querySelector('div[style*="width: 1440px"]');
+    expect(fixedCanvas).not.toBeNull();
+
+    // Restore original width
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: originalInnerWidth });
   });
 });

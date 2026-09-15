@@ -134,16 +134,20 @@ const parsePx = (val: string | number | undefined, fallback = 200): number => {
   return isNaN(n) ? fallback : n;
 };
 
-// Hook to compute responsive scale factor relative to container width (1440px standard canvas width)
+// Hook to compute responsive scale factor and container width relative to 1440px standard canvas width
 function useContainerWidthScale(ref: React.RefObject<HTMLDivElement | null>) {
   const [scale, setScale] = useState(1);
+  const [containerWidth, setContainerWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1440
+  );
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
     const update = () => {
-      const w = el.clientWidth || 1440;
+      const w = el.clientWidth || window.innerWidth || 1440;
+      setContainerWidth(w);
       setScale(w / 1440);
     };
 
@@ -154,12 +158,12 @@ function useContainerWidthScale(ref: React.RefObject<HTMLDivElement | null>) {
     return () => observer.disconnect();
   }, [ref]);
 
-  return scale;
+  return { scale, containerWidth };
 }
 
 export function DynamicModuleRenderer({ layout, module, propertySlug }: RendererProps & { propertySlug?: string }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const scale = useContainerWidthScale(containerRef);
+  const { scale, containerWidth } = useContainerWidthScale(containerRef);
 
   // Validate schema version
   const result = z.array(SafeBlockSchema).safeParse(layout);
@@ -197,28 +201,46 @@ export function DynamicModuleRenderer({ layout, module, propertySlug }: Renderer
     (b) => b.position?.x !== undefined && b.position?.y !== undefined
   );
 
-  // Stack fallback: render blocks in normal document flow
-  if (!hasPositionData) {
+  // On mobile & tablet viewports (< 1024px) or when layout lacks complete position data,
+  // render in natural responsive document flow. This prevents fixed 1440px desktop canvases
+  // from scaling down into microscopic 26% thumbnails with empty gaps on mobile devices.
+  const isResponsiveViewport = containerWidth < 1024;
+
+  if (!hasPositionData || isResponsiveViewport) {
+    // Sort blocks by vertical position (Y coordinate) to preserve the visual hierarchy designed on canvas
+    const orderedLayout = [...safeLayout].sort((a, b) => {
+      const yA = a.position?.y ?? 0;
+      const yB = b.position?.y ?? 0;
+      if (yA !== yB) return yA - yB;
+      const xA = a.position?.x ?? 0;
+      const xB = b.position?.x ?? 0;
+      return xA - xB;
+    });
+
     return (
-      <div className="relative w-full bg-slate-50 dark:bg-slate-900">
-        {safeLayout.map((block) => (
-          <BlockRenderer key={block.id} block={block} module={module} />
+      <div
+        ref={containerRef}
+        className="relative w-full bg-slate-50 dark:bg-slate-900 min-h-[60vh] flex flex-col"
+      >
+        {orderedLayout.map((block) => (
+          <div key={block.id} className="w-full">
+            <BlockRenderer block={block} module={module} />
+          </div>
         ))}
       </div>
     );
   }
 
-  // Canvas height calculation
+  // Desktop freeform canvas mode (>= 1024px) — 1440px canvas scaled to fit container width
   const canvasHeight = Math.max(
     800,
     ...safeLayout.map((b) => (b.position?.y ?? 0) + parsePx(b.position?.height, 200) + 100)
   );
 
-  // Freeform canvas mode — 1440px canvas scaled to fit container width (Desktop 100%, Mobile 375px frame)
   return (
     <div
       ref={containerRef}
-      className="relative w-full bg-slate-50 dark:bg-slate-900 overflow-hidden"
+      className="relative w-full bg-slate-50 dark:bg-slate-900 overflow-hidden min-h-[60vh]"
       style={{ height: `${canvasHeight * scale}px` }}
     >
       <div style={{
