@@ -15,7 +15,7 @@ import { useSocket } from '@/lib/socket';
 // Canonical Engine A domain helpers (plan F1): the page keys off the
 // canonical fulfillment state — never legacy composites and never
 // fulfillment inferred from transactions.status.
-import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, type CanonicalOrderState, type FulfillmentMode, type FulfillmentState } from '@/types';
+import { canonicalFulfillmentState, FULFILLMENT_LAYER_STATES, isTransactionState, type CanonicalOrderState, type FulfillmentMode, type FulfillmentState } from '@/types';
 import { getModeStateConfig, resolveColumnKey } from '@/lib/engine-a/types';
 import {
   Search,
@@ -112,33 +112,46 @@ export default function AdminOrdersPage() {
     try {
       setLoading(true);
 
-      // Discover all active instant_transaction modules
-      const modsRes = await api.get('/admin/modules').catch(() => ({ data: { data: [] } }));
-      const allMods: Array<{ id: string; slug: string; name: string; engine_type?: string; template_type?: string }> =
-        modsRes.data?.data || [];
-      const instantMods = allMods.filter(
-        m => m.engine_type === 'instant_transaction' || m.template_type === 'menu_service'
-      );
-      setModules(instantMods.map(m => ({ slug: m.slug, name: m.name })));
+      // F11: single canonical cross-engine query against the unified
+      // transactions table (all engine types) — replaces the N per-module
+      // instant_transaction-only calls. The backend projects an
+      // engine-agnostic shape; fulfillment is NEVER inferred from status
+      // (F1 two-layer rule).
+      const res = await api
+        .get('/admin/transactions', { params: { limit: 500 } })
+        .catch(() => ({ data: { data: { transactions: [], modules: [] } } }));
 
-      // Fetch orders for each module in parallel
-      const orderResponses = await Promise.all(
-        instantMods.map(m =>
-          api.get(`/staff/modules/${m.slug}/orders`).catch(() => ({ data: { data: [] } }))
-        )
-      );
+      const payload = res.data?.data || { transactions: [], modules: [] };
+      setModules((payload.modules || []).map((m: { slug: string; name: string }) => ({ slug: m.slug, name: m.name })));
 
-      const allOrders = orderResponses.flatMap((res, i) =>
-        (res.data?.data || res.data || []).map((o: Omit<Order, 'module_slug' | 'module_name'>) => ({
-          ...o,
-          module_slug: instantMods[i].slug,
-          module_name: instantMods[i].name,
-        }))
-      );
+      const allOrders: Order[] = (payload.transactions || []).map((t: {
+        id: string;
+        engineType: string;
+        module: { slug: string; name: string } | null;
+        transactionState: string;
+        fulfillmentStatus: string | null;
+        amount: number;
+        customerName: string;
+        reference: string;
+        createdAt: string;
+        updatedAt: string;
+      }) => ({
+        id: t.id,
+        order_number: t.reference,
+        module_slug: t.module?.slug || '',
+        module_name: t.module?.name || 'Unknown Module',
+        // Two-layer states preserved; the page renders via canonicalFulfillmentState
+        status: (isTransactionState(t.transactionState) ? t.transactionState : 'pending') as Order['status'],
+        fulfillmentStatus: t.fulfillmentStatus,
+        fulfillmentMode: null, // not provided by this endpoint; canonical helpers fall back gracefully
+        total_amount: t.amount,
+        items: [],
+        customer_name: t.customerName,
+        created_at: t.createdAt,
+        updated_at: t.updatedAt,
+      }));
 
-      setOrders(
-        allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      );
+      setOrders(allOrders);
     } catch (error) {
       toast.error('Failed to fetch orders');
     } finally {

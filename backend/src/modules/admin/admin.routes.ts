@@ -162,6 +162,14 @@ router.get('/reports/occupancy', authorizeManager, reportsController.getOccupanc
 router.get('/reports/customers', authorizeManager, reportsController.getCustomersReport);
 router.get('/reports/export', authorizeManager, reportsController.exportReport);
 
+// Canonical cross-engine transactions (F11 unified Orders capability).
+// Auth via router.use(authenticate) + property scope via
+// router.use(validatePropertyAccess) above; tenant defense-in-depth inside
+// the controller via the JWT-derived tenant id. Manager-gated: this exposes
+// economic data (amounts, customers) across every engine type.
+import { getCrossEngineTransactions } from './controllers/transactions.controller.js';
+router.get('/transactions', authorizeManager, asyncHandler(getCrossEngineTransactions));
+
 // Notifications (using refactored controller) - MANAGER
 router.get('/notifications', authorizeManager, notificationsController.getNotifications);
 router.get('/notifications/broadcasts', authorizeManager, notificationsController.getBroadcasts);
