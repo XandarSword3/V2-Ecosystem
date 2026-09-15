@@ -14,6 +14,8 @@ import {
   LifeBuoy,
   User,
   LogIn,
+  RotateCcw,
+  ShieldCheck,
 } from 'lucide-react';
 
 export type AccountTabKey =
@@ -22,7 +24,10 @@ export type AccountTabKey =
   | 'loyalty'
   | 'gift-cards'
   | 'reviews'
+  | 'recovery'
+  | 'returns'
   | 'support'
+  | 'profile'
   | string;
 
 export interface AccountTabItem {
@@ -43,12 +48,12 @@ export interface AccountShellProps {
 }
 
 /**
- * AccountShell — Presentation & navigation shell for customer account surfaces (Phase F3).
+ * AccountShell — Presentation & navigation shell for customer account surfaces (Phase F3 / F10).
  *
  * Responsibilities:
  * - Provides responsive tabbed navigation across customer lifecycle views
  * - Displays guest vs authenticated presentation banner
- * - Houses child account views (`OrderHistory`, `OrderTracking`, `Loyalty`, `Profile`, etc.)
+ * - Houses child account views (`OrdersHub`, `LoyaltyHub`, `ReviewsHub`, `RecoveryHub`, `ReturnsHub`, `Profile`, etc.)
  *
  * Explicit Non-Responsibilities (F3 Law):
  * - Does NOT own order lifecycle state machines or refunds
@@ -75,7 +80,9 @@ export function AccountShell({
     { key: 'loyalty', label: t('loyalty') || 'Loyalty & Rewards', href: `${basePath}/loyalty`, icon: Sparkles },
     { key: 'gift-cards', label: t('giftCards') || 'Gift Cards', href: `${basePath}/gift-cards`, icon: Gift },
     { key: 'reviews', label: t('reviews') || 'Reviews', href: `${basePath}/reviews`, icon: Star },
-    { key: 'support', label: t('support') || 'Support & Help', href: `${basePath}/support`, icon: LifeBuoy },
+    { key: 'recovery', label: t('recovery') || 'Service Recovery', href: `${basePath}/recovery`, icon: LifeBuoy },
+    { key: 'returns', label: t('returns') || 'Returns & Replacements', href: `${basePath}/returns`, icon: RotateCcw },
+    { key: 'profile', label: t('profile') || 'Profile & Security', href: `${basePath}/profile`, icon: User },
   ];
 
   const activeTabs = customTabs && customTabs.length > 0 ? customTabs : defaultTabs;

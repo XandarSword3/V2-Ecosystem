@@ -8,7 +8,9 @@ const router = Router();
 // Public routes
 router.get('/', reviewsController.getApprovedReviews);
 
-// Authenticated routes
+// Authenticated customer routes
+router.get('/me', authenticate, reviewsController.getMyReviews);
+router.get('/eligibility', authenticate, reviewsController.getReviewEligibility);
 router.post('/', authenticate, reviewsController.createReview);
 
 // Admin routes

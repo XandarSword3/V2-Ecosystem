@@ -15,6 +15,7 @@ import {
   addInternalNote,
   escalateTicket,
   getTicketStats,
+  getCustomerInquiries,
 } from './support.controller.js';
 
 const router = Router();
@@ -143,6 +144,11 @@ router.get('/faq', asyncHandler(async (req: Request, res: Response) => {
   if (error) throw error;
   res.json({ success: true, data: faqs ?? [] });
 }));
+
+// -------------------------------------------------------
+// Customer — my tickets & recovery resolutions (authenticated)
+// -------------------------------------------------------
+router.get('/my-tickets', authenticate, asyncHandler(getCustomerInquiries));
 
 // -------------------------------------------------------
 // Staff/Admin — ticket management (authenticated)

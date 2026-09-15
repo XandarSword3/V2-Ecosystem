@@ -105,6 +105,159 @@ export const getApprovedReviews = asyncHandler(async (req: Request, res: Respons
 });
 
 /**
+ * Get all reviews written by the authenticated customer
+ */
+export const getMyReviews = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const userId = (req.user as any)?.id || (req.user as any)?.userId;
+  const propertyId = getPropertyId(req);
+
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+
+  let query = supabase
+    .from('reviews')
+    .select(`
+      id,
+      rating,
+      content,
+      module_id,
+      status,
+      target_type,
+      target_id,
+      created_at
+    `)
+    .eq('customer_id', userId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+
+  if (propertyId) {
+    query = query.eq('property_id', propertyId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('[Reviews] getMyReviews failed:', error.message);
+    return res.json({ success: true, data: [] });
+  }
+
+  const mapped = (data || []).map((r: any) => ({
+    id: r.id,
+    rating: r.rating,
+    text: r.content,
+    service_type: r.module_id,
+    status: r.status,
+    target_type: r.target_type,
+    target_id: r.target_id,
+    created_at: r.created_at,
+  }));
+
+  res.json({ success: true, data: mapped });
+});
+
+/**
+ * Get review eligibility for the authenticated customer
+ * Evaluates completed transactions at the property and items ordered
+ */
+export const getReviewEligibility = asyncHandler(async (req: Request, res: Response) => {
+  const supabase = getSupabase();
+  const userId = (req.user as any)?.id || (req.user as any)?.userId;
+  const propertyId = getPropertyId(req);
+
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+
+  // Completed or confirmed transactions
+  let txQuery = supabase
+    .from('transactions')
+    .select('id, module_id, created_at, status')
+    .eq('customer_id', userId)
+    .in('status', ['completed', 'confirmed', 'delivered']);
+
+  if (propertyId) {
+    txQuery = txQuery.eq('property_id', propertyId);
+  }
+
+  const { data: txs, error: txErr } = await txQuery;
+  if (txErr || !txs || txs.length === 0) {
+    return res.json({
+      success: true,
+      data: {
+        isEligible: false,
+        completedTransactionsCount: 0,
+        eligibleTargets: [],
+      },
+    });
+  }
+
+  // Find already reviewed target IDs for this customer
+  const { data: existingReviews } = await supabase
+    .from('reviews')
+    .select('target_type, target_id, module_id')
+    .eq('customer_id', userId)
+    .is('deleted_at', null);
+
+  const reviewedKeys = new Set(
+    (existingReviews || []).map((r: any) => `${r.target_type}:${r.target_id}`)
+  );
+
+  const eligibleTargets: Array<{ targetType: string; targetId: string; title: string; subtitle?: string; moduleId?: string }> = [];
+
+  // General service eligibility for active modules
+  const modulesSeen = new Set<string>();
+  for (const tx of txs) {
+    const modId = tx.module_id || 'general';
+    if (!modulesSeen.has(modId)) {
+      modulesSeen.add(modId);
+      if (!reviewedKeys.has(`module:${modId}`)) {
+        eligibleTargets.push({
+          targetType: 'module',
+          targetId: modId,
+          title: modId === 'general' ? 'Overall Experience' : `${modId.charAt(0).toUpperCase() + modId.slice(1)} Service`,
+          subtitle: `Based on your recent visit`,
+          moduleId: modId,
+        });
+      }
+    }
+  }
+
+  // Check ordered items
+  const txIds = txs.map((t: any) => t.id);
+  const { data: orderItems } = await supabase
+    .from('order_items')
+    .select('id, catalog_item_id, item_name, name')
+    .in('transaction_id', txIds)
+    .limit(20);
+
+  if (orderItems && orderItems.length > 0) {
+    for (const item of orderItems) {
+      const targetId = item.catalog_item_id;
+      const itemName = item.item_name || item.name || 'Purchased Item';
+      if (targetId && !reviewedKeys.has(`item:${targetId}`)) {
+        reviewedKeys.add(`item:${targetId}`);
+        eligibleTargets.push({
+          targetType: 'item',
+          targetId,
+          title: itemName,
+          subtitle: 'Ordered Item',
+        });
+      }
+    }
+  }
+
+  res.json({
+    success: true,
+    data: {
+      isEligible: eligibleTargets.length > 0,
+      completedTransactionsCount: txs.length,
+      eligibleTargets,
+    },
+  });
+});
+
+/**
  * Create a new review (authenticated users only)
  */
 export const createReview = asyncHandler(async (req: Request, res: Response) => {

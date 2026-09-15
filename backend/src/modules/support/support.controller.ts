@@ -353,3 +353,50 @@ export async function getTicketStats(req: Request, res: Response) {
     res.status(500).json({ success: false, error: 'Failed to fetch stats' });
   }
 }
+
+// -------------------------------------------------------
+// Customer — list my tickets & recovery resolutions
+// -------------------------------------------------------
+export async function getCustomerInquiries(req: Request, res: Response) {
+  try {
+    const supabase = getSupabase();
+    const user = (req as any).user;
+    const userEmail = user?.email;
+
+    if (!userEmail) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const { data: tickets, error } = await supabase
+      .from('support_inquiries')
+      .select(`
+        id, name, email, phone, subject, message, status, priority,
+        created_at, updated_at, resolved_at, admin_notes
+      `)
+      .eq('email', userEmail)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      logger.error('getCustomerInquiries failed:', error);
+      return res.json({ success: true, data: [] });
+    }
+
+    const mapped = (tickets || []).map((t: any) => ({
+      id: t.id,
+      subject: t.subject,
+      message: t.message,
+      status: t.status,
+      priority: t.priority,
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+      resolved_at: t.resolved_at,
+      resolution: ['resolved', 'closed'].includes(t.status) ? (t.admin_notes || 'Resolved by support team.') : null,
+    }));
+
+    res.json({ success: true, data: mapped });
+  } catch (err) {
+    logger.error('getCustomerInquiries unexpected error:', err);
+    res.status(500).json({ success: false, error: 'Failed to retrieve inquiries' });
+  }
+}
+
