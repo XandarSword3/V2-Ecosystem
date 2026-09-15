@@ -81,6 +81,9 @@ function createQueryMock(mockDataFn: () => unknown[]) {
   return mockObj;
 }
 
+const TEST_TENANT_ID = 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44';
+const TEST_CUSTOMER_ID = 'usr-guest-1';
+
 function mockReq(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     params: {},
@@ -88,7 +91,7 @@ function mockReq(overrides: Record<string, unknown> = {}): Record<string, unknow
     body: {},
     headers: {},
     rawBody: Buffer.from('{}'),
-    user: { userId: 'usr-guest-1', roles: ['customer'] },
+    user: { userId: TEST_CUSTOMER_ID, roles: ['customer'], tenantId: TEST_TENANT_ID },
     ip: '127.0.0.1',
     get: vi.fn(),
     ...overrides,
@@ -136,6 +139,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
         total_amount: 42.5,
         currency: 'USD',
         payment_status: 'pending',
+        tenant_id: TEST_TENANT_ID,
+        property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
+        customer_id: TEST_CUSTOMER_ID,
       },
     ];
     setupSupabase();
@@ -184,6 +190,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
         total_amount: 89.99,
         currency: 'USD',
         payment_status: 'pending',
+        tenant_id: TEST_TENANT_ID,
+        property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
+        customer_id: TEST_CUSTOMER_ID,
       },
     ];
     setupSupabase();
@@ -222,6 +231,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
         total_amount: 15.25,
         currency: 'KWD',
         payment_status: 'pending',
+        tenant_id: TEST_TENANT_ID,
+        property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
+        customer_id: TEST_CUSTOMER_ID,
       },
     ];
     setupSupabase();
@@ -257,6 +269,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
         total_amount: 3500,
         currency: 'JPY',
         payment_status: 'pending',
+        tenant_id: TEST_TENANT_ID,
+        property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
+        customer_id: TEST_CUSTOMER_ID,
       },
     ];
     setupSupabase();
@@ -292,6 +307,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
         total_amount: 50.0,
         currency: 'USD',
         payment_status: 'paid',
+        tenant_id: TEST_TENANT_ID,
+        property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
+        customer_id: TEST_CUSTOMER_ID,
       },
     ];
     setupSupabase();
@@ -323,6 +341,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
         total_amount: 450.0,
         currency: 'USD',
         payment_status: 'pending',
+        tenant_id: TEST_TENANT_ID,
+        property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
+        customer_id: TEST_CUSTOMER_ID,
       },
     ];
     setupSupabase();

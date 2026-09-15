@@ -229,7 +229,10 @@ describe('PaymentController', () => {
 
     it('should convert amount to cents', async () => {
       tableData.transactions = [
-        { id: 'order-1', total_amount: 99.99, currency: 'USD', payment_status: 'pending' },
+        { id: 'order-1', total_amount: 99.99, currency: 'USD', payment_status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1', customer_id: 'admin-1' },
+      ];
+      tableData.menu_service_orders = [
+        { id: 'order-1', total_amount: 99.99, currency: 'usd', payment_status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1', customer_id: 'admin-1' },
       ];
       setupSupabase();
       mockStripePaymentIntentsCreate.mockResolvedValue({ id: 'pi_test_2', client_secret: 'cs_2' });

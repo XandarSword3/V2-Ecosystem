@@ -113,9 +113,11 @@ export function canAdvanceTo(
     return { allowed: false, reason: 'Pricing calculation error. Please try again.' };
   }
 
-  // Check 5: Confirmation can only be reached if payment has succeeded
-  if (targetStep === 'confirmation' && context.paymentStatus !== 'succeeded') {
-    return { allowed: false, reason: 'Payment must succeed before reaching confirmation.' };
+  // Check 5: Confirmation can only be reached if payment has settled (succeeded)
+  // or been deferred (customer pay-on-arrival: order confirmed, payment unsettled).
+  // A failed/cancelled payment does NOT confirm the order.
+  if (targetStep === 'confirmation' && context.paymentStatus !== 'succeeded' && context.paymentStatus !== 'deferred') {
+    return { allowed: false, reason: 'Payment must succeed or be deferred before reaching confirmation.' };
   }
 
   return { allowed: true };

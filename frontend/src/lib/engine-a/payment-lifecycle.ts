@@ -7,6 +7,7 @@ export type PaymentStatus =
   | 'awaiting_action'
   | 'processing'
   | 'succeeded'
+  | 'deferred'
   | 'failed'
   | 'cancelled';
 
@@ -38,8 +39,9 @@ export const LEGAL_PAYMENT_TRANSITIONS: Record<PaymentStatus, readonly PaymentSt
   idle: ['creating_intent', 'processing', 'failed'],
   creating_intent: ['awaiting_action', 'failed', 'cancelled'],
   awaiting_action: ['processing', 'failed', 'cancelled'],
-  processing: ['succeeded', 'failed', 'cancelled'],
+  processing: ['succeeded', 'deferred', 'failed', 'cancelled'],
   succeeded: ['idle'],
+  deferred: ['processing', 'idle'],
   failed: ['idle', 'creating_intent', 'processing'],
   cancelled: ['idle', 'creating_intent', 'processing'],
 } as const;
@@ -100,7 +102,13 @@ export function usePaymentLifecycle(options: UsePaymentLifecycleOptions = {}) {
     if (target.method === 'cash') {
       transitionTo('processing', { target, error: null });
       try {
-        if (options.recordCashOnServer ?? true) {
+        // Staff POS flow: cash is physically collected and recorded on the server
+        // (recordCashOnServer: true) — money is in hand, so transition to succeeded.
+        // Customer checkout flow: pay-on-arrival (recordCashOnServer: false) —
+        // no money has changed hands yet, so transition to deferred (payment_status
+        // stays 'pending') rather than falsely claiming succeeded.
+        const recordOnServer = options.recordCashOnServer ?? true;
+        if (recordOnServer) {
           await paymentsApi.recordCashPayment({
             referenceType: target.referenceType,
             referenceId: target.referenceId,
@@ -108,8 +116,13 @@ export function usePaymentLifecycle(options: UsePaymentLifecycleOptions = {}) {
             notes: target.notes,
           });
         }
-        transitionTo('succeeded', { error: null });
-        options.onSuccess?.(target);
+        if (recordOnServer) {
+          transitionTo('succeeded', { error: null });
+          options.onSuccess?.(target);
+        } else {
+          transitionTo('deferred', { error: null });
+          options.onSuccess?.(target);
+        }
       } catch (err: any) {
         const errorMsg = err.response?.data?.error || err.message || 'Cash payment recording failed';
         transitionTo('failed', { error: errorMsg });
@@ -225,6 +238,7 @@ export function usePaymentLifecycle(options: UsePaymentLifecycleOptions = {}) {
     isAwaitingAction: state.status === 'awaiting_action',
     isProcessing: state.status === 'processing',
     isSucceeded: state.status === 'succeeded',
+    isDeferred: state.status === 'deferred',
     isFailed: state.status === 'failed',
     isCancelled: state.status === 'cancelled',
     selectMethod,

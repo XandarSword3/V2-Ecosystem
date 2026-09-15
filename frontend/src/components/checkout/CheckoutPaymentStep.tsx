@@ -211,6 +211,25 @@ export default function CheckoutPaymentStep({
         </div>
       )}
 
+      {/* Payment Deferred (pay-on-arrival) Feedback */}
+      {paymentState.status === 'deferred' && (
+        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl space-y-2">
+          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-semibold text-sm">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span>{t('paymentDeferred') || 'Payment deferred'}</span>
+          </div>
+          <p className="text-sm text-blue-600 dark:text-blue-300">
+            {t('paymentDeferredDescription') || 'Your order is confirmed. Please pay on arrival.'}
+          </p>
+          {onRetryPayment && (
+            <Button size="sm" variant="outline" onClick={onRetryPayment} className="mt-2 text-blue-600 dark:text-blue-400">
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+              {t('changePaymentMethod') || 'Change payment method'}
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Payment Cancelled Feedback */}
       {paymentState.status === 'cancelled' && (
         <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl">

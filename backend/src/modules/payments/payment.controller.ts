@@ -74,102 +74,158 @@ function calculateRenewedEndDate(currentEndDate: string | null, billingCycle: st
 async function resolveAuthoritativePayableAmount(
   referenceType: string,
   referenceId: string,
+  req?: Request,
 ): Promise<{ amount: number; currency: string; paymentStatus?: string }> {
   const supabase = getSupabase();
   const canonicalType = normalizeReferenceType(referenceType);
 
+  let record: {
+    amount: number;
+    currency: string;
+    paymentStatus?: string;
+    tenantId?: string | null;
+    propertyId?: string | null;
+    customerId?: string | null;
+  } | null = null;
+
   // 1. First look up the canonical transactions row
   const { data: tx } = await supabase
     .from('transactions')
-    .select('total_amount, currency, payment_status, reference_table')
+    .select('total_amount, currency, payment_status, reference_table, tenant_id, property_id, customer_id')
     .eq('id', referenceId)
     .maybeSingle();
 
   if (tx && tx.total_amount !== undefined && tx.total_amount !== null) {
-    return {
+    record = {
       amount: Number(tx.total_amount),
       currency: (tx.currency || 'USD').toUpperCase(),
       paymentStatus: tx.payment_status,
+      tenantId: tx.tenant_id,
+      propertyId: tx.property_id,
+      customerId: tx.customer_id,
     };
   }
 
   // 2. Fall back to reference-specific tables
-  if (
+  if (!record && (
     canonicalType === 'instant_transaction' ||
     referenceType === 'instant_transaction' ||
     referenceType === 'order' ||
     referenceType === 'menu_service_order'
-  ) {
+  )) {
     const { data: order } = await supabase
       .from('orders')
-      .select('total_amount, final_total, total, currency, payment_status')
+      .select('total_amount, final_total, total, currency, payment_status, tenant_id, property_id, customer_id')
       .eq('id', referenceId)
       .maybeSingle();
     if (order) {
       const amount = Number(order.total_amount ?? order.final_total ?? order.total ?? 0);
-      return {
+      record = {
         amount,
         currency: (order.currency || 'USD').toUpperCase(),
         paymentStatus: order.payment_status,
+        tenantId: order.tenant_id,
+        propertyId: order.property_id,
+        customerId: order.customer_id,
       };
-    }
-
-    const { data: legacyOrder } = await supabase
-      .from('menu_service_orders')
-      .select('total_amount, final_total, total, currency, payment_status')
-      .eq('id', referenceId)
-      .maybeSingle();
-    if (legacyOrder) {
-      const amount = Number(legacyOrder.total_amount ?? legacyOrder.final_total ?? legacyOrder.total ?? 0);
-      return {
-        amount,
-        currency: (legacyOrder.currency || 'USD').toUpperCase(),
-        paymentStatus: legacyOrder.payment_status,
-      };
+    } else {
+      const { data: legacyOrder } = await supabase
+        .from('menu_service_orders')
+        .select('total_amount, final_total, total, currency, payment_status, tenant_id, property_id, customer_id')
+        .eq('id', referenceId)
+        .maybeSingle();
+      if (legacyOrder) {
+        const amount = Number(legacyOrder.total_amount ?? legacyOrder.final_total ?? legacyOrder.total ?? 0);
+        record = {
+          amount,
+          currency: (legacyOrder.currency || 'USD').toUpperCase(),
+          paymentStatus: legacyOrder.payment_status,
+          tenantId: legacyOrder.tenant_id,
+          propertyId: legacyOrder.property_id,
+          customerId: legacyOrder.customer_id,
+        };
+      }
     }
   }
 
-  if (
+  if (!record && (
     canonicalType === 'time_exclusive_reservation' ||
     referenceType === 'time_exclusive_reservation' ||
     referenceType === 'booking' ||
     referenceType === 'room_booking'
-  ) {
+  )) {
     const { data: booking } = await supabase
       .from('bookings')
-      .select('total_amount, currency, payment_status')
+      .select('total_amount, currency, payment_status, tenant_id, property_id, customer_id')
       .eq('id', referenceId)
       .maybeSingle();
     if (booking) {
-      return {
+      record = {
         amount: Number(booking.total_amount ?? 0),
         currency: (booking.currency || 'USD').toUpperCase(),
         paymentStatus: booking.payment_status,
+        tenantId: booking.tenant_id,
+        propertyId: booking.property_id,
+        customerId: booking.customer_id,
       };
     }
   }
 
-  if (
+  if (!record && (
     canonicalType === 'shared_capacity_access' ||
     referenceType === 'shared_capacity_access' ||
     referenceType === 'ticket' ||
     referenceType === 'facility_access'
-  ) {
+  )) {
     const { data: ticket } = await supabase
       .from('tickets')
-      .select('total_amount, currency, payment_status')
+      .select('total_amount, currency, payment_status, tenant_id, property_id, customer_id')
       .eq('id', referenceId)
       .maybeSingle();
     if (ticket) {
-      return {
+      record = {
         amount: Number(ticket.total_amount ?? 0),
         currency: (ticket.currency || 'USD').toUpperCase(),
         paymentStatus: ticket.payment_status,
+        tenantId: ticket.tenant_id,
+        propertyId: ticket.property_id,
+        customerId: ticket.customer_id,
       };
     }
   }
 
-  throw new Error(`Authoritative record not found for reference ${referenceType}:${referenceId}`);
+  if (!record) {
+    throw new Error(`Authoritative record not found for reference ${referenceType}:${referenceId}`);
+  }
+
+  // Multi-tenant and ownership enforcement (Fix 1: Prevent cross-tenant/cross-property exploitation)
+  if (req) {
+    // 1. Assert tenant ownership if caller has tenant context
+    if (!assertOwnedByCallerTenant(req, record.tenantId)) {
+      throw new Error(`Reference ${referenceId} is not owned by caller's tenant`);
+    }
+
+    // 2. Assert property ownership if request specifies property context
+    const reqPropertyId = (req as any).propertyId || req.property?.id || (req.headers?.['x-property-id'] as string);
+    if (reqPropertyId && record.propertyId && record.propertyId !== reqPropertyId) {
+      throw new Error(`Reference ${referenceId} belongs to property ${record.propertyId}, not ${reqPropertyId}`);
+    }
+
+    // 3. If authenticated customer (non-staff), verify customer owns this record
+    const callerRole = (req.user as any)?.role || (req.user as any)?.roles?.[0];
+    const isStaff = ['staff', 'manager', 'admin', 'super_admin', 'platform_admin'].includes(callerRole);
+    if (req.user?.userId && !isStaff) {
+      if (record.customerId && record.customerId !== req.user.userId) {
+        throw new Error(`Reference ${referenceId} does not belong to the authenticated customer`);
+      }
+    }
+  }
+
+  return {
+    amount: record.amount,
+    currency: record.currency,
+    paymentStatus: record.paymentStatus,
+  };
 }
 
 /**
@@ -200,16 +256,18 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
   // Never fall back to client-supplied money or currency.
   let authRecord: { amount: number; currency: string; paymentStatus?: string };
   try {
-    authRecord = await resolveAuthoritativePayableAmount(referenceType, referenceId);
+    authRecord = await resolveAuthoritativePayableAmount(referenceType, referenceId, req);
   } catch (err: any) {
-    logger.warn('[PaymentController] Rejected payment intent: authoritative record missing in DB', {
+    const isForbidden = err.message?.includes('not owned by') || err.message?.includes('does not belong to') || err.message?.includes('belongs to property');
+    logger.warn('[PaymentController] Rejected payment intent:', {
+      error: err.message,
       referenceType,
       referenceId,
       clientAmount,
     });
-    return res.status(404).json({
+    return res.status(isForbidden ? 403 : 404).json({
       success: false,
-      error: `Authoritative record not found for reference ${referenceType}:${referenceId}`,
+      error: err.message || `Authoritative record not found for reference ${referenceType}:${referenceId}`,
     });
   }
 
@@ -1050,7 +1108,7 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
   // 2. Verify Booking exists and is checked_in
   const { data: booking, error: bookingErr } = await supabase
     .from('transactions')
-    .select('id, status, engine_type, metadata, tenant_id, property_id')
+    .select('id, status, engine_type, metadata, tenant_id, property_id, customer_id')
     .eq('id', bookingId)
     .single();
 
@@ -1063,6 +1121,17 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
 
   if (booking.status !== 'checked_in' || booking.engine_type !== 'time_exclusive_reservation') {
     return res.status(400).json({ success: false, error: 'Booking must be an active checked-in room reservation' });
+  }
+
+  // 2b. Customer self-service room charge: an authenticated customer may charge
+  // their own checked-in folio (the route is still staff-authorized by default,
+  // but a customer whose userId matches the booking's customer_id is permitted).
+  const callerRole = (req.user as any)?.role || (req.user as any)?.roles?.[0];
+  const isStaff = ['staff', 'manager', 'admin', 'super_admin', 'platform_admin'].includes(callerRole);
+  if (!isStaff && req.user?.userId) {
+    if (booking.customer_id && booking.customer_id !== req.user.userId) {
+      return res.status(403).json({ success: false, error: 'You can only charge your own room folio' });
+    }
   }
 
   const amount = Number(order.total_amount || order.amount || 0);

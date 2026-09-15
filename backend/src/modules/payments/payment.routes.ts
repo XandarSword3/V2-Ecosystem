@@ -19,7 +19,7 @@ router.get('/:id/receipt', authenticate, paymentController.getPaymentReceipt);
 const staffRoles = ['staff', 'manager', 'admin', 'super_admin'];
 router.post('/record-cash', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.recordCashPayment);
 router.post('/record-manual', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.recordManualPayment);
-router.post('/room-charge', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.postRoomCharge);
+router.post('/room-charge', authenticate, rateLimits.write, paymentController.postRoomCharge);
 router.get('/folio-balance/:bookingId', authenticate, authorize(...staffRoles), paymentController.getFolioBalance);
 router.post('/folio-settle', authenticate, authorize(...staffRoles), rateLimits.write, paymentController.settleFolioBalance);
 // GAP-05: Verify Whish/OMT transfers before marking as completed

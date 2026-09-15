@@ -105,6 +105,8 @@ export default function GenericCheckoutWorkflow({
   const t = useTranslations('checkout');
   const [activeStep, setActiveStep] = useState<CheckoutStepId>('review');
   const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const [createdIdempotencyKey, setCreatedIdempotencyKey] = useState<string | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   // Authoritative server currency invariant: always prefer serverPricing.currency
@@ -124,6 +126,8 @@ export default function GenericCheckoutWorkflow({
     },
     onCancel: () => {
       toast.info(t('paymentCancelledNotification'));
+      // Keep the order (it is still pending); allow retry via onRetryPayment.
+      // Do NOT clear createdOrderId — the retry path targets the existing order.
     },
   });
 
@@ -156,6 +160,8 @@ export default function GenericCheckoutWorkflow({
   );
 
   // Order submission orchestrator
+  // Retry-safe: if an order was already created, subsequent calls only re-trigger
+  // payment execution against the existing order — they never create a second order.
   const handleSubmitOrder = useCallback(async () => {
     // 1. Guard against stale or invalid pricing
     if (isPricingStale || isLoadingPricing) {
@@ -173,11 +179,26 @@ export default function GenericCheckoutWorkflow({
     }
 
     setIsSubmittingOrder(true);
-    const idempotencyKey = `chk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
 
     try {
+      // If we already created an order for this workflow instance, only restart
+      // payment against it — do NOT create a second order (Fix 2: retry safety).
+      if (createdOrderId) {
+        await paymentLifecycle.startPayment({
+          referenceType: 'instant_transaction',
+          referenceId: createdOrderId,
+          amount: serverPricing.totalAmount,
+          currency: authoritativeCurrency,
+          method: paymentLifecycle.method,
+          roomChargeBookingId: activeBookingId,
+          notes: customer.notes?.trim() || undefined,
+        });
+        return;
+      }
+
       const loyaltyDiscount = serverPricing.discounts?.find((d) => d.type === 'loyalty');
       const giftCardDiscounts = serverPricing.discounts?.filter((d) => d.type === 'gift_card') || [];
+      const idempotencyKey = `chk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
 
       // 3. Create the authoritative business transaction/order target on backend
       const orderResult = await createOrder({
@@ -220,6 +241,10 @@ export default function GenericCheckoutWorkflow({
         throw new Error('Order creation did not return a valid order ID');
       }
 
+      // Remember the created order so retries target it instead of creating another
+      setCreatedOrderId(orderId);
+      setCreatedIdempotencyKey(idempotencyKey);
+
       // 4. Delegate to canonical payment lifecycle for execution
       await paymentLifecycle.startPayment({
         referenceType: 'instant_transaction',
@@ -253,6 +278,7 @@ export default function GenericCheckoutWorkflow({
     loyaltyPoints,
     authoritativeCurrency,
     activeBookingId,
+    createdOrderId,
   ]);
 
   const stepDefinitions = [
