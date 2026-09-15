@@ -1659,7 +1659,19 @@
       "resources": "Ressources",
       "fiscal": "Fiscal",
       "paymentsNav": "Paiements",
-      "analytics": "Analytique"
+      "analytics": "Analytique",
+      "taxConfiguration": "Configuration fiscale",
+      "financialReports": "Rapports financiers",
+      "economics": "Économie",
+      "executiveCockpit": "Cockpit exécutif",
+      "alertManagement": "Gestion des alertes",
+      "multiProperty": "Multi-propriétés",
+      "brand": "Marque & identité",
+      "terminology": "Terminologie",
+      "integrations": "Intégrations",
+      "channelManager": "Gestionnaire de canaux",
+      "guestMessaging": "Messagerie client",
+      "rateParity": "Parité tarifaire"
     },
     "messages": {
       "loggedOutSuccessfully": "Déconnexion réussie"

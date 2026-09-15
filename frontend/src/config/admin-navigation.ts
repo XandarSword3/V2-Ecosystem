@@ -36,6 +36,11 @@ import {
   ShoppingBag,
   CreditCard,
   Receipt,
+  ClipboardList,
+  Share2,
+  MessageSquare,
+  TrendingUp,
+  Building2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -183,6 +188,15 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
       translationKey: 'nav.business',
       icon: ShoppingBag,
       items: [
+        // ── Orders: cross-module transaction operations surface ─────
+        {
+          name: t('nav.orders') || 'Orders',
+          href: `${base}/orders`,
+          icon: ClipboardList,
+          translationKey: 'nav.orders',
+          permissions: ['order:read:all'],
+        },
+
         // ── Products: catalog across all modules ──────────────────────
         {
           name: t('nav.products') || 'Products',
@@ -330,17 +344,20 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           children: [
             { name: t('nav.general'), href: `${base}/settings`, translationKey: 'nav.general' },
             { name: t('nav.propertySettings') || 'Property Settings', href: `${base}/settings/properties`, translationKey: 'nav.propertySettings' },
-            { name: 'Multi-Property', href: `${base}/properties`, translationKey: 'nav.multiProperty', roles: ['super_admin'] },
+            { name: t('nav.multiProperty') || 'Multi-Property', href: `${base}/properties`, translationKey: 'nav.multiProperty', roles: ['super_admin'] },
             { name: t('nav.navbar'), href: `${base}/settings/navbar`, translationKey: 'nav.navbar' },
             { name: t('nav.appearance'), href: `${base}/settings/appearance`, translationKey: 'nav.appearance' },
-            { name: 'Brand & Identity', href: `${base}/settings/brand`, translationKey: 'nav.brand' },
-            { name: 'Terminology', href: `${base}/terminology`, translationKey: 'nav.terminology' },
+            { name: t('nav.brand') || 'Brand & Identity', href: `${base}/settings/brand`, translationKey: 'nav.brand' },
+            { name: t('nav.terminology') || 'Terminology', href: `${base}/terminology`, translationKey: 'nav.terminology' },
             { name: t('nav.homepage'), href: `${base}/settings/homepage`, translationKey: 'nav.homepage' },
             { name: t('nav.footer'), href: `${base}/settings/footer`, translationKey: 'nav.footer' },
             { name: t('nav.translations'), href: `${base}/settings/translations`, translationKey: 'nav.translations' },
             { name: t('nav.notifications'), href: `${base}/settings/notifications`, translationKey: 'nav.notifications' },
             { name: t('nav.databaseBackups'), href: `${base}/settings/backups`, translationKey: 'nav.databaseBackups' },
-            { name: 'Integrations', href: `${base}/integrations`, translationKey: 'nav.integrations' },
+            { name: t('nav.integrations') || 'Integrations', href: `${base}/integrations`, translationKey: 'nav.integrations' },
+            { name: t('nav.channelManager') || 'Channel Manager', href: `${base}/channels`, translationKey: 'nav.channelManager' },
+            { name: t('nav.guestMessaging') || 'Guest Messaging', href: `${base}/messaging`, translationKey: 'nav.guestMessaging' },
+            { name: t('nav.rateParity') || 'Rate Parity', href: `${base}/parity`, translationKey: 'nav.rateParity' },
           ],
         },
       ],

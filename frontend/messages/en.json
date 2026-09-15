@@ -1659,7 +1659,19 @@
       "resources": "Resources",
       "fiscal": "Fiscal",
       "paymentsNav": "Payments",
-      "analytics": "Analytics"
+      "analytics": "Analytics",
+      "taxConfiguration": "Tax Configuration",
+      "financialReports": "Financial Reports",
+      "economics": "Economics",
+      "executiveCockpit": "Executive Cockpit",
+      "alertManagement": "Alert Management",
+      "multiProperty": "Multi-Property",
+      "brand": "Brand & Identity",
+      "terminology": "Terminology",
+      "integrations": "Integrations",
+      "channelManager": "Channel Manager",
+      "guestMessaging": "Guest Messaging",
+      "rateParity": "Rate Parity"
     },
     "messages": {
       "loggedOutSuccessfully": "Logged out successfully"

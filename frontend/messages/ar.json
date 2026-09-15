@@ -1651,7 +1651,19 @@
       "resources": "الموارد",
       "fiscal": "المالية",
       "paymentsNav": "المدفوعات",
-      "analytics": "التحليلات"
+      "analytics": "التحليلات",
+      "taxConfiguration": "إعداد الضرائب",
+      "financialReports": "التقارير المالية",
+      "economics": "الاقتصاد",
+      "executiveCockpit": "لوحة القيادة التنفيذية",
+      "alertManagement": "إدارة التنبيهات",
+      "multiProperty": "متعدد العقارات",
+      "brand": "العلامة التجارية والهوية",
+      "terminology": "المصطلحات",
+      "integrations": "التكاملات",
+      "channelManager": "مدير القنوات",
+      "guestMessaging": "رسائل الضيوف",
+      "rateParity": "تكافؤ الأسعار"
     },
     "messages": {
       "loggedOutSuccessfully": "تم تسجيل الخروج بنجاح"
