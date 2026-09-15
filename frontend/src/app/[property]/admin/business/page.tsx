@@ -38,11 +38,6 @@ import { CardSkeleton } from '@/components/ui/Skeleton';
 
 // ─── Capability card model ────────────────────────────────────────────
 
-interface CapabilityStat {
-  label: string;
-  value: string | number;
-}
-
 interface CapabilityLink {
   label: string;
   href: string;
@@ -302,20 +297,31 @@ export default function BusinessOverviewPage() {
 
 // ─── Capability card with fail-soft live stats ────────────────────────
 
+/**
+ * One stat row. Rendered as its own component so useQuery is called
+ * unconditionally at the top level of a component (rules of hooks) —
+ * a card with zero stats simply renders no StatRow children.
+ */
+function StatRow({ capabilityId, label, fetch }: { capabilityId: string; label: string; fetch: () => Promise<string | number | null> }) {
+  const query = useQuery({
+    queryKey: ['business-cap', capabilityId, label],
+    queryFn: fetch,
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  return (
+    <div>
+      <p className="text-xs text-slate-400 uppercase tracking-wide">{label}</p>
+      <p className="text-lg font-bold text-slate-900 dark:text-white">
+        {query.isLoading ? '…' : query.isError ? '—' : String(query.data ?? '—')}
+      </p>
+    </div>
+  );
+}
+
 function CapabilityCard({ cap, Icon }: { cap: CapabilityDef; Icon: React.ElementType }) {
   const t = useTranslations('admin');
-
-  // Each stat fetches independently and fails soft to null ("—").
-  // React Query caches per capability+stat key; staleTime avoids re-hammering.
-  const statQueries = cap.stats.map((stat) => ({
-    label: stat.label,
-    query: useQuery({
-      queryKey: ['business-cap', cap.id, stat.label],
-      queryFn: stat.fetch,
-      staleTime: 60_000,
-      retry: false,
-    }),
-  }));
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -338,15 +344,15 @@ function CapabilityCard({ cap, Icon }: { cap: CapabilityDef; Icon: React.Element
         <p className="text-sm text-slate-600 dark:text-slate-400">{cap.description}</p>
 
         {/* Live stats */}
-        {statQueries.length > 0 && (
+        {cap.stats.length > 0 && (
           <div className="flex flex-wrap gap-4">
-            {statQueries.map(({ label, query }) => (
-              <div key={label}>
-                <p className="text-xs text-slate-400 uppercase tracking-wide">{label}</p>
-                <p className="text-lg font-bold text-slate-900 dark:text-white">
-                  {query.isLoading ? '…' : query.isError ? '—' : String(query.data ?? '—')}
-                </p>
-              </div>
+            {cap.stats.map((stat) => (
+              <StatRow
+                key={stat.label}
+                capabilityId={cap.id}
+                label={stat.label}
+                fetch={stat.fetch}
+              />
             ))}
           </div>
         )}
