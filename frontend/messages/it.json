@@ -146,7 +146,8 @@
     "lifetimeValue": "Lifetime",
     "lastOrder": "Last Order",
     "allProducts": "All Products",
-    "pricingRules": "Seasonal & Dynamic Rules"
+    "pricingRules": "Seasonal & Dynamic Rules",
+    "workQueue": "Work Queue"
   },
   "home": {
     "hero": {

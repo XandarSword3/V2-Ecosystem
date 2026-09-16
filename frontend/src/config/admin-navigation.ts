@@ -231,15 +231,15 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           ],
         },
 
-        // ── Fulfillment: operational destinations per module live under
-        //    Modules; this surfaces the cross-module reservation capacity.
+        // ── Fulfillment: cross-engine work queue + operational surfaces ─
         {
           name: t('nav.fulfillment') || 'Fulfillment',
-          href: `${base}/housekeeping`,
+          href: `${base}/fulfillment`,
           icon: Wrench,
           translationKey: 'nav.fulfillment',
-          permissions: ['housekeeping:task:manage'],
+          permissions: ['order:read:all', 'housekeeping:task:manage'],
           children: [
+            { name: t('nav.workQueue') || 'Work Queue', href: `${base}/fulfillment`, translationKey: 'nav.workQueue' },
             { name: t('nav.housekeeping') || 'Housekeeping', href: `${base}/housekeeping`, translationKey: 'nav.housekeeping' },
           ],
         },

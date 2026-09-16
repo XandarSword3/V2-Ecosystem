@@ -181,6 +181,11 @@ router.get('/catalog', authorizeManager, asyncHandler(getCrossModuleCatalog));
 import { getCrossModuleCustomers } from './controllers/customers.controller.js';
 router.get('/customers', authorizeManager, asyncHandler(getCrossModuleCustomers));
 
+// Unified fulfillment work queue (F11 Fulfillment capability). Cross-engine,
+// canonical fulfillments table, engine-computed available actions.
+import { getFulfillmentQueue } from './controllers/fulfillment.controller.js';
+router.get('/fulfillment/queue', authorizeManager, asyncHandler(getFulfillmentQueue));
+
 // Notifications (using refactored controller) - MANAGER
 router.get('/notifications', authorizeManager, notificationsController.getNotifications);
 router.get('/notifications/broadcasts', authorizeManager, notificationsController.getBroadcasts);
