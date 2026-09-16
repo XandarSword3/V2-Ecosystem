@@ -217,14 +217,15 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           ],
         },
 
-        // ── Pricing: rules, coupons, tax config ───────────────────────
+        // ── Pricing: seasonal/dynamic rules, coupons, tax config ──────
         {
           name: t('nav.pricing') || 'Pricing',
-          href: `${base}/coupons`,
+          href: `${base}/pricing`,
           icon: Ticket,
           translationKey: 'nav.pricing',
           permissions: ['coupon:manage', 'admin:settings:manage'],
           children: [
+            { name: t('nav.pricingRules') || 'Seasonal & Dynamic Rules', href: `${base}/pricing`, translationKey: 'nav.pricingRules' },
             { name: t('nav.coupons') || 'Coupons', href: `${base}/coupons`, translationKey: 'nav.coupons' },
             { name: t('nav.taxConfiguration') || 'Tax Configuration', href: `${base}/settings/tax`, translationKey: 'nav.taxConfiguration' },
           ],

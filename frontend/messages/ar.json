@@ -312,7 +312,8 @@
     "noCustomersFound": "No customers found",
     "lifetimeValue": "Lifetime",
     "lastOrder": "Last Order",
-    "allProducts": "All Products"
+    "allProducts": "All Products",
+    "pricingRules": "Seasonal & Dynamic Rules"
   },
   "home": {
     "hero": {

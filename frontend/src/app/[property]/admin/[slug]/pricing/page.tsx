@@ -51,6 +51,7 @@ export default function DynamicPricingPage() {
   const currentModule = modules.find(m => m.slug.toLowerCase() === slug);
 
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([]);
+  const [moduleUnits, setModuleUnits] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<PricingRule | null>(null);
@@ -66,13 +67,28 @@ export default function DynamicPricingPage() {
     start_date: '',
     end_date: '',
     is_active: true,
+    unit_id: '',
   });
 
   const fetchPricingRules = useCallback(async () => {
     if (!currentModule) return;
     try {
-      const response = await api.get('/accommodations/admin/price-rules', { params: { moduleId: currentModule.id } });
-      setPricingRules(response.data.data || []);
+      // F11: units price-rules CRUD (replaces dead legacy /accommodations path).
+      // Rules are per-unit; resolve this module's units then load their rules.
+      const unitsRes = await api.get('/units', { params: {} });
+      const units: Array<{ id: string; name: string; module_id?: string }> = (unitsRes.data?.data || []).filter(
+        (u: { module_id?: string }) => !u.module_id || u.module_id === currentModule.id,
+      );
+      setModuleUnits(units.map((u) => ({ id: u.id, name: u.name })));
+      const rulesLists = await Promise.all(
+        units.map((u) =>
+          api.get('/units/price-rules', { params: { unit_id: u.id } }).then(
+            (r) => (r.data?.data || []).map((rule: PricingRule) => ({ ...rule, unit_name: u.name })),
+            () => [] as Array<PricingRule & { unit_name?: string }>,
+          ),
+        ),
+      );
+      setPricingRules(rulesLists.flat());
     } catch (error) {
       toast.error(tc('errors.failedToLoad'));
     } finally {
@@ -93,12 +109,28 @@ export default function DynamicPricingPage() {
     }
     try {
       setSaving(true);
-      const payload = { ...formData, module_id: currentModule.id };
+      // F11: rules live on the unit (accommodation_unit_price_rules). Require
+      // the manager to pick which unit the rule applies to.
+      if (!formData.unit_id) {
+        toast.error('Select a unit for this rule');
+        setSaving(false);
+        return;
+      }
+      const payload = {
+        name: formData.name,
+        start_date: formData.start_date || null,
+        end_date: formData.end_date || null,
+        price: formData.base_price || null,
+        price_multiplier: null,
+        min_guests: formData.min_guests,
+        max_guests: formData.max_guests,
+        is_active: formData.is_active,
+      };
       if (editing) {
-        await api.put(`/accommodations/admin/price-rules/${editing.id}`, payload);
+        await api.put(`/units/price-rules/${editing.id}`, payload);
         toast.success(tc('success.updated'));
       } else {
-        await api.post('/accommodations/admin/price-rules', payload);
+        await api.post('/units/price-rules', { ...payload, unit_id: formData.unit_id });
         toast.success(tc('success.created'));
       }
       setShowModal(false);
@@ -131,6 +163,7 @@ export default function DynamicPricingPage() {
       start_date: rule.start_date || '',
       end_date: rule.end_date || '',
       is_active: rule.is_active,
+      unit_id: rule.unit_id || '',
     });
     setShowModal(true);
   };
@@ -138,7 +171,7 @@ export default function DynamicPricingPage() {
   const handleDelete = async (id: string) => {
     if (!confirm(tc('pricing.confirmDelete'))) return;
     try {
-      await api.delete(`/accommodations/admin/price-rules/${id}`);
+      await api.delete(`/units/price-rules/${id}`);
       setPricingRules((prev) => prev.filter((r) => r.id !== id));
       toast.success(tc('success.deleted'));
     } catch (error) {
@@ -159,6 +192,7 @@ export default function DynamicPricingPage() {
       start_date: '',
       end_date: '',
       is_active: true,
+      unit_id: '',
     });
     setShowModal(true);
   };
@@ -319,6 +353,21 @@ export default function DynamicPricingPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{tc('tables.name')} *</label>
                   <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Summer Season" />
+                </div>
+
+                <div>
+                  <label htmlFor="pricing-rule-unit" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unit *</label>
+                  <select
+                    id="pricing-rule-unit"
+                    value={formData.unit_id}
+                    onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
+                  >
+                    <option value="">Select a unit…</option>
+                    {moduleUnits.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
