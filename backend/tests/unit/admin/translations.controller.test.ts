@@ -83,7 +83,11 @@ const createMockReqRes = (overrides: { params?: any; query?: any; body?: any; us
     params: overrides.params || {},
     query: overrides.query || {},
     body: overrides.body || {},
-    user: overrides.user || { userId: 'user-1', role: 'admin' },
+    // getCallerTenantId throws AppError(403) for a non-super_admin without
+    // tenantId — asyncHandler forwards it to next() and res.json is never
+    // reached. Default to a tenant-scoped admin.
+    headers: {},
+    user: overrides.user || { userId: 'user-1', id: 'user-1', role: 'admin', tenantId: 'tenant-1', scope: 'tenant_admin' },
   } as unknown as Request;
 
   const res = {

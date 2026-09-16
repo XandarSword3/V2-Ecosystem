@@ -60,6 +60,7 @@ const mockChain = {
   upsert: vi.fn(),
   eq: vi.fn(),
   in: vi.fn(),
+  is: vi.fn(),
   single: vi.fn(),
   maybeSingle: vi.fn(),
   limit: vi.fn(),
@@ -104,8 +105,13 @@ beforeEach(() => {
 
 describe('register', () => {
   function setupRegisterMocks(existingUsers: unknown[] = [], userOverride: Record<string, unknown> = {}) {
-    // 1. email check: .select().eq().limit() — limit is terminal
-    mockChain.limit.mockResolvedValueOnce({ data: existingUsers, error: null });
+    // 1. email check: .select().eq('email').limit() then a TERMINAL
+    //    .eq('tenant_id') (tenant registration) or .is('tenant_id', null)
+    //    (platform registration) — limit no longer ends this query.
+    mockChain.eq.mockReturnValueOnce(mockChain); // .eq('email', ...) → chain continues
+    mockChain.limit.mockReturnValueOnce(mockChain); // .limit(1) → chain continues
+    mockChain.eq.mockResolvedValueOnce({ data: existingUsers, error: null }); // terminal .eq('tenant_id')
+    mockChain.is.mockResolvedValueOnce({ data: existingUsers, error: null }); // terminal .is('tenant_id', null)
     // 2. user insert: .insert().select().single() — insert returns chain, single is terminal
     mockChain.insert.mockReturnValueOnce(mockChain); // call 1: users insert → chain continues
     mockChain.single.mockResolvedValueOnce({
@@ -113,6 +119,7 @@ describe('register', () => {
       error: null,
     });
     // 3. role lookup: .select().eq().limit() — limit is terminal
+    mockChain.eq.mockReturnValueOnce(mockChain); // role lookup .eq → chain continues
     mockChain.limit.mockResolvedValueOnce({ data: [{ id: 'role-customer' }], error: null });
     // 4. user_roles insert: .insert() — terminal, resolves directly
     mockChain.insert.mockResolvedValueOnce({ data: null, error: null }); // call 2: user_roles insert
@@ -148,14 +155,15 @@ describe('register', () => {
   });
 
   it('throws when email already exists', async () => {
-    mockChain.limit.mockResolvedValueOnce({ data: [{ id: 'existing' }], error: null });
+    // no tenantId → per-tenant uniqueness check terminates on .is('tenant_id', null)
+    mockChain.is.mockResolvedValueOnce({ data: [{ id: 'existing' }], error: null });
     await expect(
       authService.register({ email: 'taken@example.com', password: 'Password123!', fullName: 'X' })
     ).rejects.toThrow('Email already registered');
   });
 
   it('throws when password policy fails', async () => {
-    mockChain.limit.mockResolvedValueOnce({ data: [], error: null });
+    mockChain.is.mockResolvedValueOnce({ data: [], error: null });
     mockValidatePassword.mockResolvedValueOnce({ valid: false, errors: ['Too short'] });
     await expect(
       authService.register({ email: 'new@example.com', password: 'weak', fullName: 'X' })
@@ -410,11 +418,26 @@ describe('resetPassword', () => {
         data: [{ id: 'sess-1', user_id: 'user-1', expires_at: future, refresh_token: 'tok' }],
         error: null,
       });
+    // fetch user: .select().eq('id', session.user_id).single()
+    mockChain.eq.mockReturnValueOnce(mockChain);
+    mockChain.single.mockResolvedValueOnce({
+      data: { id: 'user-1', email: 'u@x.com', full_name: 'U', password_hash: '$2a$12$old', tenant_id: 'tenant-1' },
+      error: null,
+    });
+    // getPreviousPasswordHashes: .select().eq().order().limit()
+    mockChain.eq.mockReturnValueOnce(mockChain);
+    mockChain.order.mockReturnValueOnce(mockChain);
+    mockChain.limit.mockResolvedValueOnce({ data: [], error: null });
+    // recordPasswordHistory: .insert() then prune .select().eq().order()
+    mockChain.insert.mockResolvedValueOnce({ data: null, error: null });
+    mockChain.eq.mockReturnValueOnce(mockChain);
+    mockChain.order.mockResolvedValueOnce({ data: [], error: null });
     // update user password: .update({...}).eq('id', session.user_id)
     mockChain.eq.mockResolvedValueOnce({ error: null });
     // delete reset session: .delete().eq('id', session.id)
     mockChain.eq.mockResolvedValueOnce({ error: null });
-    // invalidate other sessions: .update({...}).eq('user_id', session.user_id)
+    // logout(userId): sessions .update().eq('user_id') then rpc — rpc uses the
+    // resetChain default, so the try-branch succeeds and no fallback runs.
     mockChain.eq.mockResolvedValueOnce({ error: null });
 
     const result = await authService.resetPassword('tok', 'NewPass123!');

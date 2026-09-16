@@ -50,8 +50,12 @@ describe('TwoFactorService', () => {
 
   describe('generateSetup', () => {
     it('should generate setup with secret, QR code, and backup codes', async () => {
+      // resolveTenantId reads users(tenant_id) via .single(); the pending-setup
+      // write goes to two_factor_pending via upsert.
+      const usersMock = createChainableMock({ tenant_id: 'tenant-1' });
+      const pendingMock = createChainableMock({ id: 'pending-1' });
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(createChainableMock({ id: 'pending-1' }))
+        from: vi.fn((table: string) => (table === 'users' ? usersMock : pendingMock))
       } as any);
 
       const result = await twoFactorService.generateSetup('user-123', 'test@example.com');

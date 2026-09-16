@@ -13,24 +13,38 @@ const dateOrDatetimeSchema = z.string().transform((val) => {
   return `${val}T00:00:00.000Z`;
 }).optional();
 
-const createItemSchema = z.object({
+// Base field shapes WITHOUT defaults: zod v4's .partial() does not
+// suppress .default() fields, so building the update schema from a
+// defaulted schema would silently fire defaults for every omitted field
+// (e.g. a rename-only PATCH resetting min_stock_level to 10). Defaults
+// belong only on the create schema; the update schema must leave omitted
+// fields genuinely undefined.
+const itemFields = {
   name: z.string().min(1).max(200),
   sku: z.string().max(50).optional(),
   description: z.string().optional(),
   categoryId: z.string().uuid(),
-  unit: z.enum(['piece', 'kg', 'liter', 'box', 'pack', 'bottle']).default('piece'),
-  currentStock: z.number().min(0).default(0),
-  minStockLevel: z.number().min(0).default(10),
+  unit: z.enum(['piece', 'kg', 'liter', 'box', 'pack', 'bottle']),
+  currentStock: z.number().min(0),
+  minStockLevel: z.number().min(0),
   maxStockLevel: z.number().min(0).optional(),
-  reorderPoint: z.number().min(0).default(5),
+  reorderPoint: z.number().min(0),
   costPerUnit: z.number().min(0).optional(),
   supplier: z.string().max(200).optional(),
   location: z.string().max(100).optional(),
   expiryDate: dateOrDatetimeSchema,
   notes: z.string().optional(),
+};
+
+const createItemSchema = z.object({
+  ...itemFields,
+  unit: itemFields.unit.default('piece'),
+  currentStock: itemFields.currentStock.default(0),
+  minStockLevel: itemFields.minStockLevel.default(10),
+  reorderPoint: itemFields.reorderPoint.default(5),
 });
 
-const updateItemSchema = createItemSchema.partial().extend({
+const updateItemSchema = z.object(itemFields).partial().extend({
   isActive: z.boolean().optional(),
 });
 
@@ -617,6 +631,9 @@ export class InventoryController {
       const data = validation.data;
       const userId = req.user?.id;
       const tenantId = tenantScopeFor(req);
+      // requireCallerPropertyId: inventory_items.property_id is NOT NULL —
+      // fail fast with an actionable 400 instead of an opaque Postgres
+      // not-null violation (23502) at insert time.
       const propertyId = requireCallerPropertyId(req);
       const supabase = getSupabase();
 

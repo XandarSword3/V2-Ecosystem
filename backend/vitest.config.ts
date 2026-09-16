@@ -17,6 +17,7 @@ export default defineConfig({
       'dist',
       'tests/_pending/**',
       'tests/integration/**',
+      'tests/atomic-verification.integration.test.ts',
       'tests/criticalFlows.test.ts',
       'tests/ai-agent.integration.test.ts',
       'tests/comprehensive-verification.test.ts',

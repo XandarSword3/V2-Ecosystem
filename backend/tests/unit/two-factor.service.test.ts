@@ -35,15 +35,26 @@ vi.mock('otplib', () => {
 });
 
 // Mock database connection
+// resolveTenantId reads users(tenant_id) during setup — the default single()
+// must return a tenanted user for users reads while every other table's
+// default stays "no row" (the per-test mockResolvedValueOnce overrides still
+// take precedence for their specific calls).
+let currentTable = '';
 const mockSupabaseClient = {
-  from: vi.fn(() => mockSupabaseClient),
+  from: vi.fn((table: string) => { currentTable = table; return mockSupabaseClient; }),
   select: vi.fn(() => mockSupabaseClient),
   insert: vi.fn(() => mockSupabaseClient),
   update: vi.fn(() => mockSupabaseClient),
   delete: vi.fn(() => mockSupabaseClient),
   upsert: vi.fn(() => Promise.resolve({ data: null, error: null })),
   eq: vi.fn(() => mockSupabaseClient),
-  single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  single: vi.fn(() =>
+    Promise.resolve(
+      currentTable === 'users'
+        ? { data: { tenant_id: 'tenant-1' }, error: null }
+        : { data: null, error: null }
+    )
+  ),
 };
 
 vi.mock('../../src/database/connection.js', () => ({

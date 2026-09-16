@@ -79,7 +79,9 @@ function createMockReqRes(overrides: Record<string, unknown> = {}) {
     params: {},
     query: {},
     body: {},
-    user: { userId: 'user-123', role: 'staff' },
+    // createShift requires tenant + property context (400 without them).
+    headers: { 'x-property-id': 'prop-1' },
+    user: { userId: 'user-123', id: 'user-123', role: 'staff', tenantId: 'tenant-1' },
     ...overrides
   };
   const res = {
@@ -243,7 +245,7 @@ describe('Staff Controller - Service Tests', () => {
 
       const { req, res, next } = createMockReqRes({
         body: shiftData,
-        user: { userId: 'admin-1', role: 'admin' }
+        user: { userId: 'admin-1', id: 'admin-1', role: 'admin', tenantId: 'tenant-1' }
       });
       await staffController.createShift(req as any, res as any, next);
 
@@ -280,9 +282,9 @@ describe('Staff Controller - Service Tests', () => {
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
-    it('should return 400 for missing required fields', async () => {
+    it('should return 400 for invalid data', async () => {
       const { req, res, next } = createMockReqRes({
-        body: { staffId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' }
+        body: { staffId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', breakMinutes: -5 }
       });
       await staffController.createShift(req as any, res as any, next);
 
@@ -378,12 +380,19 @@ describe('Staff Controller - Service Tests', () => {
       const mockSupabase = {
         from: vi.fn().mockImplementation((table) => {
           if (table === 'staff_shifts') {
+            // First read: fetch().select().eq().single(); second read:
+            // open-shift guard needs is/neq/limit/maybeSingle (no open shift).
+            const fetchChain = {
+              eq: vi.fn().mockReturnThis(),
+              is: vi.fn().mockReturnThis(),
+              neq: vi.fn().mockReturnThis(),
+              order: vi.fn().mockReturnThis(),
+              limit: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({ data: mockShift, error: null }),
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+            };
             return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue({ data: mockShift, error: null })
-                })
-              }),
+              select: vi.fn().mockReturnValue(fetchChain),
               update: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
                   select: vi.fn().mockReturnValue({

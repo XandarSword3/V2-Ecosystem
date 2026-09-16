@@ -98,9 +98,9 @@ function createMockResponse(): { json: ReturnType<typeof vi.fn>; status: ReturnT
 describe('LoyaltyController', () => {
   let controller: LoyaltyController;
   let rpcMockFn: ReturnType<typeof vi.fn>;
-  const mockUserId = '11111111-1111-1111-1111-111111111111';
-  const mockAccountId = '22222222-2222-2222-2222-222222222222';
-  const mockTierId = '33333333-3333-3333-3333-333333333333';
+  const mockUserId = '11111111-1111-4111-8111-111111111111';
+  const mockAccountId = '22222222-2222-4222-8222-222222222222';
+  const mockTierId = '33333333-3333-4333-8333-333333333333';
 
   const mockAccount = {
     id: mockAccountId,
@@ -254,7 +254,8 @@ describe('LoyaltyController', () => {
 
     it('should handle database error', async () => {
       const mockQuery = createQueryMock(() => []);
-      mockQuery.single = vi.fn().mockResolvedValue({
+      // getAccount reads via .maybeSingle() — the error must be there.
+      mockQuery.maybeSingle = vi.fn().mockResolvedValue({
         data: null,
         error: { code: 'DB_ERROR', message: 'Database connection failed' },
       });
@@ -338,7 +339,7 @@ describe('LoyaltyController', () => {
           points: 100,
           description: 'Purchase reward',
           referenceType: 'order',
-          referenceId: '44444444-4444-4444-4444-444444444444',
+          referenceId: '44444444-4444-4444-8444-444444444444',
         },
       });
       const res = createMockResponse();
@@ -1002,10 +1003,14 @@ describe('LoyaltyController', () => {
     it('should update tier successfully', async () => {
       const updatedTier = { ...mockTier, name: 'Premium Silver', points_multiplier: 1.5 };
 
+      // Controller: update().eq('id', …).eq('property_id', …).select().single()
+      // — propertyId defaults so the second .eq always runs. Chainable eq.
       const updateMock = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: updatedTier, error: null }),
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: updatedTier, error: null }),
+            }),
           }),
         }),
       });
@@ -1056,10 +1061,14 @@ describe('LoyaltyController', () => {
     it('should update tier benefits', async () => {
       const updatedTier = { ...mockTier, benefits: ['10% discount', 'Free shipping'] };
 
+      // Controller: update().eq('id', …).eq('property_id', …).select().single()
+      // — propertyId defaults so the second .eq always runs. Chainable eq.
       const updateMock = vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: updatedTier, error: null }),
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: updatedTier, error: null }),
+            }),
           }),
         }),
       });
@@ -1241,10 +1250,12 @@ describe('LoyaltyController', () => {
       const accountMock = createQueryMock(() => []);
       (accountMock as Record<string, unknown>).select = vi.fn().mockReturnValue({
         order: vi.fn().mockReturnValue({
-          range: vi.fn().mockResolvedValue({
-            data: accounts,
-            count: 2,
-            error: null,
+          range: vi.fn().mockReturnValue({
+            // Controller applies optional .eq() filters AFTER .range(); make the
+            // mock chainable there and resolve through then.
+            eq: vi.fn().mockReturnThis(),
+            then: (resolve: (v: { data: unknown; error: unknown; count: number }) => void) =>
+              resolve({ data: accounts, error: null, count: 2 }),
           }),
         }),
       });
@@ -1275,20 +1286,20 @@ describe('LoyaltyController', () => {
 
     it('should filter by tier', async () => {
       const accountMock = createQueryMock(() => []);
-      const rangeMock = vi.fn().mockResolvedValue({
-        data: [mockAccount],
-        count: 1,
-        error: null,
-      });
-      const eqMock = vi.fn().mockReturnValue({
-        range: rangeMock,
-      });
+      // Controller chain: select→order→range→eq(property)→eq(tier)→await.
+      // Every link must be chainable; every eq result exposes .eq and .range
+      // plus a terminal .then.
+      const terminal: Record<string, any> = {};
+      const rangeFromEq = vi.fn().mockReturnValue(terminal);
+      terminal.then = (resolve: (v: { data: unknown; error: unknown; count: number }) => void) =>
+        resolve({ data: [mockAccount], error: null, count: 1 });
+      terminal.eq = vi.fn().mockReturnValue(terminal);
+      terminal.range = rangeFromEq;
+      const eqMock = vi.fn().mockReturnValue(terminal);
       (accountMock as Record<string, unknown>).select = vi.fn().mockReturnValue({
         order: vi.fn().mockReturnValue({
           eq: eqMock,
-          range: vi.fn().mockReturnValue({
-            eq: eqMock,
-          }),
+          range: vi.fn().mockReturnValue({ eq: eqMock }),
         }),
       });
 
@@ -1338,12 +1349,18 @@ describe('LoyaltyController', () => {
           let callCount = 0;
           (mock as Record<string, unknown>).select = vi.fn().mockImplementation(() => {
             callCount++;
-            const resolvable = (val: unknown) => ({
-              then: (resolve: (value: unknown) => void) => {
-                resolve(val);
-                return Promise.resolve(val);
-              },
-            });
+            // The controller applies optional .eq('property_id', …) AFTER select;
+            // keep every resolvable chainable with self-returning .eq.
+            const resolvable = (val: unknown) => {
+              const r: Record<string, unknown> = {
+                then: (resolve: (value: unknown) => void) => {
+                  resolve(val);
+                  return Promise.resolve(val);
+                },
+              };
+              r.eq = vi.fn().mockReturnValue(r);
+              return r;
+            };
             if (callCount === 1) {
               // count query
               return resolvable({ count: 2, data: null, error: null });
@@ -1416,13 +1433,8 @@ describe('LoyaltyController', () => {
             return Promise.resolve({ data: [], error: null });
           },
         }),
-        eq: vi.fn().mockReturnValue({
-          then: (resolve: (value: { data: unknown; error: unknown }) => void) => {
-            resolve({ data: [], error: null });
-            return Promise.resolve({ data: [], error: null });
-          },
-        }),
       };
+      (emptyResolvable as Record<string, unknown>).eq = vi.fn().mockReturnValue(emptyResolvable);
       const tableMocks: Record<string, ReturnType<typeof createQueryMock>> = {
         loyalty_accounts: (() => {
           const mock = createQueryMock(() => []);

@@ -3,17 +3,27 @@ import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
 
 // Validation schemas
-const createTaskSchema = z.object({
+// Base field shapes WITHOUT defaults: zod v4's .partial() does not suppress
+// .default() fields, so building an update schema from a defaulted schema
+// would silently fire defaults for omitted fields (an empty PATCH gaining
+// priority:'normal' / isActive:true) and bypass the 'No fields to update'
+// guard. Defaults belong only on the create schemas.
+const taskFields = {
   unitId: z.string().uuid().optional(),
   roomNumber: z.string().max(20).optional(),
   taskTypeId: z.string().uuid(),
-  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']),
   notes: z.string().optional(),
   assignedTo: z.string().uuid().optional(),
   scheduledFor: z.string().datetime().optional(),
+};
+
+const createTaskSchema = z.object({
+  ...taskFields,
+  priority: taskFields.priority.default('normal'),
 });
 
-const updateTaskSchema = createTaskSchema.partial().extend({
+const updateTaskSchema = z.object(taskFields).partial().extend({
   status: z.enum(['pending', 'in_progress', 'completed', 'cancelled', 'on_hold']).optional(),
 });
 
@@ -27,15 +37,25 @@ const completeTaskSchema = z.object({
   photosUrls: z.array(z.string().url()).optional(),
 });
 
-const createScheduleSchema = z.object({
+const scheduleFields = {
   unitId: z.string().uuid().optional(),
   taskTypeId: z.string().uuid(),
   dayOfWeek: z.number().int().min(0).max(6).optional(), // 0=Sunday, 6=Saturday
   timeSlot: z.string().regex(/^\d{2}:\d{2}$/),
   assignedTo: z.string().uuid().optional(),
-  isActive: z.boolean().default(true),
-  repeatPattern: z.enum(['daily', 'weekly', 'checkout']).default('daily'),
+  isActive: z.boolean(),
+  repeatPattern: z.enum(['daily', 'weekly', 'checkout']),
+};
+
+const createScheduleSchema = z.object({
+  ...scheduleFields,
+  isActive: scheduleFields.isActive.default(true),
+  repeatPattern: scheduleFields.repeatPattern.default('daily'),
 });
+
+// Defaults deliberately omitted — an empty PATCH must stay empty (see note
+// on taskFields above).
+const updateScheduleSchema = z.object(scheduleFields).partial();
 
 export class HousekeepingController {
   /**
@@ -821,7 +841,7 @@ export class HousekeepingController {
     try {
       const { id } = req.params;
       // FIX: Iteration 11 - Validate input (was missing, unlike createSchedule)
-      const validation = createScheduleSchema.partial().safeParse(req.body);
+      const validation = updateScheduleSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({ success: false, error: validation.error.issues });
       }

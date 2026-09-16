@@ -60,8 +60,10 @@ describe('ModuleGuard Middleware', () => {
     });
 
     it('should fail closed when module is not found in database', async () => {
+      // Absence is a clean zero-row miss: maybeSingle resolves (null, null).
+      // An error here would be a real DB failure (MODULE_CHECK_FAILED 503).
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockReturnValue(createChainableMock(null, { code: 'PGRST116' }))
+        from: vi.fn().mockReturnValue(createChainableMock(null))
       } as any);
 
       const middleware = requireModule('new-feature');

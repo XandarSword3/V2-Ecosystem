@@ -533,7 +533,7 @@ describe('User Controller', () => {
   describe('updateUserRoles', () => {
     it('should update user roles successfully', async () => {
       const userId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-      const roleId = 'b2c3d4e5-f678-9012-cdef-ab1234567890';
+      const roleId = 'b2c3d4e5-f678-4012-8def-ab1234567890';
 
       // Mock user exists
       const userQueryMock = createChainableMock({ id: userId, email: 'user@test.com' });

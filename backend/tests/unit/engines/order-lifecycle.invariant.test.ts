@@ -157,6 +157,9 @@ function createOrderDb(overrides: {
           builder.conditions.push([col, val]);
           return builder;
         },
+        // Fulfillment reads order+limit before maybeSingle — pass through.
+        order: () => builder,
+        limit: () => builder,
         // Real supabase-js builders are THENABLE — `.select().eq(...)` can
         // be awaited directly (the resolver does exactly that). Awaiting
         // the chain performs the read.
@@ -546,8 +549,9 @@ describe('Engine A inventory authority (plan Phase 5 proof)', () => {
     expect(staff).not.toMatch(/\.fulfillment_state/);
     expect(router).not.toMatch(/\.fulfillment_state/);
     // The join is the source: both the staff KDS endpoint and the order
-    // read endpoints select fulfillments(status).
-    expect(staff).toMatch(/fulfillments \( status \)/);
+    // read endpoints select fulfillments(status). (The staff join also
+    // selects mode for mode-aware filtering — accept extra columns.)
+    expect(staff).toMatch(/fulfillments \( status/);
     expect(router).toMatch(/fulfillments \( status \)/);
   });
 

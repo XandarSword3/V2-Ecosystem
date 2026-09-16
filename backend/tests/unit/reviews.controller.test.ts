@@ -41,7 +41,9 @@ describe('Reviews Controller', () => {
 
   describe('getApprovedReviews', () => {
     it('should return approved reviews with stats', async () => {
-      // Mock data uses module_id (DB column), controller maps to service_type
+      // The controller returns the joined rows flattened — no separate stats
+      // query, no author nesting, no camelCase remap (the frontend consumes
+      // customer_name/content directly).
       const mockReviews = [
         {
           id: 'review-1',
@@ -63,20 +65,10 @@ describe('Reviews Controller', () => {
         },
       ];
 
-      const mockRatings = [{ rating: 5 }, { rating: 4 }, { rating: 5 }];
-
-      // Create mock for main reviews query
       const reviewsQueryMock = createChainableMock(mockReviews);
-      // Create mock for ratings query (average calculation)
-      const ratingsQueryMock = createChainableMock(mockRatings);
 
-      let callCount = 0;
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockImplementation(() => {
-          callCount++;
-          // First call is for reviews, second for ratings
-          return callCount === 1 ? reviewsQueryMock : ratingsQueryMock;
-        }),
+        from: vi.fn().mockImplementation(() => reviewsQueryMock),
       } as any);
 
       const { getApprovedReviews } = await import('../../src/modules/reviews/reviews.controller.js');
@@ -88,18 +80,7 @@ describe('Reviews Controller', () => {
 
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: {
-          reviews: mockReviews.map(r => ({
-            ...r,
-            text: r.content,
-            service_type: r.module_id,
-            author: { full_name: r.customer_name, profile_image_url: null },
-          })),
-          stats: {
-            totalReviews: 3,
-            averageRating: 4.7,
-          },
-        },
+        data: mockReviews,
       });
     });
 
@@ -179,23 +160,15 @@ describe('Reviews Controller', () => {
       // Iteration 5: graceful fallback returns empty data instead of calling next(error)
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: {
-          reviews: [],
-          stats: { totalReviews: 0, averageRating: 0 },
-        },
+        data: [],
       });
     });
 
     it('should return zero average rating when no reviews exist', async () => {
       const reviewsQueryMock = createChainableMock([]);
-      const ratingsQueryMock = createChainableMock([]);
 
-      let callCount = 0;
       vi.mocked(getSupabase).mockReturnValue({
-        from: vi.fn().mockImplementation(() => {
-          callCount++;
-          return callCount === 1 ? reviewsQueryMock : ratingsQueryMock;
-        }),
+        from: vi.fn().mockImplementation(() => reviewsQueryMock),
       } as any);
 
       const { getApprovedReviews } = await import('../../src/modules/reviews/reviews.controller.js');
@@ -205,13 +178,7 @@ describe('Reviews Controller', () => {
 
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: {
-          reviews: [],
-          stats: {
-            totalReviews: 0,
-            averageRating: 0,
-          },
-        },
+        data: [],
       });
     });
   });

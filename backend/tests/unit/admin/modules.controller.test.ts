@@ -76,7 +76,10 @@ function createMockReqRes(overrides: any = {}) {
     query: {},
     body: {},
     headers: {},
-    user: { id: 'user-1', role: 'admin' },
+    // scope + tenantId are read by getCallerTenantId() (tenant-scope.ts).
+    // Without scope:'super_admin' the call throws "No tenant associated with
+    // this account" — a fixture drift from when that helper was introduced.
+    user: { id: 'user-1', userId: 'user-1', role: 'admin', roles: ['admin', 'super_admin'], scope: 'super_admin', tenantId: 'tenant-1' },
     ...overrides,
   };
   const res = {
@@ -184,9 +187,11 @@ describe('ModulesController', () => {
     });
 
     it('should return a module by slug when ID not found', async () => {
+      // A slug identifier ('menu_service') is not a UUID, so the controller
+      // skips the id query entirely and runs only the slug lookup. Queue one
+      // successful response for it.
       const mockModule = { id: 'mod-1', name: 'MenuService', slug: 'menu_service' };
-      mockBuilder.queueResponse(null, { code: 'PGRST116' }); // First query fails
-      mockBuilder.queueResponse(mockModule); // Fallback to slug query
+      mockBuilder.queueResponse(mockModule);
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'menu_service' },
@@ -201,7 +206,7 @@ describe('ModulesController', () => {
     });
 
     it('should return 404 for non-existent module', async () => {
-      mockBuilder.queueResponse(null, { code: 'PGRST116' });
+      // 'invalid' is not a UUID → single slug lookup returns nothing.
       mockBuilder.queueResponse(null);
 
       const { req, res, next } = createMockReqRes({

@@ -147,6 +147,14 @@ describe('Staff Controller', () => {
         from: vi.fn().mockReturnThis(),
         insert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
+        neq: vi.fn().mockReturnThis(),
+        in: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        // Pre-checks (existing shift today / open shift) find nothing.
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
         single: vi.fn().mockResolvedValue({ data: mockShift, error: null })
       };
       vi.mocked(getSupabase).mockReturnValue(mockSupabase as any);
@@ -159,7 +167,7 @@ describe('Staff Controller', () => {
           endTime: '17:00',
           breakMinutes: 30
         },
-        user: { id: 'user-1', role: 'admin', userId: 'user-1' }
+        user: { id: 'user-1', role: 'admin', userId: 'user-1', tenantId: 'tenant-1' }, headers: { 'x-property-id': 'prop-1' }
       });
 
       await staffController.createShift(req, res, next);
@@ -171,7 +179,7 @@ describe('Staff Controller', () => {
     it('should return 400 for invalid data', async () => {
       const { req, res, next } = createMockReqRes({
         body: { staffId: 'invalid' }, // Missing required fields
-        user: { id: 'user-1', role: 'admin', userId: 'user-1' }
+        user: { id: 'user-1', role: 'admin', userId: 'user-1', tenantId: 'tenant-1' }, headers: { 'x-property-id': 'prop-1' }
       });
 
       await staffController.createShift(req, res, next);
@@ -196,7 +204,7 @@ describe('Staff Controller', () => {
       const { req, res, next } = createMockReqRes({
         params: { shiftId: 'shift-1' },
         body: { status: 'completed' },
-        user: { id: 'user-1', role: 'admin', userId: 'user-1' }
+        user: { id: 'user-1', role: 'admin', userId: 'user-1', tenantId: 'tenant-1' }, headers: { 'x-property-id': 'prop-1' }
       });
 
       await staffController.updateShift(req, res, next);

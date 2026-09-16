@@ -13,6 +13,9 @@ interface MockRequest {
   ip: string;
   headers: Record<string, string>;
   cookies: Record<string, string>;
+  // Express provides hostname; getCookieDomain reads it to decide the
+  // cookie Domain attribute.
+  hostname: string;
 }
 
 interface MockResponse {
@@ -31,6 +34,7 @@ function createMockRequest(overrides: Partial<MockRequest> = {}): MockRequest {
     ip: '127.0.0.1',
     headers: {},
     cookies: {},
+    hostname: 'localhost',
     ...overrides,
   };
 }

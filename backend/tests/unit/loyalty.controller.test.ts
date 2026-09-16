@@ -13,6 +13,7 @@ const mockLimit = vi.fn();
 const mockRange = vi.fn();
 const mockLte = vi.fn();
 const mockGte = vi.fn();
+const mockMaybeSingle = vi.fn();
 
 const createMockQueryBuilder = () => ({
   select: mockSelect.mockReturnThis(),
@@ -21,6 +22,10 @@ const createMockQueryBuilder = () => ({
   delete: mockDelete.mockReturnThis(),
   eq: mockEq.mockReturnThis(),
   single: mockSingle,
+  maybeSingle: mockMaybeSingle,
+  is: vi.fn().mockReturnThis(),
+  neq: vi.fn().mockReturnThis(),
+  in: vi.fn().mockReturnThis(),
   order: mockOrder.mockReturnThis(),
   limit: mockLimit.mockReturnThis(),
   range: mockRange.mockReturnThis(),
@@ -50,10 +55,13 @@ describe('Loyalty Controller', () => {
   let responseStatus: number;
 
   beforeEach(() => {
+    // Reset first so later-created mocks keep their implementations, while
+    // stale once-queues from the shared query mocks are cleared.
+    vi.resetAllMocks();
     controller = new LoyaltyController();
     responseJson = {};
     responseStatus = 200;
-    
+
     mockResponse = {
       status: vi.fn().mockImplementation((code) => {
         responseStatus = code;
@@ -71,8 +79,6 @@ describe('Loyalty Controller', () => {
       query: {},
       body: {},
     };
-    
-    vi.clearAllMocks();
     
     // Reset mock return value
     mockFrom.mockReturnValue(createMockQueryBuilder());
@@ -96,7 +102,7 @@ describe('Loyalty Controller', () => {
         },
       };
 
-      mockSingle.mockResolvedValue({ data: mockAccount, error: null });
+      mockMaybeSingle.mockResolvedValue({ data: mockAccount, error: null });
       mockRequest.params = { userId: 'user-123' };
 
       await controller.getAccount(
@@ -125,12 +131,15 @@ describe('Loyalty Controller', () => {
         tier: { name: 'Bronze' },
       };
 
-      // First call returns no account (code PGRST116 = not found)
-      mockSingle
-        .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } })
+      // Account lookup and ensureLoyaltyMember's re-check both end in
+      // .maybeSingle() and find nothing; then settings + default tier
+      // (each limit().maybeSingle()), then the insert returns via .single().
+      mockMaybeSingle
+        .mockResolvedValueOnce({ data: null, error: null })
+        .mockResolvedValueOnce({ data: null, error: null })
         .mockResolvedValueOnce({ data: mockSettings, error: null })
-        .mockResolvedValueOnce({ data: mockDefaultTier, error: null })
-        .mockResolvedValueOnce({ data: mockNewAccount, error: null });
+        .mockResolvedValueOnce({ data: mockDefaultTier, error: null });
+      mockSingle.mockResolvedValueOnce({ data: mockNewAccount, error: null });
 
       mockRequest.params = { userId: 'user-123' };
 
@@ -267,15 +276,10 @@ describe('Loyalty Controller', () => {
         { id: 'tier-3', name: 'Gold', min_points: 1000 },
       ];
 
-      mockOrder.mockReturnValue({
-        select: mockSelect.mockReturnThis(),
-        order: mockOrder.mockReturnThis(),
-        then: (cb: any) => cb({ data: mockTiers, error: null }),
-      });
-      
-      // Mock the chain to resolve with tiers
+      // Chain is select('*') -> eq('property_id') -> order('min_points')
       mockFrom.mockReturnValue({
         select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnThis(),
           order: vi.fn().mockResolvedValue({ data: mockTiers, error: null }),
         }),
       });

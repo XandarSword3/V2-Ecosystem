@@ -163,16 +163,16 @@ describe('Housekeeping Controller', () => {
   describe('createTask', () => {
     it('should create a new task', async () => {
       mockRequest.body = {
-        taskTypeId: '00000000-0000-0000-0000-000000000001',
-        unitId: '00000000-0000-0000-0000-000000000002',
+        taskTypeId: '10000000-0000-1000-8000-000000000001',
+        unitId: '20000000-0000-2000-9000-000000000002',
         priority: 'high',
         notes: 'Deep clean needed',
       };
 
       const createdTask = {
         id: 'task-new',
-        task_type_id: '00000000-0000-0000-0000-000000000001',
-        unit_id: '00000000-0000-0000-0000-000000000002',
+        task_type_id: '10000000-0000-1000-8000-000000000001',
+        unit_id: '20000000-0000-2000-9000-000000000002',
         status: 'pending',
         priority: 'high',
         notes: 'Deep clean needed',
@@ -192,7 +192,7 @@ describe('Housekeeping Controller', () => {
 
     it('should reject invalid priority', async () => {
       mockRequest.body = {
-        taskTypeId: '00000000-0000-0000-0000-000000000001',
+        taskTypeId: '10000000-0000-1000-8000-000000000001',
         priority: 'invalid',
       };
 
@@ -209,7 +209,7 @@ describe('Housekeeping Controller', () => {
   describe('assignTask', () => {
     it('should assign task to staff', async () => {
       mockRequest.params = { id: 'task-1' };
-      mockRequest.body = { staffId: '00000000-0000-0000-0000-000000000003' };
+      mockRequest.body = { staffId: '30000000-0000-3000-9000-000000000003' };
 
       const updatedTask = {
         id: 'task-1',
@@ -229,7 +229,7 @@ describe('Housekeeping Controller', () => {
 
     it('should return 404 for non-existent task', async () => {
       mockRequest.params = { id: 'non-existent' };
-      mockRequest.body = { staffId: '00000000-0000-0000-0000-000000000003' };
+      mockRequest.body = { staffId: '30000000-0000-3000-9000-000000000003' };
 
       mockBuilder.queueResponse(null, { code: 'PGRST116' });
 

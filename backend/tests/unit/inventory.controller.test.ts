@@ -44,6 +44,7 @@ const createChainableMock = () => {
       responseQueue = [];
       responseIndex = 0;
     },
+    next: getNextResponse,
   };
 };
 
@@ -53,6 +54,9 @@ const mockFrom = vi.fn();
 vi.mock('../../src/database/connection.js', () => ({
   getSupabase: vi.fn(() => ({
     from: mockFrom,
+    // adjust_stock_atomic consumes from the same response queue as the
+    // builder — queue an rpc result exactly where the flow needs it.
+    rpc: vi.fn(() => Promise.resolve(mockBuilder.next())),
   })),
 }));
 
@@ -302,17 +306,20 @@ describe('Inventory Controller', () => {
         reason: 'Restocking',
       };
 
-      // Get current item
+      // 1. Get current item (maybeSingle)
       mockBuilder.queueResponse({
         id: '550e8400-e29b-41d4-a716-446655440001',
         name: 'Soap',
         current_stock: 100,
+        reorder_point: 10,
+        tenant_id: 'tenant-123',
+        property_id: 'property-123',
       }, null);
-      
-      // Insert transaction
-      mockBuilder.queueResponse(null, null);
-      
-      // Update stock
+      // 2. adjust_stock_atomic RPC succeeds
+      mockBuilder.queueResponse({ success: true, stock_after: 150, transaction_id: 'txn-1' }, null);
+      // 3. Fetch the inserted transaction by its id (maybeSingle)
+      mockBuilder.queueResponse({ id: 'txn-1' }, null);
+      // 4. last_restocked_at update (awaited builder)
       mockBuilder.queueResponse(null, null);
 
       await controller.recordTransaction(
@@ -331,17 +338,16 @@ describe('Inventory Controller', () => {
         reason: 'Used for cleaning',
       };
 
-      // Get current item
+      // 1. Get current item  2. atomic RPC (80 remaining)  3. fetch tx
       mockBuilder.queueResponse({
         id: '550e8400-e29b-41d4-a716-446655440001',
         current_stock: 100,
+        reorder_point: 10,
+        tenant_id: 'tenant-123',
+        property_id: 'property-123',
       }, null);
-      
-      // Insert transaction
-      mockBuilder.queueResponse(null, null);
-      
-      // Update stock
-      mockBuilder.queueResponse(null, null);
+      mockBuilder.queueResponse({ success: true, stock_after: 80, transaction_id: 'txn-2' }, null);
+      mockBuilder.queueResponse({ id: 'txn-2' }, null);
 
       await controller.recordTransaction(
         mockRequest as Request,
@@ -358,10 +364,17 @@ describe('Inventory Controller', () => {
         quantity: 200,
       };
 
+      // 1. Get current item  2. atomic RPC reports insufficient stock —
+      // the row lock inside adjust_stock_atomic is now the enforcement
+      // point, so the controller maps the RPC refusal to 400.
       mockBuilder.queueResponse({
         id: '550e8400-e29b-41d4-a716-446655440001',
         current_stock: 50,
+        reorder_point: 10,
+        tenant_id: 'tenant-123',
+        property_id: 'property-123',
       }, null);
+      mockBuilder.queueResponse({ success: false, error: 'Insufficient stock', available: 50 }, null);
 
       await controller.recordTransaction(
         mockRequest as Request,

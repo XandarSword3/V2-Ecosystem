@@ -57,26 +57,32 @@ describe('Cache - RedisCache Class Methods', () => {
       process.env.REDIS_URL = originalUrl;
     });
 
-    it('set should return false when cache unavailable', async () => {
+    it('set should succeed via the in-memory fallback when cache unavailable', async () => {
+      // The wrapper intentionally degrades to an in-process Map when Redis
+      // is not configured — writes still succeed (and reads of them hit the
+      // memory cache), they just don't survive a restart.
       const originalUrl = process.env.REDIS_URL;
       delete process.env.REDIS_URL;
       
       const { cache } = await import('../../src/utils/cache');
       const result = await cache.set('test-key', { data: 'test' });
       
-      expect(result).toBe(false);
+      expect(result).toBe(true);
+      expect(await cache.get('test-key')).toEqual({ data: 'test' });
       
       process.env.REDIS_URL = originalUrl;
     });
 
-    it('del should return false when cache unavailable', async () => {
+    it('del should succeed via the in-memory fallback when cache unavailable', async () => {
       const originalUrl = process.env.REDIS_URL;
       delete process.env.REDIS_URL;
       
       const { cache } = await import('../../src/utils/cache');
+      await cache.set('test-key', { data: 'test' });
       const result = await cache.del('test-key');
       
-      expect(result).toBe(false);
+      expect(result).toBe(true);
+      expect(await cache.get('test-key')).toBeNull();
       
       process.env.REDIS_URL = originalUrl;
     });

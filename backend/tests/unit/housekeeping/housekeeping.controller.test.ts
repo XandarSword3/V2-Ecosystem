@@ -159,7 +159,7 @@ describe('Housekeeping Controller', () => {
       mockBuilder.queueResponse({ id: 't1', status: 'pending' }); // insert (single)
       mockBuilder.queueResponse(null); // log insert
       const mocks = createMockReqRes({
-        body: { taskTypeId: '00000000-0000-0000-0000-000000000001', unitId: '00000000-0000-0000-0000-000000000002', priority: 'normal', notes: 'Test' },
+        body: { taskTypeId: '10000000-0000-1000-8000-000000000001', unitId: '20000000-0000-2000-9000-000000000002', priority: 'normal', notes: 'Test' },
       });
       (mocks.req as any).user = { id: 'u1' };
       await controller.createTask(mocks.req as Request, mocks.res as Response);
@@ -176,7 +176,7 @@ describe('Housekeeping Controller', () => {
     it('should handle errors', async () => {
       mockBuilder.queueResponse(null, { message: 'DB error' }); // task type lookup throws
       const mocks = createMockReqRes({
-        body: { taskTypeId: '00000000-0000-0000-0000-000000000001', priority: 'normal' },
+        body: { taskTypeId: '10000000-0000-1000-8000-000000000001', priority: 'normal' },
       });
       (mocks.req as any).user = { id: 'u1' };
       await controller.createTask(mocks.req as Request, mocks.res as Response);
@@ -190,7 +190,7 @@ describe('Housekeeping Controller', () => {
       mockBuilder.queueResponse({ id: 't1', status: 'in_progress' }); // update (single)
       mockBuilder.queueResponse(null); // log insert for status change
       const mocks = createMockReqRes({ params: { id: 't1' }, body: { status: 'in_progress', notes: 'Updated' } });
-      (mocks.req as any).user = { id: '00000000-0000-0000-0000-000000000001' };
+      (mocks.req as any).user = { id: '10000000-0000-1000-8000-000000000001' };
       await controller.updateTask(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     });
@@ -214,11 +214,11 @@ describe('Housekeeping Controller', () => {
   // ---- assignTask ----
   describe('assignTask', () => {
     it('should assign a task to staff', async () => {
-      mockBuilder.queueResponse({ id: 't1', assigned_to: '00000000-0000-0000-0000-000000000002' }); // update (single)
-      mockBuilder.queueResponse({ id: '00000000-0000-0000-0000-000000000002', full_name: 'Staff' }); // user lookup (single)
+      mockBuilder.queueResponse({ id: 't1', assigned_to: '20000000-0000-2000-9000-000000000002' }); // update (single)
+      mockBuilder.queueResponse({ id: '20000000-0000-2000-9000-000000000002', full_name: 'Staff' }); // user lookup (single)
       mockBuilder.queueResponse(null); // log insert
-      const mocks = createMockReqRes({ params: { id: 't1' }, body: { staffId: '00000000-0000-0000-0000-000000000002' } });
-      (mocks.req as any).user = { id: '00000000-0000-0000-0000-000000000001' };
+      const mocks = createMockReqRes({ params: { id: 't1' }, body: { staffId: '20000000-0000-2000-9000-000000000002' } });
+      (mocks.req as any).user = { id: '10000000-0000-1000-8000-000000000001' };
       await controller.assignTask(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     });
@@ -232,8 +232,8 @@ describe('Housekeeping Controller', () => {
 
     it('should return 404 if task not found', async () => {
       mockBuilder.queueResponse(null, { code: 'PGRST116' });
-      const mocks = createMockReqRes({ params: { id: 'nope' }, body: { staffId: '00000000-0000-0000-0000-000000000002' } });
-      (mocks.req as any).user = { id: '00000000-0000-0000-0000-000000000001' };
+      const mocks = createMockReqRes({ params: { id: 'nope' }, body: { staffId: '20000000-0000-2000-9000-000000000002' } });
+      (mocks.req as any).user = { id: '10000000-0000-1000-8000-000000000001' };
       await controller.assignTask(mocks.req as Request, mocks.res as Response);
       expect(mocks.res.status).toHaveBeenCalledWith(404);
     });
@@ -366,7 +366,7 @@ describe('Housekeeping Controller', () => {
     it('should create a schedule', async () => {
       mockBuilder.queueResponse({ id: 's1' }); // insert (single)
       const mocks = createMockReqRes({
-        body: { taskTypeId: '00000000-0000-0000-0000-000000000001', timeSlot: '09:00' },
+        body: { taskTypeId: '10000000-0000-1000-8000-000000000001', timeSlot: '09:00' },
       });
       (mocks.req as any).user = { id: 'u1' };
       await controller.createSchedule(mocks.req as Request, mocks.res as Response);

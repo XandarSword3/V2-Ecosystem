@@ -72,7 +72,11 @@ describe('LoyaltyController', () => {
     it('should auto-create account with signup bonus when none exists', async () => {
       const newAcct = { id: 'acc-new', available_points: 100, tier: { name: 'Bronze' } };
       resolveQueue = [
-        { data: null, error: { code: 'PGRST116' } }, // no existing acct → triggers create
+        // maybeSingle returns null data with NO error when the account is
+        // missing — that's what triggers lazy-create. (A PGRST116 error here
+        // would be a read failure and the controller fails closed with 500.)
+        { data: null, error: null },                     // controller's member read → none
+        { data: null, error: null },                     // ensureLoyaltyMember re-reads members → none
         { data: { signup_bonus: 100 }, error: null },   // settings
         { data: { id: 'tier-1' }, error: null },          // default tier
         { data: newAcct, error: null },                    // insert returning

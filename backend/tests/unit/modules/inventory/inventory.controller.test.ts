@@ -32,6 +32,9 @@ vi.mock('../../../../src/database/connection.js', () => ({
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────
+// createItem/recordTransaction/bulkTransaction all write rows with a
+// NOT NULL property_id and fail fast (400) without one.
+const propHeader = { 'x-property-id': 'prop-1' };
 function mockReq(overrides: Record<string, any> = {}): Request {
   return {
     params: {},
@@ -199,8 +202,11 @@ describe('InventoryController', () => {
    * ============================================================ */
   describe('deleteCategory', () => {
     it('returns 400 when category still has items', async () => {
-      // 1. count check
-      resolveQueue.push({ data: null, error: null, count: 3 });
+      // 1. tenant-ownership pre-check  2. count check
+      resolveQueue.push(
+        { data: { id: 'c1' }, error: null },
+        { data: null, error: null, count: 3 },
+      );
 
       const res = mockRes();
       await ctrl.deleteCategory(mockReq({ params: { id: 'c1' } }), res);
@@ -212,8 +218,9 @@ describe('InventoryController', () => {
     });
 
     it('deletes category when empty', async () => {
-      // 1. count check  2. delete
+      // 1. tenant-ownership pre-check  2. count check  3. delete
       resolveQueue.push(
+        { data: { id: 'c1' }, error: null },
         { data: null, error: null, count: 0 },
         { data: null, error: null },
       );
@@ -228,7 +235,11 @@ describe('InventoryController', () => {
     });
 
     it('returns 500 when count query errors', async () => {
-      resolveQueue.push({ data: null, error: { message: 'timeout' } });
+      // 1. tenant-ownership pre-check (ok)  2. count check errors
+      resolveQueue.push(
+        { data: { id: 'c1' }, error: null },
+        { data: null, error: { message: 'timeout' } },
+      );
 
       const res = mockRes();
       await ctrl.deleteCategory(mockReq({ params: { id: 'c1' } }), res);
@@ -331,7 +342,9 @@ describe('InventoryController', () => {
   describe('createItem', () => {
     const validBody = {
       name: 'Paper Towels',
-      categoryId: '11111111-1111-1111-1111-111111111111',
+      // zod v4's .uuid() enforces RFC 9562 version/variant nibbles — the
+      // all-1s placeholder stopped parsing as a UUID.
+      categoryId: '11111111-1111-4111-8111-111111111111',
       currentStock: 10,
       reorderPoint: 5,
     };
@@ -346,15 +359,17 @@ describe('InventoryController', () => {
 
     it('creates item with initial stock transaction (stock > 0, stock > reorderPoint)', async () => {
       const created = { id: 'new-i', name: 'Paper Towels' };
-      // 1. insert item  2. insert initial transaction (stock 10 > 0)
+      // 1. category ownership check  2. insert item
+      // 3. insert initial transaction (stock 10 > 0)
       // stock 10 > reorderPoint 5 → no alert
       resolveQueue.push(
+        { data: { id: 'c1' }, error: null },
         { data: created, error: null },
         { data: null, error: null },
       );
 
       const res = mockRes();
-      await ctrl.createItem(mockReq({ body: validBody }), res);
+      await ctrl.createItem(mockReq({ body: validBody, headers: propHeader }), res);
 
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith({ success: true, data: created });
@@ -363,11 +378,11 @@ describe('InventoryController', () => {
     it('creates item with alert when stock <= reorderPoint', async () => {
       const body = { ...validBody, currentStock: 3, reorderPoint: 5 };
       const created = { id: 'new-i2', name: 'Paper Towels' };
-      // 1. insert item
-      // 2. insert initial transaction (stock 3 > 0)
-      // 3. createStockAlert check existing
-      // 4. createStockAlert insert
+      // 1. category ownership check  2. insert item
+      // 3. insert initial transaction (stock 3 > 0)
+      // 4. createStockAlert check existing  5. createStockAlert insert
       resolveQueue.push(
+        { data: { id: 'c1' }, error: null },
         { data: created, error: null },
         { data: null, error: null },
         { data: null, error: null },
@@ -375,16 +390,20 @@ describe('InventoryController', () => {
       );
 
       const res = mockRes();
-      await ctrl.createItem(mockReq({ body }), res);
+      await ctrl.createItem(mockReq({ body, headers: propHeader }), res);
 
       expect(res.status).toHaveBeenCalledWith(201);
     });
 
     it('returns 500 on insert error', async () => {
-      resolveQueue.push({ data: null, error: { message: 'constraint' } });
+      // 1. category ownership check (ok)  2. insert fails
+      resolveQueue.push(
+        { data: { id: 'c1' }, error: null },
+        { data: null, error: { message: 'constraint' } },
+      );
 
       const res = mockRes();
-      await ctrl.createItem(mockReq({ body: validBody }), res);
+      await ctrl.createItem(mockReq({ body: validBody, headers: propHeader }), res);
 
       expect(res.status).toHaveBeenCalledWith(500);
     });
@@ -443,7 +462,9 @@ describe('InventoryController', () => {
    * ============================================================ */
   describe('deleteItem', () => {
     it('deactivates item and returns success', async () => {
-      resolveQueue.push({ data: null, error: null });
+      // soft-delete UPDATE ends in .select().maybeSingle() — the row must
+      // come back for the controller to report success.
+      resolveQueue.push({ data: { id: 'i1' }, error: null });
 
       const res = mockRes();
       await ctrl.deleteItem(mockReq({ params: { id: 'i1' } }), res);
@@ -469,7 +490,7 @@ describe('InventoryController', () => {
    * ============================================================ */
   describe('recordTransaction', () => {
     const txBody = (type: string, qty: number) => ({
-      itemId: '22222222-2222-2222-2222-222222222222',
+      itemId: '22222222-2222-2222-9222-222222222222',
       type,
       quantity: qty,
       referenceType: 'manual' as const,
@@ -483,15 +504,15 @@ describe('InventoryController', () => {
     });
 
     it('records stock-in and returns 201 (no alert)', async () => {
-      // 1. get item  2. insert tx  3. update stock
+      // 1. get item  2. adjust_stock_atomic RPC  3. fetch inserted tx
       resolveQueue.push(
         { data: { id: 'i1', current_stock: '10', reorder_point: '5' }, error: null },
+        { data: { success: true, stock_after: 15, transaction_id: 'tx1' }, error: null },
         { data: { id: 'tx1' }, error: null },
-        { data: null, error: null },
       );
 
       const res = mockRes();
-      await ctrl.recordTransaction(mockReq({ body: txBody('in', 5) }), res);
+      await ctrl.recordTransaction(mockReq({ body: txBody('in', 5), headers: propHeader }), res);
 
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -501,10 +522,12 @@ describe('InventoryController', () => {
     });
 
     it('returns 404 when item not found', async () => {
-      resolveQueue.push({ data: null, error: { message: 'nope' } });
+      // maybeSingle: missing row resolves with error:null and data:null —
+      // queueing an error would hit the 500 branch instead (fail-closed).
+      resolveQueue.push({ data: null, error: null });
 
       const res = mockRes();
-      await ctrl.recordTransaction(mockReq({ body: txBody('in', 1) }), res);
+      await ctrl.recordTransaction(mockReq({ body: txBody('in', 1), headers: propHeader }), res);
 
       expect(res.status).toHaveBeenCalledWith(404);
     });
@@ -512,10 +535,11 @@ describe('InventoryController', () => {
     it('returns 400 for insufficient stock on out', async () => {
       resolveQueue.push(
         { data: { id: 'i1', current_stock: '3', reorder_point: '5' }, error: null },
+        { data: { success: false, error: 'Insufficient stock', available: 3 }, error: null },
       );
 
       const res = mockRes();
-      await ctrl.recordTransaction(mockReq({ body: txBody('out', 5) }), res);
+      await ctrl.recordTransaction(mockReq({ body: txBody('out', 5), headers: propHeader }), res);
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -524,18 +548,18 @@ describe('InventoryController', () => {
     });
 
     it('triggers out_of_stock alert when stock reaches 0', async () => {
-      // 1. get item  2. insert tx  3. update stock
+      // 1. get item  2. adjust_stock_atomic RPC  3. fetch inserted tx
       // 4. createStockAlert check existing  5. createStockAlert insert
       resolveQueue.push(
         { data: { id: 'i1', current_stock: '5', reorder_point: '5' }, error: null },
+        { data: { success: true, stock_after: 0, transaction_id: 'tx2' }, error: null },
         { data: { id: 'tx2' }, error: null },
-        { data: null, error: null },
         { data: null, error: null },
         { data: null, error: null },
       );
 
       const res = mockRes();
-      await ctrl.recordTransaction(mockReq({ body: txBody('out', 5) }), res);
+      await ctrl.recordTransaction(mockReq({ body: txBody('out', 5), headers: propHeader }), res);
 
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -552,7 +576,7 @@ describe('InventoryController', () => {
       );
 
       const res = mockRes();
-      await ctrl.recordTransaction(mockReq({ body: txBody('adjustment', 25) }), res);
+      await ctrl.recordTransaction(mockReq({ body: txBody('adjustment', 25), headers: propHeader }), res);
 
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -575,18 +599,17 @@ describe('InventoryController', () => {
     it('processes multiple transactions', async () => {
       const body = {
         transactions: [
-          { itemId: '22222222-2222-2222-2222-222222222222', type: 'in', quantity: 5, referenceType: 'manual' },
+          { itemId: '22222222-2222-2222-9222-222222222222', type: 'in', quantity: 5, referenceType: 'manual' },
         ],
       };
-      // Per txn: 1. get item  2. insert tx  3. update stock
+      // 1. batch item fetch  2. adjust_stock_atomic RPC (per delta txn)
       resolveQueue.push(
-        { data: [{ id: '22222222-2222-2222-2222-222222222222', current_stock: '10' }], error: null },
-        { data: null, error: null },
-        { data: null, error: null },
+        { data: [{ id: '22222222-2222-2222-9222-222222222222', current_stock: '10' }], error: null },
+        { data: { success: true, stock_after: 15, transaction_id: 'tx-b1' }, error: null },
       );
 
       const res = mockRes();
-      await ctrl.bulkTransaction(mockReq({ body }), res);
+      await ctrl.bulkTransaction(mockReq({ body, headers: propHeader }), res);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: true,
@@ -597,13 +620,15 @@ describe('InventoryController', () => {
     it('reports item-not-found in errorDetails', async () => {
       const body = {
         transactions: [
-          { itemId: '22222222-2222-2222-2222-222222222222', type: 'in', quantity: 5, referenceType: 'manual' },
+          { itemId: '22222222-2222-2222-9222-222222222222', type: 'in', quantity: 5, referenceType: 'manual' },
         ],
       };
-      resolveQueue.push({ data: null, error: null }); // item not found
+      // batch fetch returns no rows — the item isn't in the caller's
+      // tenant/property, so it reports as not-found per line.
+      resolveQueue.push({ data: [], error: null });
 
       const res = mockRes();
-      await ctrl.bulkTransaction(mockReq({ body }), res);
+      await ctrl.bulkTransaction(mockReq({ body, headers: propHeader }), res);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: false,
@@ -692,7 +717,8 @@ describe('InventoryController', () => {
    * ============================================================ */
   describe('resolveAlert', () => {
     it('resolves alert and returns success', async () => {
-      resolveQueue.push({ data: null, error: null });
+      // UPDATE ... .select().maybeSingle() must return the row
+      resolveQueue.push({ data: { id: 'a1' }, error: null });
 
       const res = mockRes();
       await ctrl.resolveAlert(mockReq({ params: { id: 'a1' } }), res);

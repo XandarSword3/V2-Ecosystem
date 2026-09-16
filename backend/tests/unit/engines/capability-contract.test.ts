@@ -94,10 +94,15 @@ describe('Capability contract (plan Phase 2)', () => {
       { mode: 'pickup', destinations: ['pickup_location'] },
       { mode: 'local_delivery', destinations: ['address'] },
       { mode: 'digital_delivery', destinations: ['digital_account'] },
+      { mode: 'shipment', destinations: ['address'] },
+      { mode: 'service_execution', destinations: ['service_location'] },
+      { mode: 'none', destinations: ['none'] },
     ]);
     // Per-mode machine routing: hospitality modes → hospitality machine,
-    // digital_delivery → the digital adapter's machine.
-    expect(f.modeMachines!.length).toBe(2);
+    // digital_delivery → the digital adapter's machine, shipment → the
+    // shipment adapter's machine, service_execution → the service adapter's
+    // machine ('none' deliberately binds no machine).
+    expect(f.modeMachines!.length).toBe(4);
     const hospitality = f.modeMachines!.find(b => b.modes.includes('on_premise'))!;
     expect(hospitality.machine.states).toContain('queued');
     const digital = f.modeMachines!.find(b => b.modes.includes('digital_delivery'))!;
@@ -564,7 +569,7 @@ describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
     // If the registry erased generics, this exact-type check would fail.
     const typed: EngineRegistry['instant_transaction'] = getEngine('instant_transaction');
     expect(typed.type).toBe('instant_transaction');
-    expect(typed.capabilities.fulfillment.modeMachines!.length).toBe(2);
+    expect(typed.capabilities.fulfillment.modeMachines!.length).toBe(4);
     expect(resolveFulfillmentMachine(typed.capabilities.fulfillment, 'digital_delivery')).toBeDefined();
   });
 
@@ -844,10 +849,13 @@ describe('Fulfillment selection validation (Stage 6 fix)', () => {
   });
 
   it('rejects a mode the engine does not offer (even if globally registered)', () => {
-    // 'shipment' is in the global LEGAL_FULFILLMENT_COMBINATIONS registry but
-    // instant_transaction does not declare it — the engine's options win.
+    // 'shipment' is in the global LEGAL_FULFILLMENT_COMBINATIONS registry and
+    // even a declared Engine A mode — but time_exclusive_reservation declares
+    // only on_premise. The ENGINE's own options are the authority, never the
+    // global registry.
+    const reservationEngine = getEngine('time_exclusive_reservation');
     expect(() =>
-      assertValidFulfillmentSelection(engine.capabilities.fulfillment, 'shipment', null)
+      assertValidFulfillmentSelection(reservationEngine.capabilities.fulfillment, 'shipment', null)
     ).toThrow(/not offered by this engine/);
   });
 

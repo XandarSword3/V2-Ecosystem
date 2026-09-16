@@ -40,8 +40,12 @@ function createMockReqRes(overrides: any = {}) {
     params: {},
     query: {},
     body: {},
-    headers: {},
-    user: { id: 'user-1', role: 'admin' },
+    // tenantScopeFor() throws AppError(403) without tenantId, and
+    // requireCallerPropertyId() throws 400 without an x-property-id —
+    // both wrap every controller method via asyncHandler, so the default
+    // request must carry a full tenant/property context.
+    headers: { 'x-property-id': 'prop-1' },
+    user: { id: 'user-1', role: 'admin', tenantId: 'tenant-1', scope: 'admin' },
     ...overrides,
   };
   const res = {
@@ -123,7 +127,7 @@ describe('CustomizationController', () => {
 
       await customizationController.updateGroup(req as any, res as any, next);
 
-      expect(customizationService.updateGroup).toHaveBeenCalledWith('group-1', { name: 'Updated Toppings' });
+      expect(customizationService.updateGroup).toHaveBeenCalledWith('group-1', { name: 'Updated Toppings' }, 'tenant-1');
       expect(res.json).toHaveBeenCalledWith(mockGroup);
     });
   });
@@ -138,7 +142,7 @@ describe('CustomizationController', () => {
 
       await customizationController.deleteGroup(req as any, res as any, next);
 
-      expect(customizationService.deleteGroup).toHaveBeenCalledWith('group-1');
+      expect(customizationService.deleteGroup).toHaveBeenCalledWith('group-1', 'tenant-1');
       expect(res.status).toHaveBeenCalledWith(204);
       expect(res.send).toHaveBeenCalled();
     });
@@ -156,7 +160,7 @@ describe('CustomizationController', () => {
 
       await customizationController.getGroup(req as any, res as any, next);
 
-      expect(customizationService.getGroup).toHaveBeenCalledWith('group-1', true);
+      expect(customizationService.getGroup).toHaveBeenCalledWith('group-1', true, 'tenant-1');
       expect(res.json).toHaveBeenCalledWith(mockGroup);
     });
 
@@ -193,6 +197,11 @@ describe('CustomizationController', () => {
         entityType: 'menu_item',
         isGlobal: true,
         includeOptions: true,
+        tenantId: 'tenant-1',
+        // listGroups reads req.propertyId (set by validatePropertyAccess
+        // middleware), not the raw x-property-id header — which stays unset
+        // in this mock.
+        propertyId: undefined,
       });
       expect(res.json).toHaveBeenCalledWith(mockGroups);
     });
@@ -264,7 +273,7 @@ describe('CustomizationController', () => {
 
       await customizationController.updateOption(req as any, res as any, next);
 
-      expect(customizationService.updateOption).toHaveBeenCalledWith('opt-1', { name: 'Updated Cheese' });
+      expect(customizationService.updateOption).toHaveBeenCalledWith('opt-1', { name: 'Updated Cheese' }, 'tenant-1');
       expect(res.json).toHaveBeenCalledWith(mockOption);
     });
   });
@@ -279,7 +288,7 @@ describe('CustomizationController', () => {
 
       await customizationController.deleteOption(req as any, res as any, next);
 
-      expect(customizationService.deleteOption).toHaveBeenCalledWith('opt-1');
+      expect(customizationService.deleteOption).toHaveBeenCalledWith('opt-1', 'tenant-1');
       expect(res.status).toHaveBeenCalledWith(204);
       expect(res.send).toHaveBeenCalled();
     });
@@ -300,7 +309,7 @@ describe('CustomizationController', () => {
 
       await customizationController.getOptionsForGroup(req as any, res as any, next);
 
-      expect(customizationService.getOptionsForGroup).toHaveBeenCalledWith('group-1');
+      expect(customizationService.getOptionsForGroup).toHaveBeenCalledWith('group-1', 'tenant-1');
       expect(res.json).toHaveBeenCalledWith(mockOptions);
     });
   });
@@ -347,7 +356,7 @@ describe('CustomizationController', () => {
 
       await customizationController.updateEntityLink(req as any, res as any, next);
 
-      expect(customizationService.updateEntityLink).toHaveBeenCalledWith('link-1', { isRequired: true });
+      expect(customizationService.updateEntityLink).toHaveBeenCalledWith('link-1', { isRequired: true }, 'tenant-1');
       expect(res.json).toHaveBeenCalledWith(mockLink);
     });
   });
@@ -362,7 +371,7 @@ describe('CustomizationController', () => {
 
       await customizationController.unlinkFromEntity(req as any, res as any, next);
 
-      expect(customizationService.unlinkFromEntity).toHaveBeenCalledWith('link-1');
+      expect(customizationService.unlinkFromEntity).toHaveBeenCalledWith('link-1', 'tenant-1');
       expect(res.status).toHaveBeenCalledWith(204);
       expect(res.send).toHaveBeenCalled();
     });
@@ -379,7 +388,7 @@ describe('CustomizationController', () => {
 
       await customizationController.getEntityLinks(req as any, res as any, next);
 
-      expect(customizationService.getEntityLinks).toHaveBeenCalledWith('menu_item', 'item-1');
+      expect(customizationService.getEntityLinks).toHaveBeenCalledWith('menu_item', 'item-1', 'tenant-1');
       expect(res.json).toHaveBeenCalledWith(mockLinks);
     });
 
@@ -396,7 +405,8 @@ describe('CustomizationController', () => {
 
   describe('getCustomizationsForEntity', () => {
     it('should return customizations for entity', async () => {
-      const mockCustomizations = { groups: [], options: [] };
+      // controller treats the result as an array (logs .length/.map on it)
+      const mockCustomizations = [{ groupId: 'group-1', options: [] }];
       vi.mocked(customizationService.getCustomizationsForEntity).mockResolvedValue(mockCustomizations);
 
       const { req, res, next } = createMockReqRes({
@@ -487,12 +497,11 @@ describe('CustomizationController', () => {
 
       const { req, res, next } = createMockReqRes({
         body: { snapshotId: 'snap-1', reason: 'Order cancelled' },
-        user: { id: 'user-1' },
       });
 
       await customizationController.reverseOrderItemInventory(req as any, res as any, next);
 
-      expect(customizationService.reverseOrderItemInventory).toHaveBeenCalledWith('snap-1', 'Order cancelled', 'user-1');
+      expect(customizationService.reverseOrderItemInventory).toHaveBeenCalledWith('snap-1', 'Order cancelled', 'user-1', 'tenant-1');
       expect(res.json).toHaveBeenCalledWith(mockResult);
     });
 
@@ -518,7 +527,7 @@ describe('CustomizationController', () => {
 
       await customizationController.getReversibleCustomizations(req as any, res as any, next);
 
-      expect(customizationService.getReversibleOrderCustomizations).toHaveBeenCalledWith('menu_service', 'order-1');
+      expect(customizationService.getReversibleOrderCustomizations).toHaveBeenCalledWith('menu_service', 'order-1', 'tenant-1');
       expect(res.json).toHaveBeenCalledWith(mockResult);
     });
   });

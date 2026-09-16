@@ -8,8 +8,8 @@ vi.mock('../../../src/utils/logger.js', () => ({ logger: { error: vi.fn(), info:
 import { promotionsController as ctrl } from '../../../src/modules/promotions/promotions.controller.js';
 import { getSupabase } from '../../../src/database/connection.js';
 
-const UUID1 = '00000000-0000-0000-0000-000000000001';
-const UUID2 = '00000000-0000-0000-0000-000000000002';
+const UUID1 = '10000000-0000-1000-8000-000000000001';
+const UUID2 = '20000000-0000-2000-9000-000000000002';
 
 function createMockReqRes(overrides: any = {}) {
   return {

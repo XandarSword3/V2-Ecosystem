@@ -149,70 +149,77 @@ describe('SeasonalPricingService', () => {
   });
 
   describe('updateSeasonalRule', () => {
+    // One builder serves BOTH queries: ownership fetch (select→eq→single)
+    // then the update (update→eq→terminal tenant eq). eq call 1 belongs to
+    // the fetch; eq call 2 continues the update chain; eq call 3 is the
+    // terminal tenant scope whose resolved value the service awaits.
+    const mockUpdateFlow = (updateError: unknown = null) => {
+      const terminal = { error: updateError };
+      return {
+        select: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: { id: 'rule-1', tenant_id: 'tenant-1' }, error: null }),
+        update: vi.fn().mockReturnThis(),
+        eq: vi.fn()
+          .mockReturnValueOnce({ single: vi.fn().mockResolvedValue({ data: { id: 'rule-1', tenant_id: 'tenant-1' }, error: null }) })
+          .mockReturnValueOnce({ eq: vi.fn().mockResolvedValue(terminal) }),
+      };
+    };
+
     it('should update a seasonal rule', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(mockUpdateFlow() as any);
 
       await seasonalPricingService.updateSeasonalRule('rule-1', {
         name: 'Updated Name',
         priceMultiplier: 2.0,
         isActive: false,
-      });
+      }, 'tenant-1');
 
       expect(supabase.from).toHaveBeenCalledWith('seasonal_pricing_rules');
     });
 
     it('should handle partial updates', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(mockUpdateFlow() as any);
 
       await seasonalPricingService.updateSeasonalRule('rule-1', {
         isActive: false,
-      });
+      }, 'tenant-1');
 
       expect(supabase.from).toHaveBeenCalled();
     });
 
     it('should throw error on update failure', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: new Error('Update failed') }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(mockUpdateFlow(new Error('Update failed')) as any);
 
       await expect(
-        seasonalPricingService.updateSeasonalRule('rule-1', { name: 'New' })
+        seasonalPricingService.updateSeasonalRule('rule-1', { name: 'New' }, 'tenant-1')
       ).rejects.toThrow('Failed to update seasonal pricing rule');
     });
   });
 
   describe('deleteSeasonalRule', () => {
-    it('should delete a seasonal rule', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        delete: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      } as any);
+    const mockDeleteFlow = (deleteError: unknown = null) => {
+      const terminal = { error: deleteError };
+      return {
+        select: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnThis(),
+        eq: vi.fn()
+          .mockReturnValueOnce({ single: vi.fn().mockResolvedValue({ data: { id: 'rule-1', tenant_id: 'tenant-1' }, error: null }) })
+          .mockReturnValueOnce({ eq: vi.fn().mockResolvedValue(terminal) }),
+      };
+    };
 
-      await seasonalPricingService.deleteSeasonalRule('rule-1');
+    it('should delete a seasonal rule', async () => {
+      vi.mocked(supabase.from).mockReturnValue(mockDeleteFlow() as any);
+
+      await seasonalPricingService.deleteSeasonalRule('rule-1', 'tenant-1');
 
       expect(supabase.from).toHaveBeenCalledWith('seasonal_pricing_rules');
     });
 
     it('should throw error on delete failure', async () => {
-      vi.mocked(supabase.from).mockReturnValue({
-        delete: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: new Error('Delete failed') }),
-        }),
-      } as any);
+      vi.mocked(supabase.from).mockReturnValue(mockDeleteFlow(new Error('Delete failed')) as any);
 
-      await expect(seasonalPricingService.deleteSeasonalRule('rule-1')).rejects.toThrow(
+      await expect(seasonalPricingService.deleteSeasonalRule('rule-1', 'tenant-1')).rejects.toThrow(
         'Failed to delete seasonal pricing rule'
       );
     });

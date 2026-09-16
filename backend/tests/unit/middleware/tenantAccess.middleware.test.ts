@@ -133,11 +133,17 @@ describe('TenantAccess Middleware', () => {
       }
     });
 
+    // Reserved subdomains never resolve as a tenant themselves; the flow
+    // falls through to the platform-root lookup (unseeded here → null).
+    vi.mocked(getSupabase).mockReturnValue({
+      from: vi.fn().mockReturnValue(createChainableMock(null))
+    } as any);
+
     await resolveTenant(req, res, next);
 
     expect(req.tenant).toBeUndefined();
     expect(next).toHaveBeenCalled();
-    expect(getSupabase).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it('should NOT resolve tenant and should call next for admin reserved subdomain', async () => {
@@ -147,11 +153,15 @@ describe('TenantAccess Middleware', () => {
       }
     });
 
+    vi.mocked(getSupabase).mockReturnValue({
+      from: vi.fn().mockReturnValue(createChainableMock(null))
+    } as any);
+
     await resolveTenant(req, res, next);
 
     expect(req.tenant).toBeUndefined();
     expect(next).toHaveBeenCalled();
-    expect(getSupabase).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it('should block requests with 402 if billing status is suspended', async () => {

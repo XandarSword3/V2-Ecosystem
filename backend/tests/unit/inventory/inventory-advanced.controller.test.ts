@@ -84,10 +84,12 @@ describe('Inventory Advanced Controller', () => {
     };
     
     mockRequest = {
-      user: { userId: 'staff-123', role: 'staff' },
+      user: { userId: 'staff-123', id: 'staff-123', role: 'staff', tenantId: 'tenant-1', scope: 'staff' },
       params: {},
       query: {},
       body: {},
+      // Controllers here require a property context (requireCallerPropertyId).
+      headers: { 'x-property-id': 'prop-1' },
     };
     
     mockBuilder = createChainableMock();
@@ -287,12 +289,12 @@ describe('Inventory Advanced Controller', () => {
 
   describe('receivePurchaseOrder', () => {
     it('should receive and update inventory from PO', async () => {
-      const mockPO = { id: 'po-1', status: 'pending' };
-      const updatedPO = { ...mockPO, status: 'received' };
+      const mockPO = { id: 'po-1', po_number: 'PO-1', status: 'pending', tenant_id: 'tenant-1' };
       
-      mockBuilder.queueResponse(mockPO); // fetch PO
-      mockBuilder.queueResponse(updatedPO); // update PO status
-      mockRpc.mockResolvedValue({ data: null, error: null }); // add stock
+      // 1. scoped PO fetch (maybeSingle)  2. batch insert  3. adjust_stock_atomic
+      mockBuilder.queueResponse(mockPO);
+      mockBuilder.queueResponse({ data: null, error: null });
+      mockRpc.mockResolvedValue({ data: { success: true, stock_after: 50 }, error: null });
       
       mockRequest.params = { id: 'po-1' };
       mockRequest.body = {
@@ -368,97 +370,8 @@ describe('Inventory Advanced Controller', () => {
     });
   });
 
-  describe('createRecipe', () => {
-    it('should create a recipe with ingredients', async () => {
-      const mockRecipe = { 
-        id: 'recipe-1', 
-        name: 'Test Recipe',
-        catalog_item_id: 'menu-1' 
-      };
-      
-      mockBuilder.queueResponse(mockRecipe); // insert recipe
-      mockBuilder.queueResponse([{ id: 'ing-1', recipe_id: 'recipe-1' }]); // insert ingredients
-      
-      mockRequest.body = {
-        name: 'Test Recipe',
-        menuItemId: '123e4567-e89b-12d3-a456-426614174000',
-        yieldQuantity: 10,
-        ingredients: [
-          { itemId: '123e4567-e89b-12d3-a456-426614174001', quantity: 2, unit: 'kg' },
-        ],
-      };
-      
-      await controller.createRecipe(mockRequest as Request, mockResponse as Response);
-      
-      expect(mockResponse.status).toHaveBeenCalledWith(201);
-    });
-  });
-
-  describe('getRecipe', () => {
-    it('should return a recipe with ingredients', async () => {
-      const mockRecipe = {
-        id: 'recipe-1',
-        name: 'Test Recipe',
-        yields: 1,
-        ingredients: [
-          { id: 'ing-1', inventory_item: { name: 'Flour', cost_per_unit: '2.00', current_stock: '100' }, quantity: 2 },
-        ],
-      };
-      
-      mockBuilder.queueResponse(mockRecipe);
-      
-      mockRequest.params = { menuItemId: 'menu-1' };
-      
-      await controller.getRecipe(mockRequest as Request, mockResponse as Response);
-      
-      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        data: expect.objectContaining({
-          name: 'Test Recipe',
-        }),
-      }));
-    });
-
-    it('should return null data for non-existent recipe', async () => {
-      mockBuilder.queueResponse(null, { code: 'PGRST116' });
-      
-      mockRequest.params = { menuItemId: 'nonexistent' };
-      
-      await controller.getRecipe(mockRequest as Request, mockResponse as Response);
-      
-      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        data: null,
-      }));
-    });
-  });
-
-  describe('updateRecipe', () => {
-    it('should update an existing recipe', async () => {
-      const mockRecipe = { id: 'recipe-1', name: 'Updated Recipe' };
-      
-      mockBuilder.queueResponse(mockRecipe); // update recipe
-      mockBuilder.queueResponse(null); // delete old ingredients
-      mockBuilder.queueResponse([{ id: 'ing-1' }]); // insert new ingredients
-      
-      mockRequest.params = { id: 'recipe-1' };
-      mockRequest.body = {
-        name: 'Updated Recipe',
-        yieldQuantity: 15,
-        ingredients: [
-          { itemId: '123e4567-e89b-12d3-a456-426614174001', quantity: 3, unit: 'kg' },
-        ],
-      };
-      
-      await controller.updateRecipe(mockRequest as Request, mockResponse as Response);
-      
-      expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-      }));
-    });
-  });
-
-  describe('deductForOrder', () => {
+  
+describe('deductForOrder', () => {
     it('should deduct inventory for an order', async () => {
       mockRpc.mockResolvedValue({ data: { success: true }, error: null });
       
@@ -479,18 +392,15 @@ describe('Inventory Advanced Controller', () => {
 
   describe('getMenuItemCostAnalysis', () => {
     it('should return cost analysis for a menu item', async () => {
-      const mockRecipe = {
-        id: 'recipe-1',
-        name: 'Test Recipe',
-        yield_quantity: 10,
-        ingredients: [
-          { item: { cost_per_unit: 5 }, quantity: 2 },
-        ],
-      };
-      const mockMenuItem = { id: 'menu-1', name: 'Dish', price: 25 };
+      const mockMenuItem = { id: 'menu-1', name: 'Dish', price: '25' };
+      // The recipe IS the menu_item_ingredients rows (the authoritative
+      // deduction source) — there is no separate recipes table anymore.
+      const mockIngredients = [
+        { quantity_required: 2, unit: 'kg', inventory_item: { id: 'i1', name: 'Flour', cost_per_unit: '5' } },
+      ];
       
-      mockBuilder.queueResponse(mockRecipe); // get recipe
-      mockBuilder.queueResponse(mockMenuItem); // get menu item
+      mockBuilder.queueResponse(mockMenuItem); // scoped menu item (maybeSingle)
+      mockBuilder.queueResponse(mockIngredients); // ingredient rows
       
       mockRequest.params = { menuItemId: 'menu-1' };
       

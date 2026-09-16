@@ -14,7 +14,7 @@ import {
   StripePlatformService, 
   CreatePaymentIntentInput,
   PaymentPlatform 
-} from '../../src/services/stripe-platform.service.js';
+} from '../../../../src/services/stripe-platform.service';
 
 // Mock Stripe
 vi.mock('stripe', () => {

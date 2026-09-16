@@ -82,6 +82,11 @@ function createQueryMock(mockDataFn: () => unknown[]) {
         if (field === 'id') {
           return item.id === value;
         }
+        // or() scope clauses (property_id.eq.X, tenant_id.eq.Y + .is.null
+        // variants) don't filter — they WIDEN. Simulating them faithfully
+        // would require an OR engine; treating them as no-ops keeps the
+        // fixture data visible for rows that match the eq() identity filters,
+        // which is what getModule/getModules tests actually assert.
         return true;
       });
     });
@@ -154,7 +159,7 @@ function createQueryMock(mockDataFn: () => unknown[]) {
 // ── Test data ────────────────────────────────────────────────────────
 
 const MOD_RESTAURANT = {
-  id: 'mod-1',
+  id: 'a1111111-1111-4111-8111-111111111111',
   name: 'MenuService',
   slug: 'menu_service',
   template_type: 'menu_service',
@@ -171,7 +176,7 @@ const MOD_RESTAURANT = {
 };
 
 const MOD_POOL = {
-  id: 'mod-2',
+  id: 'b2222222-2222-4222-8222-222222222222',
   name: 'Pool',
   slug: 'capacity',
   template_type: 'session_access',
@@ -289,7 +294,7 @@ describe('ModulesController', () => {
   describe('getModule', () => {
     it('should return a module by ID', async () => {
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' } });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' } });
       const res = mockRes();
       await (getModule as Function)(req, res, mockNext());
 
@@ -300,19 +305,22 @@ describe('ModulesController', () => {
     });
 
     it('should fall back to slug lookup when ID not found', async () => {
-      // First call (by ID) returns nothing, second call (by slug) returns data
-      let callCount = 0;
+      // A UUID identifier that matches no row must fall through to the slug
+      // query. Note the controller queries by slug with the SAME identifier,
+      // so the fixture needs a module whose slug equals that uuid — or,
+      // more realistically, the caller passes a slug directly. Use the slug
+      // as identifier: isUuid fails, so only the slug lookup runs.
       const sb = setupSupabase();
-      sb.from.mockImplementation(() => {
-        callCount++;
-        return createQueryMock(() => callCount >= 2 ? [MOD_RESTAURANT] : []);
-      });
+      sb.from.mockImplementation(() => createQueryMock(() => [MOD_RESTAURANT]));
 
       const req = mockReq({ params: { id: 'menu_service' } });
       const res = mockRes();
       await (getModule as Function)(req, res, mockNext());
 
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+        success: true,
+        data: expect.objectContaining({ slug: 'menu_service' }),
+      }));
     });
   });
 
@@ -406,7 +414,7 @@ describe('ModulesController', () => {
     it('should update a module and return updated data', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'Updated MenuService', settings_version: 1 },
       });
       const res = mockRes();
@@ -418,7 +426,7 @@ describe('ModulesController', () => {
     it('should return 404 when module not found', async () => {
       tableData.modules = [];
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-missing' }, body: { name: 'X' } });
+      const req = mockReq({ params: { id: 'c3333333-3333-4333-8333-333333333333' }, body: { name: 'X' } });
       const res = mockRes();
       await (updateModule as Function)(req, res, mockNext());
 
@@ -429,7 +437,7 @@ describe('ModulesController', () => {
       setupSupabase();
       tableData.app_role_permissions = []; // no matching perms
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'Hack' },
         // scope+tenantId matching MOD_RESTAURANT's tenant_id so this caller
         // clears the tenant-ownership check and reaches the permission
@@ -446,7 +454,7 @@ describe('ModulesController', () => {
     it('should allow super_admin to bypass permission check', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'Admin Updated' },
         user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
@@ -459,7 +467,7 @@ describe('ModulesController', () => {
     it('should detect version conflict (optimistic locking)', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'Stale', settings_version: 99 }, // DB has version 1
       });
       const res = mockRes();
@@ -473,7 +481,7 @@ describe('ModulesController', () => {
     it('should clear module cache after update', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'Refresh' },
         user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
@@ -486,7 +494,7 @@ describe('ModulesController', () => {
     it('should log activity for update', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'Logged' },
         user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
@@ -502,7 +510,7 @@ describe('ModulesController', () => {
   describe('deleteModule', () => {
     it('should soft-delete (deactivate) by default', async () => {
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: {} });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: {} });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -514,7 +522,7 @@ describe('ModulesController', () => {
 
     it('should hard-delete with force=true and cascade dependencies', async () => {
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: { force: 'true' } });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: { force: 'true' } });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -527,7 +535,7 @@ describe('ModulesController', () => {
     it('should return 404 when deleting non-existent module', async () => {
       tableData.modules = [];
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-missing' }, query: {} });
+      const req = mockReq({ params: { id: 'c3333333-3333-4333-8333-333333333333' }, query: {} });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -537,7 +545,7 @@ describe('ModulesController', () => {
     it('should return 403 for unauthorized user', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         query: {},
         // scope+tenantId matching MOD_RESTAURANT's tenant_id — see the
         // matching updateModule test above for why this is needed.
@@ -551,7 +559,7 @@ describe('ModulesController', () => {
 
     it('should clear module cache after delete', async () => {
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: {} });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: {} });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -560,7 +568,7 @@ describe('ModulesController', () => {
 
     it('should emit socket event after delete', async () => {
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: {} });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: {} });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -569,7 +577,7 @@ describe('ModulesController', () => {
 
     it('should log activity for soft delete', async () => {
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: {} });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: {} });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -579,7 +587,7 @@ describe('ModulesController', () => {
     it('should allow module slug-specific admin to delete', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         query: {},
         // scope is any non-super_admin value here (only its equality to
         // 'super_admin' matters to getCallerTenantId) — tenantId must match
@@ -824,7 +832,7 @@ describe('ModulesController', () => {
     it('should increment settings_version when settings are updated', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { settings: { theme: 'dark' }, settings_version: 1 },
         user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
@@ -838,7 +846,7 @@ describe('ModulesController', () => {
     it('should throw when user is missing on update', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'No Auth' },
         user: undefined,
       });
@@ -856,7 +864,7 @@ describe('ModulesController', () => {
       ];
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'Updated by manager' },
         // See deleteModule's "slug-specific admin" test for why scope+tenantId are needed here.
         user: { userId: 'mgr-1', roles: ['menu_service_admin'], scope: 'tenant_admin', tenantId: 'tenant-1' },
@@ -870,7 +878,7 @@ describe('ModulesController', () => {
     it('should emit socket event after successful update', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'Socket Test' },
         user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
@@ -883,7 +891,7 @@ describe('ModulesController', () => {
     it('should skip version check when settings_version is not in body', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         body: { name: 'No Version Check' },
         user: { userId: 'admin-1', roles: ['super_admin'], scope: 'super_admin' },
       });
@@ -901,7 +909,7 @@ describe('ModulesController', () => {
     it('should throw when user is missing on delete', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         query: {},
         user: undefined,
       });
@@ -915,7 +923,7 @@ describe('ModulesController', () => {
 
     it('should log DELETE_MODULE_HARD activity on force delete', async () => {
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: { force: 'true' } });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: { force: 'true' } });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -926,7 +934,7 @@ describe('ModulesController', () => {
 
     it('should clear module cache on force delete', async () => {
       setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: { force: 'true' } });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: { force: 'true' } });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -934,9 +942,9 @@ describe('ModulesController', () => {
     });
 
     it('should cascade delete catalog_items on force delete with items present', async () => {
-      tableData.catalog_items = [{ id: 'item-1', module_id: 'mod-1' }];
+      tableData.catalog_items = [{ id: 'item-1', module_id: 'a1111111-1111-4111-8111-111111111111' }];
       const sb = setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: { force: 'true' } });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: { force: 'true' } });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -946,7 +954,7 @@ describe('ModulesController', () => {
 
     it('should clean up permissions and roles on force delete', async () => {
       const sb = setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: { force: 'true' } });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: { force: 'true' } });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -957,7 +965,7 @@ describe('ModulesController', () => {
     it('should remove module from navbar CMS on force delete', async () => {
       tableData.site_settings = [{ id: 1, navbar: { links: [{ moduleSlug: 'menu_service', label: 'MenuService' }] } }];
       const sb = setupSupabase();
-      const req = mockReq({ params: { id: 'mod-1' }, query: { force: 'true' } });
+      const req = mockReq({ params: { id: 'a1111111-1111-4111-8111-111111111111' }, query: { force: 'true' } });
       const res = mockRes();
       await (deleteModule as Function)(req, res, mockNext());
 
@@ -968,7 +976,7 @@ describe('ModulesController', () => {
     it('should use "system" as user_id in logActivity when req.user has no userId', async () => {
       setupSupabase();
       const req = mockReq({
-        params: { id: 'mod-1' },
+        params: { id: 'a1111111-1111-4111-8111-111111111111' },
         query: {},
         user: { roles: ['super_admin'], scope: 'super_admin' },
       });

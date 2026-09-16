@@ -36,6 +36,7 @@ const mockChain = vi.hoisted(() => {
     upsert: vi.fn(),
     eq: vi.fn(),
     in: vi.fn(),
+    is: vi.fn(),
     single: vi.fn(),
     order: vi.fn(),
     filter: vi.fn(),
@@ -152,9 +153,15 @@ describe('createSeasonalRule', () => {
 
 describe('updateSeasonalRule', () => {
   it('calls update on the correct table and rule ID', async () => {
-    mockChain.eq.mockResolvedValueOnce({ error: null });
+    // Tenant-isolation precheck: ownership fetch .eq('id') → chain then
+    // .single() resolves; the update ends on a TERMINAL .eq('tenant_id', ...)
+    // whose resolved value is awaited directly by the service.
+    mockChain.eq.mockReturnValueOnce(mockChain); // fetch .eq('id', 'rule-1') → chain
+    mockChain.single.mockResolvedValueOnce({ data: { id: 'rule-1', tenant_id: 'tenant-1' }, error: null });
+    mockChain.eq.mockReturnValueOnce(mockChain); // update .eq('id', 'rule-1') → chain
+    mockChain.eq.mockResolvedValueOnce({ error: null }); // terminal .eq('tenant_id')
 
-    await seasonalPricingService.updateSeasonalRule('rule-1', { isActive: false });
+    await seasonalPricingService.updateSeasonalRule('rule-1', { isActive: false }, 'tenant-1');
 
     expect(mockChain.from).toHaveBeenCalledWith('seasonal_pricing_rules');
     expect(mockChain.update).toHaveBeenCalledWith(
@@ -164,19 +171,29 @@ describe('updateSeasonalRule', () => {
   });
 
   it('throws when update fails', async () => {
+    // Queue order matters: fetch .eq → chain, .single resolves ownership,
+    // update .eq → chain, terminal .eq('tenant_id') resolves the failure.
+    mockChain.eq.mockReturnValueOnce(mockChain);
+    mockChain.single.mockResolvedValueOnce({ data: { id: 'rule-1', tenant_id: 'tenant-1' }, error: null });
+    mockChain.eq.mockReturnValueOnce(mockChain);
     mockChain.eq.mockResolvedValueOnce({ error: { message: 'update failed' } });
 
     await expect(
-      seasonalPricingService.updateSeasonalRule('rule-1', { isActive: false })
+      seasonalPricingService.updateSeasonalRule('rule-1', { isActive: false }, 'tenant-1')
     ).rejects.toThrow('Failed to update seasonal pricing rule');
   });
 });
 
 describe('deleteSeasonalRule', () => {
   it('calls delete on the correct rule', async () => {
+    // Fetch .eq → chain, .single resolves, delete .eq → chain, terminal
+    // .eq('tenant_id') resolves.
+    mockChain.eq.mockReturnValueOnce(mockChain);
+    mockChain.single.mockResolvedValueOnce({ data: { id: 'rule-1', tenant_id: 'tenant-1' }, error: null });
+    mockChain.eq.mockReturnValueOnce(mockChain);
     mockChain.eq.mockResolvedValueOnce({ error: null });
 
-    await seasonalPricingService.deleteSeasonalRule('rule-1');
+    await seasonalPricingService.deleteSeasonalRule('rule-1', 'tenant-1');
 
     expect(mockChain.from).toHaveBeenCalledWith('seasonal_pricing_rules');
     expect(mockChain.delete).toHaveBeenCalled();
@@ -184,9 +201,12 @@ describe('deleteSeasonalRule', () => {
   });
 
   it('throws when delete fails', async () => {
+    mockChain.eq.mockReturnValueOnce(mockChain);
+    mockChain.single.mockResolvedValueOnce({ data: { id: 'rule-1', tenant_id: 'tenant-1' }, error: null });
+    mockChain.eq.mockReturnValueOnce(mockChain);
     mockChain.eq.mockResolvedValueOnce({ error: { message: 'delete failed' } });
 
-    await expect(seasonalPricingService.deleteSeasonalRule('rule-1')).rejects.toThrow(
+    await expect(seasonalPricingService.deleteSeasonalRule('rule-1', 'tenant-1')).rejects.toThrow(
       'Failed to delete seasonal pricing rule'
     );
   });

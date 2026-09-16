@@ -33,8 +33,10 @@ vi.mock('../../../src/utils/logger.js', () => ({ logger: { info: vi.fn(), error:
 import { getSupabase } from '../../../src/database/connection.js';
 import { LoyaltyController } from '../../../src/modules/loyalty/loyalty.controller';
 
-const UUID1 = '00000000-0000-0000-0000-000000000001';
-const UUID2 = '00000000-0000-0000-0000-000000000002';
+// zod v4 .uuid() enforces RFC 9562 version/variant nibbles — the all-zeros
+// placeholders stopped parsing as UUIDs.
+const UUID1 = '10000000-0000-1000-8000-000000000001';
+const UUID2 = '20000000-0000-2000-9000-000000000002';
 
 describe('Loyalty Controller', () => {
   let mock: ReturnType<typeof createChainableMock>;
@@ -56,7 +58,10 @@ describe('Loyalty Controller', () => {
     });
 
     it('should create account if not exists', async () => {
-      mock.queueResponse(null, { code: 'PGRST116' }); // no account
+      // The account lookup ends in .maybeSingle(): a missing row resolves
+      // with error:null — queueing an error would hit the fail-closed 500
+      // branch instead of the lazy-create path.
+      mock.queueResponse(null); // no account (maybeSingle → null, no error)
       mock.queueResponse({ signup_bonus: 50 }); // settings (single)
       mock.queueResponse([{ id: 'tier1', min_points: 0 }]); // tiers
       mock.queueResponse({ id: 'a1', points_balance: 50 }); // insert (single)

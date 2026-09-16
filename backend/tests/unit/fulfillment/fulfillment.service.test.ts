@@ -58,6 +58,18 @@ function createSupabaseMock(initialRow: Row, opts: { failFulfillmentRead?: boole
     from: (table: string) => ({
       select: () => ({
         eq: () => ({
+          // getForTransaction reads via .eq().order().limit().maybeSingle()
+          order: () => ({
+            limit: () => ({
+              maybeSingle: async () => {
+                if (table === 'fulfillments') {
+                  if (failRead) return { data: null, error: { message: 'connection reset (simulated)' } };
+                  return { data: row, error: null };
+                }
+                return { data: null, error: null };
+              },
+            }),
+          }),
           maybeSingle: async () => {
             if (table === 'fulfillments') {
               if (failRead) return { data: null, error: { message: 'connection reset (simulated)' } };
@@ -368,11 +380,12 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     const service = new FulfillmentService();
     const supabase = createSupabaseMock(null);
 
-    // 'shipment' exists in the global registry but is NOT declared by
-    // instant_transaction — the engine's own options are the authority.
+    // time_exclusive_reservation declares only 'on_premise' — 'shipment'
+    // exists in the global registry (and even on Engine A) but the ENGINE's
+    // own options are the authority.
     const result = await service.ensure(supabase, {
       transactionId: 't1',
-      engineType: 'instant_transaction',
+      engineType: 'time_exclusive_reservation',
       mode: 'shipment',
     });
     expect(result.ok).toBe(false);
@@ -464,7 +477,7 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
     const migrationsDir = join(__dirname, '../../../../supabase/migrations');
     // The LATEST capability migration is the law: it reseeds the full
     // per-(engine_type, mode) registry mirror with ON CONFLICT DO UPDATE.
-    const seedSql = readFileSync(join(migrationsDir, '20260821190000_engine_a_digital_fulfillment_mode.sql'), 'utf8');
+    const seedSql = readFileSync(join(migrationsDir, '20260916200000_engine_fulfillment_capabilities_shipment_service_modes.sql'), 'utf8');
     for (const engine of getAllEngines()) {
       const fulfillment = engine.capabilities.fulfillment;
       if (!fulfillment.modeMachines || fulfillment.modeMachines.length === 0) {
@@ -474,6 +487,9 @@ describe('FulfillmentService (Stage 6 persistence)', () => {
         continue;
       }
       for (const option of fulfillment.options) {
+        // 'none' binds no machine by design — the capability validator
+        // explicitly exempts it, so the mirror carries no row for it.
+        if (option.mode === 'none') continue;
         const binding = fulfillment.modeMachines.find(b => b.modes.includes(option.mode));
         expect(binding, `machine binding for mode '${option.mode}' of engine '${engine.type}'`).toBeDefined();
         // Row shape: (engine_type, mode, required, handoff, initial_status).
