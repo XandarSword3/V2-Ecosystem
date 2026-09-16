@@ -108,6 +108,7 @@ export default function BusinessOverviewPage() {
         accent: 'from-orange-500 to-amber-600',
         permissions: ['admin:modules:manage', 'inventory:read'],
         links: [
+          { label: t('nav.allProducts') || 'All Products', href: `${base}/products` },
           { label: t('nav.customizations') || 'Customizations', href: `${base}/customizations` },
         ],
         stats: [
@@ -173,11 +174,20 @@ export default function BusinessOverviewPage() {
         accent: 'from-rose-500 to-pink-600',
         permissions: ['user:read:any'],
         links: [
+          { label: t('nav.allCustomers'), href: `${base}/customers` },
           { label: t('nav.customers'), href: `${base}/users/customers` },
           { label: t('nav.loyalty') || 'Loyalty Program', href: `${base}/loyalty` },
           { label: t('nav.giftCards') || 'Gift Cards', href: `${base}/giftcards` },
         ],
-        stats: [],
+        stats: [
+          {
+            label: 'Customers',
+            fetch: async () => {
+              const res = await api.get('/admin/customers', { params: { limit: 1 } });
+              return res.data?.data?.total ?? '—';
+            },
+          },
+        ],
       },
       {
         id: 'staff',

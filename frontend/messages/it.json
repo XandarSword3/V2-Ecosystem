@@ -144,7 +144,8 @@
     "failedToLoad": "Failed to load customers",
     "noCustomersFound": "No customers found",
     "lifetimeValue": "Lifetime",
-    "lastOrder": "Last Order"
+    "lastOrder": "Last Order",
+    "allProducts": "All Products"
   },
   "home": {
     "hero": {
