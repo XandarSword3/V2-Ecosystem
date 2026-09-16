@@ -130,10 +130,18 @@ export default function BusinessOverviewPage() {
         accent: 'from-violet-500 to-purple-600',
         permissions: ['coupon:manage', 'admin:settings:manage'],
         links: [
+          { label: t('nav.pricingRules') || 'Seasonal & Dynamic Rules', href: `${base}/pricing` },
           { label: t('nav.coupons') || 'Coupons', href: `${base}/coupons` },
           { label: t('nav.taxConfiguration') || 'Tax Configuration', href: `${base}/settings/tax` },
         ],
         stats: [
+          {
+            label: 'Seasonal rules',
+            fetch: async () => {
+              const res = await api.get('/pricing/seasonal-rules');
+              return num(res.data?.data?.length, 0);
+            },
+          },
           {
             label: 'Configured tax rates',
             fetch: async () => {
