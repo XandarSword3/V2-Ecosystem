@@ -160,7 +160,7 @@ export default function AdminEconomicsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-emerald-500" />
-            Product Economics
+            {t('nav.economics') || 'Product Economics'}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">
             Revenue, cost of goods, and margin per product — computed from bills of materials.

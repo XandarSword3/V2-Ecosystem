@@ -5,6 +5,11 @@
 
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS service_location_id UUID;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS staff_id UUID;
+-- reports.controller and this file's metadata_id index require this column.
+-- It existed only in the legacy TS migrate.ts path and was missing from the
+-- canonical SQL baseline; IF NOT EXISTS keeps TS-provisioned DBs unchanged
+-- while repairing SQL-provisioned ones (fresh production).
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS metadata_id UUID REFERENCES modules(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_transactions_engine_type ON transactions(engine_type);
 CREATE INDEX IF NOT EXISTS idx_transactions_metadata_id ON transactions(metadata_id);
