@@ -170,6 +170,12 @@ router.get('/reports/export', authorizeManager, reportsController.exportReport);
 import { getCrossEngineTransactions } from './controllers/transactions.controller.js';
 router.get('/transactions', authorizeManager, asyncHandler(getCrossEngineTransactions));
 
+// Cross-module catalog (F11 Products capability). Same auth/scope chain as
+// /transactions: authenticate + validatePropertyAccess via router.use,
+// manager-gated, tenant defense-in-depth in the controller.
+import { getCrossModuleCatalog } from './controllers/catalog.controller.js';
+router.get('/catalog', authorizeManager, asyncHandler(getCrossModuleCatalog));
+
 // Notifications (using refactored controller) - MANAGER
 router.get('/notifications', authorizeManager, notificationsController.getNotifications);
 router.get('/notifications/broadcasts', authorizeManager, notificationsController.getBroadcasts);

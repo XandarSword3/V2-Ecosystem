@@ -91,6 +91,14 @@ describe('F11: Business capability navigation', () => {
     expect(ordersItem!.permissions).toContain('order:read:all');
   });
 
+  it('links the cross-module catalog at admin/products', () => {
+    const productsItem = nav
+      .find((c) => c.id === 'business')!
+      .items.find((i) => i.translationKey === 'nav.products');
+    expect(productsItem).toBeDefined();
+    expect(productsItem!.href).toBe(`${base}/products`);
+  });
+
   it('links the capability overview dashboard at admin/business', () => {
     const overviewItem = nav
       .find((c) => c.id === 'business')!

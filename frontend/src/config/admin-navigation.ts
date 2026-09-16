@@ -205,16 +205,15 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           permissions: ['order:read:all'],
         },
 
-        // ── Products: catalog across all modules ──────────────────────
+        // ── Products: cross-module catalog (Phase 8 lifecycle) ────────
         {
           name: t('nav.products') || 'Products',
-          href: `${base}/customizations`,
+          href: `${base}/products`,
           icon: ShoppingBag,
           translationKey: 'nav.products',
-          permissions: ['admin:modules:manage', 'inventory:read'],
+          permissions: ['admin:modules:manage', 'inventory:read', 'catalog:read'],
           children: [
-            { name: t('nav.categories'), href: `${base}/customizations`, translationKey: 'nav.categories' },
-            { name: t('nav.modifiers') || 'Customizations', href: `${base}/customizations`, translationKey: 'nav.modifiers' },
+            { name: t('nav.customizations') || 'Customizations', href: `${base}/customizations`, translationKey: 'nav.customizations' },
           ],
         },
 
