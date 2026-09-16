@@ -251,6 +251,10 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           icon: Package,
           translationKey: 'nav.resources',
           permissions: ['inventory:manage', 'inventory:read'],
+          children: [
+            { name: t('nav.inventory') || 'Inventory', href: `${base}/inventory`, translationKey: 'nav.inventory' },
+            { name: t('nav.economics') || 'Product Economics', href: `${base}/economics`, translationKey: 'nav.economics' },
+          ],
         },
 
         // ── Customers: accounts, loyalty, stored value, reputation ────

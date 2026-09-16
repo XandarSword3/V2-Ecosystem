@@ -170,6 +170,13 @@ router.get('/reports/export', authorizeManager, reportsController.exportReport);
 import { getCrossEngineTransactions } from './controllers/transactions.controller.js';
 router.get('/transactions', authorizeManager, asyncHandler(getCrossEngineTransactions));
 
+// Product economics (F13 business economics capability): revenue → BOM cost
+// → COGS → margin per product, plus waste cost. Same auth/scope chain as
+// /transactions: authenticate + validatePropertyAccess via router.use,
+// tenant defense-in-depth inside the controller.
+import { getProductEconomics } from './controllers/economics.controller.js';
+router.get('/economics/products', authorizeManager, asyncHandler(getProductEconomics));
+
 // Cross-module catalog (F11 Products capability). Same auth/scope chain as
 // /transactions: authenticate + validatePropertyAccess via router.use,
 // manager-gated, tenant defense-in-depth in the controller.

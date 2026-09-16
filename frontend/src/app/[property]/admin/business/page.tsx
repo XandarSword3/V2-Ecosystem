@@ -159,7 +159,10 @@ export default function BusinessOverviewPage() {
         icon: Wrench,
         accent: 'from-teal-500 to-emerald-600',
         permissions: ['housekeeping:task:manage'],
-        links: [{ label: t('nav.housekeeping') || 'Housekeeping', href: `${base}/housekeeping` }],
+        links: [
+          { label: t('nav.workQueue') || 'Work Queue', href: `${base}/fulfillment` },
+          { label: t('nav.housekeeping') || 'Housekeeping', href: `${base}/housekeeping` },
+        ],
         stats: [],
       },
       {
@@ -170,7 +173,10 @@ export default function BusinessOverviewPage() {
         icon: Package,
         accent: 'from-sky-500 to-cyan-600',
         permissions: ['inventory:read', 'inventory:manage'],
-        links: [{ label: t('nav.resources') || 'Resources', href: `${base}/inventory` }],
+        links: [
+          { label: t('nav.inventory') || 'Inventory', href: `${base}/inventory` },
+          { label: t('nav.economics') || 'Product Economics', href: `${base}/economics` },
+        ],
         stats: [],
       },
       {
