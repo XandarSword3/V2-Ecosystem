@@ -137,7 +137,14 @@
     "profile": "Profilo",
     "settings": "Impostazioni",
     "signIn": "Accedi",
-    "myProfile": "Il mio profilo"
+    "myProfile": "Il mio profilo",
+    "allCustomers": "All Customers",
+    "customersSubtitle": "Customer accounts with unified transaction aggregates across all engines",
+    "searchCustomers": "Search customers by name or email…",
+    "failedToLoad": "Failed to load customers",
+    "noCustomersFound": "No customers found",
+    "lifetimeValue": "Lifetime",
+    "lastOrder": "Last Order"
   },
   "home": {
     "hero": {

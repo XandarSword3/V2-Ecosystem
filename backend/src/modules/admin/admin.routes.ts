@@ -176,6 +176,11 @@ router.get('/transactions', authorizeManager, asyncHandler(getCrossEngineTransac
 import { getCrossModuleCatalog } from './controllers/catalog.controller.js';
 router.get('/catalog', authorizeManager, asyncHandler(getCrossModuleCatalog));
 
+// Cross-module customers (F11 Customers capability). Same auth/scope chain:
+// manager-gated, property-scoped, tenant defense-in-depth in the controller.
+import { getCrossModuleCustomers } from './controllers/customers.controller.js';
+router.get('/customers', authorizeManager, asyncHandler(getCrossModuleCustomers));
+
 // Notifications (using refactored controller) - MANAGER
 router.get('/notifications', authorizeManager, notificationsController.getNotifications);
 router.get('/notifications/broadcasts', authorizeManager, notificationsController.getBroadcasts);

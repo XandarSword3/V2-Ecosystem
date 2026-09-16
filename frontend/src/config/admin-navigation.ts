@@ -255,11 +255,12 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
         // ── Customers: accounts, loyalty, stored value, reputation ────
         {
           name: t('nav.customers') || 'Customers',
-          href: `${base}/users/customers`,
+          href: `${base}/customers`,
           icon: Users,
           translationKey: 'nav.customers',
           permissions: ['user:read:any'],
           children: [
+            { name: t('nav.allCustomers'), href: `${base}/customers`, translationKey: 'nav.allCustomers' },
             { name: t('nav.customers'), href: `${base}/users/customers`, translationKey: 'nav.customers' },
             { name: t('nav.loyalty') || 'Loyalty Program', href: `${base}/loyalty`, translationKey: 'nav.loyalty' },
             { name: t('nav.giftCards') || 'Gift Cards', href: `${base}/giftcards`, translationKey: 'nav.giftCards' },
