@@ -23,6 +23,7 @@ import {
   Receipt,
   Scissors,
   AlertTriangle,
+  Scale,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
@@ -56,6 +57,25 @@ interface WasteEntry {
   cost: number;
 }
 
+interface IngredientVariance {
+  inventoryItemId: string;
+  name: string;
+  unit: string;
+  unitsSold: number;
+  theoretical: number;
+  actual: number;
+  variance: number;
+  variancePct: number | null;
+  varianceCost: number;
+  flagged: boolean;
+}
+
+interface VarianceResponse {
+  ingredients: IngredientVariance[];
+  totals: { shrinkageCost: number; flaggedCount: number; trackedCount: number };
+  windowDays: number;
+}
+
 interface EconomicsResponse {
   products: ProductEconomics[];
   totals: EconomicsTotals;
@@ -87,6 +107,15 @@ export default function AdminEconomicsPage() {
     queryFn: async (): Promise<EconomicsResponse> => {
       const res = await api.get('/admin/economics/products', { params: { days } });
       return res.data?.data ?? { products: [], totals: { revenue: 0, cogs: 0, margin: 0, marginPct: null, wasteCost: 0 }, waste: [], windowDays: days };
+    },
+    staleTime: 60_000,
+  });
+
+  const { data: variance, isLoading: varianceLoading } = useQuery({
+    queryKey: ['admin-ingredient-variance', days],
+    queryFn: async (): Promise<VarianceResponse> => {
+      const res = await api.get('/admin/economics/variance', { params: { days } });
+      return res.data?.data ?? { ingredients: [], totals: { shrinkageCost: 0, flaggedCount: 0, trackedCount: 0 }, windowDays: days };
     },
     staleTime: 60_000,
   });
@@ -323,6 +352,74 @@ export default function AdminEconomicsPage() {
               </table>
             </div>
           )}
+
+          {/* Variance: actual vs theoretical consumption (F13) */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-2">
+              <Scale className="w-4 h-4 text-sky-500" />
+              <h2 className="font-semibold text-slate-900 dark:text-white">Consumption variance</h2>
+              <span className="text-xs text-slate-400">actual ledger usage vs recipe theory — sorted by cost impact</span>
+            </div>
+            {varianceLoading ? (
+              <div className="px-4 py-8 text-center text-slate-400 text-sm">Computing variance…</div>
+            ) : !variance || variance.ingredients.length === 0 ? (
+              <div className="px-4 py-8 text-center text-slate-400 text-sm">
+                No consumption tracked in this window — variance appears once recipes and deductions exist.
+              </div>
+            ) : (
+              <>
+                {variance.totals.flaggedCount > 0 && (
+                  <div className="px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-900/40 text-sm text-amber-800 dark:text-amber-300">
+                    {variance.totals.flaggedCount} ingredient{variance.totals.flaggedCount === 1 ? '' : 's'} deviate ≥10% from theory — worth a physical count and portioning check.
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs uppercase tracking-wide text-slate-400">
+                        <th className="px-4 py-3">Ingredient</th>
+                        <th className="px-4 py-3 text-right">Theoretical</th>
+                        <th className="px-4 py-3 text-right">Actual</th>
+                        <th className="px-4 py-3 text-right">Variance</th>
+                        <th className="px-4 py-3 text-right">Cost impact</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variance.ingredients.map((v) => (
+                        <tr
+                          key={v.inventoryItemId}
+                          className={`border-b border-slate-100 dark:border-slate-700/50 last:border-0 ${v.flagged ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-slate-900 dark:text-white flex items-center gap-1.5">
+                              {v.name}
+                              {v.flagged && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
+                            </div>
+                            <div className="text-xs text-slate-400">{v.unitsSold} product units sold</div>
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{v.theoretical} {v.unit}</td>
+                          <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{v.actual} {v.unit}</td>
+                          <td className={`px-4 py-3 text-right font-medium ${v.variance > 0 ? 'text-red-600 dark:text-red-400' : v.variance < 0 ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400'}`}>
+                            {v.variance > 0 ? '+' : ''}{v.variance} {v.unit}
+                            {v.variancePct != null && (
+                              <span className="block text-xs font-normal text-slate-400">{v.variancePct > 0 ? '+' : ''}{v.variancePct}%</span>
+                            )}
+                          </td>
+                          <td className={`px-4 py-3 text-right ${v.varianceCost >= 0 ? 'text-red-600 dark:text-red-400' : 'text-sky-600 dark:text-sky-400'}`}>
+                            {v.varianceCost > 0 ? '+' : ''}{formatCurrency(v.varianceCost)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-400 flex flex-wrap gap-x-6 gap-y-1">
+                  <span>Shrinkage cost (over-consumption): <span className="text-red-600 dark:text-red-400 font-medium">{formatCurrency(variance.totals.shrinkageCost)}</span></span>
+                  <span>Positive = used more than recipes predict (shrinkage/over-portioning); negative = less.</span>
+                </div>
+              </>
+            )}
+          </div>
         </>
       )}
     </div>

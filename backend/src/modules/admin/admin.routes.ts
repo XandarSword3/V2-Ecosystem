@@ -174,8 +174,12 @@ router.get('/transactions', authorizeManager, asyncHandler(getCrossEngineTransac
 // → COGS → margin per product, plus waste cost. Same auth/scope chain as
 // /transactions: authenticate + validatePropertyAccess via router.use,
 // tenant defense-in-depth inside the controller.
-import { getProductEconomics } from './controllers/economics.controller.js';
+import { getProductEconomics, getIngredientVariance } from './controllers/economics.controller.js';
 router.get('/economics/products', authorizeManager, asyncHandler(getProductEconomics));
+
+// Ingredient variance (F13): actual (ledger) vs theoretical (BOM × units sold)
+// consumption per inventory item — shrinkage/over-portioning discovery.
+router.get('/economics/variance', authorizeManager, asyncHandler(getIngredientVariance));
 
 // Cross-module catalog (F11 Products capability). Same auth/scope chain as
 // /transactions: authenticate + validatePropertyAccess via router.use,

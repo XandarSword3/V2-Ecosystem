@@ -35,6 +35,9 @@ const EXCLUDED_STATUSES = new Set(['cancelled', 'void', 'refunded']);
 const DEFAULT_DAYS = 30;
 const MAX_DAYS = 365;
 
+/** Variance percentage at which an ingredient row is flagged for review. */
+const VARIANCE_FLAG_PCT = 10;
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -254,5 +257,107 @@ export async function getProductEconomics(req: Request, res: Response) {
   } catch (err) {
     logger.error('getProductEconomics failed', { error: err instanceof Error ? err.message : err });
     return res.status(500).json({ success: false, error: 'Failed to compute product economics' });
+  }
+}
+
+/**
+ * Actual vs theoretical ingredient consumption (F13 variance capability).
+ *
+ * Theoretical: what the bills of materials say should have been consumed for
+ * the units sold (order_items × menu_item_ingredients, revenue-gated).
+ * Actual: what the consumption ledger says was consumed (inventory_transactions
+ * 'sale' rows with reference_type order/order_customization — the checkout and
+ * customization deduction paths).
+ *
+ * Positive variance = more consumed than theory (shrinkage, over-portioning,
+ * unrecorded waste); negative = less (under-portioning or missing BOM rows).
+ * Computed in the database (get_ingredient_variance) so the window joins stay
+ * set-based; this endpoint only maps shapes and attaches unit costs.
+ */
+export async function getIngredientVariance(req: Request, res: Response) {
+  try {
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string);
+    if (!propertyId) {
+      return res.status(400).json({ success: false, error: 'Property ID context is required' });
+    }
+
+    const daysRaw = parseInt(String((req.query as any)?.days ?? ''), 10);
+    const days = Number.isFinite(daysRaw) && daysRaw > 0
+      ? Math.min(daysRaw, MAX_DAYS)
+      : DEFAULT_DAYS;
+    const until = new Date();
+    const since = new Date(until.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const supabase = getSupabase();
+    const callerTenantId = getCallerTenantId(req);
+
+    const { data: rows, error: rpcError } = await supabase.rpc('get_ingredient_variance', {
+      p_property_id: propertyId,
+      p_tenant_id: callerTenantId,
+      p_since: since.toISOString(),
+      p_until: until.toISOString(),
+    });
+    if (rpcError) throw rpcError;
+
+    // Attach unit costs for variance-cost ranking (by-id lookup; scope is
+    // inherited from the RPC, which filtered rows by property/tenant).
+    const typed = (rows || []) as Array<{
+      inventory_item_id: string;
+      item_name: string;
+      unit: string;
+      units_sold: string | number;
+      theoretical_consumption: string | number;
+      actual_consumption: string | number;
+      variance: string | number;
+      variance_pct: number | null;
+    }>;
+    const ids = typed.map((r) => r.inventory_item_id);
+    const costMap = new Map<string, number>();
+    if (ids.length > 0) {
+      const { data: invItems, error: invError } = await supabase
+        .from('inventory_items')
+        .select('id, cost_per_unit')
+        .in('id', ids);
+      if (invError) throw invError;
+      for (const it of invItems || []) {
+        costMap.set((it as { id: string }).id, Number((it as { cost_per_unit: number | null }).cost_per_unit ?? 0));
+      }
+    }
+
+    const ingredients = typed
+      .map((r) => {
+        const variance = Number(r.variance ?? 0);
+        const costPerUnit = costMap.get(r.inventory_item_id) ?? 0;
+        const varianceCost = round2(variance * costPerUnit);
+        const variancePct = r.variance_pct === null || r.variance_pct === undefined ? null : Number(r.variance_pct);
+        return {
+          inventoryItemId: r.inventory_item_id,
+          name: r.item_name,
+          unit: r.unit,
+          unitsSold: Number(r.units_sold ?? 0),
+          theoretical: round2(Number(r.theoretical_consumption ?? 0)),
+          actual: round2(Number(r.actual_consumption ?? 0)),
+          variance: round2(variance),
+          variancePct,
+          varianceCost,
+          flagged: variancePct !== null && Math.abs(variancePct) >= VARIANCE_FLAG_PCT,
+        };
+      })
+      .sort((a, b) => Math.abs(b.varianceCost) - Math.abs(a.varianceCost));
+
+    const shrinkageCost = round2(ingredients.reduce((acc, i) => acc + Math.max(0, i.varianceCost), 0));
+    const flaggedCount = ingredients.filter((i) => i.flagged).length;
+
+    return res.json({
+      success: true,
+      data: {
+        ingredients,
+        totals: { shrinkageCost, flaggedCount, trackedCount: ingredients.length },
+        windowDays: days,
+      },
+    });
+  } catch (err) {
+    logger.error('getIngredientVariance failed', { error: err instanceof Error ? err.message : err });
+    return res.status(500).json({ success: false, error: 'Failed to compute ingredient variance' });
   }
 }
