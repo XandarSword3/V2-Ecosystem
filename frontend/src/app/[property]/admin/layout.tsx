@@ -23,6 +23,11 @@ import {
   Bell,
   LogOut,
   Search,
+  Terminal,
+  ChevronLeft,
+  ArrowRight,
+  CheckCircle2,
+  Package,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -205,7 +210,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [isAuthenticated, isLoading, router, user, t]);
 
-  // Check onboarding status
+  // F12: gate admin into the onboarding wizard until setup is complete.
   useEffect(() => {
     if (onboardingChecked) return;
 
@@ -260,9 +265,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         />
       </div>
     );
-  }
-
-  // Bypass Layout wrapper for onboarding setup page
+  }      // F12 onboarding wizard: render under the full admin chrome so the
+  // step list + sidebar are available during setup.
   if (pathname === `/${propertySlug}/admin/setup`) {
     return (
       <PropertyProvider>

@@ -1,0 +1,7 @@
+{
+  "setup": {
+    "title": "Business Setup",
+    "stepCompleted": "Completed",
+    "stepPending": "Not completed"
+  }
+}

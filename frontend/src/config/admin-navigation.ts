@@ -41,6 +41,7 @@ import {
   MessageSquare,
   TrendingUp,
   Building2,
+  Terminal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -372,6 +373,13 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
             { name: t('nav.guestMessaging') || 'Guest Messaging', href: `${base}/messaging`, translationKey: 'nav.guestMessaging' },
             { name: t('nav.rateParity') || 'Rate Parity', href: `${base}/parity`, translationKey: 'nav.rateParity' },
           ],
+        },
+        {
+          name: t('nav.setup') || 'Setup',
+          href: `${base}/setup`,
+          icon: Terminal,
+          translationKey: 'nav.setup',
+          permissions: ['admin:settings:manage'],
         },
       ],
       collapsible: true,
