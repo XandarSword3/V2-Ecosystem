@@ -67,7 +67,7 @@ export async function resolveAndPriceCatalogItems(
   // Fetch catalog items from database
   const { data: catalogRows, error: catalogError } = await supabase
     .from('catalog_items')
-    .select('id, name, price')
+    .select('id, name, price, is_available, lifecycle_status')
     .eq('module_id', moduleId)
     .in('id', itemIds);
 
@@ -110,6 +110,47 @@ export async function resolveAndPriceCatalogItems(
   if (unknownIds.length > 0) {
     logger.error('[CatalogPricing] Unresolved catalog item IDs', { unknownIds, moduleId });
     validationErrors.push(`Unknown catalog item(s): ${unknownIds.join(', ')}`);
+    return {
+      resolvedItems: [],
+      nameMap,
+      priceMap,
+      validationErrors,
+    };
+  }
+
+  // FIX (D8): quantity bounds + item availability gating.
+  // Previously quantity passed through raw (`Number(item.quantity) || 1`), so
+  // negative quantities produced negative-total orders, fractional quantities
+  // crashed pricing, and draft/unavailable items were orderable even though the
+  // public catalog endpoint filters them out.
+  const MAX_LINE_QUANTITY = 50; // matches transactionItemSchema in validation/schemas.ts
+  items.forEach((item, index) => {
+    const resolvedId = item.catalog_item_id || item.menuItemId || item.itemId || '';
+    if (item.quantity !== undefined && item.quantity !== null) {
+      const q = Number(item.quantity);
+      if (!Number.isFinite(q)) {
+        validationErrors.push(`Item ${index + 1}: quantity must be a number`);
+      } else if (!Number.isInteger(q)) {
+        validationErrors.push(`Item ${index + 1}: quantity must be a whole number`);
+      } else if (q < 1) {
+        validationErrors.push(`Item ${index + 1}: quantity must be at least 1`);
+      } else if (q > MAX_LINE_QUANTITY) {
+        validationErrors.push(`Item ${index + 1}: quantity cannot exceed ${MAX_LINE_QUANTITY}`);
+      }
+    }
+
+    // Availability only applies to catalog_items (bookable_units / add-ons are
+    // availability-controlled elsewhere).
+    const row = (catalogRows ?? []).find((r) => r.id === resolvedId);
+    if (row) {
+      if (row.is_available === false) {
+        validationErrors.push(`Item "${row.name}" is currently unavailable`);
+      } else if (row.lifecycle_status && row.lifecycle_status !== 'active') {
+        validationErrors.push(`Item "${row.name}" is not available for ordering (status: ${row.lifecycle_status})`);
+      }
+    }
+  });
+  if (validationErrors.length > 0) {
     return {
       resolvedItems: [],
       nameMap,

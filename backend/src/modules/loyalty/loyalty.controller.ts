@@ -608,7 +608,11 @@ export class LoyaltyController {
       if (data.pointsExpiryDays !== undefined) updates.points_expiry_days = data.pointsExpiryDays;
       if (data.signupBonus !== undefined) updates.signup_bonus = data.signupBonus;
       if (data.birthdayBonus !== undefined) updates.birthday_bonus = data.birthdayBonus;
-      if (data.isEnabled !== undefined) updates.is_enabled = data.isEnabled;
+      // N2 fix: `isEnabled` was mapped to the nonexistent is_enabled column
+      // (every such update 400'd). The settings row's existence is the
+      // enablement; there is nothing to toggle. The zod field is kept so
+      // existing payloads still parse, but the value is deliberately
+      // ignored.
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ success: false, error: 'No fields to update' });
@@ -812,7 +816,13 @@ export class LoyaltyController {
         return res.status(400).json({ success: false, error: 'Invalid amount' });
       }
 
-      let settingsQuery = supabase.from('loyalty_settings').select('*').eq('is_enabled', true);
+      // N2 fix: loyalty_settings has no `is_enabled` column (baseline
+      // schema; confirmed against the deployed DB). Filtering on it made
+      // PostgREST reject the whole request with 400 (PGRST204), so
+      // calculatePoints could never return a positive estimate. The row's
+      // presence is the enablement signal — handled by the `!settings`
+      // branch below.
+      let settingsQuery = supabase.from('loyalty_settings').select('*');
       if (propertyId) settingsQuery = settingsQuery.eq('property_id', propertyId);
       const { data: settings } = await settingsQuery.limit(1).single();
 

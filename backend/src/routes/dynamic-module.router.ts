@@ -20,6 +20,7 @@ import { linkDiscountsToOrder, reverseDiscounts } from '../engines/discount-reve
 import { actorForUser, resolveAction, changeInstantTransactionOrderStatus } from '../engines/order-status.service.js';
 import type { FulfillmentMode } from '../engines/types.js';
 import { resolveFulfillmentSelection } from '../modules/fulfillment/fulfillment-selection.js';
+import { FulfillmentContractError } from '../engines/fulfillment-contract.js';
 import { ResourceConsumptionService } from '../modules/resource/index.js';
 import { hospitalityResourceResolver } from '../adapters/hospitality/resources.js';
 import { emitToUnit } from '../socket/index.js';
@@ -1450,6 +1451,12 @@ function buildInstantTransactionRouter(router: Router): void {
           // Scoped idempotency tracking
           ...(rawIdempotencyKey ? { idempotency_key: rawIdempotencyKey } : {}),
           ...(scopedIdempotencyKey ? { scoped_idempotency_key: scopedIdempotencyKey } : {}),
+          // D10 companion: persist the consumed discounts (coupon/gift-card
+          // breakdown from pricing) so a LATER full refund — a separate
+          // request that only has the order id — can reverse them via
+          // reverseDiscounts (payment.controller reads metadata.discounts).
+          // In-memory `appliedDiscounts` is gone by then.
+          ...(pricing.discounts?.length ? { discounts: pricing.discounts } : {}),
         },
       };
 
@@ -1838,6 +1845,53 @@ function buildInstantTransactionRouter(router: Router): void {
           error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
         });
       }
+
+      // D10 fix: non-card tenders previously left NO payments row at all —
+      // the refund endpoint (POST /payments/transactions/:id/refund) looks
+      // the payment up by id and 404'd for every cash / gift-card module
+      // order, making them financially irreversible. Record the tender at
+      // creation (row shape mirrors recordCashPayment) so the existing
+      // refund machinery — including coupon/gift-card reversal on full
+      // refunds — applies uniformly. Card/stripe tenders are skipped: the
+      // payment-intent webhook owns that row, and a duplicate here would
+      // break findPaymentByReference's single-completed-row assumption.
+      const cardLikeTenders = new Set(['card', 'stripe', 'stripe_payment', 'payment_intent', 'online']);
+      if (!cardLikeTenders.has(String(resolvedPaymentMethod).toLowerCase())) {
+        try {
+          const { data: existingPaymentRow } = await supabase
+            .from('payments')
+            .select('id')
+            .eq('reference_type', 'order')
+            .eq('reference_id', created.id)
+            .maybeSingle();
+          if (!existingPaymentRow) {
+            const { error: paymentInsertErr } = await supabase.from('payments').insert({
+              reference_type: 'order',
+              reference_id: created.id,
+              amount: pricing.totalAmount.toFixed(2),
+              currency,
+              method: String(resolvedPaymentMethod),
+              status: 'completed',
+              processed_by: req.user?.userId ?? null,
+              processed_at: new Date().toISOString(),
+              tenant_id: tenantId,
+              property_id: propertyId,
+              notes: 'Auto-recorded at order creation',
+            });
+            if (paymentInsertErr) {
+              logger.warn('[Dynamic Router] Failed to auto-record order payment row (non-fatal)', {
+                orderId: created.id,
+                error: paymentInsertErr instanceof Error ? paymentInsertErr.message : String(paymentInsertErr),
+              });
+            }
+          }
+        } catch (paymentErr) {
+          logger.warn('[Dynamic Router] Exception while auto-recording order payment row (non-fatal)', {
+            orderId: created.id,
+            error: paymentErr instanceof Error ? paymentErr.message : String(paymentErr),
+          });
+        }
+      }
       
       const meta = (created?.metadata ?? {}) as Record<string, unknown>;
 
@@ -1904,6 +1958,22 @@ function buildInstantTransactionRouter(router: Router): void {
 
       res.status(201).json(responsePayload);
     } catch (error) {
+      // Client-side contract violations are 400s, not 500s (defect D3)
+      if (error instanceof FulfillmentContractError) {
+        logger.warn('[Dynamic Router] POST /orders rejected: invalid fulfillment selection', { message: error.message });
+        if (scopedIdempotencyKey) {
+          await rollbackFailedOrder(
+            supabase,
+            created?.id ?? null,
+            baseInventoryDeducted ? baseInventoryRestorePayload : [],
+            appliedDiscounts,
+            scopedIdempotencyKey,
+            claimToken,
+            req.user?.userId,
+          );
+        }
+        return res.status(400).json({ success: false, error: 'INVALID_FULFILLMENT_SELECTION', message: error.message });
+      }
       logger.error('[Dynamic Router] POST /orders failed', error);
       if (scopedIdempotencyKey) {
         await rollbackFailedOrder(
@@ -2463,6 +2533,60 @@ function buildInstantTransactionRouter(router: Router): void {
     } catch (error) {
       logger.error('[Dynamic Router] PATCH /orders/:id/status failed', error);
       res.status(500).json({ success: false, error: 'Failed to update order status' });
+    }
+  });
+
+  // Customer-initiated cancellation of their OWN order (Engine A re-verification
+  // finding D7: the engine's state machine declares a customer-allowed cancel
+  // action on pending orders, but the only status route was staff-only, so
+  // customers could never exercise it).
+  // Scope: customer role, order ownership enforced by customer_id match, and the
+  // transition itself still goes through the canonical state machine with
+  // actor 'customer' — the machine decides whether cancel is legal from the
+  // current state (pending/confirmed → yes; in_progress onwards → no).
+  router.delete('/orders/:id', authorize('customer'), async (req: Request, res: Response) => {
+    try {
+      const mounted = getMountedModule(req);
+      if (!mounted) {
+        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
+      }
+      const supabase = getSupabase();
+      const { data: owned, error: ownedError } = await supabase
+        .from('transactions')
+        .select('id, customer_id')
+        .eq('id', req.params.id)
+        .eq('module_id', mounted.id)
+        .eq('engine_type', 'instant_transaction')
+        .maybeSingle();
+      if (ownedError) {
+        logger.error('[Dynamic Router] DELETE /orders/:id ownership read failed', ownedError);
+        return res.status(500).json({ success: false, error: 'Failed to verify order ownership' });
+      }
+      if (!owned) {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+      if (owned.customer_id !== req.user?.userId) {
+        // 404, not 403 — don't confirm another customer's order exists here.
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+
+      const result = await changeInstantTransactionOrderStatus(supabase, {
+        orderId: req.params.id,
+        moduleId: mounted.id,
+        moduleSlug: mounted.slug,
+        moduleEngineTypeRaw: mounted.engine_type,
+        requestedStatus: 'cancelled',
+        actor: 'customer',
+        userId: req.user?.userId,
+        tenantId: req.user?.tenantId,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ success: false, error: result.error });
+      }
+      res.json({ success: true, data: result.order });
+    } catch (error) {
+      logger.error('[Dynamic Router] DELETE /orders/:id failed', error);
+      res.status(500).json({ success: false, error: 'Failed to cancel order' });
     }
   });
 

@@ -241,13 +241,22 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
     // Dynamic Permission Generation using template presets.
     try {
         const modulePermissionSlugs = buildModulePermissionRows(finalSlug, engine_type);
+        // app_permissions / app_role_permissions have NOT NULL tenant_id (and
+        // property_id) — unstamped rows violated the constraint and silently
+        // disabled this whole block, leaving builder-created modules without
+        // module:{slug}:manage grants (admins then got 403 on
+        // PUT /admin/modules/:id — see Engine A re-verification finding N1).
+        const tenantId = requireTenantScope(req);
         const permsToCreate = modulePermissionSlugs.map((slug) => ({
           slug,
           description: `Auto-generated permission for module ${name}`,
           module_slug: finalSlug,
+          tenant_id: tenantId,
+          property_id: propertyId,
         }));
 
-        await supabase.from('app_permissions').upsert(permsToCreate, { onConflict: 'slug' });
+        const { error: permUpsertError } = await supabase.from('app_permissions').upsert(permsToCreate, { onConflict: 'slug' });
+        if (permUpsertError) throw permUpsertError;
 
         // Assign based on template preset policy.
         const rolePerms: Array<{ role_name: string; permission_slug: string }> = [];
@@ -263,9 +272,11 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
           }
         });
 
-        await supabase.from('app_role_permissions').upsert(rolePerms, { onConflict: 'role_name,permission_slug' });
+        const stampedRolePerms = rolePerms.map((rp) => ({ ...rp, tenant_id: tenantId, property_id: propertyId }));
+        const { error: rolePermUpsertError } = await supabase.from('app_role_permissions').upsert(stampedRolePerms, { onConflict: 'role_name,permission_slug' });
+        if (rolePermUpsertError) throw rolePermUpsertError;
         await permissionCache.refreshCache();
-        
+
     } catch (permError) {
         logger.error(`Failed to generate permissions for ${finalSlug}`, permError);
     }
@@ -510,8 +521,23 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
     }
 
     // 2. Enforce Permissions
-    const hasPermission = user.roles.includes('super_admin') || 
-                         user.roles.includes(`${moduleData.slug}_admin`);
+    // Previously only super_admin or a literal '{slug}_admin' role qualified —
+    // those roles are never provisioned anywhere, so tenant admins could never
+    // delete their own modules (same family as N1). Accept the same
+    // module:{slug}:manage grant updateModule enforces, which createModule
+    // auto-provisions for the tenant's staff/manager/admin roles.
+    let hasPermission = isSuperAdmin || user.roles.includes(`${moduleData.slug}_admin`);
+
+    if (!hasPermission) {
+      const requiredPerm = `module:${moduleData.slug}:manage`;
+      const { data: permData } = await supabase
+        .from('app_role_permissions')
+        .select('permission_slug')
+        .eq('permission_slug', requiredPerm)
+        .in('role_name', user.roles)
+        .limit(1);
+      hasPermission = Boolean(permData && permData.length > 0);
+    }
 
     if (!hasPermission) {
       logger.warn(`Unauthorized module delete attempt by ${user.userId} on ${moduleData.slug}`);

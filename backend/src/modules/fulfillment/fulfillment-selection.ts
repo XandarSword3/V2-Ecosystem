@@ -14,7 +14,9 @@
  *
  * Legacy Adapter Boundary:
  *   Resolves legacy `orderType` (dine_in/takeaway/delivery/counter) ONLY when canonical
- *   fulfillmentSelection is not supplied.
+ *   fulfillmentSelection is not supplied. Canonical mode names are also accepted here so
+ *   clients that carry their vocabulary in `orderType` (as the existing frontend and e2e
+ *   callers do) resolve instead of erroring (defect D3).
  */
 import { getEngine, type EngineRegistry } from '../../engines/registry.js';
 import {
@@ -70,10 +72,19 @@ const DEFAULT_DESTINATION_TYPE_PER_MODE: Readonly<Record<FulfillmentMode, Destin
 const LEGACY_ORDER_TYPE_TO_SELECTION: Readonly<
   Record<string, { mode: FulfillmentMode; destinationType: DestinationType }>
 > = {
+  // Legacy hospitality order types
   dine_in: { mode: 'on_premise', destinationType: 'on_premise_location' },
   counter: { mode: 'pickup', destinationType: 'pickup_location' },
   takeaway: { mode: 'pickup', destinationType: 'pickup_location' },
   delivery: { mode: 'local_delivery', destinationType: 'address' },
+  // Canonical mode names accepted via the orderType fallback carrier
+  on_premise: { mode: 'on_premise', destinationType: 'on_premise_location' },
+  pickup: { mode: 'pickup', destinationType: 'pickup_location' },
+  local_delivery: { mode: 'local_delivery', destinationType: 'address' },
+  digital_delivery: { mode: 'digital_delivery', destinationType: 'digital_account' },
+  shipment: { mode: 'shipment', destinationType: 'address' },
+  service_execution: { mode: 'service_execution', destinationType: 'service_location' },
+  none: { mode: 'none', destinationType: 'none' },
 };
 
 /**
@@ -164,9 +175,11 @@ export function resolveFulfillmentSelection(
   }
 
   const destinationRef =
-    legacyBase.mode === 'local_delivery'
-      ? (input.address ?? null)
-      : (input.serviceLocationId ?? input.tableNumber ?? null);
+    legacyBase.mode === 'none'
+      ? null
+      : legacyBase.mode === 'local_delivery' || legacyBase.mode === 'shipment'
+        ? (input.destinationRef ?? input.address ?? null)
+        : (input.destinationRef ?? input.serviceLocationId ?? input.tableNumber ?? null);
 
   const selection: FulfillmentSelection = {
     mode: legacyBase.mode,

@@ -17,6 +17,19 @@ let isShuttingDown = false;
 
 async function main() {
   try {
+    // D1 fail-fast: PORT=0 asks the OS for a random free port. That is a
+    // valid choice for throwaway CLI tools, but for this backend it makes
+    // 'PORT=0 npm run dev' appear to start while the API is actually
+    // listening on an unpredictable port — health checks, CORS origins and
+    // every client pointed at the configured port then fail with no error
+    // anywhere. Refuse to start so the misconfiguration is loud.
+    if (config.port === 0) {
+      throw new Error(
+        'PORT=0 is not supported: the backend must bind the port its clients are configured for. ' +
+          'Unset PORT to use the default, or set an explicit port number.',
+      );
+    }
+
     // Create HTTP server first (so health check works immediately)
     const server = http.createServer(app);
 

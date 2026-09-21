@@ -101,12 +101,17 @@ describe('Capability contract (plan Phase 2)', () => {
     // Per-mode machine routing: hospitality modes → hospitality machine,
     // digital_delivery → the digital adapter's machine, shipment → the
     // shipment adapter's machine, service_execution → the service adapter's
-    // machine ('none' deliberately binds no machine).
-    expect(f.modeMachines!.length).toBe(4);
+    // machine, 'none' → the degenerate none adapter's machine (D6: without
+    // a binding, required-fulfillment completion had no origin and none-mode
+    // orders were permanently stuck on 'confirmed').
+    expect(f.modeMachines!.length).toBe(5);
     const hospitality = f.modeMachines!.find(b => b.modes.includes('on_premise'))!;
     expect(hospitality.machine.states).toContain('queued');
     const digital = f.modeMachines!.find(b => b.modes.includes('digital_delivery'))!;
     expect(digital.machine.states).toContain('provisioning');
+    const none = f.modeMachines!.find(b => b.modes.includes('none'))!;
+    expect(none.machine.states).toContain('queued');
+    expect(none.handoff).toBe(false);
     // Handoff semantics are per MODE, never engine-wide: hospitality models a
     // separate handoff step, digital delivery does not (delivery IS handoff).
     expect(f.modeMachines!.find(b => b.modes.includes('on_premise'))!.handoff).toBe(true);
@@ -569,7 +574,7 @@ describe('Registry preserves TFulfillmentStatus (no string erasure)', () => {
     // If the registry erased generics, this exact-type check would fail.
     const typed: EngineRegistry['instant_transaction'] = getEngine('instant_transaction');
     expect(typed.type).toBe('instant_transaction');
-    expect(typed.capabilities.fulfillment.modeMachines!.length).toBe(4);
+    expect(typed.capabilities.fulfillment.modeMachines!.length).toBe(5);
     expect(resolveFulfillmentMachine(typed.capabilities.fulfillment, 'digital_delivery')).toBeDefined();
   });
 

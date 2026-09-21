@@ -42,6 +42,9 @@ import {
   serviceFulfillmentStateMachine,
   type ServiceFulfillmentMachineStatus,
 } from '../../adapters/service/fulfillment.js';
+import {
+  noneFulfillmentStateMachine,
+} from '../../adapters/none/fulfillment.js';
 
 // ============================================
 // Transaction-layer state machine
@@ -230,8 +233,16 @@ export const instantTransactionEngine: EngineDefinition<TransactionState, Instan
           handoff: true,
           machine: serviceFulfillmentStateMachine,
         },
-        // 'none' mode: no fulfillment machine — order stays in pending/confirmed
-        // until manually completed or cancelled.
+        {
+          // 'none' mode (defect D6): the DEGENERATE machine — no fulfillment
+          // work exists, the row starts AT its terminal pre-completion state
+          // and staff/admin complete (or cancel) directly through the
+          // fulfillment layer. Without a binding, the completion gate made
+          // none-mode orders uncompletable.
+          modes: ['none'],
+          handoff: false,
+          machine: noneFulfillmentStateMachine,
+        },
       ],
     },
     execution: {

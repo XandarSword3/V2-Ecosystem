@@ -473,5 +473,55 @@ export async function changeInstantTransactionOrderStatus(
     }
   }
 
+  // ── Loyalty earn (Engine A interaction 'earn_loyalty_on_purchase') ────────
+  // The engine definition declares earnsLoyaltyPoints: true with the guard
+  // "payment successful (not pending)", but no code path ever awarded points
+  // (re-verification finding D5: completed orders stayed at 0 points). The
+  // economic commit point is the completed state, so earn fires when the
+  // order reaches completed. Non-fatal by design — the state move has
+  // persisted, and the RPC is idempotent (unique earn reference per order,
+  // migration 20260816000000) so a retried transition cannot double-award.
+  if (transition.targetState === 'completed' || transition.canonicalState === 'completed') {
+    const earnCustomerId = (current as { customer_id?: string | null }).customer_id;
+    const earnOrderAmount = Number((order as { amount?: number | null }).amount ?? 0);
+    if (earnCustomerId && earnOrderAmount > 0) {
+      try {
+        const scopeTenant = tenantId ?? String(current.tenant_id);
+        const { data: loyaltySettings } = await supabase
+          .from('loyalty_settings')
+          .select('points_per_dollar')
+          .eq('tenant_id', scopeTenant)
+          .maybeSingle();
+        const { data: earnResult, error: earnError } = await supabase.rpc('earn_loyalty_points_atomic', {
+          p_user_id: earnCustomerId,
+          p_order_total: earnOrderAmount,
+          p_order_id: orderId,
+          p_points_per_dollar: loyaltySettings?.points_per_dollar ?? 1,
+          p_tenant_id: scopeTenant,
+          p_property_id: (order as { property_id?: string | null }).property_id ?? null,
+        });
+        if (earnError || !earnResult?.[0]?.success) {
+          logger.warn('[OrderStatus] Loyalty earn skipped', {
+            orderId,
+            reason: earnError?.message ?? earnResult?.[0]?.error_message ?? 'unknown',
+          });
+        } else {
+          const earned = earnResult[0].points_earned ?? 0;
+          // Record the award on the order snapshot (ledger loyalty_points_earned
+          // stays a checkout-time fact; this is the completion-time award).
+          await supabase
+            .from('transactions')
+            .update({
+              metadata: { ...((order.metadata ?? {}) as Record<string, unknown>), loyalty_points_earned: earned },
+            })
+            .eq('id', orderId);
+          logger.info('[OrderStatus] Loyalty points earned on completion', { orderId, customerId: earnCustomerId, points: earned });
+        }
+      } catch (loyaltyErr) {
+        logger.warn('[OrderStatus] Loyalty earn error (non-fatal)', loyaltyErr instanceof Error ? loyaltyErr.message : String(loyaltyErr));
+      }
+    }
+  }
+
   return { ok: true, status: 200, order };
 }

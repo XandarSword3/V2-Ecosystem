@@ -208,7 +208,13 @@ export class SupabaseLoyaltyResolver implements LoyaltyResolver {
         .limit(1)
         .single();
 
-      if (!settings?.is_enabled) {
+      if (!settings) {
+        // N2 fix: the gate used to read `settings?.is_enabled`, but
+        // loyalty_settings has NO is_enabled column (baseline schema,
+        // confirmed against the deployed DB) — the optional-chained access
+        // was always `undefined`, making earn permanently dead code here.
+        // The intended semantic is "loyalty is off when no settings row
+        // exists": the row's presence IS the enablement.
         return 0;
       }
 
