@@ -15,10 +15,7 @@ import {
   Trash2,
   Save,
   GripVertical,
-  Facebook,
-  Instagram,
-  Twitter,
-  Youtube,
+  Share2,
   Globe,
   Layout,
   Info,
@@ -333,7 +330,7 @@ export default function FooterSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Facebook className="w-5 h-5 text-blue-600" />
+                <Share2 className="w-5 h-5 text-blue-600" />
                 Social Media
               </CardTitle>
               <CardDescription>Links to your social profiles</CardDescription>
