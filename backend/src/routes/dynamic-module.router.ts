@@ -56,6 +56,15 @@ interface DynamicRequest extends Request {
 }
 const engineService = getEngineService();
 const STAFF_ROLES = ['staff', 'manager', 'admin', 'super_admin'];
+
+/**
+ * a destinationRef may be either a service_location UUID (physical table/room
+ * known to the module) or an opaque human label ("T-1", "Bar L", ...). The
+ * fulfillment contract treats it as a free string; only UUID-shaped refs can
+ * be resolved against service_locations. Guarding here prevents a Postgres
+ * 22P02 uuid-cast crash (500) when a caller sends a table label.
+ */
+const DESTINATION_REF_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Memory-based multer: files stay in-process as Buffer, nothing touches disk.
 // 10 MB cap — large enough for any realistic CSV/JSON import.
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -1375,13 +1384,20 @@ function buildInstantTransactionRouter(router: Router): void {
 
       // Validate service_location_id belongs to this module before trusting it —
       // otherwise a caller could tag an order to another module's location.
+      // A UUID-shaped ref is a service_location id (verify it); any other
+      // non-empty ref ("T-1", ...) is an opaque label carried by the canonical
+      // fulfillment snapshot — no lookup, no server-side occupancy gate.
       let serviceLocationId: string | null = null;
       const requestedLocationId =
         rawFulfillmentSelection?.destinationType === 'on_premise_location'
           ? (rawFulfillmentSelection.destinationRef || req.body?.service_location_id || req.body?.serviceLocationId)
           : (req.body?.service_location_id || req.body?.serviceLocationId);
 
-      if (typeof requestedLocationId === 'string' && requestedLocationId.length > 0) {
+      if (
+        typeof requestedLocationId === 'string' &&
+        requestedLocationId.length > 0 &&
+        DESTINATION_REF_UUID_RE.test(requestedLocationId)
+      ) {
         const { data: locationRow, error: locationError } = await supabase
           .from('service_locations')
           .select('id')
@@ -1817,7 +1833,11 @@ function buildInstantTransactionRouter(router: Router): void {
         }
       }
 
-      // Persist to financial ledger (non-fatal)
+      // Persist to financial ledger — FATAL ON FAILURE (Main Plan Phase 16:
+      // "Never create a financial mutation without ledger entry"). The
+      // engineService path retries transient failures with backoff; a final
+      // failure must NOT commit an untraceable sale. Roll the whole order
+      // back through the durable compensation helper and fail closed.
       try {
         const actorIsStaff = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
         await engineService.recordToLedger(pricing, {
@@ -1840,9 +1860,23 @@ function buildInstantTransactionRouter(router: Router): void {
           },
         });
       } catch (ledgerErr) {
-        logger.warn('[Dynamic Router] Failed to record order to financial ledger', {
+        logger.error('[Dynamic Router] Order rolled back: ledger write failed after retries', {
           orderId: created.id,
           error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+        });
+        await rollbackFailedOrder(
+          supabase,
+          created.id,
+          baseInventoryDeducted ? baseInventoryRestorePayload : [],
+          appliedDiscounts,
+          scopedIdempotencyKey,
+          claimToken,
+          req.user?.userId,
+        );
+        return res.status(500).json({
+          success: false,
+          error: 'LEDGER_WRITE_FAILED',
+          message: 'Order could not be committed to the financial ledger and was rolled back. No charge has been recorded — please retry.',
         });
       }
 
@@ -2223,9 +2257,11 @@ function buildInstantTransactionRouter(router: Router): void {
           message: allocation.error || 'Resource allocation failed for the added items',
         });
       }
-      // Non-fatal, matches POST /orders: the order_items + transactions
-      // update above are already the authoritative record of what
-      // happened; the ledger entry only enriches it.
+      // Persist to financial ledger — FATAL ON FAILURE (Main Plan Phase 16:
+      // "Never create a financial mutation without ledger entry"). Mirror
+      // the resource-allocation rollback directly above: remove the added
+      // items, restore their deducted inventory and the order's pre-update
+      // totals, then fail closed.
       try {
         const actorIsStaff = (req.user?.roles ?? []).some((r: string) => STAFF_ROLES.includes(r));
         await engineService.recordToLedger(pricing, {
@@ -2252,9 +2288,31 @@ function buildInstantTransactionRouter(router: Router): void {
           },
         });
       } catch (ledgerErr) {
-        logger.warn('[Dynamic Router] Failed to record item-addition to financial ledger', {
+        logger.error('[Dynamic Router] Item addition rolled back: ledger write failed after retries', {
           orderId: order.id,
           error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+        });
+        await supabase
+          .from('order_items')
+          .delete()
+          .in('id', (insertedItems ?? []).map((i: any) => i.id));
+        await supabase.rpc('restore_inventory_for_order_items', {
+          p_items: deductionPayload,
+          p_user_id: req.user?.userId ?? null,
+        });
+        await supabase
+          .from('transactions')
+          .update({
+            amount: asNumber(order.amount, 0),
+            tax_amount: asNumber(order.tax_amount, 0),
+            service_charge: asNumber(order.service_charge, 0),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', order.id);
+        return res.status(500).json({
+          success: false,
+          error: 'LEDGER_WRITE_FAILED',
+          message: `Added items were rolled back because the financial ledger could not be updated. The order is unchanged.`,
         });
       }
       // Notify the KDS the same way POST /orders does — a distinct event
@@ -2777,106 +2835,6 @@ function buildInstantTransactionRouter(router: Router): void {
       res.status(500).json({ success: false, error: 'Failed to list service locations' });
     }
   });
-  // Waitlist endpoints
-  router.get('/waitlist', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
-    try {
-      const mounted = getMountedModule(req);
-      if (!mounted) {
-        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
-      }
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('waitlist_entries')
-        .select('*')
-        .eq('module_id', mounted.id)
-        .order('created_at', { ascending: true });
-      if (error) {
-        logger.warn('[Dynamic Router] GET /waitlist query warning:', error.message);
-        return res.json({ success: true, data: [] });
-      }
-      res.json({ success: true, data: data ?? [] });
-    } catch (error) {
-      logger.error('[Dynamic Router] GET /waitlist failed', error);
-      res.status(500).json({ success: false, error: 'Failed to list waitlist entries' });
-    }
-  });
-  router.post('/waitlist', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
-    try {
-      const mounted = getMountedModule(req);
-      if (!mounted) {
-        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
-      }
-      const { guest_name, name, party_size, partySize, phone, notes } = req.body ?? {};
-      const resolvedName = guest_name || name || 'Guest';
-      const resolvedPartySize = party_size || partySize || 1;
-      const tenant_id = await getTenantIdForMountedModule(mounted);
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('waitlist_entries')
-        .insert({
-          module_id: mounted.id,
-          tenant_id,
-          property_id: mounted.property_id ?? null,
-          guest_name: resolvedName,
-          party_size: resolvedPartySize,
-          phone: phone ?? null,
-          notes: notes ?? null,
-          status: 'waiting',
-          created_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      res.status(201).json({ success: true, data });
-    } catch (error) {
-      logger.error('[Dynamic Router] POST /waitlist failed', error);
-      res.status(500).json({ success: false, error: 'Failed to add to waitlist' });
-    }
-  });
-  router.patch('/waitlist/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
-    try {
-      const mounted = getMountedModule(req);
-      if (!mounted) {
-        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
-      }
-      const { status } = req.body ?? {};
-      const supabase = getSupabase();
-      const { data, error } = await supabase
-        .from('waitlist_entries')
-        .update({
-          ...(status && { status }),
-          ...(status === 'notified' && { notified_at: new Date().toISOString() }),
-        })
-        .eq('id', req.params.id)
-        .eq('module_id', mounted.id)
-        .select()
-        .single();
-      if (error) throw error;
-      res.json({ success: true, data });
-    } catch (error) {
-      logger.error('[Dynamic Router] PATCH /waitlist/:id failed', error);
-      res.status(500).json({ success: false, error: 'Failed to update waitlist entry' });
-    }
-  });
-  router.delete('/waitlist/:id', authorize(...STAFF_ROLES), async (req: Request, res: Response) => {
-    try {
-      const mounted = getMountedModule(req);
-      if (!mounted) {
-        return res.status(500).json({ success: false, error: 'Mounted module context missing' });
-      }
-      const supabase = getSupabase();
-      const { error } = await supabase
-        .from('waitlist_entries')
-        .delete()
-        .eq('id', req.params.id)
-        .eq('module_id', mounted.id);
-      if (error) throw error;
-      res.json({ success: true });
-    } catch (error) {
-      logger.error('[Dynamic Router] DELETE /waitlist/:id failed', error);
-      res.status(500).json({ success: false, error: 'Failed to delete waitlist entry' });
-    }
-  });
 }
 function buildTimeExclusiveReservationRouter(router: Router): void {
   router.get('/availability', authorize('customer', ...STAFF_ROLES), async (req: Request, res: Response) => {
@@ -2918,6 +2876,9 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
       const checkOut = dayjs(check_out_date);
       if (!checkIn.isValid() || !checkOut.isValid() || !checkOut.isAfter(checkIn)) {
         return res.status(400).json({ success: false, error: 'Invalid check-in/check-out dates' });
+      }
+      if (checkIn.isBefore(dayjs().startOf('day'))) {
+        return res.status(400).json({ success: false, error: 'Cannot book dates in the past' });
       }
       // Validate unit exists for this module. Client-supplied price is never trusted —
       // total is computed server-side below from base_price/weekend_price/unit_price_rules.
@@ -4389,6 +4350,11 @@ async function commitImportForEngine(
         };
         isActive?: boolean;
       }>) {
+        // bookable_units is a VIEW over accommodation_units (INSTEAD OF
+        // trigger). It exposes neither tenant_id nor property_id — sending
+        // them fails with PGRST204. The trigger stamps both on the base
+        // table, resolved from the module (see migration
+        // 20261104000000_fix_bookable_units_trigger_tenant_scope.sql).
         const { error } = await supabase.from('bookable_units').insert({
           name: item.name,
           description: item.description,
@@ -4397,8 +4363,6 @@ async function commitImportForEngine(
           capacity: item.maxGuests,   // bookable_units view maps to accommodation_units.capacity
           is_active: item.isActive ?? true,
           module_id: moduleId,
-          tenant_id,
-          property_id: module?.property_id,
         });
         if (error) {
           results.failed++;

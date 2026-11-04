@@ -538,6 +538,11 @@ export async function migrate() {
         v_required NUMERIC;
         v_deduct_result JSONB;
         v_deducted_count INTEGER := 0;
+        v_stock_before NUMERIC;
+        v_stock_after NUMERIC;
+        v_tenant_id UUID;
+        v_property_id UUID;
+        v_transaction_id UUID;
       BEGIN
         IF p_key IS NOT NULL AND p_claim_token IS NOT NULL THEN
           SELECT * INTO v_lease
@@ -552,6 +557,23 @@ export async function migrate() {
 
         IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
           RETURN jsonb_build_object('success', true, 'ingredients_deducted', 0);
+        END IF;
+
+        -- Scope columns for the ledger rows come from the first catalog item's
+        -- module (tenant/property are uniform within one property-wide checkout).
+        SELECT c.tenant_id, c.property_id
+        INTO v_tenant_id, v_property_id
+        FROM catalog_items c
+        WHERE c.id = (SELECT (j->>'catalog_item_id')::UUID
+                      FROM jsonb_array_elements(p_items) j
+                      LIMIT 1);
+
+        -- When p_order_id IS NULL (deduction genuinely preceding the
+        -- transactions INSERT), rows carry reference_id NULL. When the router
+        -- passes the created order id, rows are per-order reversible by
+        -- restore_inventory_for_order (cancellation compensation).
+        IF p_order_id IS NOT NULL THEN
+          v_transaction_id := p_order_id;
         END IF;
 
         FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
@@ -570,6 +592,10 @@ export async function migrate() {
           LOOP
             v_required := v_ingredient.quantity_required * v_quantity;
 
+            SELECT current_stock INTO v_stock_before
+            FROM inventory_items
+            WHERE id = v_ingredient.inventory_item_id;
+
             v_deduct_result := "public"."deduct_stock_fifo"(
               v_ingredient.inventory_item_id,
               v_required,
@@ -580,6 +606,24 @@ export async function migrate() {
             IF NOT COALESCE((v_deduct_result->>'success')::boolean, false) THEN
               RETURN jsonb_build_object('success', false, 'error', 'INSUFFICIENT_STOCK', 'message', 'One or more items in your order are out of stock', 'details', v_deduct_result);
             END IF;
+
+            v_stock_after := v_stock_before - v_required;
+
+            -- F13 consumption ledger row (negative quantity = stock out),
+            -- reference_type 'transaction' = the canonical convention
+            -- restore_inventory_for_order reverses on cancellation (the
+            -- previous 'order' type made storefront cancellations silently
+            -- lose their stock — fixed by 20261103120000).
+            INSERT INTO inventory_transactions (
+              item_id, transaction_type, quantity, stock_before, stock_after,
+              reference_type, reference_id, notes, performed_by, tenant_id, property_id
+            ) VALUES (
+              v_ingredient.inventory_item_id, 'sale', -v_required,
+              v_stock_before, v_stock_after,
+              'transaction', v_transaction_id,
+              'Checkout deduction: ' || v_quantity || ' x ' || v_catalog_item_id,
+              p_user_id, v_tenant_id, v_property_id
+            );
 
             v_deducted_count := v_deducted_count + 1;
           END LOOP;

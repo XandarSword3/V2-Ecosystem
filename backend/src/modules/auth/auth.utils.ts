@@ -65,6 +65,7 @@ export function generateTokens(payload: TokenPayload): {
       userId:       payload.userId,
       tokenVersion,
       type:         'refresh',
+      jti:          uuidv4(),
     },
     config.jwt.refreshSecret,
     { expiresIn: refreshExpiresIn },

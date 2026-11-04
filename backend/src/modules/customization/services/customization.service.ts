@@ -639,8 +639,20 @@ class CustomizationService {
   /**
    * Link a customization group to an entity
    */
-  async linkToEntity(data: LinkCustomizationRequest, tenantId?: string | null): Promise<EntityCustomization> {
+  async linkToEntity(
+    data: LinkCustomizationRequest,
+    ownerContext?: { tenantId?: string | null; propertyId?: string | null } | string | null
+  ): Promise<EntityCustomization> {
     const supabase = getSupabase();
+
+    // Accept either the legacy bare tenantId or the { tenantId, propertyId }
+    // owner context used by the other write paths.
+    const tenantId = typeof ownerContext === 'object' && ownerContext !== null
+      ? ownerContext.tenantId
+      : ownerContext;
+    const propertyId = typeof ownerContext === 'object' && ownerContext !== null
+      ? ownerContext.propertyId
+      : null;
 
     const { data: link, error } = await supabase
       .from('entity_customizations')
@@ -653,7 +665,8 @@ class CustomizationService {
         max_selections_override: data.maxSelectionsOverride,
         price_multiplier: data.priceMultiplier ?? 1.0,
         sort_order: data.sortOrder ?? 0,
-        tenant_id: tenantId ?? null
+        tenant_id: tenantId ?? null,
+        property_id: propertyId ?? null
       })
       .select()
       .single();

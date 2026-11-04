@@ -295,7 +295,7 @@ export async function login(
     });
 
   if (sessionError) {
-    logger.error('Error creating session:', sessionError.message);
+    logger.error(`Error creating session: ${sessionError.message} (details: ${sessionError.details}, code: ${sessionError.code}, hint: ${sessionError.hint})`);
   }
 
   // Update last login

@@ -35,10 +35,53 @@ import { PricingPipeline, type PricingPipelineDeps } from './pricing-pipeline.js
 import { StateMachine, StateMachineError } from './state-machine.js';
 import { LayeredStateMachine } from './layered-state.js';
 import { createDiscountResolvers } from './discount-resolvers.js';
-import { getFinancialLedgerService, type LedgerTransactionType } from './financial-ledger.js';
+import { getFinancialLedgerService, LedgerWriteError, type LedgerTransactionType } from './financial-ledger.js';
 import { getTransactionManager, type TransactionStep, type EngineOperationContext } from './transaction-manager.js';
 import { TaxService } from '../services/tax.service.js';
 import { logger } from '../utils/logger.js';
+
+// ============================================
+// Ledger write durability (Main Plan Phase 16 invariant: "Never create a
+// financial mutation without ledger entry").
+//
+// Transient infrastructure failures (network, PostgREST 5xx, timeouts)
+// surface as LedgerWriteError thrown from the insert path — message prefix
+// "Failed to record ledger entry:" — and are worth retrying with backoff.
+// Deterministic failures (invariant violations, missing currency, illegal
+// amounts) are NOT retryable and propagate immediately.
+// ============================================
+
+const RETRYABLE_LEDGER_ERROR = /^Failed to record ledger entry:/;
+const LEDGER_RETRY_DELAY_MS = [150, 400, 900];
+const LEDGER_MAX_ATTEMPTS = LEDGER_RETRY_DELAY_MS.length + 1;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function withLedgerRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= LEDGER_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const retryable =
+        error instanceof LedgerWriteError && RETRYABLE_LEDGER_ERROR.test(error.message);
+      if (!retryable) throw error;
+      if (attempt < LEDGER_MAX_ATTEMPTS) {
+        logger.warn('[EngineService] Financial-ledger write hit a transient error; retrying', {
+          attempt,
+          nextDelayMs: LEDGER_RETRY_DELAY_MS[attempt - 1],
+          error: error instanceof Error ? error.message : String(error),
+        });
+        await sleep(LEDGER_RETRY_DELAY_MS[attempt - 1]);
+      }
+    }
+  }
+  // Exhausted retries — surface the last transient failure to the caller,
+  // which decides whether the surrounding operation can be compensated
+  // (order creation rolls back) or must fail closed.
+  throw lastError;
+}
 
 // ============================================
 // Engine Service
@@ -348,10 +391,12 @@ export class EngineService {
   ): Promise<string> {
     const engineType = this.resolveEngineType(context.templateType);
     const ledger = getFinancialLedgerService();
-    return ledger.recordFromPricing(pricingResult, {
-      ...context,
-      engineType,
-    });
+    return withLedgerRetry(() =>
+      ledger.recordFromPricing(pricingResult, {
+        ...context,
+        engineType,
+      }),
+    );
   }
 
   /**
@@ -375,7 +420,7 @@ export class EngineService {
   ): Promise<string> {
     const engineType = this.resolveEngineType(context.templateType);
     const ledger = getFinancialLedgerService();
-    return ledger.recordRefund(entityId, { ...context, engineType });
+    return withLedgerRetry(() => ledger.recordRefund(entityId, { ...context, engineType }));
   }
 
   /**

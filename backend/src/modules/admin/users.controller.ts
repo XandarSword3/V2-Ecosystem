@@ -494,8 +494,12 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
       tenant_id: tenantId ?? null,
     });
 
-    // Link user to current property access
-    if (propertyId && process.env.NODE_ENV !== 'test') {
+    // Link user to current property access. NODE_ENV must never gate an
+    // authorization write (see getPropertyContext above): skipping the grant
+    // in test mode made every staff user created via the admin API silently
+    // lack property access, so requireModulePropertyAccess denied them on
+    // every staff route — test behavior diverged from production.
+    if (propertyId) {
       const { error: accessError } = await supabase
         .from('user_property_access')
         .insert({
@@ -542,9 +546,23 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, error: 'Access denied to this user' });
     }
 
+    // Schema fields are camelCase (API contract); users columns are snake_case.
+    // Writing validatedData directly makes PostgREST fail with PGRST204
+    // ("Could not find the 'emailVerified' column").
+    const updates: Record<string, unknown> = {};
+    if (validatedData.fullName !== undefined) updates.full_name = validatedData.fullName;
+    if (validatedData.phone !== undefined) updates.phone = validatedData.phone;
+    if (validatedData.isActive !== undefined) updates.is_active = validatedData.isActive;
+    if (validatedData.emailVerified !== undefined) updates.email_verified = validatedData.emailVerified;
+    if (validatedData.preferredLanguage !== undefined) updates.preferred_language = validatedData.preferredLanguage;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, error: 'No updatable fields provided' });
+    }
+
     const { data, error } = await supabase
       .from('users')
-      .update(validatedData)
+      .update(updates)
       .eq('id', id)
       .select()
       .single();

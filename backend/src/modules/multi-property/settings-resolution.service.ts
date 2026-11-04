@@ -8,10 +8,8 @@ import { logger } from '../../utils/logger';
 
 // Lazy initialisation — avoids calling getSupabase() at import time,
 // which breaks unit tests that mock the connection module.
-let _supabase: ReturnType<typeof getSupabase> | null = null;
 function supabase() {
-  if (!_supabase) _supabase = getSupabase();
-  return _supabase;
+  return getSupabase();
 }
 
 export interface ResolvedSetting {

@@ -37,8 +37,8 @@ function safeParseJson(value: unknown): unknown {
 }
 
 export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string || (process.env.NODE_ENV === 'test' ? 'test-property-id' : undefined);
-    const isSuperAdmin = req.user?.roles?.includes('super_admin') || (process.env.NODE_ENV === 'test');
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    const isSuperAdmin = req.user?.roles?.includes('super_admin') ?? false;
     
     if (!propertyId && !isSuperAdmin) {
       res.status(400).json({ success: false, error: 'Property ID context is required' });
@@ -53,8 +53,8 @@ export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => 
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (propertyId) {
-      query = query.eq('property_id', propertyId);
+    if (propertyId && !isSuperAdmin) {
+      query = query.or(`property_id.eq.${propertyId},property_id.is.null`);
     }
 
     const { data: logs, error } = await query
@@ -101,8 +101,8 @@ export const getAuditLogs = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const getAuditLogsByResource = asyncHandler(async (req: Request, res: Response) => {
-    const propertyId = (req as any).propertyId || req.headers?.['x-property-id'] as string || (process.env.NODE_ENV === 'test' ? 'test-property-id' : undefined);
-    const isSuperAdmin = req.user?.roles?.includes('super_admin') || (process.env.NODE_ENV === 'test');
+    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    const isSuperAdmin = req.user?.roles?.includes('super_admin') ?? false;
     
     if (!propertyId && !isSuperAdmin) {
       res.status(400).json({ success: false, error: 'Property ID context is required' });
@@ -124,8 +124,8 @@ export const getAuditLogsByResource = asyncHandler(async (req: Request, res: Res
       `)
       .eq('resource', resource);
 
-    if (propertyId) {
-      query = query.eq('property_id', propertyId);
+    if (propertyId && !isSuperAdmin) {
+      query = query.or(`property_id.eq.${propertyId},property_id.is.null`);
     }
 
     if (resourceId) {

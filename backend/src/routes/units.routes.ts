@@ -227,10 +227,21 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
       return;
     }
 
+    const checkIn = dayjs(check_in_date);
+    const checkOut = dayjs(check_out_date);
+    if (!checkIn.isValid() || !checkOut.isValid() || !checkOut.isAfter(checkIn)) {
+      res.status(400).json({ success: false, error: 'Invalid check-in/check-out dates' });
+      return;
+    }
+    if (checkIn.isBefore(dayjs().startOf('day'))) {
+      res.status(400).json({ success: false, error: 'Cannot book dates in the past' });
+      return;
+    }
+
     const supabase = getSupabase();
     const { data: unit, error: unitError } = await supabase
       .from('accommodation_units')
-      .select('id, name, base_price, module_id')
+      .select('id, name, base_price, module_id, property_id, tenant_id')
       .eq('id', unit_id)
       .maybeSingle();
 
@@ -240,12 +251,15 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
       return;
     }
 
-    // Fetch module's tax category for tax scoping
+    // Fetch module's tax category and property_id for scoping
     const { data: module } = await supabase
       .from('modules')
-      .select('tax_category')
+      .select('tax_category, property_id, tenant_id')
       .eq('id', unit.module_id)
       .maybeSingle();
+
+    const resolvedPropertyId = unit.property_id || module?.property_id;
+    const resolvedTenantId = unit.tenant_id || (req as any).tenant?.id || module?.tenant_id;
 
     const nights = Math.max(1, dayjs(check_out_date).diff(dayjs(check_in_date), 'day'));
     const unitPrice = asNumber(unit.base_price, 0);
@@ -263,7 +277,7 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
         ...lineItem,
         taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
       }],
-      { moduleId: unit.module_id ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(unit.module_id) },
+      { moduleId: unit.module_id ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(unit.module_id, resolvedPropertyId) },
     );
 
     const { data: created, error } = await supabase
@@ -271,9 +285,14 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
       .insert({
         engine_type: 'time_exclusive_reservation',
         module_id: unit.module_id ?? null,
+        property_id: resolvedPropertyId,
+        tenant_id: resolvedTenantId,
+        currency: pricing.currency || 'USD',
         customer_id: req.user?.userId ?? null,
         status: 'pending',
         amount: pricing.totalAmount,
+        tax_amount: pricing.taxAmount ?? 0,
+        net_amount: pricing.netAmount ?? pricing.totalAmount,
         metadata: {
           unit_id,
           check_in_date,
@@ -287,6 +306,7 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
     if (error) throw error;
     res.status(201).json({ success: true, data: created });
   } catch (error: any) {
+    logger.error('Failed to create booking:', error);
     res.status(500).json({ success: false, error: error?.message ?? 'Failed to create booking' });
   }
 }));

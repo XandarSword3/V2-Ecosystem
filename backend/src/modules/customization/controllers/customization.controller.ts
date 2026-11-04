@@ -232,7 +232,15 @@ class CustomizationController {
         return;
       }
 
-      const link = await customizationService.linkToEntity(data, tenantScopeFor(req));
+      // property_id is NOT NULL on entity_customizations — resolve it up
+      // front (same pattern as createGroup) rather than letting a null
+      // reach Postgres as an opaque 23502 not-null-violation 500.
+      const propertyId = requireCallerPropertyId(req);
+
+      const link = await customizationService.linkToEntity(data, {
+        tenantId: tenantScopeFor(req),
+        propertyId,
+      });
       
       logger.info('Customization linked to entity', { 
         linkId: link.id, 

@@ -27,12 +27,33 @@ export async function blacklistToken(
   jti: string,
   userId: string,
   expiresAt: Date,
+  tenantId?: string | null,
 ): Promise<void> {
   const supabase = getSupabase();
+
+  let resolvedTenantId = tenantId;
+  if (!resolvedTenantId) {
+    const { data: user } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', userId)
+      .maybeSingle();
+    resolvedTenantId = user?.tenant_id;
+  }
+
+  const payload: Record<string, any> = {
+    jti,
+    user_id: userId,
+    expires_at: expiresAt.toISOString(),
+  };
+  if (resolvedTenantId) {
+    payload.tenant_id = resolvedTenantId;
+  }
+
   const { error } = await supabase
     .from('token_blacklist')
     .upsert(
-      { jti, user_id: userId, expires_at: expiresAt.toISOString() },
+      payload,
       { onConflict: 'jti' },
     );
 

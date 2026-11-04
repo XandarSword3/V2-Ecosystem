@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { getSupabase } from '../../database/connection.js';
 import { z } from 'zod';
 import { ensureLoyaltyMember } from './loyalty.service.js';
+import { requireTenantScope } from '../../security/tenant-scope.js';
 
 /**
  * Loyalty Controller
@@ -897,6 +898,16 @@ export class LoyaltyController {
       const propertyId = getPropertyId(req);
       const supabase = getSupabase();
 
+      // loyalty_tiers.tenant_id is NOT NULL — stamp the caller's tenant
+      // (403 for accounts without a concrete tenant, including unscoped
+      // super_admin). Previously omitted, every insert failed with 23502.
+      let tenantId: string;
+      try {
+        tenantId = requireTenantScope(req);
+      } catch {
+        return res.status(403).json({ success: false, error: 'This action requires a tenant-scoped account' });
+      }
+
       const tierPayload: Record<string, any> = {
         name: data.name,
         min_points: data.min_points,
@@ -906,6 +917,7 @@ export class LoyaltyController {
         icon: data.icon,
         is_active: data.is_active,
         property_id: propertyId || null,
+        tenant_id: tenantId,
       };
 
       let { data: tier, error } = await supabase
