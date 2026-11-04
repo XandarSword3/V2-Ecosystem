@@ -8,8 +8,21 @@
  * These tests use the REAL engine definitions (A, B, C, D) with mock external deps
  * (TaxService, OrderConfigService, discount resolvers).
  */
-import { createEngineService, EngineService, resetEngineService } from '../../../src/engines/engine-service.js';
+import { createEngineService, EngineService, resetEngineService, getEngineService } from '../../../src/engines/engine-service.js';
 import type { PricingLineItem, PricingContext } from '../../../../shared/types/engines.js';
+
+const mockLedgerService = vi.hoisted(() => ({
+  recordFromPricing: vi.fn().mockResolvedValue('ledger-entry-123'),
+  recordRefund: vi.fn().mockResolvedValue('ledger-refund-456'),
+}));
+
+vi.mock('../../../src/engines/financial-ledger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/engines/financial-ledger.js')>();
+  return {
+    ...actual,
+    getFinancialLedgerService: () => mockLedgerService,
+  };
+});
 
 // ============================================
 // Mock Dependencies
@@ -564,6 +577,145 @@ describe('EngineService — Integration', () => {
       ], { currency: 'EUR', conditions: { orderType: 'takeaway' } });
 
       expect(result.lineItems[0].itemId).toBe('custom-id');
+    });
+  });
+
+  // ============================================
+  // Durability & Financial Operations
+  // ============================================
+
+  describe('durability & financial operations', () => {
+    it('should record transaction to financial ledger via engineService.recordToLedger', async () => {
+      const pricingResult = await service.calculatePricing('instant_transaction', [
+        { name: 'Coffee', unitPrice: 4, quantity: 1 },
+      ], { currency: 'EUR', conditions: { orderType: 'takeaway' } });
+
+      const entryId = await service.recordToLedger(pricingResult, {
+        tenantId: 'tenant-123',
+        moduleId: 'mod-123',
+        propertyId: 'prop-123',
+        templateType: 'instant_transaction',
+        entityId: 'order-999',
+        entityType: 'order',
+        transactionType: 'charge',
+        actorType: 'customer',
+        actorId: 'cust-123',
+      });
+
+      expect(typeof entryId).toBe('string');
+      expect(entryId.length).toBeGreaterThan(0);
+    });
+
+    it('should record refund to financial ledger via engineService.recordRefundToLedger', async () => {
+      // First record charge
+      const pricingResult = await service.calculatePricing('instant_transaction', [
+        { name: 'Coffee', unitPrice: 4, quantity: 1 },
+      ], { currency: 'EUR', conditions: { orderType: 'takeaway' } });
+
+      await service.recordToLedger(pricingResult, {
+        tenantId: 'tenant-123',
+        moduleId: 'mod-123',
+        propertyId: 'prop-123',
+        templateType: 'instant_transaction',
+        entityId: 'order-888',
+        entityType: 'order',
+        transactionType: 'charge',
+        actorType: 'customer',
+      });
+
+      const refundEntryId = await service.recordRefundToLedger('order-888', {
+        tenantId: 'tenant-123',
+        moduleId: 'mod-123',
+        templateType: 'instant_transaction',
+        entityType: 'order',
+        currency: 'EUR',
+        refundAmount: 4,
+        reason: 'Customer requested cancellation',
+        actorType: 'staff',
+        actorId: 'staff-1',
+      });
+
+      expect(typeof refundEntryId).toBe('string');
+      expect(refundEntryId.length).toBeGreaterThan(0);
+    });
+
+    it('should execute multi-step saga operation atomically via executeAtomicOperation', async () => {
+      let step1Executed = false;
+      let step2Executed = false;
+
+      const result = await service.executeAtomicOperation<string>([
+        {
+          name: 'reserve_inventory',
+          execute: async () => {
+            step1Executed = true;
+            return { reserved: true };
+          },
+          compensate: async () => {
+            step1Executed = false;
+          },
+        },
+        {
+          name: 'process_charge',
+          execute: async () => {
+            step2Executed = true;
+            return 'SUCCESS_TOKEN';
+          },
+          compensate: async () => {
+            step2Executed = false;
+          },
+        },
+      ], {
+        tenantId: 'tenant-123',
+        operationId: 'op-123',
+      });
+
+      expect(result).toBe('SUCCESS_TOKEN');
+      expect(step1Executed).toBe(true);
+      expect(step2Executed).toBe(true);
+    });
+
+    it('should compensate executed steps and throw error when atomic operation step fails', async () => {
+      let step1Compensated = false;
+
+      await expect(
+        service.executeAtomicOperation([
+          {
+            name: 'hold_slot',
+            execute: async () => ({ slot: 'A1' }),
+            compensate: async () => {
+              step1Compensated = true;
+            },
+          },
+          {
+            name: 'faulty_step',
+            execute: async () => {
+              throw new Error('Payment gateway offline');
+            },
+            compensate: async () => {},
+          },
+        ], {
+          tenantId: 'tenant-123',
+          operationId: 'op-fail',
+        })
+      ).rejects.toThrow("Engine operation failed at step 'faulty_step': Payment gateway offline");
+
+      expect(step1Compensated).toBe(true);
+    });
+
+    it('should retrieve all states for an engine type', () => {
+      const states = service.getStates('instant_transaction');
+      expect(Array.isArray(states)).toBe(true);
+      expect(states).toContain('pending');
+      expect(states).toContain('completed');
+      expect(states).toContain('cancelled');
+    });
+
+    it('should retrieve or initialize the singleton engine service instance', () => {
+      resetEngineService();
+      const instance1 = getEngineService();
+      const instance2 = getEngineService();
+      expect(instance1).toBe(instance2);
+      expect(instance1).toBeInstanceOf(EngineService);
     });
   });
 

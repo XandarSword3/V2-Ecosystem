@@ -43,7 +43,10 @@ describe('AuditController', () => {
       const queryBuilder = createChainableMock(mockLogs);
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
-      const { req, res, next } = createMockReqRes({ query: { limit: '50', offset: '0' } });
+      const { req, res, next } = createMockReqRes({ 
+        propertyId: 'prop-1',
+        query: { limit: '50', offset: '0' } 
+      });
       await getAuditLogs(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -77,7 +80,7 @@ describe('AuditController', () => {
       const queryBuilder = createChainableMock(mockLogs);
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
-      const { req, res, next } = createMockReqRes({ query: {} });
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1', query: {} });
       await getAuditLogs(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -95,7 +98,7 @@ describe('AuditController', () => {
       const queryBuilder = createChainableMock([]);
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
-      const { req, res, next } = createMockReqRes({ query: {} });
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1', query: {} });
       await getAuditLogs(req, res, next);
 
       expect(queryBuilder.range).toHaveBeenCalledWith(0, 49);
@@ -105,7 +108,7 @@ describe('AuditController', () => {
       const queryBuilder = createChainableMock([]);
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
-      const { req, res, next } = createMockReqRes({ query: { limit: '20', offset: '40' } });
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1', query: { limit: '20', offset: '40' } });
       await getAuditLogs(req, res, next);
 
       expect(queryBuilder.range).toHaveBeenCalledWith(40, 59);
@@ -115,7 +118,7 @@ describe('AuditController', () => {
       const queryBuilder = createChainableMock(null, new Error('Database error'));
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
-      const { req, res, next } = createMockReqRes({ query: {} });
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1', query: {} });
       await getAuditLogs(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -125,7 +128,7 @@ describe('AuditController', () => {
       const queryBuilder = createChainableMock([]);
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
-      const { req, res, next } = createMockReqRes({ query: {} });
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1', query: {} });
       await getAuditLogs(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
@@ -152,7 +155,7 @@ describe('AuditController', () => {
       const queryBuilder = createChainableMock(mockLogs);
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
-      const { req, res, next } = createMockReqRes({ query: {} });
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1', query: {} });
       await getAuditLogs(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -185,6 +188,7 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
+        propertyId: 'prop-1',
         params: { resource: 'accommodation unit' },
         query: {}
       });
@@ -203,6 +207,7 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
+        propertyId: 'prop-1',
         params: { resource: 'accommodation unit', resourceId: 'accommodation unit-123' },
         query: {}
       });
@@ -217,6 +222,7 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
+        propertyId: 'prop-1',
         params: { resource: 'accommodation unit' },
         query: { limit: '10' }
       });
@@ -230,6 +236,7 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
+        propertyId: 'prop-1',
         params: { resource: 'accommodation unit' },
         query: {}
       });
@@ -243,6 +250,7 @@ describe('AuditController', () => {
       vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
 
       const { req, res, next } = createMockReqRes({
+        propertyId: 'prop-1',
         params: { resource: 'accommodation unit' },
         query: {}
       });

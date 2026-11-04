@@ -288,7 +288,13 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
       .set('X-Tenant-ID', tenantId)
       .send({
         items: [{ catalog_item_id: catalogItemId, quantity: ORDER_QTY }],
-        table_number: 'T-1',
+        // Canonical contract (fulfillment-selection): the customer storefront
+        // route requires an explicit selection; dine-in at a table.
+        fulfillmentSelection: {
+          mode: 'on_premise',
+          destinationType: 'on_premise_location',
+          destinationRef: 'T-1',
+        },
       });
 
     expect(res.status).toBe(201);
@@ -466,7 +472,14 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
       .post(`/api/v1/${moduleSlug}/orders`)
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
-      .send({ items: [{ catalog_item_id: catalogItemId, quantity: ORDER_QTY }], table_number: 'T-2' });
+      .send({
+        items: [{ catalog_item_id: catalogItemId, quantity: ORDER_QTY }],
+        fulfillmentSelection: {
+          mode: 'on_premise',
+          destinationType: 'on_premise_location',
+          destinationRef: 'T-2',
+        },
+      });
     expect(createRes.status).toBe(201);
     secondOrderId = createRes.body.data.id;
 
@@ -570,7 +583,14 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
           .post(`/api/v1/${moduleSlug}/orders`)
           .set('Authorization', `Bearer ${staffToken}`)
           .set('X-Tenant-ID', tenantId)
-          .send({ items: [{ catalog_item_id: raceCat.id, quantity: RACE_QTY }], table_number: `R-${i}` })
+          .send({
+            items: [{ catalog_item_id: raceCat.id, quantity: RACE_QTY }],
+            fulfillmentSelection: {
+              mode: 'on_premise',
+              destinationType: 'on_premise_location',
+              destinationRef: `R-${i}`,
+            },
+          })
       )
     );
 

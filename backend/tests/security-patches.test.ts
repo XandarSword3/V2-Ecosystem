@@ -5,6 +5,15 @@ describe('Security Hardening Migration Checks', () => {
     const supabase = getSupabase();
     const testPermissionSlug = 'security_test:run_check';
     const testLedgerWebhookId = 'webhook_test_' + Date.now();
+    let tenantId: string;
+    let propertyId: string;
+
+    beforeAll(async () => {
+        const { data: tenant } = await supabase.from('tenants').select('id').limit(1).single();
+        tenantId = tenant!.id;
+        const { data: property } = await supabase.from('properties').select('id').eq('tenant_id', tenantId).limit(1).single();
+        propertyId = property!.id;
+    });
 
     it('should allow creating dynamic application permissions in app_permissions', async () => {
         const { data, error } = await supabase
@@ -12,7 +21,9 @@ describe('Security Hardening Migration Checks', () => {
             .insert({
                 slug: testPermissionSlug,
                 description: 'Temporary permission for verification test',
-                module_slug: 'security_module'
+                module_slug: 'security_module',
+                tenant_id: tenantId,
+                property_id: propertyId,
             })
             .select()
             .single();
@@ -30,6 +41,8 @@ describe('Security Hardening Migration Checks', () => {
         const { data: ledgerEntry, error: insertError } = await supabase
             .from('payment_ledger')
             .insert({
+                tenant_id: tenantId,
+                property_id: propertyId,
                 reference_type: 'test_order',
                 reference_id: '00000000-0000-0000-0000-000000000000', // Dummy UUID
                 event_type: 'authorized',

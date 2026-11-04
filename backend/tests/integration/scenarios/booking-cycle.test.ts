@@ -18,7 +18,7 @@ import {
   assertHasData,
   assertBookingStructure,
 } from '../assertions';
-import { waitForServices, resetTestContext } from '../setup';
+import { waitForServices, resetTestContext, seedTestDatabase, getTestDbPool } from '../setup';
 
 // Skip if integration tests not enabled
 const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
@@ -31,31 +31,51 @@ describeIf('Booking Cycle Integration', () => {
   let bookingId: string;
   let servicesAvailable = false;
 
-  // Use dates in the future to avoid conflicts
+  // Use unique dates in the future to avoid conflicts across test runs
+  const offsetDays = 30 + Math.floor(Math.random() * 500) + Math.floor(Date.now() % 100);
   const checkInDate = new Date();
-  checkInDate.setDate(checkInDate.getDate() + 30);
+  checkInDate.setDate(checkInDate.getDate() + offsetDays);
   const checkOutDate = new Date(checkInDate);
   checkOutDate.setDate(checkOutDate.getDate() + 2);
 
   const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
   beforeAll(async () => {
-    // Always create clients
-    guestClient = await createCustomerClient();
-    staffClient = await createCustomerClient(); // Will be replaced if services available
-    
     const services = await waitForServices(5, 1000);
     if (!services.api) {
       console.warn('⚠️ API not available, tests will be skipped');
       return;
     }
 
+    // Seed database to ensure test users exist
+    await seedTestDatabase();
+
     servicesAvailable = true;
     resetTestContext();
+    guestClient = await createCustomerClient();
     staffClient = await createStaffClient();
   });
 
-  afterAll(() => {
+  beforeEach(async () => {
+    if (!guestClient || !guestClient.isAuthenticated) {
+      guestClient = await createCustomerClient();
+    }
+    if (!staffClient || !staffClient.isAuthenticated) {
+      staffClient = await createStaffClient();
+    }
+  });
+
+  afterAll(async () => {
+    if (bookingId) {
+      const pool = getTestDbPool();
+      try {
+        await pool.query('DELETE FROM transactions WHERE id = $1', [bookingId]);
+      } catch (_) {
+        // Non-fatal cleanup
+      } finally {
+        await pool.end();
+      }
+    }
     resetTestContext();
   });
 

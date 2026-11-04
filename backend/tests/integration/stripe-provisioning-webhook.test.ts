@@ -114,20 +114,10 @@ describe('SaaS Tenant Provisioning Integration (Real Database)', () => {
     expect(prop?.public_slug).toBeTruthy();
     expect(prop?.is_active).toBe(true);
 
-    // Direct database assertions: roles seeded
-    const { data: roles, error: rErr } = await supabase
-      .from('roles')
-      .select('id, name, tenant_id')
-      .eq('tenant_id', createdTenantId);
-
-    expect(rErr).toBeNull();
-    expect(roles).toBeDefined();
-    const roleNames = (roles || []).map((r) => r.name);
-    expect(roleNames).toContain('tenant_owner');
-    expect(roleNames).toContain('admin');
-    expect(roleNames).toContain('staff');
-    expect(roleNames).toContain('customer');
-
+    // Scope-based authorization contract (provisioning.service.ts header):
+    // scope is the single source of truth — no tenant-scoped roles or
+    // user_roles rows are seeded per tenant anymore. Assert the owner's
+    // scope instead (the legacy roles assertions were removed 2026-11-04).
     // Direct database assertions: owner user row
     const { data: user, error: uErr } = await supabase
       .from('users')
@@ -141,21 +131,6 @@ describe('SaaS Tenant Provisioning Integration (Real Database)', () => {
     expect(user?.scope).toBe('tenant_owner');
     expect(user?.email_verified).toBe(true);
     expect(user?.must_change_password).toBe(true);
-
-    // Direct database assertions: user_roles assignment
-    const ownerRole = roles?.find((r) => r.name === 'tenant_owner');
-    expect(ownerRole).toBeDefined();
-
-    const { data: userRole, error: urErr } = await supabase
-      .from('user_roles')
-      .select('id, user_id, role_id')
-      .eq('user_id', createdUserId)
-      .eq('role_id', ownerRole!.id)
-      .maybeSingle();
-
-    expect(urErr).toBeNull();
-    expect(userRole).toBeDefined();
-    expect(userRole?.user_id).toBe(createdUserId);
   });
 
   it('2. is strictly idempotent — second provision call does not duplicate rows', async () => {

@@ -80,7 +80,7 @@ describe('NotificationsController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1' });
       await getNotifications(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -125,7 +125,7 @@ describe('NotificationsController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1' });
       await getNotifications(req, res, next);
 
       const response = (res.json as any).mock.calls[0][0];
@@ -154,7 +154,7 @@ describe('NotificationsController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1' });
       await getNotifications(req, res, next);
 
       const response = (res.json as any).mock.calls[0][0];
@@ -180,7 +180,7 @@ describe('NotificationsController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1' });
       await getNotifications(req, res, next);
 
       const response = (res.json as any).mock.calls[0][0];
@@ -206,7 +206,7 @@ describe('NotificationsController', () => {
 
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1' });
       await getNotifications(req, res, next);
 
       const response = (res.json as any).mock.calls[0][0];
@@ -220,7 +220,7 @@ describe('NotificationsController', () => {
       const fromMock = vi.fn().mockImplementation(() => createChainableMock([]));
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1' });
       await getNotifications(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
@@ -230,7 +230,7 @@ describe('NotificationsController', () => {
       const fromMock = vi.fn().mockImplementation(() => createChainableMock([]));
       vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
 
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({ propertyId: 'prop-1' });
       await getNotifications(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -245,7 +245,7 @@ describe('NotificationsController', () => {
       const mockNotification = { id: 'notification-1', is_read: true };
       mockNotificationService.markAsRead.mockResolvedValue(mockNotification);
       
-      const { req, res, next } = createMockReqRes({ params: { id: 'notification-1' } });
+      const { req, res, next } = createMockReqRes({ params: { id: 'notification-1' }, propertyId: 'prop-1' });
       await markNotificationRead(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
@@ -259,7 +259,7 @@ describe('NotificationsController', () => {
     it('should return success', async () => {
       mockNotificationService.markAllAsRead.mockResolvedValue(5);
       
-      const { req, res, next } = createMockReqRes({ user: { userId: 'user-1' } });
+      const { req, res, next } = createMockReqRes({ user: { id: 'user-1', role: 'admin', userId: 'user-1', tenantId: 'tenant-1' }, propertyId: 'prop-1' });
       await markAllNotificationsRead(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
@@ -283,7 +283,8 @@ describe('NotificationsController', () => {
 
       const { req, res, next } = createMockReqRes({
         body: { title: 'System Update', message: 'Maintenance scheduled' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1' },
+        propertyId: 'prop-1'
       });
 
       await broadcastNotification(req, res, next);
@@ -297,7 +298,9 @@ describe('NotificationsController', () => {
 
     it('should require title', async () => {
       const { req, res, next } = createMockReqRes({
-        body: { message: 'Maintenance scheduled' }
+        body: { message: 'Maintenance scheduled' },
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1' },
+        propertyId: 'prop-1'
       });
 
       await broadcastNotification(req, res, next);
@@ -311,7 +314,9 @@ describe('NotificationsController', () => {
 
     it('should require message', async () => {
       const { req, res, next } = createMockReqRes({
-        body: { title: 'System Update' }
+        body: { title: 'System Update' },
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1' },
+        propertyId: 'prop-1'
       });
 
       await broadcastNotification(req, res, next);
@@ -328,7 +333,8 @@ describe('NotificationsController', () => {
 
       const { req, res, next } = createMockReqRes({
         body: { title: 'Test', message: 'Test message', type: 'info', target_type: 'staff' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1' },
+        propertyId: 'prop-1'
       });
 
       await broadcastNotification(req, res, next);
@@ -342,7 +348,8 @@ describe('NotificationsController', () => {
 
       const { req, res, next } = createMockReqRes({
         body: { title: 'Test', message: 'Test message' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1' },
+        propertyId: 'prop-1'
       });
 
       await broadcastNotification(req, res, next);
@@ -358,7 +365,7 @@ describe('NotificationsController', () => {
     it('should delete notification successfully', async () => {
       mockNotificationService.delete.mockResolvedValue(undefined);
 
-      const { req, res, next } = createMockReqRes({ params: { id: 'notif-1' } });
+      const { req, res, next } = createMockReqRes({ params: { id: 'notif-1' }, propertyId: 'prop-1' });
       await deleteNotification(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
@@ -370,7 +377,7 @@ describe('NotificationsController', () => {
     it('should handle errors gracefully', async () => {
       mockNotificationService.delete.mockRejectedValue(new Error('Delete failed'));
 
-      const { req, res, next } = createMockReqRes({ params: { id: 'notif-1' } });
+      const { req, res, next } = createMockReqRes({ params: { id: 'notif-1' }, propertyId: 'prop-1' });
       await deleteNotification(req, res, next);
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));

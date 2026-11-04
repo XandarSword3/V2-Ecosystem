@@ -14,23 +14,16 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getTestApiBaseUrl } from './config';
 import { Pool } from 'pg';
-import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const TEST_API_URL = getTestApiBaseUrl();
 
-// Use test database config from setup.ts pattern
-const TEST_DB_HOST = process.env.TEST_DB_HOST || '127.0.0.1';
-const TEST_DB_PORT = parseInt(process.env.TEST_DB_PORT || '5432', 10);
-const TEST_DB_USER = process.env.TEST_DB_USER || 'v2ecosystem';
-const TEST_DB_PASSWORD = process.env.TEST_DB_PASSWORD || 'v2ecosystem_secret';
-const TEST_DB_NAME = process.env.TEST_DB_NAME || 'v2ecosystem';
-
+// Connect with the same URL the rest of the integration suite uses
+// (TEST_DATABASE_URL, falling back to DATABASE_URL). The previous discrete
+// TEST_DB_* defaults pointed at 127.0.0.1:5432, which never matched the real
+// test stack (local supabase CLI Postgres @15432) and always ECONNREFUSED.
 const pool = new Pool({
-  host: TEST_DB_HOST,
-  port: TEST_DB_PORT,
-  user: TEST_DB_USER,
-  password: TEST_DB_PASSWORD,
-  database: TEST_DB_NAME,
+  connectionString: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL,
 });
 
 describe('Phase 1: Cross-Tenant Isolation (linkToMenuItem)', () => {
@@ -71,25 +64,27 @@ describe('Phase 1: Cross-Tenant Isolation (linkToMenuItem)', () => {
         INSERT INTO property_groups (id, name, created_at)
         VALUES ($1, 'Test Group A', NOW())
         ON CONFLICT (id) DO NOTHING
-      `, ['gggggggg-gggg-gggg-gggg-gggggggggggg']);
+      `, ['77777777-7777-7777-7777-777777777777']);
 
       // Create two tenants
       await client.query(`
         INSERT INTO tenants (id, subdomain, property_group_id, subscription_tier, billing_status, created_at)
         VALUES 
-          ($1, 'tenant-a-test', 'gggggggg-gggg-gggg-gggg-gggggggggggg', 'starter', 'active', NOW()),
-          ($2, 'tenant-b-test', 'gggggggg-gggg-gggg-gggg-gggggggggggg', 'starter', 'active', NOW())
+          ($1, 'tenant-a-test', '77777777-7777-7777-7777-777777777777', 'starter', 'active', NOW()),
+          ($2, 'tenant-b-test', '77777777-7777-7777-7777-777777777777', 'starter', 'active', NOW())
         ON CONFLICT (id) DO NOTHING
       `, [tenantAId, tenantBId]);
 
-      // Create two properties (one per tenant)
+      // Create two properties (one per tenant). tenant_id is NOT NULL in the
+      // current schema, so it must be set at insert time (the old
+      // "update afterwards if the column exists" dance predates that).
       await client.query(`
-        INSERT INTO properties (id, name, group_id, public_slug, is_active, created_at)
+        INSERT INTO properties (id, name, group_id, tenant_id, public_slug, is_active, created_at)
         VALUES 
-          ($1, 'Property A', 'gggggggg-gggg-gggg-gggg-gggggggggggg', 'property-a', true, NOW()),
-          ($2, 'Property B', 'gggggggg-gggg-gggg-gggg-gggggggggggg', 'property-b', true, NOW())
+          ($1, 'Property A', $3, $4, 'property-a', true, NOW()),
+          ($2, 'Property B', $3, $5, 'property-b', true, NOW())
         ON CONFLICT (id) DO NOTHING
-      `, [propertyAId, propertyBId]);
+      `, [propertyAId, propertyBId, '77777777-7777-7777-7777-777777777777', tenantAId, tenantBId]);
 
       // Update properties to have tenant_id (if column exists)
       try {
@@ -112,46 +107,59 @@ describe('Phase 1: Cross-Tenant Isolation (linkToMenuItem)', () => {
         ON CONFLICT (id) DO NOTHING
       `, [moduleAId, propertyAId, tenantAId, moduleBId, propertyBId, tenantBId]);
 
-      // Create catalog items (one per module/tenant)
+      // Create catalog items (one per module/tenant). property_id is NOT NULL
+      // in the current schema.
       await client.query(`
-        INSERT INTO catalog_items (id, name, description, price, is_available, module_id, tenant_id, created_at)
+        INSERT INTO catalog_items (id, name, description, price, is_available, module_id, property_id, tenant_id, created_at)
         VALUES 
-          ($1, 'Catalog Item A', 'Test item A', 10.00, true, $2, $3, NOW()),
-          ($4, 'Catalog Item B', 'Test item B', 15.00, true, $5, $6, NOW())
+          ($1, 'Catalog Item A', 'Test item A', 10.00, true, $2, $4, $3, NOW()),
+          ($5, 'Catalog Item B', 'Test item B', 15.00, true, $6, $8, $7, NOW())
         ON CONFLICT (id) DO NOTHING
-      `, [catalogItemAId, moduleAId, tenantAId, catalogItemBId, moduleBId, tenantBId]);
+      `, [catalogItemAId, moduleAId, tenantAId, propertyAId, catalogItemBId, moduleBId, tenantBId, propertyBId]);
 
-      // Create inventory category
+      // Create inventory category (property_id NOT NULL in current schema)
       const categoryId = '55555555-5555-5555-5555-555555555555';
       await client.query(`
-        INSERT INTO inventory_categories (id, name, tenant_id, created_at)
-        VALUES ($1, 'Test Category', $2, NOW())
+        INSERT INTO inventory_categories (id, name, property_id, tenant_id, created_at)
+        VALUES ($1, 'Test Category', $3, $2, NOW())
         ON CONFLICT (id) DO NOTHING
-      `, [categoryId, tenantAId]);
+      `, [categoryId, tenantAId, propertyAId]);
 
-      // Create inventory items (one per tenant)
+      // Create inventory items (one per tenant; property_id and module_id
+      // required by the link-menu property-scope check). DO UPDATE so a row
+      // seeded by an older version of this test (without module_id) is
+      // refreshed rather than kept stale by ON CONFLICT DO NOTHING.
       await client.query(`
-        INSERT INTO inventory_items (id, name, sku, current_stock, cost_per_unit, category_id, tenant_id, created_at)
+        INSERT INTO inventory_items (id, name, sku, current_stock, cost_per_unit, category_id, module_id, property_id, tenant_id, created_at)
         VALUES 
-          ($1, 'Inventory Item A', 'SKU-A', 100, 5.00, $2, $3, NOW()),
-          ($4, 'Inventory Item B', 'SKU-B', 50, 7.50, $2, $5, NOW())
-        ON CONFLICT (id) DO NOTHING
-      `, [inventoryItemAId, categoryId, tenantAId, inventoryItemBId, categoryId, tenantBId]);
+          ($1, 'Inventory Item A', 'SKU-A', 100, 5.00, $2, $5, $4, $3, NOW()),
+          ($6, 'Inventory Item B', 'SKU-B', 50, 7.50, $2, $9, $8, $7, NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          module_id = EXCLUDED.module_id,
+          property_id = EXCLUDED.property_id,
+          tenant_id = EXCLUDED.tenant_id,
+          category_id = EXCLUDED.category_id
+      `, [inventoryItemAId, categoryId, tenantAId, propertyAId, moduleAId, inventoryItemBId, tenantBId, propertyBId, moduleBId]);
 
-      // Create users with admin scope (explicitly set scope to avoid provisioning bug)
-      const passwordHashA = await bcrypt.hash('TestPassword123!', 12);
-      const passwordHashB = await bcrypt.hash('TestPassword123!', 12);
-
+      // Create tenant_admin users. The Q103 mandatory-2FA gate blocks the
+      // *login flow* for tenant_admin accounts (403 requiresTwoFactorSetup),
+      // so this test mints access tokens directly below instead of logging
+      // in — token validation (resolveUserFromToken) only checks the DB for
+      // is_active/token_version; the 2FA gate is a login-flow gate, not a
+      // token gate. tenant_admin is the scope whose derived roles include
+      // 'admin', which the route's authorize('admin', 'super_admin') guard
+      // requires (property_manager derives ['manager','staff'] and would 403
+      // every request, making the cross-tenant assertions vacuous).
       await client.query(`
         INSERT INTO users (id, email, password_hash, full_name, email_verified, is_active, scope, tenant_id, created_at)
         VALUES 
-          ('uuuuuuuu-uuuu-uuuu-uuuu-uuuuuuuuuuuu', 'user-a@test.com', $1, 'User A', true, true, 'tenant_admin', $2, NOW()),
-          ('vvvvvvvv-vvvv-vvvv-vvvv-vvvvvvvvvvvv', 'user-b@test.com', $3, 'User B', true, true, 'tenant_admin', $4, NOW())
+          ('88888888-8888-8888-8888-888888888888', 'user-a@test.com', $1, 'User A', true, true, 'tenant_admin', $2, NOW()),
+          ('99999999-9999-9999-9999-999999999999', 'user-b@test.com', $3, 'User B', true, true, 'tenant_admin', $4, NOW())
         ON CONFLICT (id) DO UPDATE SET
           password_hash = EXCLUDED.password_hash,
           scope = EXCLUDED.scope,
           tenant_id = EXCLUDED.tenant_id
-      `, [passwordHashA, tenantAId, passwordHashB, tenantBId]);
+      `, ['unused-hash-a', tenantAId, 'unused-hash-b', tenantBId]);
 
       await client.query('COMMIT');
     } catch (error) {
@@ -161,34 +169,16 @@ describe('Phase 1: Cross-Tenant Isolation (linkToMenuItem)', () => {
       client.release();
     }
 
-    // Authenticate both users to get JWTs
-    const loginA = await fetch(`${TEST_API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'user-a@test.com',
-        password: 'TestPassword123!'
-      })
-    });
-
-    if (loginA.ok) {
-      const dataA = await loginA.json();
-      userAToken = dataA.data?.token || dataA.data?.access_token;
-    }
-
-    const loginB = await fetch(`${TEST_API_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: 'user-b@test.com',
-        password: 'TestPassword123!'
-      })
-    });
-
-    if (loginB.ok) {
-      const dataB = await loginB.json();
-      userBToken = dataB.data?.token || dataB.data?.access_token;
-    }
+    // Mint access tokens directly (see the seeding comment above for why
+    // the login flow is bypassed).
+    const mintToken = (userId: string, email: string, tenantId: string): string =>
+      jwt.sign(
+        { userId, email, scope: 'tenant_admin', roles: ['admin'], tokenVersion: 0, tenantId },
+        process.env.JWT_SECRET as string,
+        { expiresIn: '1h' },
+      );
+    userAToken = mintToken('88888888-8888-8888-8888-888888888888', 'user-a@test.com', tenantAId);
+    userBToken = mintToken('99999999-9999-9999-9999-999999999999', 'user-b@test.com', tenantBId);
   });
 
   describe('Cross-tenant rejection', () => {
@@ -202,11 +192,12 @@ describe('Phase 1: Cross-Tenant Isolation (linkToMenuItem)', () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userAToken}`,
-          'X-Tenant-ID': tenantAId
+          'X-Tenant-ID': tenantAId,
+          'X-Property-Id': propertyAId
         },
         body: JSON.stringify({
           catalogItemId: catalogItemAId,
-          quantityNeeded: 1
+          quantityRequired: 1
         })
       });
 
@@ -225,11 +216,12 @@ describe('Phase 1: Cross-Tenant Isolation (linkToMenuItem)', () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userBToken}`,
-          'X-Tenant-ID': tenantBId
+          'X-Tenant-ID': tenantBId,
+          'X-Property-Id': propertyBId
         },
         body: JSON.stringify({
           catalogItemId: catalogItemBId,
-          quantityNeeded: 1
+          quantityRequired: 1
         })
       });
 
@@ -249,15 +241,16 @@ describe('Phase 1: Cross-Tenant Isolation (linkToMenuItem)', () => {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userAToken}`,
-          'X-Tenant-ID': tenantAId
+          'X-Tenant-ID': tenantAId,
+          'X-Property-Id': propertyAId
         },
         body: JSON.stringify({
           catalogItemId: catalogItemAId,
-          quantityNeeded: 1
+          quantityRequired: 1
         })
       });
 
-      expect(res.ok).toBe(true);
+      expect(res.ok, `link-menu failed: ${res.status} ${JSON.stringify(await res.json().catch(() => null)).slice(0, 300)}`).toBe(true);
     });
   });
 });

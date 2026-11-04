@@ -15,8 +15,40 @@ import {
   assertUnauthorized,
   assertUserStructure,
 } from '../assertions';
-import { waitForServices, resetTestContext, trackResource } from '../setup';
+import { waitForServices, resetTestContext, trackResource, getTestDbPool } from '../setup';
 import { TEST_CONFIG } from '../config';
+
+// Helper to verify user's email via the verification token in sessions table
+async function verifyUserEmail(userId: string, guestClient: TestApiClient): Promise<void> {
+  const pool = getTestDbPool();
+  try {
+    let token: string | undefined;
+    for (let i = 0; i < 10; i++) {
+      const res = await pool.query(
+        `SELECT token FROM sessions
+         WHERE user_id = $1 AND session_type = 'email_verification' AND is_active = TRUE
+         ORDER BY created_at DESC LIMIT 1`,
+        [userId],
+      );
+      token = res.rows[0]?.token;
+      if (token) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (token) {
+      const res = await guestClient.request(`/auth/verify-email?token=${encodeURIComponent(token)}`, 'GET', undefined, {
+        requiresAuth: false,
+      });
+      if (!res.success) {
+        console.warn('⚠️ verify-email returned failure:', res.error);
+      }
+    } else {
+      // Direct update fallback if email delivery was mocked or bypassed
+      await pool.query('UPDATE users SET email_verified = true WHERE id = $1', [userId]);
+    }
+  } finally {
+    await pool.end();
+  }
+}
 
 // Skip if integration tests not enabled
 const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
@@ -52,14 +84,21 @@ describeIf('Authentication Flow Integration', () => {
       const response = await client.register(testEmail, testPassword, testFullName, '+1234567890');
       assertSuccess(response);
 
+      let registeredUserId: string | undefined;
       assertHasData<any>(response, (data: any) => {
         // Registration may or may not return tokens (depends on email verification requirement)
         // At minimum, it should return user info
         expect(data.user).toBeDefined();
         if (data.user) {
           assertUserStructure(data.user);
+          registeredUserId = data.user.id;
         }
       });
+
+      // Verify email if needed before logging in
+      if (registeredUserId) {
+        await verifyUserEmail(registeredUserId, client);
+      }
 
       // If registration doesn't return tokens, we need to login to get them
       if (!client.isAuthenticated) {
@@ -197,12 +236,13 @@ describeIf('Authentication Flow Integration', () => {
     });
 
     it('should login with new password after change', async () => {
-      const newClient = createGuestClient();
-      const response = await newClient.login(testEmail, newPassword);
+      // Re-authenticate client with the new credentials so subsequent phases (Phase 5: Logout)
+      // have a valid current session after the password-change session invalidation (Q102).
+      const response = await client.login(testEmail, newPassword);
 
       // If password change was not implemented, old password still works
       if (!response.success) {
-        const fallbackResponse = await newClient.login(testEmail, testPassword);
+        const fallbackResponse = await client.login(testEmail, testPassword);
         assertSuccess(fallbackResponse);
         return;
       }

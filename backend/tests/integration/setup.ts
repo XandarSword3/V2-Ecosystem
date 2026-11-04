@@ -177,6 +177,22 @@ export function clearTrackedResources(): void {
 }
 
 /**
+ * Helper to get a pg.Pool connected to the test database.
+ */
+export function getTestDbPool(): import('pg').Pool {
+  const { Pool } = require('pg');
+  const connectionString = getTestDatabaseUrl();
+  const isLocalConnection = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+  return new Pool({
+    connectionString,
+    connectionTimeoutMillis: 5000,
+    ssl: isLocalConnection ? false : {
+      rejectUnauthorized: false,
+    },
+  });
+}
+
+/**
  * Check if test database is available
  */
 export async function isDatabaseAvailable(): Promise<boolean> {
@@ -303,6 +319,14 @@ export async function seedTestDatabaseViaSupabase(): Promise<void> {
   const staffPasswordHash = await bcrypt.hash(TEST_CONFIG.users.staff.password, 12);
   const customerPasswordHash = await bcrypt.hash(TEST_CONFIG.users.customer.password, 12);
 
+  const { data: rootTenant } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('is_platform_root', true)
+    .limit(1)
+    .maybeSingle();
+  const platformTenantId = rootTenant?.id || null;
+
   const users = [
     {
       id: '11111111-1111-1111-1111-111111111111',
@@ -312,6 +336,7 @@ export async function seedTestDatabaseViaSupabase(): Promise<void> {
       email_verified: true,
       is_active: true,
       scope: 'super_admin',
+      two_factor_enabled: false,
     },
     {
       id: '22222222-2222-2222-2222-222222222222',
@@ -321,6 +346,7 @@ export async function seedTestDatabaseViaSupabase(): Promise<void> {
       email_verified: true,
       is_active: true,
       scope: 'super_admin',
+      two_factor_enabled: false,
     },
     {
       id: '33333333-3333-3333-3333-333333333333',
@@ -329,13 +355,33 @@ export async function seedTestDatabaseViaSupabase(): Promise<void> {
       full_name: TEST_CONFIG.users.customer.fullName,
       email_verified: true,
       is_active: true,
-      scope: 'super_admin',
+      scope: 'customer',
+      tenant_id: platformTenantId,
+      two_factor_enabled: false,
     },
   ];
 
   const { error: usersError } = await supabase.from('users').upsert(users, { onConflict: 'id' });
   if (usersError) {
     throw new Error(`Supabase seed users failed: ${usersError.message}`);
+  }
+
+  if (platformTenantId) {
+    const { data: props } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('tenant_id', platformTenantId);
+    if (props && props.length > 0) {
+      const accessEntries = props.map((p) => ({
+        user_id: '33333333-3333-3333-3333-333333333333',
+        property_id: p.id,
+        access_level: 'read',
+        tenant_id: platformTenantId,
+      }));
+      await supabase.from('user_property_access').upsert(accessEntries, {
+        onConflict: 'user_id,property_id',
+      });
+    }
   }
 
   const roleAssignments: Array<[string, string]> = [
@@ -443,28 +489,45 @@ export async function seedTestDatabase(): Promise<void> {
     const staffPasswordHash = await bcrypt.hash(TEST_CONFIG.users.staff.password, 12);
     const customerPasswordHash = await bcrypt.hash(TEST_CONFIG.users.customer.password, 12);
 
-    // Create test users — scope = 'super_admin' bypasses the
-    // chk_scope_tenant CHECK constraint (which requires tenant_id for
-    // all non-platform scopes). Test users don't belong to a specific
-    // tenant; they act as platform-level identities for auth testing.
+    // Look up the platform-root tenant to scope test users appropriately.
+    const rootTenantRes = await seedClient.query<{ id: string }>(
+      'SELECT id FROM tenants WHERE is_platform_root = true LIMIT 1'
+    );
+    const platformTenantId = rootTenantRes.rows[0]?.id || null;
+
+    // Create test users — admin and staff use platform super_admin,
+    // while customer is scoped to the platform root tenant with customer scope.
     await seedClient.query(`
-      INSERT INTO users (id, email, password_hash, full_name, email_verified, is_active, scope)
+      INSERT INTO users (id, email, password_hash, full_name, email_verified, is_active, scope, tenant_id, two_factor_enabled)
       VALUES 
-        ('11111111-1111-1111-1111-111111111111', $1, $2, $3, true, true, 'super_admin'),
-        ('22222222-2222-2222-2222-222222222222', $4, $5, $6, true, true, 'super_admin'),
-        ('33333333-3333-3333-3333-333333333333', $7, $8, $9, true, true, 'super_admin')
+        ('11111111-1111-1111-1111-111111111111', $1, $2, $3, true, true, 'super_admin', NULL, false),
+        ('22222222-2222-2222-2222-222222222222', $4, $5, $6, true, true, 'super_admin', NULL, false),
+        ('33333333-3333-3333-3333-333333333333', $7, $8, $9, true, true, 'customer', $10, false)
       ON CONFLICT (id) DO UPDATE SET
         email = EXCLUDED.email,
         password_hash = EXCLUDED.password_hash,
         full_name = EXCLUDED.full_name,
         email_verified = EXCLUDED.email_verified,
         is_active = EXCLUDED.is_active,
-        scope = EXCLUDED.scope
+        scope = EXCLUDED.scope,
+        tenant_id = EXCLUDED.tenant_id,
+        two_factor_enabled = EXCLUDED.two_factor_enabled
     `, [
       TEST_CONFIG.users.admin.email, adminPasswordHash, TEST_CONFIG.users.admin.fullName,
       TEST_CONFIG.users.staff.email, staffPasswordHash, TEST_CONFIG.users.staff.fullName,
       TEST_CONFIG.users.customer.email, customerPasswordHash, TEST_CONFIG.users.customer.fullName,
+      platformTenantId,
     ]);
+
+    if (platformTenantId) {
+      await seedClient.query(`
+        INSERT INTO user_property_access (user_id, property_id, access_level, tenant_id)
+        SELECT '33333333-3333-3333-3333-333333333333', p.id, 'read', p.tenant_id
+        FROM properties p
+        WHERE p.tenant_id = $1
+        ON CONFLICT (user_id, property_id) DO NOTHING
+      `, [platformTenantId]);
+    }
 
     const roleAssignments: Array<[string, string]> = [
       [TEST_CONFIG.users.admin.email, 'super_admin'],

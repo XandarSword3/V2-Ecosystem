@@ -1,12 +1,44 @@
-/**
- * Maintenance Service Tests
- *
- * Unit tests for the Maintenance/Work Order Service with DI.
- */
+import {
+  createMaintenanceService,
+  MaintenanceServiceError,
+  type WorkOrder,
+  type WorkOrderPart,
+  type MaintenanceRepository,
+} from '../../../src/services/maintenance.service.js';
 
-import { createMaintenanceService, MaintenanceServiceError } from '../../../src/lib/services/maintenance.service';
-import { InMemoryMaintenanceRepository } from '../../../src/lib/repositories/maintenance.repository.memory';
-import type { Container, WorkOrder } from '../../../src/lib/container/types';
+class InMemoryMaintenanceRepository implements MaintenanceRepository {
+  private orders = new Map<string, WorkOrder>();
+  private parts = new Map<string, WorkOrderPart[]>();
+
+  async findById(id: string): Promise<WorkOrder | null> {
+    return this.orders.get(id) ?? null;
+  }
+  async findAll(filters?: { category?: string; priority?: string; status?: string; locationId?: string }): Promise<WorkOrder[]> {
+    return Array.from(this.orders.values()).filter((o) => {
+      if (filters?.category && o.category !== filters.category) return false;
+      if (filters?.priority && o.priority !== filters.priority) return false;
+      if (filters?.status && o.status !== filters.status) return false;
+      if (filters?.locationId && o.locationId !== filters.locationId) return false;
+      return true;
+    });
+  }
+  async save(o: WorkOrder): Promise<WorkOrder> {
+    this.orders.set(o.id, { ...o });
+    return { ...o };
+  }
+  async delete(id: string): Promise<void> {
+    this.orders.delete(id);
+  }
+  async savePart(p: WorkOrderPart): Promise<WorkOrderPart> {
+    const list = this.parts.get(p.workOrderId) || [];
+    list.push({ ...p });
+    this.parts.set(p.workOrderId, list);
+    return { ...p };
+  }
+  async findParts(workOrderId: string): Promise<WorkOrderPart[]> {
+    return this.parts.get(workOrderId) || [];
+  }
+}
 
 // Test UUIDs
 const LOCATION_1 = '11111111-1111-1111-1111-111111111111';
@@ -15,7 +47,7 @@ const REPORTER_1 = '33333333-3333-3333-3333-333333333333';
 const TECHNICIAN_1 = '44444444-4444-4444-4444-444444444444';
 const INVALID_UUID = 'not-a-valid-uuid';
 
-function createMockContainer(maintenanceRepository: InMemoryMaintenanceRepository): Container {
+function createMockContainer(maintenanceRepository: InMemoryMaintenanceRepository) {
   return {
     maintenanceRepository,
     logger: {
@@ -24,7 +56,7 @@ function createMockContainer(maintenanceRepository: InMemoryMaintenanceRepositor
       error: () => {},
       debug: () => {},
     },
-  } as unknown as Container;
+  };
 }
 
 function createTestWorkOrder(overrides: Partial<WorkOrder> = {}): WorkOrder {
@@ -56,7 +88,7 @@ function createTestWorkOrder(overrides: Partial<WorkOrder> = {}): WorkOrder {
 
 describe('MaintenanceService', () => {
   let repository: InMemoryMaintenanceRepository;
-  let container: Container;
+  let container: any;
   let service: ReturnType<typeof createMaintenanceService>;
 
   beforeEach(() => {

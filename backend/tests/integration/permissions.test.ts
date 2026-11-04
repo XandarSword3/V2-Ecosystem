@@ -75,19 +75,20 @@ describe('Permission Middleware Integration', () => {
       }
     );
 
-    // MenuService orders - requires menu service:order:read_all
-    app.get('/${slug}/orders', 
-      mockAuthMiddleware, 
-      requirePermission(Permissions.RESTAURANT_ORDER_READ_ALL), 
+    // MenuService orders - requires order:read:all (generic constant since the
+    // engine refit; the old RESTAURANT_ORDER_* constants no longer exist)
+    app.get('/restaurant/orders',
+      mockAuthMiddleware,
+      requirePermission(Permissions.ORDER_READ_ALL),
       (req, res) => {
         res.json({ success: true, message: 'MenuService orders' });
       }
     );
 
-    // Create order - requires menu service:order:create
-    app.post('/${slug}/orders', 
-      mockAuthMiddleware, 
-      requirePermission(Permissions.RESTAURANT_ORDER_CREATE), 
+    // Create order - requires order:create
+    app.post('/restaurant/orders',
+      mockAuthMiddleware,
+      requirePermission(Permissions.ORDER_CREATE),
       (req, res) => {
         res.json({ success: true, message: 'Order created' });
       }
@@ -199,18 +200,18 @@ describe('Permission Middleware Integration', () => {
     });
 
     describe('MenuService Orders', () => {
-      it('should deny staff from reading all orders (module routes use role gates, not permission constants)', async () => {
+      it('should allow staff to read all orders (engine-refit matrix grants STAFF order:read:all)', async () => {
         const token = createTestToken('staff-1', [Roles.STAFF]);
         const response = await request(app)
-          .get('/${slug}/orders')
+          .get('/restaurant/orders')
           .set('Authorization', `Bearer ${token}`);
-        expect(response.status).toBe(403);
+        expect(response.status).toBe(200);
       });
 
       it('should allow admin to read orders', async () => {
         const token = createTestToken('admin-1', [Roles.ADMIN]);
         const response = await request(app)
-          .get('/${slug}/orders')
+          .get('/restaurant/orders')
           .set('Authorization', `Bearer ${token}`);
         expect(response.status).toBe(200);
       });
@@ -218,7 +219,7 @@ describe('Permission Middleware Integration', () => {
       it('should deny customer from reading all orders', async () => {
         const token = createTestToken('customer-1', [Roles.CUSTOMER]);
         const response = await request(app)
-          .get('/${slug}/orders')
+          .get('/restaurant/orders')
           .set('Authorization', `Bearer ${token}`);
         expect(response.status).toBe(403);
       });
@@ -226,7 +227,7 @@ describe('Permission Middleware Integration', () => {
       it('should allow customer to create orders', async () => {
         const token = createTestToken('customer-1', [Roles.CUSTOMER]);
         const response = await request(app)
-          .post('/${slug}/orders')
+          .post('/restaurant/orders')
           .set('Authorization', `Bearer ${token}`)
           .send({ items: [] });
         expect(response.status).toBe(200);
@@ -322,16 +323,18 @@ describe('Permission Middleware Integration', () => {
       
       // Can create orders (customer permission)
       const orderResponse = await request(app)
-        .post('/${slug}/orders')
+        .post('/restaurant/orders')
         .set('Authorization', `Bearer ${token}`)
         .send({ items: [] });
       expect(orderResponse.status).toBe(200);
       
-      // Staff role does not add module-specific read-all permission
+      // Staff role adds order:read:all in the current matrix, so combined
+      // roles can read all orders (the old "staff lacks read-all" premise
+      // predates the engine-refit permission matrix).
       const readResponse = await request(app)
-        .get('/${slug}/orders')
+        .get('/restaurant/orders')
         .set('Authorization', `Bearer ${token}`);
-      expect(readResponse.status).toBe(403);
+      expect(readResponse.status).toBe(200);
     });
   });
 

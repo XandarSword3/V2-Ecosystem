@@ -24,9 +24,9 @@ export const EngineType = {
 } as const;
 
 export const ModuleSlug = {
-  RESTAURANT: 'menu_service',
-  CHALETS: 'accommodation_units',
-  ACCOMMODATION_UNITS: 'accommodation_units',
+  RESTAURANT: 'menu-service',
+  CHALETS: 'accommodation-units',
+  ACCOMMODATION_UNITS: 'accommodation-units',
   POOL: 'capacity',
   kiosk: 'kiosk',
 } as const;

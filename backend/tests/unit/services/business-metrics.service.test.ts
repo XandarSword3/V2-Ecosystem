@@ -3,6 +3,7 @@
 vi.mock('../../../src/lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
+    rpc: vi.fn(),
   },
 }));
 
@@ -205,6 +206,84 @@ describe('BusinessMetricsService', () => {
       expect(result).toHaveProperty('users');
       expect(result).toHaveProperty('operational');
       expect(result).toHaveProperty('timestamp');
+    });
+  });
+
+  describe('getPerformanceMetrics', () => {
+    it('retrieves DB connection count and Redis cache hit stats', async () => {
+      vi.mocked(supabase.rpc as any).mockResolvedValueOnce({ data: 12, error: null });
+
+      const metrics = await businessMetricsService.getPerformanceMetrics();
+      expect(metrics.database_connections).toBe(12);
+      expect(metrics.uptime_percentage).toBe(99.9);
+      expect(metrics).toHaveProperty('api_response_time_p50');
+      expect(metrics).toHaveProperty('cache_hit_rate');
+    });
+  });
+
+  describe('recordMetric and getMetricsHistory', () => {
+    it('inserts a metric event into metrics_events', async () => {
+      const mockInsert = vi.fn().mockResolvedValue({ error: null });
+      vi.mocked(supabase.from).mockReturnValue({
+        insert: mockInsert,
+      } as any);
+
+      await businessMetricsService.recordMetric('checkout_duration_ms', 145, { engine: 'instant' });
+
+      expect(supabase.from).toHaveBeenCalledWith('metrics_events');
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'checkout_duration_ms',
+          value: 145,
+          labels: { engine: 'instant' },
+          timestamp: expect.any(String),
+        })
+      );
+    });
+
+    it('queries metric history within period filter', async () => {
+      const mockData = [
+        { timestamp: '2026-11-04T10:00:00Z', value: 100 },
+        { timestamp: '2026-11-04T11:00:00Z', value: 120 },
+      ];
+
+      vi.mocked(supabase.from).mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            gte: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: mockData, error: null }),
+            }),
+          }),
+        }),
+      } as any);
+
+      const history = await businessMetricsService.getMetricsHistory('checkout_duration_ms', 'day');
+      expect(history).toHaveLength(2);
+      expect(history[0].value).toBe(100);
+    });
+  });
+
+  describe('getPrometheusMetrics', () => {
+    it('formats business metrics as standard Prometheus metrics text', async () => {
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        const mockObj = createQueryMock([]);
+        mockObj.select = vi.fn().mockImplementation((_cols?: string, options?: any) => {
+          if (options?.count === 'exact') {
+            return createQueryMock(null, 15);
+          }
+          return mockObj;
+        });
+        return mockObj;
+      });
+
+      const output = await businessMetricsService.getPrometheusMetrics();
+
+      expect(output).toContain('# HELP v2ecosystem_bookings_total');
+      expect(output).toContain('# TYPE v2ecosystem_bookings_total gauge');
+      expect(output).toContain('v2ecosystem_bookings_total');
+      expect(output).toContain('v2ecosystem_revenue_total');
+      expect(output).toContain('v2ecosystem_users_total');
+      expect(output).toContain('v2ecosystem_transactions_today');
     });
   });
 });

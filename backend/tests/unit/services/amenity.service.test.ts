@@ -1,31 +1,78 @@
-import { createAmenityService, AmenityService } from '../../../src/lib/services/amenity.service';
-import { InMemoryAmenityRepository } from '../../../src/lib/repositories/amenity.repository.memory';
-import { Container, Amenity, AmenityCategory, AmenityStatus } from '../../../src/lib/container/types';
+import {
+  createAmenityService,
+  type Amenity,
+  type AmenityCategory,
+  type AmenityStatus,
+  type AmenitySchedule,
+  type AmenityReservation,
+  type AmenityRepository,
+} from '../../../src/services/amenity.service.js';
+
+class InMemoryAmenityRepository implements AmenityRepository {
+  private amenities = new Map<string, Amenity>();
+  private schedules = new Map<string, AmenitySchedule[]>();
+  private reservations = new Map<string, AmenityReservation>();
+
+  async findById(id: string): Promise<Amenity | null> {
+    return this.amenities.get(id) ?? null;
+  }
+  async findAll(): Promise<Amenity[]> {
+    return Array.from(this.amenities.values());
+  }
+  async save(amenity: Amenity): Promise<Amenity> {
+    this.amenities.set(amenity.id, { ...amenity });
+    return { ...amenity };
+  }
+  async delete(id: string): Promise<void> {
+    this.amenities.delete(id);
+  }
+  async saveSchedule(schedule: AmenitySchedule[]): Promise<AmenitySchedule[]> {
+    if (schedule.length > 0) {
+      this.schedules.set(schedule[0].amenityId, schedule);
+    }
+    return schedule;
+  }
+  async findSchedule(amenityId: string): Promise<AmenitySchedule[]> {
+    return this.schedules.get(amenityId) ?? [];
+  }
+  async saveReservation(r: AmenityReservation): Promise<AmenityReservation> {
+    this.reservations.set(r.id, { ...r });
+    return { ...r };
+  }
+  async findReservation(id: string): Promise<AmenityReservation | null> {
+    return this.reservations.get(id) ?? null;
+  }
+  async findReservations(amenityId: string, date?: string): Promise<AmenityReservation[]> {
+    return Array.from(this.reservations.values()).filter(
+      (r) => r.amenityId === amenityId && (!date || r.date === date)
+    );
+  }
+}
 
 describe('AmenityService', () => {
-  let service: AmenityService;
+  let service: ReturnType<typeof createAmenityService>;
   let repository: InMemoryAmenityRepository;
   let mockLogger: any;
 
-  const createMockContainer = (): Container => {
+  const createMockContainer = () => {
     repository = new InMemoryAmenityRepository();
     mockLogger = {
       info: vi.fn(),
       error: vi.fn(),
       warn: vi.fn(),
-      debug: vi.fn()
+      debug: vi.fn(),
     };
 
     return {
       amenityRepository: repository,
-      logger: mockLogger
-    } as unknown as Container;
+      logger: mockLogger,
+    };
   };
 
   const validAmenityInput = {
     name: 'Main Pool',
     description: 'Olympic-sized swimming pool',
-    category: 'capacity' as AmenityCategory,
+    category: 'pool' as AmenityCategory,
     location: 'Ground Floor',
     capacity: 50,
     openingTime: '06:00',
@@ -60,7 +107,7 @@ describe('AmenityService', () => {
       expect(amenity.id).toBeDefined();
       expect(amenity.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(amenity.name).toBe('Main Pool');
-      expect(amenity.category).toBe('capacity');
+      expect(amenity.category).toBe('pool');
       expect(amenity.status).toBe('available');
       expect(amenity.isActive).toBe(true);
       expect(amenity.createdAt).toBeDefined();
@@ -85,7 +132,7 @@ describe('AmenityService', () => {
       const amenity = await service.createAmenity({
         name: 'Test Amenity',
         description: 'Test',
-        category: 'capacity',
+        category: 'pool',
         location: 'Test Location',
         openingTime: '08:00',
         closingTime: '20:00'
@@ -137,7 +184,7 @@ describe('AmenityService', () => {
       await service.createAmenity(validAmenityInput);
       await service.createAmenity({ ...validAmenityInput, name: 'Spa', category: 'spa' });
 
-      const poolAmenities = await service.getAmenitiesByCategory('capacity');
+      const poolAmenities = await service.getAmenitiesByCategory('pool');
       const spaAmenities = await service.getAmenitiesByCategory('spa');
 
       expect(poolAmenities).toHaveLength(1);
@@ -742,7 +789,7 @@ describe('AmenityService', () => {
 
   describe('edge cases', () => {
     it('should handle all amenity categories', async () => {
-      const categories: AmenityCategory[] = ['capacity', 'spa', 'fitness', 'dining', 'entertainment', 'sports', 'recreation', 'business', 'kids', 'other'];
+      const categories: AmenityCategory[] = ['pool', 'spa', 'fitness', 'dining', 'entertainment', 'sports', 'recreation', 'business', 'kids', 'other'];
 
       for (const category of categories) {
         const amenity = await service.createAmenity({

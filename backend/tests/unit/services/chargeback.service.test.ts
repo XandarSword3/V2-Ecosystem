@@ -54,9 +54,193 @@ describe('ChargebackService', () => {
   });
 
   describe('handleDisputeCreated', () => {
-    it.skip('should create a chargeback record from dispute - complex integration test', async () => {
-      // This test requires extensive mocking of Stripe + Supabase + email + activity logger
-      // Skipping in favor of simpler unit tests
+    it('should create a chargeback record from dispute and send alert email', async () => {
+      const mockPayment = {
+        id: 'pm-100',
+        user_id: 'user-100',
+        amount: 150,
+        description: 'Deluxe Room Stay',
+      };
+
+      const mockChargeback = {
+        id: 'cb-100',
+        payment_id: 'pm-100',
+        stripe_dispute_id: 'dp_valid',
+        amount: 150,
+        currency: 'EUR',
+        status: 'needs_response',
+        due_date: new Date(Date.now() + 86400000).toISOString(),
+      };
+
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        if (table === 'payment_ledger') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: mockPayment, error: null }),
+              }),
+            }),
+          } as any;
+        }
+        if (table === 'chargebacks') {
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: mockChargeback, error: null }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      const mockDispute = {
+        id: 'dp_valid',
+        payment_intent: 'pi_valid',
+        charge: 'ch_valid',
+        amount: 15000,
+        currency: 'eur',
+        reason: 'fraudulent',
+        evidence_details: { due_by: Math.floor(Date.now() / 1000) + 86400 },
+      } as any;
+
+      const created = await chargebackService.handleDisputeCreated(mockDispute);
+      expect(created.id).toBe('cb-100');
+      expect(created.status).toBe('needs_response');
+    });
+  });
+
+  describe('handleDisputeUpdated', () => {
+    it('should update chargeback status and outcome upon dispute resolution', async () => {
+      const mockChargeback = {
+        id: 'cb-200',
+        status: 'needs_response',
+      };
+
+      const mockUpdated = {
+        id: 'cb-200',
+        status: 'won',
+        outcome: 'won',
+        resolved_at: new Date().toISOString(),
+      };
+
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        if (table === 'chargebacks') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: mockChargeback, error: null }),
+              }),
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: mockUpdated, error: null }),
+                }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      const mockDispute = {
+        id: 'dp_resolved',
+        status: 'won',
+      } as any;
+
+      const updated = await chargebackService.handleDisputeUpdated(mockDispute);
+      expect(updated?.status).toBe('won');
+      expect(updated?.outcome).toBe('won');
+    });
+
+    it('should return null when dispute does not exist in chargebacks table', async () => {
+      vi.mocked(supabase.from).mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: null, error: new Error('Not found') }),
+          }),
+        }),
+      } as any);
+
+      const updated = await chargebackService.handleDisputeUpdated({ id: 'dp_nonexistent' } as any);
+      expect(updated).toBeNull();
+    });
+  });
+
+  describe('submitEvidence', () => {
+    it('should submit evidence to Stripe and update chargeback status to under_review', async () => {
+      const mockChargeback = {
+        id: 'cb-300',
+        stripe_dispute_id: 'dp_300',
+        status: 'needs_response',
+      };
+
+      const mockUpdated = {
+        id: 'cb-300',
+        status: 'under_review',
+        evidence_submitted: {
+          customer_name: 'John Doe',
+          submitted_at: new Date().toISOString(),
+        },
+      };
+
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        if (table === 'chargebacks') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: mockChargeback, error: null }),
+              }),
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: mockUpdated, error: null }),
+                }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      const result = await chargebackService.submitEvidence(
+        'cb-300',
+        { customer_name: 'John Doe', product_description: 'Room reservation' },
+        'admin-user-1'
+      );
+
+      expect(result.status).toBe('under_review');
+    });
+
+    it('should reject evidence submission if dispute is not in needs_response state', async () => {
+      const mockChargeback = {
+        id: 'cb-closed',
+        status: 'won',
+      };
+
+      vi.mocked(supabase.from).mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: mockChargeback, error: null }),
+          }),
+        }),
+      } as any);
+
+      await expect(
+        chargebackService.submitEvidence('cb-closed', {}, 'admin-user-1')
+      ).rejects.toThrow('Cannot submit evidence for this dispute');
+    });
+  });
+
+  describe('evidence templates', () => {
+    it('should return appropriate template for given reason', () => {
+      const fraudTemplate = chargebackService.getEvidenceTemplate('fraudulent');
+      expect(fraudTemplate.uncategorized_text).toBeDefined();
+
+      const generalTemplate = chargebackService.getEvidenceTemplate('unknown_reason');
+      expect(generalTemplate.uncategorized_text).toBe('This transaction was legitimate...');
     });
 
     it('should throw when payment not found', async () => {

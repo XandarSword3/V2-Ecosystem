@@ -42,23 +42,14 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
     const superAdminId = uuidv4();
     const testUserId = uuidv4();
 
-    // Generate tokens
-    const superAdminToken = generateTokens({
-        userId: superAdminId,
-        email: 'superadmin@test.com',
-        roles: ['super_admin']
-    }).accessToken;
-
-    const testUserToken = generateTokens({
-        userId: testUserId,
-        email: 'testuser@test.com',
-        roles: [testRoleName]
-    }).accessToken;
+    let superAdminToken: string;
+    let testUserToken: string;
 
     let moduleId: string;
     let initialVersion: number;
 
     let platformTenantId: string | null = null;
+    let testPropertyId: string | null = null;
 
     beforeAll(async () => {
         // Create a test role
@@ -72,6 +63,26 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
             .eq('subdomain', 'platform')
             .maybeSingle();
         platformTenantId = platformTenant?.id ?? null;
+
+        const { data: prop } = await supabase.from('properties').select('id').limit(1).maybeSingle();
+        testPropertyId = prop?.id ?? null;
+
+        // Generate tokens with tenant context
+        superAdminToken = generateTokens({
+            userId: superAdminId,
+            email: 'superadmin@test.com',
+            scope: 'super_admin',
+            roles: ['super_admin'],
+            tenantId: platformTenantId ?? undefined,
+        }).accessToken;
+
+        testUserToken = generateTokens({
+            userId: testUserId,
+            email: 'testuser@test.com',
+            scope: 'super_admin',
+            roles: [testRoleName],
+            tenantId: platformTenantId ?? undefined,
+        }).accessToken;
 
         // Seed users referenced by generated JWTs.
         // scope = 'super_admin' bypasses chk_scope_tenant (which requires
@@ -87,6 +98,7 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
                 email_verified: true,
                 token_version: 0,
                 scope: 'super_admin',
+                tenant_id: platformTenantId,
             },
             {
                 id: testUserId,
@@ -97,12 +109,31 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
                 email_verified: true,
                 token_version: 0,
                 scope: 'super_admin',
+                tenant_id: platformTenantId,
             },
         ], { onConflict: 'id' });
+
+        if (testPropertyId && platformTenantId) {
+            await supabase.from('user_property_access').upsert([
+                {
+                    user_id: superAdminId,
+                    property_id: testPropertyId,
+                    access_level: 'admin',
+                    tenant_id: platformTenantId,
+                },
+                {
+                    user_id: testUserId,
+                    property_id: testPropertyId,
+                    access_level: 'staff',
+                    tenant_id: platformTenantId,
+                },
+            ]);
+        }
     });
 
     afterAll(async () => {
         // Cleanup
+        await supabase.from('user_property_access').delete().in('user_id', [superAdminId, testUserId]);
         await supabase.from('modules').delete().eq('slug', moduleSlug);
         await supabase.from('roles').delete().eq('name', testRoleName);
         await supabase.from('app_permissions').delete().like('slug', `module:${moduleSlug}%`);
@@ -115,10 +146,11 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
         const res = await request(app)
             .post('/api/v1/admin/modules')
             .set('Authorization', `Bearer ${superAdminToken}`)
+            .set('X-Property-Id', testPropertyId || '')
             .send({
                 name: `Test Module ${testId}`,
                 slug: moduleSlug,
-                template_type: 'menu_service',
+                engine_type: 'instant_transaction',
                 description: 'A test module for verification',
                 settings: { color: 'blue' }
             });
@@ -144,6 +176,7 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
         const res = await request(app)
             .put(`/api/v1/admin/modules/${moduleId}`)
             .set('Authorization', `Bearer ${testUserToken}`)
+            .set('X-Property-Id', testPropertyId || '')
             .send({
                 description: 'Hacker Update'
             });
@@ -153,14 +186,18 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
 
     it('should allow module update to user WITH permissions', async () => {
         // Grant permission
-        await supabase.from('app_role_permissions').insert({
+        const { error: permError } = await supabase.from('app_role_permissions').insert({
             role_name: testRoleName,
-            permission_slug: `module:${moduleSlug}:manage`
+            permission_slug: `module:${moduleSlug}:manage`,
+            tenant_id: platformTenantId!,
+            property_id: testPropertyId!,
         });
+        expect(permError).toBeNull();
 
         const res = await request(app)
             .put(`/api/v1/admin/modules/${moduleId}`)
             .set('Authorization', `Bearer ${testUserToken}`)
+            .set('X-Property-Id', testPropertyId || '')
             .send({
                 description: 'Authorized Update'
             });
@@ -171,26 +208,14 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
 
     // 3. Module Versioning (Optimistic Locking)
     it('should increment settings_version on update', async () => {
-        const res = await request(app)
-            .put(`/api/v1/admin/modules/${moduleId}`)
-            .set('Authorization', `Bearer ${superAdminToken}`)
-            .send({
-                settings: { color: 'red' }, // Updating settings triggers increment
-                settings_version: 1 // Providing correct current version (it was 1 initially, but previous test might have bumped it? No, previous test updated description, not settings)
-                // Wait, previous test updated description. Controller logic: "Increment version if settings are being updated".
-                // So version should still be 1 if the previous test only updated description?
-                // logic: `if (validatedData.settings) { updateData.settings_version = ... + 1 }`
-                // Yes.
-            });
-
-        // Actually if previous test succeeded, the version in DB is whatever module has.
-        // Let's refetch current state first to be safe.
+        // Refetch current state first
         const { data: current } = await supabase.from('modules').select('settings_version').eq('id', moduleId).single();
         const ver = current?.settings_version || 1;
 
         const res2 = await request(app)
             .put(`/api/v1/admin/modules/${moduleId}`)
             .set('Authorization', `Bearer ${superAdminToken}`)
+            .set('X-Property-Id', testPropertyId || '')
             .send({
                 settings: { color: 'green' },
                 settings_version: ver // Correct version
@@ -208,9 +233,10 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
         const res = await request(app)
             .put(`/api/v1/admin/modules/${moduleId}`)
             .set('Authorization', `Bearer ${superAdminToken}`)
+            .set('X-Property-Id', testPropertyId || '')
             .send({
                 settings: { color: 'purple' },
-                settings_version: ver - 1 // Stale version
+                settings_version: Math.max(1, ver - 1) // Stale version
             });
 
         expect(res.status).toBe(409);
@@ -234,6 +260,9 @@ describe.skipIf(!shouldRunIntegrationTests)('Comprehensive Verification: Securit
         // migration added tenant_id to payment_ledger (may be NOT NULL).
         if (platformTenantId) {
             entry.tenant_id = platformTenantId;
+        }
+        if (testPropertyId) {
+            entry.property_id = testPropertyId;
         }
 
         // First Insert

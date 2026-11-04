@@ -4,9 +4,57 @@
  * Unit tests for the Task/Work Order Service with DI.
  */
 
-import { createTaskService, TaskServiceError } from '../../../src/lib/services/task.service';
-import { InMemoryTaskRepository } from '../../../src/lib/repositories/task.repository.memory';
-import type { Container, Task } from '../../../src/lib/container/types';
+import {
+  createTaskService,
+  TaskServiceError,
+  type Task,
+  type TaskComment,
+  type TaskRepository,
+} from '../../../src/services/task.service';
+
+class InMemoryTaskRepository implements TaskRepository {
+  private tasks = new Map<string, Task>();
+  private comments: TaskComment[] = [];
+
+  addTask(t: Task): void {
+    this.tasks.set(t.id, { ...t });
+  }
+
+  async findById(id: string): Promise<Task | null> {
+    const t = this.tasks.get(id);
+    return t ? { ...t } : null;
+  }
+
+  async findAll(filters?: Partial<Pick<Task, 'category' | 'priority' | 'status' | 'createdBy' | 'assignedTo'>>): Promise<Task[]> {
+    let list = Array.from(this.tasks.values());
+    if (filters) {
+      if (filters.category) list = list.filter(t => t.category === filters.category);
+      if (filters.priority) list = list.filter(t => t.priority === filters.priority);
+      if (filters.status) list = list.filter(t => t.status === filters.status);
+      if (filters.createdBy) list = list.filter(t => t.createdBy === filters.createdBy);
+      if (filters.assignedTo) list = list.filter(t => t.assignedTo === filters.assignedTo);
+    }
+    return list.map(t => ({ ...t }));
+  }
+
+  async save(t: Task): Promise<Task> {
+    this.tasks.set(t.id, { ...t });
+    return { ...t };
+  }
+
+  async delete(id: string): Promise<void> {
+    this.tasks.delete(id);
+  }
+
+  async saveComment(c: TaskComment): Promise<TaskComment> {
+    this.comments.push({ ...c });
+    return { ...c };
+  }
+
+  async findComments(taskId: string): Promise<TaskComment[]> {
+    return this.comments.filter(c => c.taskId === taskId).map(c => ({ ...c }));
+  }
+}
 
 // Test UUIDs
 const STAFF_1 = '11111111-1111-1111-1111-111111111111';
@@ -14,7 +62,7 @@ const STAFF_2 = '22222222-2222-2222-2222-222222222222';
 const AUTHOR_1 = '33333333-3333-3333-3333-333333333333';
 const INVALID_UUID = 'not-a-valid-uuid';
 
-function createMockContainer(taskRepository: InMemoryTaskRepository): Container {
+function createMockContainer(taskRepository: InMemoryTaskRepository) {
   return {
     taskRepository,
     logger: {
@@ -23,7 +71,7 @@ function createMockContainer(taskRepository: InMemoryTaskRepository): Container 
       error: () => {},
       debug: () => {},
     },
-  } as unknown as Container;
+  };
 }
 
 function createTestTask(overrides: Partial<Task> = {}): Task {
@@ -54,7 +102,7 @@ function createTestTask(overrides: Partial<Task> = {}): Task {
 
 describe('TaskService', () => {
   let repository: InMemoryTaskRepository;
-  let container: Container;
+  let container: ReturnType<typeof createMockContainer>;
   let service: ReturnType<typeof createTaskService>;
 
   beforeEach(() => {

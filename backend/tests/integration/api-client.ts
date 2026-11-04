@@ -32,6 +32,8 @@ export class TestApiClient {
   public userId: string | null = null;
   public userRoles: string[] = [];
 
+  private cookies: Map<string, string> = new Map();
+
   constructor(baseUrl = TEST_CONFIG.api.baseUrl) {
     this.baseUrl = baseUrl;
   }
@@ -42,6 +44,14 @@ export class TestApiClient {
 
   getToken(): string | null {
     return this.accessToken;
+  }
+
+  getCookie(name: string): string | undefined {
+    return this.cookies.get(name);
+  }
+
+  setCookie(name: string, value: string): void {
+    this.cookies.set(name, value);
   }
 
   get isAuthenticated(): boolean {
@@ -65,6 +75,13 @@ export class TestApiClient {
       headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
+    if (this.cookies.size > 0) {
+      const cookieStr = Array.from(this.cookies.entries())
+        .map(([k, v]) => `${k}=${v}`)
+        .join('; ');
+      headers.Cookie = cookieStr;
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -77,6 +94,26 @@ export class TestApiClient {
       });
 
       clearTimeout(timeoutId);
+
+      // Capture set-cookie headers
+      const setCookieHeaders: string[] = [];
+      const rawSetCookie = (response.headers as any).getSetCookie?.();
+      if (Array.isArray(rawSetCookie)) {
+        setCookieHeaders.push(...rawSetCookie);
+      } else {
+        const sc = response.headers.get('set-cookie');
+        if (sc) setCookieHeaders.push(sc);
+      }
+      for (const cookieHeader of setCookieHeaders) {
+        const parts = cookieHeader.split(';')[0]?.split('=');
+        if (parts && parts.length >= 2) {
+          const key = parts[0]?.trim();
+          const val = parts.slice(1).join('=').trim();
+          if (key) {
+            this.cookies.set(key, val);
+          }
+        }
+      }
 
       let data: unknown;
       const contentType = response.headers.get('content-type');
@@ -120,7 +157,7 @@ export class TestApiClient {
 
     if (result.success && result.data) {
       this.accessToken = result.data.accessToken || result.data.tokens?.accessToken || null;
-      this.refreshToken = result.data.refreshToken || result.data.tokens?.refreshToken || null;
+      this.refreshToken = result.data.refreshToken || result.data.tokens?.refreshToken || this.cookies.get('refreshToken') || null;
       this.userId = result.data.user?.id || null;
       this.userRoles = result.data.user?.roles || [];
       if (this.userId) {
@@ -140,7 +177,7 @@ export class TestApiClient {
 
     if (result.success && result.data) {
       this.accessToken = result.data.accessToken || result.data.tokens?.accessToken || null;
-      this.refreshToken = result.data.refreshToken || result.data.tokens?.refreshToken || null;
+      this.refreshToken = result.data.refreshToken || result.data.tokens?.refreshToken || this.cookies.get('refreshToken') || null;
       this.userId = result.data.user?.id || null;
       this.userRoles = result.data.user?.roles || [];
     }
@@ -154,26 +191,28 @@ export class TestApiClient {
       this.refreshToken = null;
       this.userId = null;
       this.userRoles = [];
+      this.cookies.clear();
     }
     return result;
   }
 
   async refreshTokens(): Promise<ApiResponse<AuthResponse>> {
-    if (!this.refreshToken) {
+    const rfToken = this.refreshToken || this.cookies.get('refreshToken');
+    if (!rfToken) {
       return { success: false, status: 401, error: 'No refresh token available' };
     }
 
     const result = await this.request<AuthResponse>(
       '/auth/refresh',
       'POST',
-      { refreshToken: this.refreshToken },
+      { refreshToken: rfToken },
       { requiresAuth: false },
     );
 
     if (result.success && result.data) {
       this.accessToken = result.data.accessToken || result.data.tokens?.accessToken || null;
       this.refreshToken =
-        result.data.refreshToken || result.data.tokens?.refreshToken || this.refreshToken;
+        result.data.refreshToken || result.data.tokens?.refreshToken || this.cookies.get('refreshToken') || this.refreshToken;
     }
     return result;
   }
@@ -183,7 +222,7 @@ export class TestApiClient {
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {
-    return this.request('/auth/change-password', 'POST', { currentPassword, newPassword });
+    return this.request('/auth/change-password', 'PUT', { currentPassword, newPassword });
   }
 
   // ============ RESTAURANT (menu_service → instant_transaction) ============

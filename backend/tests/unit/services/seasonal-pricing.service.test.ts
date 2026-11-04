@@ -224,4 +224,156 @@ describe('SeasonalPricingService', () => {
       );
     });
   });
+
+  describe('calculatePrice', () => {
+    it('should calculate seasonal adjustment for dates within active rule range', async () => {
+      const mockRules = [
+        {
+          id: 'rule-summer',
+          name: 'Summer Peak',
+          start_date: '06-01',
+          end_date: '08-31',
+          price_multiplier: 1.5,
+          applicable_to: ['accommodation_units'],
+          specific_items: null,
+          priority: 1,
+          is_active: true,
+        },
+      ];
+
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        if (table === 'seasonal_pricing_rules') {
+          return {
+            select: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: mockRules, error: null }),
+            }),
+          } as any;
+        }
+        if (table === 'system_settings') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      // July 15 falls inside 06-01 to 08-31
+      const checkIn = new Date('2026-07-15T12:00:00Z');
+      const result = await seasonalPricingService.calculatePrice(
+        'accommodation_units',
+        'unit-101',
+        100,
+        checkIn
+      );
+
+      expect(result.basePrice).toBe(100);
+      expect(result.finalPrice).toBe(150);
+      expect(result.breakdown.seasonalAdjustment).toBe(50);
+      expect(result.appliedRules).toHaveLength(1);
+      expect(result.appliedRules[0].name).toBe('Summer Peak');
+    });
+
+    it('should apply weekend pricing on weekend check-in dates', async () => {
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        if (table === 'seasonal_pricing_rules') {
+          return {
+            select: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          } as any;
+        }
+        if (table === 'system_settings') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: { value: { enabled: true, multiplier: 1.25 } },
+                  error: null,
+                }),
+              }),
+            }),
+          } as any;
+        }
+        if (table === 'accommodation_units' || table === 'transactions') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                filter: vi.fn().mockReturnValue({
+                  filter: vi.fn().mockReturnValue({
+                    in: vi.fn().mockResolvedValue({ count: 0 }),
+                  }),
+                }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      // 2026-07-18 is a Saturday (dayOfWeek = 6)
+      const saturdayDate = new Date('2026-07-18T14:00:00Z');
+      const result = await seasonalPricingService.calculatePrice(
+        'accommodation_units',
+        'unit-101',
+        200,
+        saturdayDate
+      );
+
+      expect(result.breakdown.weekendAdjustment).toBe(50);
+      expect(result.finalPrice).toBe(250);
+      expect(result.appliedRules.some(r => r.type === 'weekend')).toBe(true);
+    });
+
+    it('should handle year-wrapping date ranges (e.g. winter holidays 12-15 to 01-15)', async () => {
+      const mockRules = [
+        {
+          id: 'rule-winter',
+          name: 'Winter Holiday',
+          start_date: '12-15',
+          end_date: '01-15',
+          price_multiplier: 1.3,
+          applicable_to: ['time_exclusive_reservation'],
+          specific_items: null,
+          priority: 1,
+          is_active: true,
+        },
+      ];
+
+      vi.mocked(supabase.from).mockImplementation((table: string) => {
+        if (table === 'seasonal_pricing_rules') {
+          return {
+            select: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({ data: mockRules, error: null }),
+            }),
+          } as any;
+        }
+        if (table === 'system_settings') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
+              }),
+            }),
+          } as any;
+        }
+        return {} as any;
+      });
+
+      // Jan 05 is within the winter holiday range
+      const janDate = new Date('2026-01-05T12:00:00Z');
+      const result = await seasonalPricingService.calculatePrice(
+        'time_exclusive_reservation',
+        'chalet-1',
+        100,
+        janDate
+      );
+
+      expect(result.breakdown.seasonalAdjustment).toBe(30);
+      expect(result.finalPrice).toBe(130);
+    });
+  });
 });
