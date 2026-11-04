@@ -44,6 +44,7 @@ vi.mock('@/utils/performance', () => ({
 }));
 
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({
     modules: [
       {

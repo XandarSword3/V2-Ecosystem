@@ -176,7 +176,7 @@ describe('socket hooks', () => {
     expect(harness.socket.off).toHaveBeenCalledWith('connect', expect.any(Function));
   });
 
-  it('wires order, menu service, kiosk item, and waitlist event hooks', async () => {
+  it('wires order, menu service, and kiosk item event hooks', async () => {
     const harness = createSocketHarness();
     ioMock.mockReturnValue(harness.socket);
 
@@ -186,17 +186,14 @@ describe('socket hooks', () => {
     const onRestaurantStatus = vi.fn();
     const onSnackNew = vi.fn();
     const onSnackStatus = vi.fn();
-    const onWaitlist = vi.fn();
 
     const orderHook = renderHook(() => mod.useOrderUpdates('order-1', onOrderUpdate));
     const restaurantHook = renderHook(() => mod.useModuleOrders('menu_service', onRestaurantNew, onRestaurantStatus));
     const snackHook = renderHook(() => mod.useModuleOrders('kiosk', onSnackNew, onSnackStatus));
-    const waitlistHook = renderHook(() => mod.useWaitlistUpdates(onWaitlist));
 
     act(() => {
       harness.triggerSocket('order:updated', { orderId: 'order-1', status: 'ready', updatedAt: 'now' });
       harness.triggerSocket('order:new', { orderId: 'order-2', moduleId: 'menu_service', totalAmount: 100, items: 2, createdAt: 'now' });
-      harness.triggerSocket('waitlist.updated', { action: 'created', entryId: 'w-1' });
     });
 
     expect(onOrderUpdate).toHaveBeenCalled();
@@ -204,14 +201,12 @@ describe('socket hooks', () => {
     expect(onRestaurantStatus).toHaveBeenCalled();
     expect(onSnackNew).toHaveBeenCalled();
     expect(onSnackStatus).toHaveBeenCalled();
-    expect(onWaitlist).toHaveBeenCalledWith({ action: 'created', entryId: 'w-1' });
     expect(harness.socket.emit).toHaveBeenCalledWith('join:unit', 'menu_service');
     expect(harness.socket.emit).toHaveBeenCalledWith('join:unit', 'kiosk');
 
     orderHook.unmount();
     restaurantHook.unmount();
     snackHook.unmount();
-    waitlistHook.unmount();
   });
 
   it('tracks page navigation and emits user updates', async () => {

@@ -47,6 +47,7 @@ vi.mock('@/lib/translate', () => ({
 }));
 
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({
     modules: [
       {

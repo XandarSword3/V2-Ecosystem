@@ -14,7 +14,8 @@ const path = require('path');
 const ts = require('typescript');
 
 const MESSAGES_DIR = path.join(__dirname, '../messages');
-const SUPPORTED_LANGUAGES = ['en', 'ar', 'fr'];
+// Keep in sync with `locales` in src/i18n/request.ts — en is the source of truth.
+const SUPPORTED_LANGUAGES = ['en', 'ar', 'fr', 'de', 'it'];
 const BASE_LANGUAGE = 'en';
 
 const USER_FACING_ATTRS = new Set([
@@ -112,7 +113,7 @@ function commandCheckParity() {
   let hasDiscrepancy = false;
   const enKeys = new Set(Object.keys(flatDicts['en']));
 
-  for (const lang of ['ar', 'fr']) {
+  for (const lang of SUPPORTED_LANGUAGES.filter((l) => l !== 'en')) {
     const langKeys = new Set(Object.keys(flatDicts[lang]));
 
     const missingInLang = [...enKeys].filter((k) => !langKeys.has(k));
@@ -134,7 +135,7 @@ function commandCheckParity() {
   }
 
   if (!hasDiscrepancy) {
-    log(`\n🎉 100% Mutual Parity! All ${enKeys.size} keys match exactly across [en, ar, fr].\n`, 'green');
+    log(`\n🎉 100% Mutual Parity! All ${enKeys.size} keys match exactly across [${SUPPORTED_LANGUAGES.join(', ')}].\n`, 'green');
     return 0;
   } else {
     log('\n❌ Translation parity check failed.\n', 'red');

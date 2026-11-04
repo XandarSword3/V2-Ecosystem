@@ -119,7 +119,8 @@ export const dynamicTranslationDictionary: Record<string, Partial<Record<Support
   'all': { ar: 'الكل', fr: 'Tous' },
 
   // Modules & Navigation Slugs
-  'iron paradise gym': { ar: 'نادي آيرون بارادايس الرياضي', fr: 'Iron Paradise Gym' },
+  // NOTE: no brand-name entries here — brand names come from CMS settings via
+  // the {brandName} message placeholder (see docs/i18n/RULES.md).
   'the ember bar': { ar: 'بار ذا إمبر', fr: 'The Ember Bar' },
   'the-ember-bar': { ar: 'بار ذا إمبر', fr: 'The Ember Bar' },
   'chocolate box': { ar: 'صندوق الشوكولاتة', fr: 'Chocolate Box' },

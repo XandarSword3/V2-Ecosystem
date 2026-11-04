@@ -14,6 +14,7 @@ vi.mock('next-themes', () => ({
 }));
 
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({ settings: settingsState.settings }),
 }));
 

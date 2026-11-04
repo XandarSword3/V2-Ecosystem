@@ -8,13 +8,10 @@ import {
     MapPin,
     Phone,
     Mail,
-    Facebook,
-    Instagram,
-    Twitter as TwitterIcon,
     Globe,
     ArrowUpRight
 } from 'lucide-react';
-import { useSiteSettings } from '@/lib/settings-context';
+import { useSiteSettings, DEFAULT_BRAND_NAME } from '@/lib/settings-context';
 import { usePathname, useParams } from 'next/navigation';
 import { Container } from '@/components/layout/Container';
 import { getTranslatedModuleName, translateDynamicString } from '@/lib/translate';
@@ -95,7 +92,7 @@ export default function Footer() {
             showPhone: true,
             showEmail: true
         },
-        copyright: tFooter('copyright', { year: new Date().getFullYear() })
+        copyright: tFooter('copyright', { year: new Date().getFullYear(), brandName: settings.siteName || DEFAULT_BRAND_NAME })
     };
 
     // If CMS footer exists, translate its content
@@ -164,12 +161,7 @@ export default function Footer() {
     } : defaultFooterConfig;
 
     const getSocialIcon = (platform: string) => {
-        switch (platform.toLowerCase()) {
-            case 'facebook': return <Facebook className="w-5 h-5" />;
-            case 'instagram': return <Instagram className="w-5 h-5" />;
-            case 'twitter': return <TwitterIcon className="w-5 h-5" />;
-            default: return <Globe className="w-5 h-5" />;
-        }
+        return <Globe className="w-5 h-5" />;
     };
 
     if (pathname === '/nexus' || pathname?.startsWith('/nexus')) {

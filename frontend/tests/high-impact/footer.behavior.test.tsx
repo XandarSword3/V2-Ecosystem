@@ -65,6 +65,7 @@ vi.mock('next-intl', () => ({
 
 vi.mock('@/lib/settings-context', () => ({
   useSiteSettings: () => siteState,
+  DEFAULT_BRAND_NAME: 'V2 Resort',
 }));
 
 import Footer from '../../src/components/Footer';

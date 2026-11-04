@@ -7,6 +7,13 @@ import { settingsLogger } from './logger';
 import { extractHostSegments } from './api';
 import { getStoredPropertyId } from './property-id';
 
+/**
+ * Fallback brand name used when no CMS site name is configured.
+ * Message files reference the brand via the {brandName} ICU placeholder —
+ * never hardcode a brand name in messages/*.json (see docs/i18n/RULES.md).
+ */
+export const DEFAULT_BRAND_NAME = 'V2 Resort';
+
 export interface DPAAgreement {
   status: boolean;
   dateCompleted: string;

@@ -6,6 +6,7 @@ import { Star, Quote, ChevronLeft, ChevronRight, User, Loader2, X, Send } from '
 import { useState, useEffect } from 'react';
 import { API_BASE_URL, api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useSiteSettings, DEFAULT_BRAND_NAME } from '@/lib/settings-context';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
@@ -65,6 +66,8 @@ const getServiceLabel = (serviceType: string): string => {
 
 export default function TestimonialsCarousel() {
   const t = useTranslations('testimonials');
+  const { settings } = useSiteSettings();
+  const brandName = settings.siteName || DEFAULT_BRAND_NAME;
   const { isAuthenticated, user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
@@ -432,7 +435,7 @@ export default function TestimonialsCarousel() {
               {t('title')}
             </h2>
             <p className="text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-              {t('subtitle')}
+              {t('subtitle', { brandName })}
             </p>
           </motion.div>
         </div>

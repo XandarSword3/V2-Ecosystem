@@ -66,6 +66,7 @@ vi.mock('@/lib/auth-context', () => ({
 
 // Mock site settings
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({
     modules: [
       {

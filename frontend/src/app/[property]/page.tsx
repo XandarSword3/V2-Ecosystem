@@ -2,7 +2,7 @@
  * Property Home — app/[property]/page.tsx
  *
  * Resolves the /{propertySlug} route that guest-facing pages link to as
- * "Back to Home" (cancellation, cart, loyalty, reserve, waitlist, etc.).
+ * "Back to Home" (cancellation, cart, loyalty, reserve, etc.).
  *
  * In path-based routing the canonical homepage lives at the tenant root ("/"),
  * so we redirect there. Middleware has already set x-property-slug on the

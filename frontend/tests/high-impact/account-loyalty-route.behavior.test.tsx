@@ -55,16 +55,23 @@ describe('Customer loyalty route behavior', () => {
     apiPostMock.mockReset();
   });
 
-  it('redirects unauthenticated users to login with loyalty redirect path', async () => {
+  it('presents guest-mode affordances to unauthenticated users', async () => {
     authState.user = null;
     authState.isAuthenticated = false;
     authState.isLoading = false;
 
     render(<CustomerLoyaltyPage />);
 
-    await waitFor(() => {
-      expect(pushMock).toHaveBeenCalledWith('/login?redirect=/test-property/account/loyalty');
-    });
+    // Current contract (Phase F3/F10): account routes no longer hard-redirect
+    // guests to /login. AccountShell shows a guest-mode banner and LoyaltyHub
+    // renders its own sign-in prompt; both link out to /login.
+    expect(await screen.findByText('Viewing in Guest Mode')).toBeInTheDocument();
+    const signInLinks = await screen.findAllByRole('link', { name: /sign in/i });
+    expect(signInLinks.length).toBeGreaterThan(0);
+    for (const link of signInLinks) {
+      expect(link.getAttribute('href')).toBe('/login');
+    }
+    expect(pushMock).not.toHaveBeenCalled();
   });
 
   it('loads and renders loyalty account, tier progress, and recent activity', async () => {
@@ -137,9 +144,14 @@ describe('Customer loyalty route behavior', () => {
 
     render(<CustomerLoyaltyPage />);
 
-    expect(await screen.findByText('Available Points')).toBeInTheDocument();
+    // Current contract: balance banner is "Available Loyalty Balance" with a
+    // tier badge (e.g. "Silver Tier"), and the history card is titled
+    // "Loyalty Transaction Ledger".
+    expect(await screen.findByText('Available Loyalty Balance')).toBeInTheDocument();
+    expect(screen.getByText('Silver Tier')).toBeInTheDocument();
+    expect(screen.getByText('Progress to Gold')).toBeInTheDocument();
     expect(screen.getByText('AccommodationUnit booking bonus')).toBeInTheDocument();
-    expect(screen.getByText('Membership Tiers')).toBeInTheDocument();
+    expect(screen.getByText('Loyalty Transaction Ledger')).toBeInTheDocument();
 
     expect(apiGetMock).toHaveBeenCalledWith('/loyalty/me', expect.any(Object));
     expect(apiGetMock).toHaveBeenCalledWith('/loyalty/me/transactions', expect.any(Object));
@@ -155,7 +167,7 @@ describe('Customer loyalty route behavior', () => {
 
     render(<CustomerLoyaltyPage />);
 
-    expect(await screen.findByText('Unable to load loyalty account')).toBeInTheDocument();
-    expect(screen.getByText('Please try again later.')).toBeInTheDocument();
+    expect(await screen.findByText('Unable to load loyalty account information.')).toBeInTheDocument();
+    expect(screen.getByText('Please check your connection and try again.')).toBeInTheDocument();
   });
 });

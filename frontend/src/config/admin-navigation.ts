@@ -25,19 +25,24 @@ import {
   Users,
   Settings,
   BarChart3,
+  Shield,
   Cloud,
+  Star,
   Award,
   Gift,
   Ticket,
+  Brush,
   Package,
   Wrench,
   UserCog,
   Cog,
   ShoppingBag,
+  ShoppingCart,
   CreditCard,
   Receipt,
   ClipboardList,
   Share2,
+  Megaphone,
   MessageSquare,
   TrendingUp,
   Building2,
@@ -111,7 +116,6 @@ export function getModuleChildren(
         { name: t('nav.categories'), href: `${base}/${safeSlug}/categories`, translationKey: 'nav.categories' },
         { name: t('nav.orders'), href: `${base}/${safeSlug}/orders`, translationKey: 'nav.orders' },
         { name: t('nav.tables'), href: `${base}/${safeSlug}/tables`, translationKey: 'nav.tables' },
-        { name: t('nav.waitlist') || 'Waitlist', href: `${base}/${safeSlug}/waitlist`, translationKey: 'nav.waitlist' },
         { name: t('nav.modifiers') || 'Customizations', href: `${base}/customizations`, translationKey: 'nav.modifiers' },
       ];
     case 'time_exclusive_reservation':
@@ -143,9 +147,7 @@ export function getModuleChildren(
 }
 
 // Static navigation categories (non-module items).
-// F11: organized around Engine A capabilities — what the business does —
-// rather than legacy platform sections. The per-module surfaces remain
-// under the dynamic MODULES category ([slug]/admin/*).
+// Multi-engine platform navigation for property administration.
 // propertySlug: the active property slug from the URL ([tenant].host/[property]/admin/...).
 export function getStaticNavigation(t: (key: string) => string, propertySlug: string): NavCategory[] {
   const base = `/${propertySlug}/admin`;
@@ -180,152 +182,141 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
       defaultExpanded: true,
     },
 
-    // BUSINESS — Engine A capability surface (F11). Cross-cutting
-    // capabilities a merchant configures and operates, independent of
-    // how many modules they run.
+    // MARKETING & LOYALTY
     {
-      id: 'business',
-      name: t('nav.business') || 'Business',
-      translationKey: 'nav.business',
-      icon: ShoppingBag,
+      id: 'marketing',
+      name: t('nav.marketing') || 'Marketing & Loyalty',
+      translationKey: 'nav.marketing',
+      icon: Megaphone,
       items: [
-        // ── Overview: capability dashboard (F11 home) ───────────────
         {
-          name: t('nav.overview') || 'Overview',
-          href: `${base}/business`,
-          icon: LayoutDashboard,
-          translationKey: 'nav.overview',
+          name: t('nav.loyalty') || 'Loyalty Program',
+          href: `${base}/loyalty`,
+          icon: Award,
+          translationKey: 'nav.loyalty',
+          roles: ['admin', 'super_admin'],
+          permissions: ['loyalty:read:any', 'loyalty:settings:manage'],
         },
+        {
+          name: t('nav.giftCards') || 'Gift Cards',
+          href: `${base}/giftcards`,
+          icon: Gift,
+          translationKey: 'nav.giftCards',
+          roles: ['admin', 'super_admin'],
+          permissions: ['giftcard:manage'],
+        },
+        {
+          name: t('nav.coupons') || 'Coupons',
+          href: `${base}/coupons`,
+          icon: Ticket,
+          translationKey: 'nav.coupons',
+          roles: ['admin', 'super_admin'],
+          permissions: ['coupon:manage'],
+        },
+        {
+          name: t('nav.reviews') || 'Reviews',
+          href: `${base}/reviews`,
+          icon: Star,
+          translationKey: 'nav.reviews',
+          roles: ['admin', 'super_admin'],
+          permissions: ['review:moderate'],
+        },
+      ],
+      collapsible: true,
+      defaultExpanded: false,
+    },
 
-        // ── Orders: cross-module transaction operations surface ─────
+    // OPERATIONS
+    {
+      id: 'operations',
+      name: t('nav.operations') || 'Operations',
+      translationKey: 'nav.operations',
+      icon: Wrench,
+      items: [
         {
           name: t('nav.orders') || 'Orders',
           href: `${base}/orders`,
-          icon: ClipboardList,
+          icon: ShoppingCart,
           translationKey: 'nav.orders',
+          roles: ['admin', 'super_admin'],
           permissions: ['order:read:all'],
         },
-
-        // ── Products: cross-module catalog (Phase 8 lifecycle) ────────
-        {
-          name: t('nav.products') || 'Products',
-          href: `${base}/products`,
-          icon: ShoppingBag,
-          translationKey: 'nav.products',
-          permissions: ['admin:modules:manage', 'inventory:read', 'catalog:read'],
-          children: [
-            { name: t('nav.customizations') || 'Customizations', href: `${base}/customizations`, translationKey: 'nav.customizations' },
-          ],
-        },
-
-        // ── Pricing: seasonal/dynamic rules, coupons, tax config ──────
-        {
-          name: t('nav.pricing') || 'Pricing',
-          href: `${base}/pricing`,
-          icon: Ticket,
-          translationKey: 'nav.pricing',
-          permissions: ['coupon:manage', 'admin:settings:manage'],
-          children: [
-            { name: t('nav.pricingRules') || 'Seasonal & Dynamic Rules', href: `${base}/pricing`, translationKey: 'nav.pricingRules' },
-            { name: t('nav.coupons') || 'Coupons', href: `${base}/coupons`, translationKey: 'nav.coupons' },
-            { name: t('nav.taxConfiguration') || 'Tax Configuration', href: `${base}/settings/tax`, translationKey: 'nav.taxConfiguration' },
-          ],
-        },
-
-        // ── Fulfillment: cross-engine work queue + operational surfaces ─
         {
           name: t('nav.fulfillment') || 'Fulfillment',
           href: `${base}/fulfillment`,
           icon: Wrench,
           translationKey: 'nav.fulfillment',
+          roles: ['admin', 'super_admin'],
           permissions: ['order:read:all', 'housekeeping:task:manage'],
-          children: [
-            { name: t('nav.workQueue') || 'Work Queue', href: `${base}/fulfillment`, translationKey: 'nav.workQueue' },
-            { name: t('nav.housekeeping') || 'Housekeeping', href: `${base}/housekeeping`, translationKey: 'nav.housekeeping' },
-          ],
         },
-
-        // ── Resources: inventory & resource economics ─────────────────
         {
-          name: t('nav.resources') || 'Resources',
+          name: t('nav.housekeeping') || 'Housekeeping',
+          href: `${base}/housekeeping`,
+          icon: Brush,
+          translationKey: 'nav.housekeeping',
+          roles: ['admin', 'super_admin'],
+          permissions: ['housekeeping:task:manage'],
+        },
+        {
+          name: t('nav.inventory') || 'Inventory',
           href: `${base}/inventory`,
           icon: Package,
-          translationKey: 'nav.resources',
+          translationKey: 'nav.inventory',
+          roles: ['admin', 'super_admin'],
           permissions: ['inventory:manage', 'inventory:read'],
-          children: [
-            { name: t('nav.inventory') || 'Inventory', href: `${base}/inventory`, translationKey: 'nav.inventory' },
-            { name: t('nav.economics') || 'Product Economics', href: `${base}/economics`, translationKey: 'nav.economics' },
-          ],
         },
-
-        // ── Customers: accounts, loyalty, stored value, reputation ────
         {
-          name: t('nav.customers') || 'Customers',
-          href: `${base}/customers`,
+          name: t('nav.channelManager') || 'Channel Manager',
+          href: `${base}/channels`,
+          icon: Share2,
+          translationKey: 'nav.channelManager',
+          roles: ['admin', 'super_admin'],
+        },
+        {
+          name: t('nav.guestMessaging') || 'Guest Messaging',
+          href: `${base}/messaging`,
+          icon: MessageSquare,
+          translationKey: 'nav.guestMessaging',
+          roles: ['admin', 'super_admin'],
+        },
+        {
+          name: t('nav.rateParity') || 'Rate Parity',
+          href: `${base}/parity`,
+          icon: TrendingUp,
+          translationKey: 'nav.rateParity',
+          roles: ['admin', 'super_admin'],
+        },
+        {
+          name: t('nav.multiProperty') || 'Multi-Property',
+          href: `${base}/properties`,
+          icon: Building2,
+          translationKey: 'nav.multiProperty',
+          roles: ['super_admin'],
+        },
+      ],
+      collapsible: true,
+      defaultExpanded: false,
+    },
+
+    // PEOPLE
+    {
+      id: 'people',
+      name: t('nav.people') || 'People',
+      translationKey: 'nav.people',
+      icon: UserCog,
+      items: [
+        {
+          name: t('nav.users'),
+          href: `${base}/users`,
           icon: Users,
-          translationKey: 'nav.customers',
+          translationKey: 'nav.users',
+          roles: ['admin', 'super_admin'],
           permissions: ['user:read:any'],
           children: [
-            { name: t('nav.allCustomers'), href: `${base}/customers`, translationKey: 'nav.allCustomers' },
-            { name: t('nav.customers'), href: `${base}/users/customers`, translationKey: 'nav.customers' },
-            { name: t('nav.loyalty') || 'Loyalty Program', href: `${base}/loyalty`, translationKey: 'nav.loyalty' },
-            { name: t('nav.giftCards') || 'Gift Cards', href: `${base}/giftcards`, translationKey: 'nav.giftCards' },
-            { name: t('nav.reviews') || 'Reviews', href: `${base}/reviews`, translationKey: 'nav.reviews' },
-          ],
-        },
-
-        // ── Staff: staff accounts, admins, live sessions ──────────────
-        {
-          name: t('nav.staff') || 'Staff',
-          href: `${base}/users/staff`,
-          icon: UserCog,
-          translationKey: 'nav.staff',
-          permissions: ['user:read:any'],
-          children: [
-            { name: t('nav.staff'), href: `${base}/users/staff`, translationKey: 'nav.staff' },
-            { name: t('nav.admins'), href: `${base}/users/admins`, translationKey: 'nav.admins' },
-            { name: t('nav.liveUsers') || 'Live Users', href: `${base}/users/live`, translationKey: 'nav.liveUsers' },
-          ],
-        },
-
-        // ── Payments: gateway config & stored value ───────────────────
-        {
-          name: t('nav.paymentsNav') || 'Payments',
-          href: `${base}/settings/payments`,
-          icon: CreditCard,
-          translationKey: 'nav.paymentsNav',
-          permissions: ['admin:settings:manage', 'giftcard:manage'],
-          children: [
-            { name: t('nav.payments'), href: `${base}/settings/payments`, translationKey: 'nav.payments' },
-            { name: t('nav.giftCards') || 'Gift Cards', href: `${base}/giftcards`, translationKey: 'nav.giftCards' },
-          ],
-        },
-
-        // ── Fiscal: tax, financial reports, audit evidence ────────────
-        {
-          name: t('nav.fiscal') || 'Fiscal',
-          href: `${base}/financial-reports`,
-          icon: Receipt,
-          translationKey: 'nav.fiscal',
-          permissions: ['admin:reports:read', 'admin:audit:read'],
-          children: [
-            { name: t('nav.financialReports') || 'Financial Reports', href: `${base}/financial-reports`, translationKey: 'nav.financialReports' },
-            { name: t('nav.taxConfiguration') || 'Tax Configuration', href: `${base}/settings/tax`, translationKey: 'nav.taxConfiguration' },
-            { name: t('nav.auditLogs'), href: `${base}/audit`, translationKey: 'nav.auditLogs', permissions: ['admin:audit:read'] },
-          ],
-        },
-
-        // ── Analytics: economics, cockpit, alerts ─────────────────────
-        {
-          name: t('nav.analytics') || 'Analytics',
-          href: `${base}/cockpit`,
-          icon: BarChart3,
-          translationKey: 'nav.analytics',
-          permissions: ['admin:reports:read'],
-          children: [
-            { name: t('nav.economics') || 'Economics', href: `${base}/reports?tab=economics`, translationKey: 'nav.economics' },
-            { name: t('nav.executiveCockpit') || 'Executive Cockpit', href: `${base}/cockpit`, translationKey: 'nav.executiveCockpit' },
-            { name: t('nav.alertManagement') || 'Alert Management', href: `${base}/alerts`, translationKey: 'nav.alertManagement' },
+            { name: t('nav.customers'), href: `${base}/users/customers`, translationKey: 'nav.customers', roles: ['admin', 'super_admin'] },
+            { name: t('nav.staff'), href: `${base}/users/staff`, translationKey: 'nav.staff', roles: ['admin', 'super_admin'] },
+            { name: t('nav.admins'), href: `${base}/users/admins`, translationKey: 'nav.admins', roles: ['admin', 'super_admin'] },
+            { name: t('nav.liveUsers') || 'Live Users', href: `${base}/users/live`, translationKey: 'nav.liveUsers', roles: ['admin', 'super_admin'] },
           ],
         },
       ],
@@ -333,9 +324,7 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
       defaultExpanded: false,
     },
 
-    // SYSTEM — platform configuration, integrations, site presentation.
-    // (F11: capability pages moved to BUSINESS; this keeps only
-    // platform-level configuration that isn't a business capability.)
+    // SYSTEM
     {
       id: 'system',
       name: t('nav.system') || 'System',
@@ -343,10 +332,25 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
       icon: Cog,
       items: [
         {
+          name: t('nav.reports') || 'Reports',
+          href: `${base}/cockpit`,
+          icon: BarChart3,
+          translationKey: 'nav.reports',
+          roles: ['admin', 'super_admin'],
+          permissions: ['admin:reports:read'],
+          children: [
+            { name: t('nav.economics') || 'Economics', href: `${base}/reports?tab=economics`, translationKey: 'nav.economics', roles: ['admin', 'super_admin'] },
+            { name: t('nav.executiveCockpit') || 'Executive Cockpit', href: `${base}/cockpit`, translationKey: 'nav.executiveCockpit', roles: ['admin', 'super_admin'] },
+            { name: t('nav.financialReports') || 'Financial Reports', href: `${base}/financial-reports`, translationKey: 'nav.financialReports', roles: ['admin', 'super_admin'] },
+            { name: t('nav.alertManagement') || 'Alert Management', href: `${base}/alerts`, translationKey: 'nav.alertManagement', roles: ['admin', 'super_admin'] },
+          ],
+        },
+        {
           name: t('nav.modules'),
           href: `${base}/modules`,
           icon: Cloud,
           translationKey: 'nav.modules',
+          roles: ['admin', 'super_admin'],
           permissions: ['admin:modules:manage'],
         },
         {
@@ -354,24 +358,24 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           href: `${base}/settings`,
           icon: Settings,
           translationKey: 'nav.settings',
+          roles: ['admin', 'super_admin'],
           permissions: ['admin:settings:manage'],
           children: [
-            { name: t('nav.general'), href: `${base}/settings`, translationKey: 'nav.general' },
-            { name: t('nav.propertySettings') || 'Property Settings', href: `${base}/settings/properties`, translationKey: 'nav.propertySettings' },
-            { name: t('nav.multiProperty') || 'Multi-Property', href: `${base}/properties`, translationKey: 'nav.multiProperty', roles: ['super_admin'] },
-            { name: t('nav.navbar'), href: `${base}/settings/navbar`, translationKey: 'nav.navbar' },
-            { name: t('nav.appearance'), href: `${base}/settings/appearance`, translationKey: 'nav.appearance' },
-            { name: t('nav.brand') || 'Brand & Identity', href: `${base}/settings/brand`, translationKey: 'nav.brand' },
-            { name: t('nav.terminology') || 'Terminology', href: `${base}/terminology`, translationKey: 'nav.terminology' },
-            { name: t('nav.homepage'), href: `${base}/settings/homepage`, translationKey: 'nav.homepage' },
-            { name: t('nav.footer'), href: `${base}/settings/footer`, translationKey: 'nav.footer' },
-            { name: t('nav.translations'), href: `${base}/settings/translations`, translationKey: 'nav.translations' },
-            { name: t('nav.notifications'), href: `${base}/settings/notifications`, translationKey: 'nav.notifications' },
-            { name: t('nav.databaseBackups'), href: `${base}/settings/backups`, translationKey: 'nav.databaseBackups' },
-            { name: t('nav.integrations') || 'Integrations', href: `${base}/integrations`, translationKey: 'nav.integrations' },
-            { name: t('nav.channelManager') || 'Channel Manager', href: `${base}/channels`, translationKey: 'nav.channelManager' },
-            { name: t('nav.guestMessaging') || 'Guest Messaging', href: `${base}/messaging`, translationKey: 'nav.guestMessaging' },
-            { name: t('nav.rateParity') || 'Rate Parity', href: `${base}/parity`, translationKey: 'nav.rateParity' },
+            { name: t('nav.general'), href: `${base}/settings`, translationKey: 'nav.general', roles: ['admin', 'super_admin'] },
+            { name: t('nav.propertySettings') || 'Property Settings', href: `${base}/settings/properties`, translationKey: 'nav.propertySettings', roles: ['admin', 'super_admin'] },
+            { name: t('nav.navbar'), href: `${base}/settings/navbar`, translationKey: 'nav.navbar', roles: ['admin', 'super_admin'] },
+            { name: t('nav.appearance'), href: `${base}/settings/appearance`, translationKey: 'nav.appearance', roles: ['admin', 'super_admin'] },
+            { name: t('nav.brand') || 'Brand & Identity', href: `${base}/settings/brand`, translationKey: 'nav.brand', roles: ['admin', 'super_admin'] },
+            { name: t('nav.customizations') || 'Customizations', href: `${base}/customizations`, translationKey: 'nav.customizations', roles: ['admin', 'super_admin'] },
+            { name: t('nav.terminology') || 'Terminology', href: `${base}/terminology`, translationKey: 'nav.terminology', roles: ['admin', 'super_admin'] },
+            { name: t('nav.homepage'), href: `${base}/settings/homepage`, translationKey: 'nav.homepage', roles: ['admin', 'super_admin'] },
+            { name: t('nav.footer'), href: `${base}/settings/footer`, translationKey: 'nav.footer', roles: ['admin', 'super_admin'] },
+            { name: t('nav.translations'), href: `${base}/settings/translations`, translationKey: 'nav.translations', roles: ['admin', 'super_admin'] },
+            { name: t('nav.payments'), href: `${base}/settings/payments`, translationKey: 'nav.payments', roles: ['admin', 'super_admin'] },
+            { name: t('nav.taxConfiguration') || 'Tax Configuration', href: `${base}/settings/tax`, translationKey: 'nav.taxConfiguration', roles: ['admin', 'super_admin'] },
+            { name: t('nav.notifications'), href: `${base}/settings/notifications`, translationKey: 'nav.notifications', roles: ['admin', 'super_admin'] },
+            { name: t('nav.databaseBackups'), href: `${base}/settings/backups`, translationKey: 'nav.databaseBackups', roles: ['admin', 'super_admin'] },
+            { name: t('nav.integrations') || 'Integrations', href: `${base}/integrations`, translationKey: 'nav.integrations', roles: ['admin', 'super_admin'] },
           ],
         },
         {
@@ -379,7 +383,16 @@ export function getStaticNavigation(t: (key: string) => string, propertySlug: st
           href: `${base}/setup`,
           icon: Terminal,
           translationKey: 'nav.setup',
+          roles: ['admin', 'super_admin'],
           permissions: ['admin:settings:manage'],
+        },
+        {
+          name: t('nav.auditLogs'),
+          href: `${base}/audit`,
+          icon: Shield,
+          translationKey: 'nav.auditLogs',
+          roles: ['super_admin', 'admin'],
+          permissions: ['admin:audit:read'],
         },
       ],
       collapsible: true,

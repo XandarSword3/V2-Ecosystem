@@ -32,6 +32,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({
     modules: [{ id: 'mod-1', slug: 'accommodation_units', name: 'AccommodationUnits' }],
   }),

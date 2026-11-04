@@ -117,6 +117,7 @@ const mockSettings = {
   tagline: 'Luxury resort',
 };
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({
     settings: mockSettings,
     modules: [],

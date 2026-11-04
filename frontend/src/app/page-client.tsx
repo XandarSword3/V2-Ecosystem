@@ -26,7 +26,7 @@ import {
 import { fadeInUp, staggerContainer, scaleIn } from '@/lib/animations/presets';
 import { Button } from '@/components/ui/Button';
 import dynamic from 'next/dynamic';
-import { useSiteSettings } from '@/lib/settings-context';
+import { useSiteSettings, DEFAULT_BRAND_NAME } from '@/lib/settings-context';
 import { getModuleIcon, getMainPageModules, getModuleDefaultDescription, getModuleStatLabel, getModuleStatPlaceholder, type Module } from '@/lib/module-utils';
 import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
 
@@ -64,7 +64,7 @@ export default function HomePage() {
     const customSlides = settings.homepage?.heroSlides?.filter(s => s.enabled) || [];
     const defaultSlide = {
       id: 'default',
-      title: settings.siteName || tHome('hero.titleHighlight'),
+      title: settings.siteName || tHome('hero.titleHighlight', { brandName: DEFAULT_BRAND_NAME }),
       subtitle: settings.description || tHome('hero.subtitle'),
       buttonText: tHome('cta.viewMenu'),
       buttonLink: '/',
@@ -616,7 +616,7 @@ export default function HomePage() {
                   {tHome('features.title')}
                   <span className="relative inline-block">
                     <span className="text-primary-600 dark:text-primary-400">
-                      {' '}{settings.siteName || tHome('hero.titleHighlight')}
+                      {' '}{settings.siteName || tHome('hero.titleHighlight', { brandName: DEFAULT_BRAND_NAME })}
                     </span>
                     <motion.span
                       className="absolute bottom-0 left-0 h-[0.15em] w-full bg-primary-500/40"

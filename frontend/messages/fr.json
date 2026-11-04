@@ -318,15 +318,15 @@
   },
   "home": {
     "hero": {
-      "title": "Bienvenue à Iron Paradise Gym",
-      "titleHighlight": "Iron Paradise Gym",
+      "title": "Bienvenue à {brandName}",
+      "titleHighlight": "{brandName}",
       "subtitle": "Votre destination premium pour une gastronomie exceptionnelle, des chalets confortables et des expériences de piscine rafraîchissantes au cœur du Liban.",
       "cta": "Explorer Maintenant",
       "badge": "L'Expérience Resort Premium du Liban"
     },
     "services": {
       "title": "Nos Services",
-      "subtitle": "Découvrez tout ce que Iron Paradise Gym a à offrir pour une expérience inoubliable",
+      "subtitle": "Découvrez tout ce que {brandName} a à offrir pour une expérience inoubliable",
       "whatWeOffer": "Ce Que Nous Offrons",
       "restaurant": {
         "title": "Restaurant",
@@ -346,7 +346,7 @@
       }
     },
     "features": {
-      "title": "Pourquoi Choisir Iron Paradise Gym?",
+      "title": "Pourquoi choisir {brandName} ?",
       "subtitle": "Pourquoi Nous Choisir",
       "primeLocation": {
         "title": "Emplacement Privilégié",
@@ -397,7 +397,7 @@
       "bookChalet": "Réserver un Chalet",
       "bookNow": "Réserver Maintenant",
       "readyGetaway": "Prêt pour Votre Escapade Parfaite?",
-      "bookStayNow": "Réservez votre séjour maintenant et découvrez le meilleur de l'hospitalité libanaise à Iron Paradise Gym",
+      "bookStayNow": "Réservez votre séjour maintenant et découvrez le meilleur de l'hospitalité à {brandName}",
       "bookYourChaletNow": "Réservez Votre Chalet Maintenant"
     }
   },
@@ -691,7 +691,7 @@
   },
   "adminDashboard": {
     "welcomeBack": "Bon retour",
-    "subtitle": "Voici ce qui se passe au complexe aujourd'hui, {name}",
+    "subtitle": "Voici ce qui se passe aujourd'hui à {brandName}, {name}",
     "refresh": "Actualiser",
     "refreshed": "Tableau de bord actualisé",
     "errors": {
@@ -1884,7 +1884,7 @@
       "table": "Table {number}"
     },
     "dashboard": {
-      "welcomeSubtitle": "Voici ce qui se passe aujourd'hui au Iron Paradise Gym",
+      "welcomeSubtitle": "Voici ce qui se passe aujourd'hui à {brandName}",
       "quickActions": "Actions Rapides",
       "recentActivity": "Activité Récente",
       "noActivity": "Aucune activité récente",
@@ -2138,11 +2138,11 @@
     "cancellationPolicy": "Politique d'Annulation",
     "giftCards": "Cartes Cadeaux",
     "contact": "Contact",
-    "address": "Iron Paradise Gym, Liban",
+    "address": "123 Boulevard du Complexe, Global City",
     "phone": "+961 XX XXX XXX",
     "email": "info@v2ecosystem.com",
     "followUs": "Suivez-nous",
-    "copyright": "© {year} Iron Paradise Gym. Tous droits réservés.",
+    "copyright": "© {year} {brandName}. Tous droits réservés.",
     "cookiePolicy": "Politique relative aux cookies"
   },
   "contact": {
@@ -2219,7 +2219,7 @@
   "testimonials": {
     "badge": "Avis des Clients",
     "title": "Ce Que Disent Nos Clients",
-    "subtitle": "Lisez les avis authentiques de clients ayant séjourné au Iron Paradise Gym",
+    "subtitle": "Lisez les avis authentiques de clients ayant séjourné à {brandName}",
     "averageRating": "Note Moyenne",
     "happyGuests": "Clients Satisfaits",
     "recommend": "Recommandent",
@@ -2242,7 +2242,7 @@
     "pleaseWriteReview": "Veuillez écrire un avis"
   },
   "weather": {
-    "location": "Iron Paradise Gym, Liban",
+    "location": "Emplacement du complexe",
     "goodMorning": "Bonjour",
     "goodAfternoon": "Bon Après-midi",
     "goodEvening": "Bonsoir",
@@ -2396,11 +2396,11 @@
       "contactUs": "Contactez notre équipe juridique pour clarification",
       "acceptance": {
         "title": "Acceptation des conditions",
-        "content": "En utilisant les services de Iron Paradise Gym, vous acceptez d'être lié par ces Conditions d'utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser nos services."
+        "content": "En utilisant nos services, vous acceptez d'être lié par ces Conditions d'utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser nos services."
       },
       "services": {
         "title": "Nos services",
-        "content": "Iron Paradise Gym propose:\n• Restauration et commandes de repas\n• Hébergement en chalets et réservations\n• Accès à la piscine et billetterie\n• Services de buffet"
+        "content": "Nous proposons :\n• Restauration et commandes de repas\n• Hébergement en chalets et réservations\n• Accès à la piscine et billetterie\n• Services de buffet"
       },
       "bookings": {
         "title": "Réservations",
@@ -2412,7 +2412,7 @@
       },
       "liability": {
         "title": "Limitation de responsabilité",
-        "content": "Iron Paradise Gym n'est pas responsable de:\n• Effets personnels laissés dans les locaux\n• Blessures résultant du non-respect des règles de sécurité\n• Interruptions de service dues aux conditions météorologiques"
+        "content": "Nous ne sommes pas responsables de :\n• Effets personnels laissés dans les locaux\n• Blessures résultant du non-respect des règles de sécurité\n• Interruptions de service dues aux conditions météorologiques"
       },
       "changes": {
         "title": "Modifications des conditions",

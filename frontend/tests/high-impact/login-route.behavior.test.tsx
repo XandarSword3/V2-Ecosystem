@@ -43,6 +43,12 @@ vi.mock('@/lib/auth-context', () => ({
   }),
 }));
 
+// The login page routes post-auth redirects through the property slug
+// (/${propertySlug}/admin|staff). Provide a stable property context.
+vi.mock('@/lib/settings-context', () => ({
+  useSiteSettings: () => ({ settings: { propertySlug: 'demo' } }),
+}));
+
 import LoginPage from '../../src/app/login/page';
 
 describe('Login route behavior', () => {
@@ -62,7 +68,18 @@ describe('Login route behavior', () => {
     render(<LoginPage />);
 
     await waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith('/admin');
+      expect(replaceMock).toHaveBeenCalledWith('/demo/admin');
+    });
+  });
+
+  it('redirects already authenticated platform admins to /platform-admin', async () => {
+    authState.user = { id: 'root-1', roles: ['super_admin'], is_platform_admin: true };
+    authState.isAuthenticated = true;
+
+    render(<LoginPage />);
+
+    await waitFor(() => {
+      expect(replaceMock).toHaveBeenCalledWith('/platform-admin');
     });
   });
 
@@ -77,12 +94,12 @@ describe('Login route behavior', () => {
 
     render(<LoginPage />);
 
-    fireEvent.change(screen.getByLabelText('email'), { target: { value: 'user@example.com' } });
-    fireEvent.change(screen.getByLabelText('password'), { target: { value: 'secret123' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret123' } });
     await user.click(screen.getByRole('button', { name: 'title' }));
 
     await waitFor(() => {
-      expect(loginMock).toHaveBeenCalledWith('user@example.com', 'secret123');
+      expect(loginMock).toHaveBeenCalledWith('user@example.com', 'secret123', undefined);
     });
 
     expect(await screen.findByText('Two-Factor Authentication')).toBeInTheDocument();
@@ -91,9 +108,58 @@ describe('Login route behavior', () => {
     await user.click(screen.getByRole('button', { name: 'Verify & Sign In' }));
 
     await waitFor(() => {
-      expect(verify2FAMock).toHaveBeenCalledWith('user-2fa', '123456');
+      expect(verify2FAMock).toHaveBeenCalledWith('user-2fa', '123456', false);
     });
 
     expect(await screen.findByText('Invalid verification code')).toBeInTheDocument();
+  });
+
+  it('logs in successfully and redirects staff-role users to the property staff area', async () => {
+    const originalLocation = window.location;
+    let navigatedTo = '';
+    // jsdom cannot navigate; stub window.location so the post-login
+    // window.location.href assignment (redirectAfterLogin contract) is
+    // observable while getRedirectPath() keeps reading an empty search.
+    try {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: {
+          get search() {
+            return '';
+          },
+          get href() {
+            return 'http://localhost/login';
+          },
+          set href(value: string) {
+            navigatedTo = value;
+          },
+        },
+      });
+
+      authState.user = null;
+      authState.isAuthenticated = false;
+      loginMock.mockResolvedValue({
+        id: 'user-1',
+        email: 'staff@example.com',
+        fullName: 'Staff Member',
+        roles: ['staff'],
+      });
+
+      const user = userEvent.setup();
+      render(<LoginPage />);
+
+      fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'staff@example.com' } });
+      fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret123' } });
+      await user.click(screen.getByRole('button', { name: 'title' }));
+
+      await waitFor(() => {
+        expect(loginMock).toHaveBeenCalledWith('staff@example.com', 'secret123', undefined);
+      });
+      await waitFor(() => {
+        expect(navigatedTo).toBe('/demo/staff');
+      });
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    }
   });
 });

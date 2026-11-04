@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import {
   Award,
+  AlertTriangle,
   Sparkles,
   TrendingUp,
   History,
@@ -142,6 +143,28 @@ export function LoyaltyHub({ propertySlug = '', className = '' }: LoyaltyHubProp
           >
             Sign In / Register
           </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Explicit load-failure surface (Phase 12). Without this branch a network
+  // failure would silently render the "not enrolled" panel below — the
+  // customer's actual error masquerading as enrollment.
+  if (loadError) {
+    return (
+      <Card className="text-center p-8 border-red-200 dark:border-red-900/40" data-testid="loyalty-load-error">
+        <CardContent className="space-y-4 max-w-lg mx-auto">
+          <AlertTriangle className="w-10 h-10 text-red-500 mx-auto" />
+          <h2 className="text-xl font-bold text-foreground">Unable to load loyalty account information.</h2>
+          <p className="text-sm text-muted-foreground">Please check your connection and try again.</p>
+          <Button
+            type="button"
+            onClick={() => fetchLoyaltyData(new AbortController().signal)}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            Try Again
+          </Button>
         </CardContent>
       </Card>
     );

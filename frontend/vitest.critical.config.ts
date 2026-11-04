@@ -5,7 +5,6 @@ import path from 'path';
 const criticalRouteFiles = [
   'src/app/admin/[slug]/bookings/page.tsx',
   'src/app/admin/[slug]/reservations/page.tsx',
-  'src/app/admin/[slug]/waitlist/page.tsx',
   'src/app/account/loyalty/page.tsx',
   'src/app/admin/settings/payments/page.tsx',
   'src/app/login/page.tsx',
@@ -20,7 +19,6 @@ export default defineConfig({
     include: [
       'tests/high-impact/admin-bookings-route.behavior.test.tsx',
       'tests/high-impact/admin-reservations-route.behavior.test.tsx',
-      'tests/high-impact/admin-waitlist-route.behavior.test.tsx',
       'tests/high-impact/account-loyalty-route.behavior.test.tsx',
       'tests/high-impact/admin-payments-route.behavior.test.tsx',
       'tests/high-impact/login-route.behavior.test.tsx',

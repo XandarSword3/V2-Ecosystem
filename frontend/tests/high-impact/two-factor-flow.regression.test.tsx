@@ -66,6 +66,7 @@ vi.mock('@/lib/auth-context', () => ({
 }));
 
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({
     settings: { propertySlug: 'test-property' },
   }),

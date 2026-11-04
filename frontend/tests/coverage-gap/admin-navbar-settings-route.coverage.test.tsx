@@ -35,6 +35,7 @@ vi.mock('@/lib/api', () => ({
 }));
 
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({
     modules: [
       { id: 'm-1', slug: 'spa', name: 'Spa Module' },

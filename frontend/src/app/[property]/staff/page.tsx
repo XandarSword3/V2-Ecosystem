@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth-context';
-import { useSiteSettings } from '@/lib/settings-context';
+import { useSiteSettings, DEFAULT_BRAND_NAME } from '@/lib/settings-context';
 import { useProperty } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
 import { MULTI_ENGINE_LEGACY_STATUSES, MULTI_ENGINE_ACTIVE_STATUSES } from '@/components/staff/types';
@@ -66,7 +66,8 @@ export default function StaffDashboard() {
   const params = useParams();
   const propertySlug = (params?.property as string) || 'default';
   const { user, isAuthenticated, isLoading } = useAuth();
-  const { modules } = useSiteSettings();
+  const { modules, settings } = useSiteSettings();
+  const brandName = settings.siteName || DEFAULT_BRAND_NAME;
   const t = useTranslations('staff');
   const td = useTranslations('staff.dashboard');
   const { socket } = useSocket();
@@ -385,7 +386,7 @@ export default function StaffDashboard() {
           Welcome, {user?.fullName?.split(' ')[0] || 'Staff'} 👋
         </h1>
         <p className="text-slate-600 dark:text-slate-400 mt-1">
-          {td('welcomeSubtitle')}
+          {td('welcomeSubtitle', { brandName })}
         </p>
       </motion.div>
 

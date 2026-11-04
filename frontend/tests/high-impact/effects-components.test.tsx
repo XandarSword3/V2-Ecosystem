@@ -29,6 +29,7 @@ vi.mock('framer-motion', () => {
 });
 
 vi.mock('@/lib/settings-context', () => ({
+  DEFAULT_BRAND_NAME: 'V2 Resort',
   useSiteSettings: () => ({
     settings: {
       propertyName: 'V2 Ecosystem',

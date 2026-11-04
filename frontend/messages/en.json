@@ -318,15 +318,15 @@
   },
   "home": {
     "hero": {
-      "title": "Welcome to Iron Paradise Gym",
-      "titleHighlight": "Iron Paradise Gym",
+      "title": "Welcome to {brandName}",
+      "titleHighlight": "{brandName}",
       "subtitle": "Your premium destination for exceptional dining, comfortable chalets, and refreshing pool experiences.",
       "cta": "Explore Now",
       "badge": "Premier Resort Experience"
     },
     "services": {
       "title": "Our Services",
-      "subtitle": "Discover everything Iron Paradise Gym has to offer for an unforgettable experience",
+      "subtitle": "Discover everything {brandName} has to offer for an unforgettable experience",
       "whatWeOffer": "What We Offer",
       "restaurant": {
         "title": "Restaurant",
@@ -346,7 +346,7 @@
       }
     },
     "features": {
-      "title": "Why Choose Iron Paradise Gym?",
+      "title": "Why Choose {brandName}?",
       "subtitle": "Why Choose Us",
       "primeLocation": {
         "title": "Prime Location",
@@ -397,7 +397,7 @@
       "bookChalet": "Book a Chalet",
       "bookNow": "Book Now",
       "readyGetaway": "Ready for Your Perfect Getaway?",
-      "bookStayNow": "Book your stay now and experience the best of hospitality at Iron Paradise Gym",
+      "bookStayNow": "Book your stay now and experience the best of hospitality at {brandName}",
       "bookYourChaletNow": "Book Your Chalet Now"
     }
   },
@@ -691,7 +691,7 @@
   },
   "adminDashboard": {
     "welcomeBack": "Welcome back",
-    "subtitle": "Here's what's happening at Iron Paradise Gym today, {name}",
+    "subtitle": "Here's what's happening at {brandName} today, {name}",
     "refresh": "Refresh",
     "refreshed": "Dashboard refreshed",
     "errors": {
@@ -1884,7 +1884,7 @@
       "table": "Table {number}"
     },
     "dashboard": {
-      "welcomeSubtitle": "Here's what's happening today at Iron Paradise Gym",
+      "welcomeSubtitle": "Here's what's happening today at {brandName}",
       "quickActions": "Quick Actions",
       "recentActivity": "Recent Activity",
       "noActivity": "No recent activity",
@@ -2142,7 +2142,7 @@
     "phone": "+1 234 567 8900",
     "email": "bookings@v2ecosystem.com",
     "followUs": "Follow Us",
-    "copyright": "© {year} Iron Paradise Gym. All rights reserved.",
+    "copyright": "© {year} {brandName}. All rights reserved.",
     "cookiePolicy": "Cookie Policy"
   },
   "contact": {
@@ -2219,7 +2219,7 @@
   "testimonials": {
     "badge": "Guest Reviews",
     "title": "What Our Guests Say",
-    "subtitle": "Read authentic reviews from guests who have experienced Iron Paradise Gym",
+    "subtitle": "Read authentic reviews from guests who have experienced {brandName}",
     "averageRating": "Average Rating",
     "happyGuests": "Happy Guests",
     "recommend": "Would Recommend",
@@ -2242,7 +2242,7 @@
     "pleaseWriteReview": "Please write a review"
   },
   "weather": {
-    "location": "Iron Paradise Gym",
+    "location": "Resort Location",
     "goodMorning": "Good Morning",
     "goodAfternoon": "Good Afternoon",
     "goodEvening": "Good Evening",
@@ -2396,11 +2396,11 @@
       "contactUs": "Contact our legal team for clarification",
       "acceptance": {
         "title": "Acceptance of Terms",
-        "content": "By accessing or using Iron Paradise Gym's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services."
+        "content": "By accessing or using our services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services."
       },
       "services": {
         "title": "Our Services",
-        "content": "Iron Paradise Gym provides:\n• Restaurant dining and food ordering\n• Chalet accommodations and bookings\n• Pool access and ticket reservations\n• Snack bar services\n\nAll services are subject to availability."
+        "content": "We provide:\n• Restaurant dining and food ordering\n• Chalet accommodations and bookings\n• Pool access and ticket reservations\n• Snack bar services\n\nAll services are subject to availability."
       },
       "bookings": {
         "title": "Bookings & Reservations",
@@ -2412,7 +2412,7 @@
       },
       "liability": {
         "title": "Limitation of Liability",
-        "content": "Iron Paradise Gym is not liable for:\n• Personal belongings left on premises\n• Injuries resulting from failure to follow safety rules\n• Weather-related service interruptions\n• Third-party service failures\n\nOur maximum liability is limited to the amount paid for services."
+        "content": "We are not liable for:\n• Personal belongings left on premises\n• Injuries resulting from failure to follow safety rules\n• Weather-related service interruptions\n• Third-party service failures\n\nOur maximum liability is limited to the amount paid for services."
       },
       "changes": {
         "title": "Changes to Terms",

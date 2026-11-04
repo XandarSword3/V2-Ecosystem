@@ -1,16 +1,14 @@
 /**
- * F11 — Business Administration navigation contract tests.
+ * Admin Navigation multi-engine platform contract tests.
  *
- * Locks the capability-organized admin navigation so future edits cannot
- * silently regress the F11 model:
- *
- * 1. The BUSINESS category exists and contains the canonical Engine A
- *    capability items (no vertical vocabulary like restaurant/pool/snack).
- * 2. Legacy categories (marketing/operations/people) are gone.
- * 3. Permission filtering is capability-scoped: removing a permission
- *    removes exactly the capability items that require it.
- * 4. Cross-module Orders is surfaced and gated by order:read:all.
- * 5. The capability overview dashboard (admin/business) is linked.
+ * Validates that the admin navigation properly exposes all multi-engine platform categories:
+ * 1. The categories exist: dashboard, modules, marketing, operations, people, system.
+ * 2. Per-module configuration surfaces are derived dynamically per engine_type.
+ * 3. Operations features (Orders, Fulfillment, Housekeeping, Inventory, Channels, Messaging, Parity) are reachable.
+ * 4. Marketing features (Loyalty, Gift Cards, Coupons, Reviews) are reachable.
+ * 5. People features (Customers, Staff, Admins, Live Users) are reachable.
+ * 6. System features (Reports, Modules, Settings, Setup, Audit) are reachable.
+ * 7. Admin role allows full visibility while non-admin role respects permission filtering.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -38,155 +36,130 @@ function hrefsOf(categories: ReturnType<typeof getStaticNavigation>, categoryId:
   return out;
 }
 
-describe('F11: Business capability navigation', () => {
+describe('Admin: Multi-engine platform navigation', () => {
   const nav = getStaticNavigation(t, PROPERTY);
   const categoryIds = nav.map((c) => c.id);
 
-  it('has the F11 category structure: dashboard, modules, business, system', () => {
-    expect(categoryIds).toEqual(['dashboard', 'modules', 'business', 'system']);
+  it('has the full platform category structure: dashboard, modules, marketing, operations, people, system', () => {
+    expect(categoryIds).toEqual(['dashboard', 'modules', 'marketing', 'operations', 'people', 'system']);
   });
 
-  it('no longer exposes legacy platform categories', () => {
-    for (const legacy of ['marketing', 'operations', 'people']) {
-      expect(categoryIds).not.toContain(legacy);
-    }
-  });
-
-  it('business category contains the canonical capability items', () => {
-    const business = nav.find((c) => c.id === 'business')!;
-    const names = business.items.map((i) => i.translationKey ?? i.name);
-
-    // Canonical F11 capabilities present
-    for (const key of [
-      'nav.overview',
-      'nav.orders',
-      'nav.products',
-      'nav.pricing',
-      'nav.fulfillment',
-      'nav.resources',
-      'nav.customers',
-      'nav.staff',
-      'nav.paymentsNav',
-      'nav.fiscal',
-      'nav.analytics',
-    ]) {
-      expect(names).toContain(key);
-    }
-  });
-
-  it('business category contains no vertical/legacy vocabulary', () => {
-    const business = nav.find((c) => c.id === 'business')!;
-    const blob = JSON.stringify(business).toLowerCase();
-    for (const vertical of ['restaurant', 'pool', 'snack', 'chalet', 'kitchen', 'waitlist']) {
-      expect(blob).not.toContain(vertical);
-    }
-  });
-
-  it('links the cross-module orders surface gated by order:read:all', () => {
-    const ordersItem = nav
-      .find((c) => c.id === 'business')!
-      .items.find((i) => i.translationKey === 'nav.orders');
-    expect(ordersItem).toBeDefined();
-    expect(ordersItem!.href).toBe(`${base}/orders`);
-    expect(ordersItem!.permissions).toContain('order:read:all');
-  });
-
-  it('links the cross-module catalog at admin/products', () => {
-    const productsItem = nav
-      .find((c) => c.id === 'business')!
-      .items.find((i) => i.translationKey === 'nav.products');
-    expect(productsItem).toBeDefined();
-    expect(productsItem!.href).toBe(`${base}/products`);
-  });
-
-  it('links the capability overview dashboard at admin/business', () => {
-    const overviewItem = nav
-      .find((c) => c.id === 'business')!
-      .items.find((i) => i.translationKey === 'nav.overview');
-    expect(overviewItem).toBeDefined();
-    expect(overviewItem!.href).toBe(`${base}/business`);
-  });
-
-  it('preserves per-module configuration under dynamic MODULES category', () => {
-    // getModuleChildren still derives per-module surfaces from engine_type
+  it('preserves per-module configuration under dynamic MODULES category for all engines', () => {
+    // Engine A: instant_transaction
     const menuChildren = getModuleChildren('bistro', 'instant_transaction', t, PROPERTY);
     expect(menuChildren.some((c) => c.href === `${base}/bistro/menu`)).toBe(true);
+    expect(menuChildren.some((c) => c.href === `${base}/bistro/orders`)).toBe(true);
 
+    // Engine B: time_exclusive_reservation
     const bookingChildren = getModuleChildren('chalets', 'time_exclusive_reservation', t, PROPERTY);
     expect(bookingChildren.some((c) => c.href === `${base}/chalets/bookings`)).toBe(true);
+    expect(bookingChildren.some((c) => c.href === `${base}/chalets`)).toBe(true);
+
+    // Engine C: shared_capacity_access
+    const sessionChildren = getModuleChildren('pool', 'shared_capacity_access', t, PROPERTY);
+    expect(sessionChildren.some((c) => c.href === `${base}/pool/sessions`)).toBe(true);
+    expect(sessionChildren.some((c) => c.href === `${base}/pool/tickets`)).toBe(true);
+
+    // Engine D: ongoing_entitlement
+    const membershipChildren = getModuleChildren('gym', 'ongoing_entitlement', t, PROPERTY);
+    expect(membershipChildren.some((c) => c.href === `${base}/gym/memberships`)).toBe(true);
   });
 
-  it('keeps channel/integration features reachable under System settings', () => {
-    const hrefs = hrefsOf(nav, 'system');
-    for (const href of [`${base}/channels`, `${base}/messaging`, `${base}/parity`, `${base}/integrations`]) {
-      expect(hrefs).toContain(href);
-    }
-  });
-});
-
-describe('F11: capability-scoped permission filtering', () => {
-  it('hides exactly the capability items whose permissions are missing', () => {
-    const full = getStaticNavigation(t, PROPERTY);
-
-    // Actor with only order visibility: should see Orders but not Resources/Staff
-    const ordersOnly = filterNavigationByRole(full, [], new Set(['order:read:all']));
-    const businessOrdersOnly = ordersOnly.find((c) => c.id === 'business')!;
-    const orderNames = businessOrdersOnly.items.map((i) => i.translationKey ?? i.name);
-    expect(orderNames).toContain('nav.orders');
-    expect(orderNames).not.toContain('nav.resources');
-    expect(orderNames).not.toContain('nav.staff');
-    // Overview has no permission gate — always visible
-    expect(orderNames).toContain('nav.overview');
+  it('operations category contains core operational surfaces', () => {
+    const opsHrefs = hrefsOf(nav, 'operations');
+    expect(opsHrefs).toContain(`${base}/orders`);
+    expect(opsHrefs).toContain(`${base}/fulfillment`);
+    expect(opsHrefs).toContain(`${base}/housekeeping`);
+    expect(opsHrefs).toContain(`${base}/inventory`);
+    expect(opsHrefs).toContain(`${base}/channels`);
+    expect(opsHrefs).toContain(`${base}/messaging`);
+    expect(opsHrefs).toContain(`${base}/parity`);
   });
 
-  it('wildcard permission sees the entire capability surface', () => {
-    const full = getStaticNavigation(t, PROPERTY);
-    const wildcard = filterNavigationByRole(full, [], new Set(['*']));
-    const business = wildcard.find((c) => c.id === 'business')!;
-    // Every ungated item plus all permission-gated items survive
-    expect(business.items.length).toBe(full.find((c) => c.id === 'business')!.items.length);
+  it('marketing category contains customer engagement surfaces', () => {
+    const mktHrefs = hrefsOf(nav, 'marketing');
+    expect(mktHrefs).toContain(`${base}/loyalty`);
+    expect(mktHrefs).toContain(`${base}/giftcards`);
+    expect(mktHrefs).toContain(`${base}/coupons`);
+    expect(mktHrefs).toContain(`${base}/reviews`);
   });
 
-  it('an actor with no permissions still sees the ungated overview', () => {
-    const full = getStaticNavigation(t, PROPERTY);
-    const none = filterNavigationByRole(full, [], new Set<string>());
-    const business = none.find((c) => c.id === 'business')!;
-    const names = business.items.map((i) => i.translationKey ?? i.name);
-    expect(names).toContain('nav.overview');
-    expect(names).not.toContain('nav.orders');
+  it('people category contains user administration surfaces', () => {
+    const peopleHrefs = hrefsOf(nav, 'people');
+    expect(peopleHrefs).toContain(`${base}/users/customers`);
+    expect(peopleHrefs).toContain(`${base}/users/staff`);
+    expect(peopleHrefs).toContain(`${base}/users/admins`);
+    expect(peopleHrefs).toContain(`${base}/users/live`);
   });
 
-  it('removes audit child from Fiscal when audit permission is missing', () => {
-    const full = getStaticNavigation(t, PROPERTY);
-    const noAudit = filterNavigationByRole(full, [], new Set(['admin:reports:read']));
-    const fiscal = noAudit.find((c) => c.id === 'business')!.items.find(
-      (i) => i.translationKey === 'nav.fiscal',
-    )!;
-    const childKeys = (fiscal.children ?? []).map((c) => c.translationKey ?? c.name);
-    expect(childKeys).toContain('nav.financialReports');
-    expect(childKeys).not.toContain('nav.auditLogs');
+  it('system category contains reports, settings, setup, and audit', () => {
+    const sysHrefs = hrefsOf(nav, 'system');
+    expect(sysHrefs).toContain(`${base}/cockpit`);
+    expect(sysHrefs).toContain(`${base}/modules`);
+    expect(sysHrefs).toContain(`${base}/settings`);
+    expect(sysHrefs).toContain(`${base}/setup`);
+    expect(sysHrefs).toContain(`${base}/audit`);
   });
 });
 
-describe('F11: invariants', () => {
+describe('Admin: Role and permission filtering', () => {
+  it('admin role sees all categories and items without being blocked by empty permissions', () => {
+    const full = getStaticNavigation(t, PROPERTY);
+    const adminView = filterNavigationByRole(full, ['admin'], new Set<string>());
+    const categoryIds = adminView.map((c) => c.id);
+    expect(categoryIds).toContain('dashboard');
+    expect(categoryIds).toContain('marketing');
+    expect(categoryIds).toContain('operations');
+    expect(categoryIds).toContain('people');
+    expect(categoryIds).toContain('system');
+
+    // Operations items are all present
+    const ops = adminView.find((c) => c.id === 'operations')!;
+    const opsNames = ops.items.map((i) => i.name);
+    expect(opsNames).toContain('nav.orders');
+    expect(opsNames).toContain('nav.inventory');
+  });
+
+  it('super_admin sees multi-property item', () => {
+    const full = getStaticNavigation(t, PROPERTY);
+    const superAdminView = filterNavigationByRole(full, ['super_admin'], new Set<string>());
+    const opsHrefs = hrefsOf(superAdminView, 'operations');
+    expect(opsHrefs).toContain(`${base}/properties`);
+  });
+
+  it('non-admin role without permissions is filtered appropriately', () => {
+    const full = getStaticNavigation(t, PROPERTY);
+    // User with only staff role and no admin role
+    const staffView = filterNavigationByRole(full, ['staff'], new Set(['order:read:all']));
+    const ops = staffView.find((c) => c.id === 'operations')!;
+    const opsNames = ops.items.map((i) => i.name);
+    expect(opsNames).toContain('nav.orders');
+    expect(opsNames).not.toContain('nav.inventory');
+  });
+});
+
+describe('Admin: Invariants', () => {
   it('system page slugs unchanged', () => {
     expect(SYSTEM_PAGE_SLUGS).toEqual(['home-page', 'privacy-policy', 'terms-of-service']);
   });
 
-  it('every business capability href points into the admin property namespace', () => {
+  it('every href points into the admin property namespace', () => {
     const nav = getStaticNavigation(t, PROPERTY);
-    const business = nav.find((c) => c.id === 'business')!;
-    for (const item of business.items) {
-      expect(item.href.startsWith(base)).toBe(true);
-      for (const child of item.children ?? []) {
-        expect(child.href.startsWith(base)).toBe(true);
+    for (const cat of nav) {
+      for (const item of cat.items) {
+        expect(item.href.startsWith(base)).toBe(true);
+        for (const child of item.children ?? []) {
+          expect(child.href.startsWith(base)).toBe(true);
+        }
       }
     }
   });
 
-  it('search flattening covers capability items', () => {
+  it('search flattening covers all navigation items', () => {
     const nav = getStaticNavigation(t, PROPERTY);
     const flat = flattenNavigation(nav);
-    expect(flat.some((f) => f.category === 'Business' || f.category === 'nav.business')).toBe(true);
+    expect(flat.length).toBeGreaterThan(15);
+    expect(flat.some((f) => f.href.includes('/orders'))).toBe(true);
+    expect(flat.some((f) => f.href.includes('/inventory'))).toBe(true);
   });
 });
