@@ -81,6 +81,10 @@ jobs:
         working-directory: frontend
         run: npx tsc --noEmit
 
+      - name: Check translation parity (en/ar/fr/de/it)
+        working-directory: frontend
+        run: npm run check:translations
+
   backend-unit:
     name: Stage 2 - Backend Unit
     runs-on: ubuntu-latest
