@@ -1,14 +1,15 @@
-/**
- * Phase 2 Verification Program — Extended API Client
+﻿/**
+ * Phase 2 Verification Program â€” Extended API Client
  *
  * Engine-refit aligned (ARCHITECTURE_LAW.md):
- * - Commerce records are `transactions` rows (never menu_service_orders / capacity_access_tickets / …).
+ * - Commerce records are `transactions` rows (never menu_service_orders / capacity_access_tickets / â€¦).
  * - Customer module routes: `/{moduleSlug}/orders|bookings|tickets|sessions`.
- * - Staff module routes: `/staff/modules/{slug}/…` (entry, exit, capacity, validate-ticket).
+ * - Staff module routes: `/staff/modules/{slug}/â€¦` (entry, exit, capacity, validate-ticket).
  */
 
 import { TEST_CONFIG } from '../config';
 import { ModuleSlug, trackTransaction } from '../engine-refit-helpers';
+import { generate as generateOtp } from 'otplib';
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -22,10 +23,18 @@ export class Phase2Client {
   private baseUrl: string;
   private token: string | null = null;
   public userId: string | null = null;
+  /**
+   * Tenant/property context sent with every request (X-Tenant-ID /
+   * X-Property-Id). Admin settings and module writes are stamped with the
+   * property â€” without these headers site_settings writes fail on the
+   * property_id NOT NULL constraint. Static like csrfToken: configured once
+   * by the suite bootstrap, shared by every client instance.
+   */
+  private static defaultHeaders: Record<string, string> = {};
 
   /**
    * Static CSRF token shared across all Phase2Client instances.
-   * The API uses Double Submit Cookie pattern — we send the same
+   * The API uses Double Submit Cookie pattern â€” we send the same
    * arbitrary token in both the `Cookie: csrf-token=<tok>` header
    * and the `X-CSRF-Token: <tok>` header.
    */
@@ -44,7 +53,11 @@ export class Phase2Client {
     return this.token;
   }
 
-  // ───────── Core HTTP ─────────
+  static setDefaultHeaders(headers: Record<string, string>): void {
+    Phase2Client.defaultHeaders = { ...headers };
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Core HTTP â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   private static readonly SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
@@ -58,6 +71,7 @@ export class Phase2Client {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Integration-Test': 'true',
+      ...Phase2Client.defaultHeaders,
     };
     if (auth && this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
@@ -122,7 +136,7 @@ export class Phase2Client {
     return this.request<T>(endpoint, 'DELETE', undefined, opts);
   }
 
-  // ───────── Auth ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async login(email: string, password: string): Promise<ApiResponse> {
     const res = await this.post('/auth/login', { email, password }, { auth: false });
@@ -130,6 +144,76 @@ export class Phase2Client {
       this.token = res.data.accessToken || res.data.tokens?.accessToken || null;
       this.userId = res.data.user?.id || res.data.id || null;
     }
+    return res;
+  }
+
+  /**
+   * Admin login implementing the real mandatory-2FA operator journey (Q103):
+   *
+   * 1. POST /auth/login â†’ 403 TWO_FACTOR_SETUP_REQUIRED with a short-lived
+   *    twoFactorSetupToken (privileged scopes without 2FA get no session).
+   * 2. POST /auth/2fa/setup (Bearer setupToken) â†’ one-time plain `secret`.
+   * 3. POST /auth/2fa/enable (Bearer setupToken + TOTP code) â†’ the API
+   *    completes login on the spot and returns real access tokens.
+   *
+   * The harness re-enrolls on every run (it clears two_factor_* rows for the
+   * phase2 admin user), so this path is deterministic. If the account already
+   * has 2FA enabled the login answers `requiresTwoFactor` instead â€” we surface
+   * a clear error rather than guessing codes.
+   */
+  async loginAsAdmin(email: string, password: string): Promise<ApiResponse> {
+    const res = await this.post('/auth/login', { email, password }, { auth: false });
+
+    // Path A: plain login succeeded (non-privileged scope or 2FA satisfied)
+    if (res.success && res.data) {
+      this.token = res.data.accessToken || res.data.tokens?.accessToken || null;
+      this.userId = res.data.user?.id || res.data.id || null;
+      return res;
+    }
+
+    const code2fa = res.raw?.code;
+    const setupPayload = res.raw?.data || {};
+
+    // Path B: mandatory 2FA enrollment required (privileged scope, 2FA off)
+    if (res.status === 403 && code2fa === 'TWO_FACTOR_SETUP_REQUIRED') {
+      const setupToken = setupPayload.twoFactorSetupToken;
+      const enrollUserId = setupPayload.userId;
+      if (!setupToken || !enrollUserId) {
+        return { ...res, error: 'TWO_FACTOR_SETUP_REQUIRED without setup token' };
+      }
+
+      // /2fa/setup and /2fa/enable are guarded by
+      // authenticateForTwoFactorEnrollment, which accepts only the short-lived
+      // setup token â€” use it as the bearer for both calls.
+      this.setToken(setupToken);
+      const setupRes = await this.post('/auth/2fa/setup', {});
+      const secret = setupRes.data?.secret;
+      if (!setupRes.success || !secret) {
+        this.setToken(null);
+        return { ...setupRes, error: setupRes.error || '2FA setup returned no secret' };
+      }
+
+      const totpCode = await generateOtp({ secret, digits: 6, period: 30, algorithm: 'sha1' } as any);
+      const enableRes = await this.post('/auth/2fa/enable', { code: totpCode });
+      if (!enableRes.success) {
+        this.setToken(null);
+        return { ...enableRes, error: enableRes.error || '2FA enable failed' };
+      }
+
+      // The enable response completes the login: real access token inside.
+      this.token = enableRes.data?.accessToken || enableRes.data?.tokens?.accessToken || null;
+      this.userId = enableRes.data?.user?.id || enrollUserId;
+      return enableRes;
+    }
+
+    // Path C: 2FA already enrolled â€” needs a code we don't have
+    if (res.raw?.data?.requiresTwoFactor || setupPayload.requiresTwoFactor) {
+      return {
+        ...res,
+        error: 'Account already has 2FA enabled; harness must clear two_factor_* rows before login',
+      };
+    }
+
     return res;
   }
 
@@ -150,7 +234,7 @@ export class Phase2Client {
         this.token = accessToken;
         this.userId = res.data.user?.id || res.data.id || null;
       } else {
-        // Registration succeeded but no token — login to get one
+        // Registration succeeded but no token â€” login to get one
         this.userId = res.data.user?.id || res.data.id || null;
         const loginRes = await this.login(data.email, data.password);
         if (!loginRes.success) {
@@ -162,7 +246,7 @@ export class Phase2Client {
     return res;
   }
 
-  // ───────── Admin Settings ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Admin Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getSettings(): Promise<ApiResponse> {
     return this.get('/admin/settings');
@@ -172,7 +256,7 @@ export class Phase2Client {
     return this.put('/admin/settings', { key, value });
   }
 
-  // ───────── Modules ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Modules â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getModules(): Promise<ApiResponse> {
     return this.get('/admin/modules');
@@ -182,7 +266,8 @@ export class Phase2Client {
     name: string;
     slug: string;
     description?: string;
-    template_type: string;
+    /** Canonical engine type (ARCHITECTURE_LAW.md) â€” the API schema rejects legacy template names. */
+    engine_type: string;
     is_active?: boolean;
     show_in_main?: boolean;
     settings?: any;
@@ -194,13 +279,33 @@ export class Phase2Client {
     return this.put(`/admin/modules/${id}`, data);
   }
 
-  // ───────── MenuService ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ MenuService â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getMenu(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    const itemsRes = await this.get(`/${ModuleSlug.RESTAURANT}/items${qs}`);
+    // Resolve the slug from the module id — getMenu is also used for
+    // non-restaurant modules (e.g. the kiosk module's categories).
+    const slug = await this.resolveModuleSlug(moduleId);
+    const itemsRes = await this.get(`/${slug}/items${qs}`);
     if (itemsRes.success) return itemsRes;
-    return this.get(`/${ModuleSlug.RESTAURANT}/menu${qs}`);
+    return this.get(`/${slug}/menu${qs}`);
+  }
+
+  /**
+   * Module-scoped routes mount by slug, but callers pass a module_id. Resolve
+   * the slug via /admin/modules (cached per client instance) so the request
+   * lands on the right module's route.
+   */
+  private moduleSlugCache: Map<string, string> | null = null;
+
+  private async resolveModuleSlug(moduleId?: string): Promise<string> {
+    if (!moduleId) return ModuleSlug.RESTAURANT;
+    if (!this.moduleSlugCache) {
+      const res = await this.getModules();
+      const mods = Array.isArray(res.data) ? res.data : res.data?.modules || [];
+      this.moduleSlugCache = new Map(mods.map((m: any) => [m.id, m.slug]));
+    }
+    return this.moduleSlugCache.get(moduleId) ?? ModuleSlug.RESTAURANT;
   }
 
   async createCategory(data: {
@@ -210,28 +315,27 @@ export class Phase2Client {
     sort_order?: number;
     description?: string;
   }): Promise<ApiResponse> {
-    const res = await this.post('/admin/import/menu', {
-      moduleId: data.module_id,
-      items: [
-        {
-          name: `${data.name} Placeholder`,
-          category: data.name,
-          price: 0,
-          is_available: false,
-        },
-      ],
+    // Module-scoped catalog route (the old global /admin/import/menu route
+    // no longer exists). The mounted module comes from the slug in the URL.
+    const slug = await this.resolveModuleSlug(data.module_id);
+    // Idempotent for repeated suite runs: catalog_categories has a unique
+    // (name, module_id) constraint, and the route's error body doesn't carry
+    // the duplicate detail — so resolve-then-create instead.
+    const list = await this.get(`/${slug}/categories`);
+    const cats = Array.isArray(list.data) ? list.data : list.data?.categories || [];
+    const existing = cats.find((c: any) => c.name === data.name);
+    if (existing) {
+      return { success: true, status: 200, data: { id: existing.id, category: existing } };
+    }
+    const res = await this.post(`/${slug}/admin/categories`, {
+      name: data.name,
+      description: data.description,
     });
-
-    if (!res.success) return res;
-    const first = Array.isArray(res.data) ? res.data[0] : null;
-    const categoryId = first?.category_id;
-    return {
-      ...res,
-      data: {
-        id: categoryId,
-        category: { id: categoryId },
-      },
-    };
+    if (res.success) {
+      const created = res.data as any;
+      return { ...res, data: { id: created?.id, category: created } };
+    }
+    return res;
   }
 
   async createMenuItem(data: {
@@ -246,21 +350,17 @@ export class Phase2Client {
     is_vegan?: boolean;
     is_gluten_free?: boolean;
   }): Promise<ApiResponse> {
-    const res = await this.post('/admin/import/menu', {
-      moduleId: data.module_id,
-      items: [
-        {
-          name: data.name,
-          category_id: data.category_id,
-          price: data.price,
-          description: data.description,
-          is_available: data.is_available,
-          is_featured: data.is_featured,
-          is_vegetarian: data.is_vegetarian,
-          is_vegan: data.is_vegan,
-          is_gluten_free: data.is_gluten_free,
-        },
-      ],
+    const slug = await this.resolveModuleSlug(data.module_id);
+    const res = await this.post(`/${slug}/admin/items`, {
+      name: data.name,
+      category_id: data.category_id,
+      price: data.price,
+      description: data.description,
+      is_available: data.is_available,
+      is_featured: data.is_featured,
+      is_vegetarian: data.is_vegetarian,
+      is_vegan: data.is_vegan,
+      is_gluten_free: data.is_gluten_free,
     });
 
     if (!res.success) return res;
@@ -290,7 +390,7 @@ export class Phase2Client {
       minSelections: data.min_selections ?? 0,
       maxSelections: data.max_selections ?? 1,
       isRequired: data.is_required ?? false,
-      applicableEntityTypes: ['menu_item'],
+      applicableEntityTypes: ['catalog_item'],
       isGlobal: false,
     });
 
@@ -332,7 +432,7 @@ export class Phase2Client {
     let lastRes: ApiResponse = { success: true, status: 200 };
     for (const modifier of modifierGroupIds) {
       lastRes = await this.post('/customizations/entity-links', {
-        entityType: 'menu_item',
+        entityType: 'catalog_item',
         entityId: menuItemId,
         customizationGroupId: modifier.groupId,
         sortOrder: modifier.sortOrder ?? 0,
@@ -346,18 +446,26 @@ export class Phase2Client {
     return lastRes;
   }
 
+  /**
+   * Create a service location (Engine A Refit Phase 3 â€” replaces the dead
+   * /tables stub). Legacy table fields map onto service locations:
+   * table_number â†’ name; capacity/section have no storage anymore.
+   */
   async createTable(data: {
     table_number: string;
     capacity?: number;
     section?: string;
     module_id?: string;
   }): Promise<ApiResponse> {
-    return this.post('/${slug}/admin/tables', data);
+    const slug = await this.resolveModuleSlug(data.module_id);
+    return this.post(`/${slug}/admin/service-locations`, {
+      name: data.table_number,
+    });
   }
 
   async getTables(moduleId?: string): Promise<ApiResponse> {
-    const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    return this.get(`/${slug}/tables${qs}`);
+    const slug = await this.resolveModuleSlug(moduleId);
+    return this.get(`/${slug}/service-locations`);
   }
 
   async createOrder(data: {
@@ -408,7 +516,7 @@ export class Phase2Client {
     return this.patch(`/${ModuleSlug.RESTAURANT}/orders/${id}/status`, { status });
   }
 
-  // ───────── AccommodationUnits ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ AccommodationUnits â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getAccommodationUnits(): Promise<ApiResponse> {
     return this.get(`/${ModuleSlug.ACCOMMODATION_UNITS}/availability`);
@@ -456,7 +564,7 @@ export class Phase2Client {
     priority?: number;
     is_active?: boolean;
   }): Promise<ApiResponse> {
-    return this.post('/accommodation_units/admin/price-rules', data);
+    return this.post('/accommodation-units/admin/price-rules', data);
   }
 
   async createAddOn(data: {
@@ -466,12 +574,12 @@ export class Phase2Client {
     price_type?: string;
     is_active?: boolean;
   }): Promise<ApiResponse> {
-    return this.post('/accommodation_units/admin/add-ons', data);
+    return this.post('/accommodation-units/admin/add-ons', data);
   }
 
   async getAddOns(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
-    return this.get(`/accommodation_units/add-ons${qs}`);
+    return this.get(`/${ModuleSlug.ACCOMMODATION_UNITS}/add-ons${qs}`);
   }
 
   async getAccommodationAvailability(
@@ -533,14 +641,14 @@ export class Phase2Client {
   }
 
   async getAccommodationSettings(): Promise<ApiResponse> {
-    return this.get('/accommodation_units/admin/settings');
+    return this.get('/accommodation-units/admin/settings');
   }
 
   async updateAccommodationSettings(data: any): Promise<ApiResponse> {
-    return this.put('/accommodation_units/admin/settings', data);
+    return this.put('/accommodation-units/admin/settings', data);
   }
 
-  // ───────── Pool ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Pool â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getCapacityWindows(moduleId?: string): Promise<ApiResponse> {
     const qs = moduleId ? `?moduleId=${moduleId}` : '';
@@ -559,13 +667,17 @@ export class Phase2Client {
     module_id?: string;
     gender_restriction?: string;
   }): Promise<ApiResponse> {
+    // capacity_windows.starts_at/ends_at are timestamptz — a bare 'HH:mm'
+    // fails the cast, so normalize time-only values onto today's date.
+    const toTimestamp = (t: string): string =>
+      /^\d{1,2}:\d{2}$/.test(t) ? `${new Date().toISOString().slice(0, 10)}T${t}:00` : t;
     return this.post(`/${ModuleSlug.POOL}/import/commit`, {
       moduleId: data.module_id,
       items: [
         {
           name: data.name,
-          startTime: data.start_time,
-          endTime: data.end_time,
+          startTime: toTimestamp(data.start_time),
+          endTime: toTimestamp(data.end_time),
           capacity: data.max_capacity ?? data.capacity ?? 50,
           adultPrice: data.adult_price ?? data.price ?? 15,
           childPrice: data.child_price ?? 8,
@@ -645,7 +757,7 @@ export class Phase2Client {
     return this.post('/pool/admin/reset-occupancy');
   }
 
-  // ───────── Loyalty ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Loyalty â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getLoyaltySettings(): Promise<ApiResponse> {
     return this.get('/loyalty/settings');
@@ -716,7 +828,7 @@ export class Phase2Client {
     return this.post('/loyalty/adjust', data);
   }
 
-  // ───────── Coupons ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Coupons â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getCoupons(): Promise<ApiResponse> {
     return this.get('/coupons');
@@ -741,7 +853,7 @@ export class Phase2Client {
     return this.post('/coupons/apply', { code, order_total: orderTotal });
   }
 
-  // ───────── Gift Cards ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Gift Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getGiftCards(): Promise<ApiResponse> {
     return this.get('/giftcards');
@@ -759,7 +871,7 @@ export class Phase2Client {
     return this.post('/giftcards/redeem', { code, amount });
   }
 
-  // ───────── Housekeeping ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Housekeeping â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getHousekeepingTaskTypes(): Promise<ApiResponse> {
     return this.get('/housekeeping/task-types');
@@ -795,7 +907,7 @@ export class Phase2Client {
     return this.post(`/housekeeping/tasks/${taskId}/complete`);
   }
 
-  // ───────── Admin Users ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Admin Users â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getAdminUsers(params?: { type?: string }): Promise<ApiResponse> {
     const qs = params?.type ? `?type=${params.type}` : '';
@@ -804,7 +916,7 @@ export class Phase2Client {
 
   async createAdminUser(data: {
     name?: string;
-    full_name?: string;
+    fullName?: string;
     email: string;
     password: string;
     phone?: string;
@@ -812,7 +924,15 @@ export class Phase2Client {
     roles?: string[];
     scope?: string;
   }): Promise<ApiResponse> {
-    return this.post('/admin/users', data);
+    // API schema (createUserSchemaWithScope) expects `fullName` â€” normalize
+    // the legacy `name`/`full_name` aliases callers may still pass.
+    const payload = {
+      ...data,
+      fullName: data.fullName || (data as any).full_name || data.name,
+    };
+    delete (payload as any).name;
+    delete (payload as any).full_name;
+    return this.post('/admin/users', payload);
   }
 
   async updateUserRoles(
@@ -829,17 +949,19 @@ export class Phase2Client {
     return this.put(`/admin/users/${userId}`, data);
   }
 
-  // ───────── Admin Dashboard & Reports ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Admin Dashboard & Reports â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async getDashboard(): Promise<ApiResponse> {
-    return this.get('/admin/dashboard');
+    // /admin/dashboard was deleted by design (admin.routes.ts): the frontend
+    // redirects to /admin/modules and revenue data lives under /admin/reports.
+    return this.get('/admin/reports/overview');
   }
 
   async getDashboardRevenue(): Promise<ApiResponse> {
-    return this.get('/admin/dashboard/revenue');
+    return this.get('/admin/reports/occupancy');
   }
 
-  // ───────── Payments ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Payments â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async createPaymentIntent(data: {
     amount: number;
@@ -854,7 +976,7 @@ export class Phase2Client {
     return this.post('/payments/confirm', { paymentIntentId });
   }
 
-  // ───────── Auth (2FA, GDPR) ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Auth (2FA, GDPR) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async enable2FA(): Promise<ApiResponse> {
     return this.post('/auth/2fa/setup');
@@ -880,7 +1002,7 @@ export class Phase2Client {
     return this.post('/gdpr/delete-request');
   }
 
-  // ───────── Health ─────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€ Health â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async health(): Promise<ApiResponse> {
     return this.get('/health', { auth: false });

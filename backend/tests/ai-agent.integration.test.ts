@@ -34,8 +34,11 @@ describe('AI Agent Interaction Tests', () => {
     });
 
     it('should require auth for module paths (not return legacy 410)', async () => {
+        // Canonical slugs are hyphenated (accommodation-units); the legacy
+        // underscore name no longer routes (404). The admin sub-route is the
+        // auth boundary: unauthenticated access must be 401, never a legacy 410.
         const response = await request(app)
-            .get(`${API_V1}/accommodation_units`)
+            .get(`${API_V1}/accommodation-units/admin/items`)
             .expect(401);
 
         expect(response.body.success).toBe(false);

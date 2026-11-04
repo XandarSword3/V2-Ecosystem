@@ -1,10 +1,10 @@
-/**
- * Phase 2 — Part 1: Admin Setup Sequence
+﻿/**
+ * Phase 2 â€” Part 1: Admin Setup Sequence
  *
  * Takes the system from blank state to fully operational resort.
  * 30 setup steps executed in dependency order.
  *
- * All subsequent test files (Parts 2–5) depend on this running first.
+ * All subsequent test files (Parts 2â€“5) depend on this running first.
  *
  * Run:  npx vitest run --config vitest.integration.config.ts tests/integration/phase2/01-admin-setup.test.ts
  */
@@ -12,7 +12,12 @@
 import { Phase2Client, createAuthenticatedClient } from './phase2-client';
 import { TEST_CONFIG } from '../config';
 import { state, saveState } from './phase2-state';
-import { initializePhase2SuiteState } from './phase2-suite-bootstrap';
+import {
+  initializePhase2SuiteState,
+  resetPhase2Admin2FA,
+  wireAdminContext,
+  PHASE2_ADMIN_CREDENTIALS,
+} from './phase2-suite-bootstrap';
 
 describe('Part 1: Admin Setup Sequence', () => {
   let admin: Phase2Client;
@@ -21,21 +26,21 @@ describe('Part 1: Admin Setup Sequence', () => {
     await initializePhase2SuiteState();
   });
 
-  // ─────────── Step 1: Super Admin Authentication ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 1: Super Admin Authentication â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 1: Super Admin Authentication', () => {
     it('should authenticate as super_admin', async () => {
       admin = new Phase2Client();
-      const loginCandidates: Array<{ email: string; password: string }> = [
-        { email: TEST_CONFIG.users.admin.email, password: TEST_CONFIG.users.admin.password },
-        { email: 'admin@v2ecosystem.com', password: 'admin123' },
-        { email: 'admin@v2ecosystem.com', password: 'Admin123!' },
-      ];
+      await wireAdminContext();
 
-      let res = await admin.login(loginCandidates[0].email, loginCandidates[0].password);
-      for (let i = 1; i < loginCandidates.length && !res.success; i++) {
-        const candidate = loginCandidates[i];
-        res = await admin.login(candidate.email, candidate.password);
-      }
+      // The operator journey includes the mandatory 2FA enrollment (Q103):
+      // reset the dedicated phase2 admin's 2FA, then log in â€” the client
+      // enrolls via /2fa/setup + /2fa/enable and lands a real super_admin
+      // session. (admin@v2ecosystem.com is the real account â€” never touched.)
+      await resetPhase2Admin2FA();
+      const res = await admin.loginAsAdmin(
+        PHASE2_ADMIN_CREDENTIALS.email,
+        PHASE2_ADMIN_CREDENTIALS.password,
+      );
 
       expect(res.success, `Login failed: ${res.error}`).toBe(true);
       expect(res.data).toBeDefined();
@@ -46,8 +51,8 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 2: General Settings ───────────
-  describe('Step 2: System Identity — General Settings', () => {
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 2: General Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  describe('Step 2: System Identity â€” General Settings', () => {
     it('should configure resort name and branding', async () => {
       const res = await admin.updateSettings('general', {
         propertyName: 'V2 Test Property',
@@ -71,7 +76,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 3: Contact Information ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 3: Contact Information â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 3: Contact Information', () => {
     it('should set contact details', async () => {
       const res = await admin.updateSettings('contact', {
@@ -83,7 +88,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 4: Payment Configuration ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 4: Payment Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 4: Payment Configuration', () => {
     it('should configure Stripe keys', async () => {
       const res = await admin.updateSettings('payments', {
@@ -96,7 +101,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 5: Tax Configuration ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 5: Tax Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 5: Tax Configuration', () => {
     it('should configure 11% tax rate', async () => {
       // Try tax endpoint first, fall back to admin settings
@@ -116,7 +121,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 6: Order Configuration ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 6: Order Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 6: Service Charge & Delivery Fee', () => {
     it('should set service charge 10% and delivery fee $5', async () => {
       const res = await admin.updateSettings('order_configuration', {
@@ -127,7 +132,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 7: Currency ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 7: Currency â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 7: Currency Configuration', () => {
     it('should set default currency to USD', async () => {
       const res = await admin.updateSettings('default_currency', 'USD');
@@ -135,14 +140,14 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 8: Create MenuService Module ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 8: Create MenuService Module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 8: MenuService Module (Engine A)', () => {
     it('should create the menu service module', async () => {
       const res = await admin.createModule({
         name: 'MenuService',
-        slug: 'menu_service',
+        slug: 'menu-service',
         description: 'Full-service dining',
-        template_type: 'instant_transaction',
+        engine_type: 'instant_transaction',
         is_active: true,
         show_in_main: true,
         settings: {
@@ -156,7 +161,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       if (res.success) {
         state.menuServiceModuleId = res.data?.id || res.data?.module?.id;
       } else {
-        // Module may already exist (duplicate slug) — look it up
+        // Module may already exist (duplicate slug) â€” look it up
         const modules = await admin.getModules();
         const all = Array.isArray(modules.data) ? modules.data : modules.data?.modules || [];
         const found = all.find((m: any) => m.slug === 'menu_service' || m.name === 'MenuService');
@@ -179,7 +184,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 9: Create MenuService Categories ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 9: Create MenuService Categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 9: MenuService Menu Categories', () => {
     const categories = [
       { name: 'Appetizers', order: 1, key: 'appetizersCatId' as const },
@@ -200,7 +205,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         if (res.success) {
           state[cat.key] = res.data?.id || res.data?.category?.id;
         } else if (res.status === 409 || res.status === 400) {
-          // May already exist — fetch all and find
+          // May already exist â€” fetch all and find
           const menu = await admin.getMenu(state.menuServiceModuleId);
           const categories = menu.data?.categories || menu.data || [];
           const found = (Array.isArray(categories) ? categories : []).find(
@@ -213,7 +218,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 10: Create Menu Items ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 10: Create Menu Items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 10: MenuService Menu Items', () => {
     const items = [
       {
@@ -286,7 +291,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 11: Modifier Groups ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 11: Modifier Groups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 11: Modifier Groups', () => {
     it('should create "Steak Temperature" modifier group', async () => {
       const res = await admin.createModifierGroup({
@@ -345,7 +350,7 @@ describe('Part 1: Admin Setup Sequence', () => {
 
     it('should link modifiers to Wagyu Steak', async () => {
       if (!state.wagyuId || !state.tempGroupId || !state.sideGroupId) {
-        console.warn('Skipping modifier link — missing IDs');
+        console.warn('Skipping modifier link â€” missing IDs');
         return;
       }
       const res = await admin.linkModifiersToItem(state.wagyuId, [
@@ -357,7 +362,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 12: MenuService Tables ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 12: MenuService Tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 12: MenuService Tables', () => {
     const tables = [
       { number: '501', capacity: 4, section: 'indoor', key: 'table1Id' as const },
@@ -378,11 +383,11 @@ describe('Part 1: Admin Setup Sequence', () => {
           state[t.key] = res.data?.id || res.data?.table?.id;
         }
         if (!state[t.key]) {
-          // Try to fetch tables and find it
+          // Try to fetch service locations and find it
           const tables = await admin.getTables(state.menuServiceModuleId);
           const all = Array.isArray(tables.data) ? tables.data : tables.data?.tables || [];
           const found = all.find(
-            (tb: any) => tb.table_number === t.number || tb.number === t.number
+            (tb: any) => tb.name === t.number || tb.table_number === t.number || tb.number === t.number
           );
           if (found) state[t.key] = found.id;
         }
@@ -391,14 +396,14 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 13: AccommodationUnits Module (Engine B) ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 13: AccommodationUnits Module (Engine B) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 13: AccommodationUnits Module (Engine B)', () => {
     it('should create accommodation_units module', async () => {
       const res = await admin.createModule({
         name: 'AccommodationUnits',
-        slug: 'accommodation_units',
+        slug: 'accommodation-units',
         description: 'Private accommodation unit accommodations',
-        template_type: 'time_exclusive_reservation',
+        engine_type: 'time_exclusive_reservation',
         is_active: true,
         show_in_main: true,
         settings: {
@@ -423,7 +428,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 14: AccommodationUnit Configuration ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 14: AccommodationUnit Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 14: AccommodationUnit Deposit & Check-in Times', () => {
     it('should configure accommodation unit settings', async () => {
       const res = await admin.updateSettings('accommodation_units', {
@@ -439,7 +444,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 15: Create AccommodationUnit Units ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 15: Create AccommodationUnit Units â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 15: AccommodationUnit Units', () => {
     const accommodation_units = [
       {
@@ -496,7 +501,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 16: AccommodationUnit Pricing Rules ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 16: AccommodationUnit Pricing Rules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 16: AccommodationUnit Pricing Rules', () => {
     it('should create Summer Peak Season rule', async () => {
       const res = await admin.createPriceRule({
@@ -511,7 +516,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       if (res.success) {
         state.summerPeakRuleId = res.data?.id || res.data?.rule?.id;
       }
-      // Non-blocking — seasonal pricing is optional for base tests
+      // Non-blocking â€” seasonal pricing is optional for base tests
     });
 
     it('should create Mountain View Premium rule', async () => {
@@ -531,7 +536,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 17: AccommodationUnit Add-ons ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 17: AccommodationUnit Add-ons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 17: AccommodationUnit Add-ons', () => {
     const addons = [
       {
@@ -580,14 +585,14 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 18: Pool Module (Engine C) ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 18: Pool Module (Engine C) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 18: Pool Module (Engine C)', () => {
     it('should create pool module', async () => {
       const res = await admin.createModule({
         name: 'Pool',
         slug: 'capacity',
         description: 'Property swimming pool',
-        template_type: 'shared_capacity_access',
+        engine_type: 'shared_capacity_access',
         is_active: true,
         show_in_main: true,
         settings: {
@@ -610,7 +615,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 19: Capacity Windows (shared_capacity_access) ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 19: Capacity Windows (shared_capacity_access) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 19: Capacity Window Creation', () => {
     const sessions = [
       {
@@ -671,7 +676,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 20: Pool Settings ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 20: Pool Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 20: Pool Settings', () => {
     it('should configure pool pricing defaults', async () => {
       const res = await admin.updateSettings('capacity', {
@@ -684,14 +689,14 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 21: KioskItem Bar Module ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 21: KioskItem Bar Module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 21: KioskItem Bar Module', () => {
     it('should create kiosk module', async () => {
       const res = await admin.createModule({
         name: 'KioskItem Bar',
         slug: 'kiosk',
         description: 'Poolside kiosk items and drinks',
-        template_type: 'instant_transaction',
+        engine_type: 'instant_transaction',
         is_active: true,
         show_in_main: true,
         settings: {
@@ -716,7 +721,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 22: KioskItem Bar Menu ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 22: KioskItem Bar Menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 22: KioskItem Bar Menu', () => {
     it('should create KioskItems category', async () => {
       const res = await admin.createCategory({
@@ -750,7 +755,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       if (res.success) {
         state.clubSandwichId = res.data?.id || res.data?.item?.id;
       }
-      // Fallback lookup omitted for brevity — pattern same as Step 10
+      // Fallback lookup omitted for brevity â€” pattern same as Step 10
     });
 
     it('should create Fresh Juice', async () => {
@@ -767,7 +772,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 23: Staff Accounts ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 23: Staff Accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 23: Staff Accounts', () => {
     const staffRoles = [
       {
@@ -842,7 +847,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 24: Customer Accounts ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 24: Customer Accounts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 24: Customer Accounts', () => {
     const customers = [
       {
@@ -878,7 +883,7 @@ describe('Part 1: Admin Setup Sequence', () => {
       it(`should register "${c.firstName} ${c.lastName}"`, async () => {
         const fullName = `${c.firstName} ${c.lastName}`;
 
-        // Create via admin API — auto-verified email, can login immediately
+        // Create via admin API â€” auto-verified email, can login immediately
         const createRes = await admin.createAdminUser({
           full_name: fullName,
           email: c.email,
@@ -889,7 +894,7 @@ describe('Part 1: Admin Setup Sequence', () => {
         if (createRes.success) {
           state[c.idKey] = createRes.data?.id || createRes.data?.user?.id;
         } else {
-          // User may already exist (previous run) — find & ensure verified
+          // User may already exist (previous run) â€” find & ensure verified
           const usersRes = await admin.getAdminUsers();
           const users = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.users || [];
           const existing = users.find((u: any) => u.email === c.email);
@@ -916,14 +921,14 @@ describe('Part 1: Admin Setup Sequence', () => {
     }
   });
 
-  // ─────────── Step 25: Loyalty Program ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 25: Loyalty Program â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 25: Loyalty Program Configuration', () => {
     it('should configure loyalty settings', async () => {
       const res = await admin.updateLoyaltySettings({
         pointsPerDollar: 10,
         pointsExpiryDays: 365,
       });
-      // Loyalty settings endpoint has known column mapping issues — accept any non-crash
+      // Loyalty settings endpoint has known column mapping issues â€” accept any non-crash
       expect(res.status).toBeLessThan(500);
     });
 
@@ -992,7 +997,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 26: Coupons ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 26: Coupons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 26: Coupons', () => {
     const coupons = [
       {
@@ -1071,15 +1076,15 @@ describe('Part 1: Admin Setup Sequence', () => {
 
     it('should reject EXPIRED1 coupon', async () => {
       const res = await admin.validateCoupon('EXPIRED1', 50);
-      // Should fail — expired
+      // Should fail â€” expired
       if (res.success) {
         // If the system doesn't validate expiry on validate endpoint, that's also data
-        console.warn('EXPIRED1 coupon was accepted — expiry check may not apply on validate');
+        console.warn('EXPIRED1 coupon was accepted â€” expiry check may not apply on validate');
       }
     });
   });
 
-  // ─────────── Step 27: Gift Cards ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 27: Gift Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 27: Gift Cards', () => {
     it('should create $50 gift card for Bob', async () => {
       const res = await admin.createGiftCard({
@@ -1117,7 +1122,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 28: Housekeeping Task Types ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 28: Housekeeping Task Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 28: Housekeeping Task Types', () => {
     it('should create Standard Cleaning type', async () => {
       const res = await admin.createHousekeepingTaskType({
@@ -1140,7 +1145,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 29: Notification Templates ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 29: Notification Templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 29: Notification Configuration', () => {
     it('should configure notification settings', async () => {
       const res = await admin.updateSettings('notifications', {
@@ -1153,7 +1158,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Step 30: Appearance ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Step 30: Appearance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Step 30: Appearance Configuration', () => {
     it('should set luxury theme', async () => {
       const res = await admin.updateSettings('appearance', {
@@ -1166,7 +1171,7 @@ describe('Part 1: Admin Setup Sequence', () => {
     });
   });
 
-  // ─────────── Verification Checkpoint ───────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Verification Checkpoint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   describe('Setup Verification Checkpoint', () => {
     it('should have all 4 modules active', async () => {
       const res = await admin.getModules();
@@ -1199,22 +1204,22 @@ describe('Part 1: Admin Setup Sequence', () => {
 
     it('should log final state summary', () => {
       const populated = Object.entries(state).filter(([, v]) => v != null);
-      console.log(`\n✅ Setup complete: ${populated.length} state fields populated`);
+      console.log(`\nâœ… Setup complete: ${populated.length} state fields populated`);
       console.log('State keys:', populated.map(([k]) => k).join(', '));
 
       const missing = Object.entries(state).filter(([, v]) => v == null);
       if (missing.length > 0) {
-        console.log(`⚠️  Missing: ${missing.map(([k]) => k).join(', ')}`);
+        console.log(`âš ï¸  Missing: ${missing.map(([k]) => k).join(', ')}`);
       }
 
       // Compatibility no-op in in-memory state mode
       saveState();
-      console.log('💾 Phase 2 state finalized in memory');
+      console.log('ðŸ’¾ Phase 2 state finalized in memory');
     });
   });
 });
 
-// ────── Helpers ──────
+// â”€â”€â”€â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€
 
 function extractMenuItems(data: any): any[] {
   if (!data) return [];

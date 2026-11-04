@@ -1,5 +1,5 @@
 /**
- * Phase 2 — Part 2: Complete Journey Library (J-01 through J-15)
+ * Phase 2 â€” Part 2: Complete Journey Library (J-01 through J-15)
  *
  * 15 customer/staff journeys that exercise every engine and cross-engine flow.
  * Must run AFTER Part 1 admin setup.
@@ -9,10 +9,14 @@
 
 import { Phase2Client } from './phase2-client';
 import { state, requireState } from './phase2-state';
-import { initializePhase2SuiteState, cleanupPhase2SuiteState } from './phase2-suite-bootstrap';
+import {
+  initializePhase2SuiteState,
+  cleanupPhase2SuiteState,
+  verifyNewUserEmail,
+} from './phase2-suite-bootstrap';
 import { ModuleSlug } from '../engine-refit-helpers';
 
-// ─────────── Helpers ───────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function client(token: string): Phase2Client {
   const c = new Phase2Client();
@@ -42,9 +46,9 @@ afterAll(() => {
   cleanupPhase2SuiteState();
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-01: MenuService Dine-In — Cash Payment (Happy Path)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// J-01: MenuService Dine-In â€” Cash Payment (Happy Path)
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-01: MenuService Dine-In Cash Payment', () => {
   it('should place a dine-in order with 2x Bruschetta + 1x Wagyu Steak (Medium Rare + Fries)', async () => {
     const alice = client(requireState('aliceToken'));
@@ -92,7 +96,7 @@ describe('J-01: MenuService Dine-In Cash Payment', () => {
     if (order?.total_amount !== undefined) {
       // Total = subtotal + tax + service_charge
       // With 11% tax and 10% service charge on $113.50:
-      //   tax ≈ 12.49, sc ≈ 11.35, total ≈ 137.34
+      //   tax â‰ˆ 12.49, sc â‰ˆ 11.35, total â‰ˆ 137.34
       expect(order.total_amount).toBeGreaterThan(100);
     }
     expect(order?.payment_method || order?.paymentMethod).toMatch(/cash/i);
@@ -102,14 +106,28 @@ describe('J-01: MenuService Dine-In Cash Payment', () => {
     const orderId = requireState('j01OrderId');
     const kitchen = client(requireState('kitchenStaffToken'));
 
-    const statuses = ['confirmed', 'preparing', 'ready', 'delivered', 'completed'];
-    for (const status of statuses) {
-      const res = await kitchen.updateOrderStatus(orderId, status);
+    // Canonical Stage-6 fulfillment lifecycle (hospitality machine):
+    // confirmed -> in_progress -> ready -> handed_off -> completed. The
+    // legacy composite names (preparing/delivered) are accepted by
+    // resolveAction as aliases, but the row lands on the canonical state.
+    const statusWalk: Array<{ send: string; expect: string }> = [
+      { send: 'confirmed', expect: 'queued' },
+      { send: 'preparing', expect: 'in_progress' },
+      { send: 'ready', expect: 'ready' },
+      { send: 'delivered', expect: 'handed_off' },
+      { send: 'completed', expect: 'completed' },
+    ];
+    for (const step of statusWalk) {
+      const res = await kitchen.updateOrderStatus(orderId, step.send);
       // Some states may not be valid transitions — accept success or 400
       if (res.success) {
         const check = await kitchen.getOrder(orderId);
         if (check.success && check.data) {
-          expect(check.data.status).toBe(status);
+          // Stage-6 contract: fulfillment-layer moves leave transactions.status
+          // at 'confirmed' and carry the canonical state in fulfillment_status.
+          // completed/cancelled are transaction-layer moves, so status matches.
+          const observed = check.data.fulfillment_status ?? check.data.status;
+          expect(observed).toBe(step.expect);
         }
       }
     }
@@ -136,14 +154,14 @@ describe('J-01: MenuService Dine-In Cash Payment', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-02: MenuService Dine-In — Card Payment with Coupon
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// J-02: MenuService Dine-In â€” Card Payment with Coupon
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-02: MenuService Card Payment with Coupon', () => {
   it('should validate FIXED5 coupon before ordering', async () => {
     const bob = client(requireState('bobToken'));
     const res = await bob.validateCoupon('FIXED5', 32);
-    // May succeed or warn — not all systems validate the same way
+    // May succeed or warn â€” not all systems validate the same way
     expect(res.status).toBeLessThan(500);
   });
 
@@ -181,15 +199,15 @@ describe('J-02: MenuService Card Payment with Coupon', () => {
     const res = await bob.validateCoupon('EXPIRED1', 50);
     // Should fail validation (expired)
     if (res.success && res.data?.valid !== false) {
-      console.warn('System accepted expired coupon — expiry check may not apply on validate endpoint');
+      console.warn('System accepted expired coupon â€” expiry check may not apply on validate endpoint');
     }
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-03: AccommodationUnit Booking with Add-ons
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-03: AccommodationUnit Booking — Weekend with Add-ons', () => {
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+describe('J-03: AccommodationUnit Booking â€” Weekend with Add-ons', () => {
   let j03CheckIn = futureDate(140);
   let j03CheckOut = futureDate(142);
 
@@ -277,16 +295,16 @@ describe('J-03: AccommodationUnit Booking — Weekend with Add-ons', () => {
       paymentMethod: 'cash',
     });
 
-    // Should be rejected — dates already booked
+    // Should be rejected â€” dates already booked
     expect(res.success).toBe(false);
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-04: Shared Capacity Access Purchase
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-04: Shared Capacity Access Purchase — Multiple Guests', () => {
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+describe('J-04: Shared Capacity Access Purchase â€” Multiple Guests', () => {
   it('should check pool availability', async () => {
     const bob = client(requireState('bobToken'));
     const res = await bob.getPoolAvailability(today(), state.afternoonSessionId);
@@ -344,9 +362,9 @@ describe('J-04: Shared Capacity Access Purchase — Multiple Guests', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// J-05: Access Validation Flow — Entry/Exit & Capacity Tracking
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// J-05: Access Validation Flow â€” Entry/Exit & Capacity Tracking
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-05: Access Validation Flow', () => {
   it('should record pool entry for Bob\'s ticket', async () => {
     const capacityStaff = client(requireState('capacityStaffToken'));
@@ -388,14 +406,14 @@ describe('J-05: Access Validation Flow', () => {
     const ticketId = requireState('j04TicketId');
 
     const res = await capacityStaff.recordPoolEntry(ticketId);
-    // Should fail — ticket already used
+    // Should fail â€” ticket already used
     expect(res.success).toBe(false);
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-06: AccommodationUnit Check-in/Check-out with Housekeeping
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-06: AccommodationUnit Check-in Through Check-out with Housekeeping', () => {
   it('should confirm booking', async () => {
     const admin = client(requireState('adminToken'));
@@ -455,9 +473,9 @@ describe('J-06: AccommodationUnit Check-in Through Check-out with Housekeeping',
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-07: Loyalty Earn + Redeem Across Engines
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-07: Loyalty Earn + Redeem', () => {
   it('should check Alice loyalty balance before order', async () => {
     const alice = client(requireState('aliceToken'));
@@ -497,9 +515,9 @@ describe('J-07: Loyalty Earn + Redeem', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-08: Gift Card + Coupon Stacking
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-08: Gift Card + Coupon Stacking', () => {
   it('should place order with FIXED5 coupon + gift card', async () => {
     const bob = client(requireState('bobToken'));
@@ -546,9 +564,9 @@ describe('J-08: Gift Card + Coupon Stacking', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-09: Booking Cancellation and Refund
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-09: Booking Cancellation and Refund', () => {
   let bookingId: string;
   // Use a random offset to avoid date collisions with previous test runs
@@ -604,9 +622,9 @@ describe('J-09: Booking Cancellation and Refund', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-10: Registration, 2FA, GDPR Deletion
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-10: Registration through GDPR Deletion', () => {
   let userToken: string;
   let userId: string;
@@ -626,6 +644,16 @@ describe('J-10: Registration through GDPR Deletion', () => {
     expect(res.success, `Registration failed: ${res.error}`).toBe(true);
     userToken = c.getToken()!;
     userId = c.userId!;
+    if (!userToken && userId) {
+      // Registration issues no session until the email is verified — complete
+      // the real verification journey (token from sessions table → public
+      // verify-email endpoint), then log in.
+      const verified = await verifyNewUserEmail(c, userId);
+      expect(verified, 'email verification token not found for new user').toBe(true);
+      const loginRes = await c.login(testEmail, 'GDPRTest123!');
+      expect(loginRes.success, `post-verification login failed: ${loginRes.error}`).toBe(true);
+      userToken = c.getToken()!;
+    }
     expect(userToken).toBeTruthy();
   });
 
@@ -673,15 +701,15 @@ describe('J-10: Registration through GDPR Deletion', () => {
     // After GDPR deletion, login should fail (soft-deleted or anonymized)
     // However, if deletion is async/queued, this may still succeed
     if (res.success) {
-      console.warn('Login succeeded after GDPR deletion — deletion may be async/queued');
+      console.warn('Login succeeded after GDPR deletion â€” deletion may be async/queued');
     }
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-11: Dynamic Module Creation
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-11: Dynamic Module — Gym', () => {
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+describe('J-11: Dynamic Module â€” Gym', () => {
   let gymModuleId: string;
   let gymSessionId: string;
 
@@ -690,7 +718,7 @@ describe('J-11: Dynamic Module — Gym', () => {
     const res = await admin.createModule({
       name: 'Gym',
       slug: 'gym',
-      template_type: 'session_access',
+      engine_type: 'shared_capacity_access',
       is_active: true,
       show_in_main: true,
       settings: { icon: 'dumbbell', show_in_nav: true },
@@ -771,10 +799,10 @@ describe('J-11: Dynamic Module — Gym', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-12: Cross-Engine Grand Journey
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-describe('J-12: Full Guest Stay — Cross-Engine Grand Journey', () => {
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+describe('J-12: Full Guest Stay â€” Cross-Engine Grand Journey', () => {
   // Use a random offset to avoid date collisions with previous test runs
   const j12Offset = 900 + Math.floor(Math.random() * 800);
   let checkIn = futureDate(j12Offset);
@@ -894,9 +922,9 @@ describe('J-12: Full Guest Stay — Cross-Engine Grand Journey', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-13: Admin Financial Reports
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-13: Admin Financial Reports Verification', () => {
   it('should access admin dashboard', async () => {
     const admin = client(requireState('adminToken'));
@@ -919,9 +947,9 @@ describe('J-13: Admin Financial Reports Verification', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-14: Staff Role Authorization Boundaries
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-14: Staff Role Authorization Boundaries', () => {
   it('staff CAN list menu service instant_transaction rows', async () => {
     const staff = client(requireState('kitchenStaffToken'));
@@ -961,7 +989,7 @@ describe('J-14: Staff Role Authorization Boundaries', () => {
 
   it('customer CANNOT update order status', async () => {
     const alice = client(requireState('aliceToken'));
-    // Use a random order ID — should be blocked by role check before reaching order lookup
+    // Use a random order ID â€” should be blocked by role check before reaching order lookup
     const res = await alice.updateOrderStatus('00000000-0000-0000-0000-000000000001', 'confirmed');
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
@@ -975,9 +1003,9 @@ describe('J-14: Staff Role Authorization Boundaries', () => {
   });
 });
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // J-15: Ghost Role Verification
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 describe('J-15: Ghost Role Ground Truth Verification', () => {
   it('staff can view menu service transactions', async () => {
     const staff = client(requireState('kitchenStaffToken'));
@@ -989,7 +1017,7 @@ describe('J-15: Ghost Role Ground Truth Verification', () => {
     if (!state.j01OrderId) return;
     const staff = client(requireState('kitchenStaffToken'));
     const res = await staff.updateOrderStatus(state.j01OrderId, 'completed');
-    // Accept 200 (success) or 400 (invalid state transition) — NOT 403
+    // Accept 200 (success) or 400 (invalid state transition) â€” NOT 403
     expect(res.status).not.toBe(403);
   });
 

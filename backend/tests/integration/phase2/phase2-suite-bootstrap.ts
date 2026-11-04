@@ -9,9 +9,32 @@
 import { TEST_CONFIG } from '../config';
 import { Phase2Client } from './phase2-client';
 import { resetPhase2State, state, type Phase2State } from './phase2-state';
+import { Pool } from 'pg';
 
 const FALLBACK_ID = '00000000-0000-0000-0000-000000000000';
 const FALLBACK_TOKEN = 'phase2-suite-fallback-token';
+
+/**
+ * Dedicated super_admin actor for the phase2 operator journey.
+ *
+ * Deliberately NOT admin@v2ecosystem.com (real account — never touched) and
+ * NOT test.admin@v2ecosystem.com (its tenant-scoped login resolves the
+ * property_manager row, which authorize('admin') correctly rejects).
+ *
+ * Homed to the platform-root tenant so the bare-localhost tenant fallback
+ * resolves it, and so getCallerTenantId returns a concrete tenant. The
+ * mandatory-2FA journey (Q103) is exercised for real: the harness clears this
+ * user's two_factor_* rows on every run, then loginAsAdmin() enrolls via the
+ * public API and lands a real session.
+ */
+const PHASE2_ADMIN_EMAIL = 'phase2.admin@v2ecosystem.test';
+const PHASE2_ADMIN_PASSWORD = 'Phase2Admin123!';
+
+/** Credentials of the dedicated phase2 admin actor (see comment above). */
+export const PHASE2_ADMIN_CREDENTIALS = {
+  email: PHASE2_ADMIN_EMAIL,
+  password: PHASE2_ADMIN_PASSWORD,
+};
 
 type StateKey = keyof Phase2State;
 type LooseRecord = Record<string, unknown>;
@@ -187,6 +210,142 @@ function extractMenuItems(menuData: unknown): LooseRecord[] {
   );
 }
 
+function dbPool(): Pool {
+  return new Pool({
+    connectionString: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL,
+  });
+}
+
+/**
+ * Clear the phase2 admin user's 2FA state so the mandatory-enrollment journey
+ * (Q103) runs from scratch on the next loginAsAdmin(). Idempotent.
+ */
+export async function resetPhase2Admin2FA(): Promise<void> {
+  const pool = dbPool();
+  try {
+    const tenantRes = await pool.query(
+      'SELECT id FROM tenants WHERE is_platform_root = TRUE ORDER BY created_at LIMIT 1',
+    );
+    const tenantId: string | undefined = tenantRes.rows[0]?.id;
+    const userRes = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND tenant_id = $2 LIMIT 1',
+      [PHASE2_ADMIN_EMAIL, tenantId],
+    );
+    const userId: string | undefined = userRes.rows[0]?.id;
+    if (!userId) {
+      return;
+    }
+    await pool.query('DELETE FROM two_factor_auth WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM two_factor_pending WHERE user_id = $1', [userId]);
+    // login() reads users.two_factor_enabled (not the two_factor_* tables) —
+    // clearing the tables alone would leave the login answering
+    // requiresTwoFactor instead of starting a fresh enrollment.
+    await pool.query('UPDATE users SET two_factor_enabled = FALSE WHERE id = $1', [userId]);
+  } finally {
+    await pool.end();
+  }
+}
+
+/**
+ * Ensure the dedicated phase2 super_admin exists and is reset to a
+ * deterministic pre-login state (2FA cleared so the enrollment journey runs
+ * fresh on every suite start). Idempotent.
+ */
+async function ensurePhase2AdminUser(): Promise<void> {
+  const pool = dbPool();
+  try {
+    const tenantRes = await pool.query(
+      'SELECT id FROM tenants WHERE is_platform_root = TRUE ORDER BY created_at LIMIT 1',
+    );
+    const tenantId: string | undefined = tenantRes.rows[0]?.id;
+    if (!tenantId) {
+      throw new Error('phase2 bootstrap: no platform-root tenant found');
+    }
+
+    const bcrypt = await import('bcryptjs');
+    const passwordHash = await bcrypt.hash(PHASE2_ADMIN_PASSWORD, 12);
+
+    const existing = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND tenant_id = $2 LIMIT 1',
+      [PHASE2_ADMIN_EMAIL, tenantId],
+    );
+    let userId: string;
+    if (existing.rows[0]) {
+      userId = existing.rows[0].id;
+      await pool.query(
+        `UPDATE users SET password_hash = $2, scope = 'super_admin', is_active = TRUE,
+           email_verified = TRUE, full_name = 'Phase2 Admin' WHERE id = $1`,
+        [userId, passwordHash],
+      );
+    } else {
+      const inserted = await pool.query(
+        `INSERT INTO users (email, password_hash, full_name, email_verified, is_active, scope, tenant_id)
+         VALUES ($1, $2, 'Phase2 Admin', TRUE, TRUE, 'super_admin', $3) RETURNING id`,
+        [PHASE2_ADMIN_EMAIL, passwordHash, tenantId],
+      );
+      userId = inserted.rows[0].id;
+    }
+  } finally {
+    await pool.end();
+  }
+
+  await resetPhase2Admin2FA();
+}
+
+/**
+ * Complete the real email-verification journey for a freshly registered
+ * user: registration issues no session until the email is verified (login
+ * answers 403 EMAIL_NOT_VERIFIED). The verification token is stored in the
+ * sessions table (session_type='email_verification'); the harness reads it
+ * and calls the public GET /auth/verify-email endpoint — the same link a
+ * real user clicks. Idempotent.
+ */
+export async function verifyNewUserEmail(client: Phase2Client, userId: string): Promise<boolean> {
+  const pool = dbPool();
+  try {
+    const res = await pool.query(
+      `SELECT token FROM sessions
+       WHERE user_id = $1 AND session_type = 'email_verification' AND is_active = TRUE
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId],
+    );
+    const token: string | undefined = res.rows[0]?.token;
+    if (!token) {
+      return false;
+    }
+    const verifyRes = await client.get(`/auth/verify-email?token=${encodeURIComponent(token)}`, { auth: false });
+    return verifyRes.success;
+  } finally {
+    await pool.end();
+  }
+}
+
+/**
+ * Resolve the tenant/property context the admin client sends on every request.
+ * The harness hits bare localhost, so tenant resolution falls back to the
+ * platform-root tenant; admin settings writes additionally need a property
+ * (site_settings.property_id is NOT NULL).
+ */
+export async function wireAdminContext(): Promise<void> {
+  const pool = dbPool();
+  try {
+    const tenantRes = await pool.query(
+      'SELECT id FROM tenants WHERE is_platform_root = TRUE ORDER BY created_at LIMIT 1',
+    );
+    const tenantId: string | undefined = tenantRes.rows[0]?.id;
+    const propertyRes = await pool.query(
+      `SELECT id FROM properties WHERE tenant_id = $1 ORDER BY (id = '00000000-0000-0000-0000-000000000001') DESC, created_at LIMIT 1`,
+      [tenantId],
+    );
+    const propertyId: string | undefined = propertyRes.rows[0]?.id;
+    if (tenantId && propertyId) {
+      Phase2Client.setDefaultHeaders({ 'X-Tenant-ID': tenantId, 'X-Property-Id': propertyId });
+    }
+  } finally {
+    await pool.end();
+  }
+}
+
 async function loginUser(email: string, password: string): Promise<{ token?: string; userId?: string }> {
   const c = new Phase2Client();
   const loginRes = await c.login(email, password);
@@ -226,6 +385,32 @@ async function ensureUser(admin: Phase2Client, seed: UserSeed): Promise<void> {
     login = await loginUser(seed.email, seed.password);
   }
 
+  // Ensure staff / property_staff users have user_property_access on the suite's property
+  if (login.userId && seed.role === 'staff') {
+    const pool = dbPool();
+    try {
+      const tenantRes = await pool.query(
+        'SELECT id FROM tenants WHERE is_platform_root = TRUE ORDER BY created_at LIMIT 1',
+      );
+      const tenantId: string | undefined = tenantRes.rows[0]?.id;
+      const propertyRes = await pool.query(
+        `SELECT id FROM properties WHERE tenant_id = $1 ORDER BY (id = '00000000-0000-0000-0000-000000000001') DESC, created_at LIMIT 1`,
+        [tenantId],
+      );
+      const propertyId: string | undefined = propertyRes.rows[0]?.id;
+      if (propertyId && tenantId) {
+        await pool.query(
+          `INSERT INTO user_property_access (user_id, property_id, tenant_id, access_level)
+           VALUES ($1, $2, $3, 'write')
+           ON CONFLICT (user_id, property_id) DO NOTHING`,
+          [login.userId, propertyId, tenantId],
+        );
+      }
+    } finally {
+      await pool.end();
+    }
+  }
+
   setState(seed.tokenKey, login.token);
   setState(seed.idKey, login.userId);
 }
@@ -233,7 +418,7 @@ async function ensureUser(admin: Phase2Client, seed: UserSeed): Promise<void> {
 async function ensureModule(admin: Phase2Client, module: {
   slug: string;
   name: string;
-  template_type: string;
+  engine_type: string;
   stateKey: keyof Pick<Phase2State, 'menuServiceModuleId' | 'accommodationModuleId' | 'capacityModuleId' | 'kioskModuleId'>;
 }): Promise<void> {
   const modulesRes = await admin.getModules();
@@ -247,7 +432,7 @@ async function ensureModule(admin: Phase2Client, module: {
     const createRes = await admin.createModule({
       name: module.name,
       slug: module.slug,
-      template_type: module.template_type,
+      engine_type: module.engine_type,
       is_active: true,
       show_in_main: true,
     });
@@ -536,38 +721,44 @@ function ensureFallbacks(): void {
 export async function initializePhase2SuiteState(): Promise<void> {
   resetPhase2State();
 
+  await ensurePhase2AdminUser();
+
   const admin = new Phase2Client();
-  const adminLogin = await admin.login(TEST_CONFIG.users.admin.email, TEST_CONFIG.users.admin.password);
+  const adminLogin = await admin.loginAsAdmin(PHASE2_ADMIN_EMAIL, PHASE2_ADMIN_PASSWORD);
+  if (!adminLogin.success) {
+    console.error(`[phase2-bootstrap] admin login failed: ${adminLogin.error}`);
+  }
+  await wireAdminContext();
 
   setState('adminToken', admin.getToken());
   setState('managerToken', admin.getToken());
 
   if (adminLogin.success) {
     await ensureModule(admin, {
-      slug: 'menu_service',
+      slug: 'menu-service',
       name: 'MenuService',
-      template_type: 'instant_transaction',
+      engine_type: 'instant_transaction',
       stateKey: 'menuServiceModuleId',
     });
 
     await ensureModule(admin, {
-      slug: 'accommodation_units',
+      slug: 'accommodation-units',
       name: 'AccommodationUnits',
-      template_type: 'time_exclusive_reservation',
+      engine_type: 'time_exclusive_reservation',
       stateKey: 'accommodationModuleId',
     });
 
     await ensureModule(admin, {
       slug: 'capacity',
       name: 'Pool',
-      template_type: 'shared_capacity_access',
+      engine_type: 'shared_capacity_access',
       stateKey: 'capacityModuleId',
     });
 
     await ensureModule(admin, {
       slug: 'kiosk',
       name: 'KioskItem Bar',
-      template_type: 'instant_transaction',
+      engine_type: 'instant_transaction',
       stateKey: 'kioskModuleId',
     });
 
