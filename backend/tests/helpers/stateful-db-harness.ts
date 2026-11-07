@@ -277,6 +277,17 @@ export function createStatefulDbHarness(): StatefulHarness {
       calls.push(args);
       rpcCalls.set(fnName, calls);
 
+      if (fnName === 'deduct_stock_fifo') {
+        const itemId = args?.p_item_id;
+        const qty = args?.p_quantity || 0;
+        const inventory = getTable('inventory_items');
+        const row = inventory.find((i) => i.id === itemId);
+        if (row) {
+          row.current_stock = Math.max(0, (row.current_stock || 0) - qty);
+        }
+        return Promise.resolve({ data: { success: true }, error: null });
+      }
+
       if (fnName === 'restore_inventory_for_order_items') {
         const items = args?.p_items || [];
         const inventory = getTable('inventory_items');

@@ -26,9 +26,11 @@ vi.mock('@/lib/auth-context', () => ({
   }),
 }));
 
+const mockHasPermission = vi.fn((_perm?: string) => true);
+
 vi.mock('@/lib/authorization', () => ({
   useAuthorization: () => ({
-    hasPermission: () => true,
+    hasPermission: (perm: string) => mockHasPermission(perm),
     propertyId: 'prop-1',
   }),
   Perm: {
@@ -204,6 +206,7 @@ function setupMocks() {
 describe('Phase F9 — Staff Quick Order / Assisted Commerce', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHasPermission.mockImplementation(() => true);
     setupMocks();
   });
 
@@ -375,5 +378,63 @@ describe('Phase F9 — Staff Quick Order / Assisted Commerce', () => {
     // Close receipt modal
     await user.click(screen.getByRole('button', { name: /new order/i }));
     expect(screen.queryByText('Payment Successful')).not.toBeInTheDocument();
+  });
+  it('hides pending order action buttons (Accept/Reject) when staff lacks ORDER_UPDATE permission', async () => {
+    // Negative RBAC test: user does NOT have order:update permission
+    mockHasPermission.mockImplementation((perm) => perm !== 'order:update');
+
+    apiGetMock.mockImplementation((url) => {
+      if (url === `/staff/modules/${MODULE_SLUG}/orders`) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: 'order-pending-1',
+                orderNumber: 'ORD-PENDING-99',
+                status: 'pending',
+                fulfillment_status: 'pending',
+                items: [{ id: 'item-1', name: 'Burger', quantity: 1, price: 10 }],
+                totalAmount: 10,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          },
+        });
+      }
+      if (url === '/staff/shifts/me/current') {
+        return Promise.resolve({ data: { data: activeShift } });
+      }
+      if (url === `/staff/shifts/${activeShift.id}/cash`) {
+        return Promise.resolve({ data: { success: true, totals: { cashIn: 0, cashOut: 0, net: 0 } } });
+      }
+      if (url === `/staff/modules/${MODULE_SLUG}/tables`) {
+        return Promise.resolve({ data: { data: [] } });
+      }
+      if (url === `/staff/modules/${MODULE_SLUG}/menu`) {
+        return Promise.resolve({ data: { data: { categories: sampleCategories, items: sampleMenuItems } } });
+      }
+      return Promise.resolve({ data: { data: [] } });
+    });
+
+    render(
+      <StaffPOSTemplate
+        moduleId={MODULE_ID}
+        moduleSlug={MODULE_SLUG}
+        moduleName="Bistro POS"
+      />
+    );
+
+    await screen.findByText('Bistro POS');
+
+    // Switch to Orders view
+    const ordersTab = screen.getByRole('button', { name: /orders/i });
+    await userEvent.click(ordersTab);
+
+    // Order ORD-PENDING-99 appears
+    await screen.findByText(/ORD-PENDING-99/i);
+
+    // In unauthorized mode, Accept and Reject buttons MUST NOT be rendered
+    expect(screen.queryByRole('button', { name: /accept/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reject/i })).not.toBeInTheDocument();
   });
 });
