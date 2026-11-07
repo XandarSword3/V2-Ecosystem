@@ -285,7 +285,14 @@ export async function changeInstantTransactionOrderStatus(
   // Keyed off the canonical resulting state — resolveAction may have mapped
   // an alias, and fulfillment states are canonical now.
   const timestampFields: Record<string, unknown> = {
-    ...(transition.canonicalState === 'in_progress' ? { estimated_ready_time: new Date(Date.now() + 20 * 60000).toISOString() } : {}),
+    ...(transition.canonicalState === 'in_progress' ? {
+      estimated_ready_time: new Date(
+        Date.now() +
+        ((typeof orderMetadata.estimatedPrepTimeMinutes === 'number' && orderMetadata.estimatedPrepTimeMinutes > 0)
+          ? orderMetadata.estimatedPrepTimeMinutes
+          : 20) * 60000
+      ).toISOString()
+    } : {}),
     ...(transition.canonicalState === 'ready' ? { actual_ready_time: now } : {}),
     ...(transition.canonicalState === 'handed_off' ? { served_at: now } : {}),
     ...(transition.canonicalState === 'completed' || transition.targetState === 'completed' ? { completed_at: now } : {}),

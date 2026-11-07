@@ -1008,45 +1008,107 @@ export async function processRefundById(
   await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, refStatus);
 
   // Give back whatever coupon/gift card the order consumed at creation (see
-  // discount-reversal.ts). Previously a refund only touched Stripe + the
-  // payments table + the order's payment_status — coupon usage counts and
-  // gift card balances were never restored, refunded or not.
+  // discount-reversal.ts). Also cancel the transaction, cancel any linked
+  // fulfillment, and restore inventory so stock and order status remain consistent.
   //
   // Scoped to full refunds of order-type payments only: a partial refund
   // doesn't have an unambiguous rule for how much of a coupon/gift-card
   // discount to give back, and reversing the whole thing on a partial
-  // refund would usually be wrong (e.g. a $5 refund on a $50 order with a
-  // 20%-off coupon shouldn't restore the full discount). Left as a flagged
-  // gap for partial refunds rather than guessed at.
+  // refund would usually be wrong.
   if (!isPartialRefund && payment.reference_type === 'order') {
     try {
       const { data: order } = await supabase
         .from('transactions')
-        .select('id, customer_id, metadata')
+        .select('id, customer_id, metadata, status, tenant_id, property_id, module_id, amount')
         .eq('id', payment.reference_id)
         .maybeSingle();
 
-      const orderMetadata = (order?.metadata ?? {}) as Record<string, unknown>;
-      const alreadyReversed = Boolean(orderMetadata.discountsReversedAt);
-      const discounts = Array.isArray((orderMetadata as { discounts?: unknown }).discounts)
-        ? (orderMetadata as { discounts: any[] }).discounts
-        : [];
+      if (order) {
+        const orderMetadata = (order.metadata ?? {}) as Record<string, unknown>;
+        const alreadyReversed = Boolean(orderMetadata.discountsReversedAt);
+        const discounts = Array.isArray((orderMetadata as { discounts?: unknown }).discounts)
+          ? (orderMetadata as { discounts: any[] }).discounts
+          : [];
 
-      if (order && !alreadyReversed && discounts.length > 0) {
-        await reverseDiscounts(supabase, discounts, {
-          userId: order.customer_id ?? undefined,
-          orderId: order.id,
-        });
-        await supabase
-          .from('transactions')
-          .update({ metadata: { ...orderMetadata, discountsReversedAt: new Date().toISOString() } })
-          .eq('id', order.id);
+        // 1. Reverse discounts if not already reversed
+        if (!alreadyReversed && discounts.length > 0) {
+          await reverseDiscounts(supabase, discounts, {
+            userId: order.customer_id ?? undefined,
+            orderId: order.id,
+          });
+        }
+
+        // 2. Cancel order transaction if not already cancelled
+        if (order.status !== 'cancelled') {
+          const nowIso = new Date().toISOString();
+          await supabase
+            .from('transactions')
+            .update({
+              status: 'cancelled',
+              updated_at: nowIso,
+              metadata: {
+                ...orderMetadata,
+                cancelled_at: nowIso,
+                cancellation_reason: reason || 'Refunded',
+                discountsReversedAt: nowIso,
+              },
+            })
+            .eq('id', order.id);
+
+          // 3. Cancel linked fulfillment row and append fulfillment event
+          const { data: fulfillmentRow } = await supabase
+            .from('fulfillments')
+            .select('id, status')
+            .eq('transaction_id', order.id)
+            .maybeSingle();
+
+          if (fulfillmentRow && fulfillmentRow.status !== 'cancelled' && fulfillmentRow.status !== 'completed') {
+            await supabase
+              .from('fulfillments')
+              .update({
+                status: 'cancelled',
+                updated_at: nowIso,
+              })
+              .eq('id', fulfillmentRow.id);
+
+            await supabase
+              .from('fulfillment_events')
+              .insert({
+                fulfillment_id: fulfillmentRow.id,
+                event_type: 'cancelled',
+                actor_type: 'staff',
+                actor_id: processedByUserId ?? null,
+                payload: { reason: reason || 'Payment refunded' },
+              });
+          }
+
+          // 4. Restore inventory for order items
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('catalog_item_id, quantity')
+            .eq('transaction_id', order.id);
+
+          if (orderItems && orderItems.length > 0) {
+            const itemsPayload = orderItems
+              .filter((oi) => oi.catalog_item_id)
+              .map((oi) => ({
+                catalog_item_id: oi.catalog_item_id,
+                quantity: oi.quantity,
+              }));
+
+            if (itemsPayload.length > 0) {
+              await supabase.rpc('restore_inventory_for_order_items', {
+                p_items: itemsPayload,
+                p_user_id: processedByUserId ?? null,
+              });
+            }
+          }
+        }
       }
     } catch (reversalErr) {
       // Non-fatal: the refund itself already succeeded and must not be
-      // rolled back over this. Logged at error level in reverseDiscounts()
-      // itself/here since a failure here is a real, if secondary, money leak.
-      logger.error('[Payments] Failed to reverse order discount usage after refund', {
+      // rolled back over this. Logged at error level.
+      logger.error('[Payments] Failed to complete order rollback on refund', {
         paymentId,
         referenceId: payment.reference_id,
         error: reversalErr instanceof Error ? reversalErr.message : String(reversalErr),

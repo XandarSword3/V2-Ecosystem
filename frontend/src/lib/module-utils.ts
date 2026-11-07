@@ -148,11 +148,13 @@ export function getNavModules(modules: Module[]): Module[] {
 export function getModuleDefaultDescription(module: Module): string {
   switch (module.engine_type) {
     case 'instant_transaction':
-      return `Browse our ${module.name.toLowerCase()} menu and place orders`;
+      return `Browse our ${module.name.toLowerCase()} offerings and place orders`;
     case 'time_exclusive_reservation':
       return `Book your stay at our ${module.name.toLowerCase()}`;
     case 'shared_capacity_access':
       return `Purchase tickets and passes for ${module.name.toLowerCase()}`;
+    case 'platform_entitlement':
+      return `Manage subscriptions and access for ${module.name.toLowerCase()}`;
     default:
       return `Explore our ${module.name.toLowerCase()} services`;
   }
@@ -164,11 +166,13 @@ export function getModuleDefaultDescription(module: Module): string {
 export function getModuleStatLabel(module: Module): string {
   switch (module.engine_type) {
     case 'instant_transaction':
-      return 'Menu Items';
+      return 'Catalog Items';
     case 'time_exclusive_reservation':
       return 'Units Available';
     case 'shared_capacity_access':
       return 'Daily Visitors';
+    case 'platform_entitlement':
+      return 'Subscribed Tenants';
     default:
       return 'Available';
   }

@@ -242,5 +242,117 @@ describe('Payment Controller', () => {
         message: 'Payment refunded successfully',
       });
     });
+
+    it('should cancel transaction, cancel fulfillment, and restore inventory when full refund is processed for an order', async () => {
+      const mockPayment = {
+        id: 'payment-full-order',
+        amount: '60.00',
+        method: 'cash',
+        status: 'completed',
+        reference_type: 'order',
+        reference_id: 'order-full-refund',
+        notes: 'Original note',
+      };
+
+      const mockOrder = {
+        id: 'order-full-refund',
+        status: 'confirmed',
+        amount: 60.0,
+        customer_id: 'cust-1',
+        metadata: { discounts: [] },
+      };
+
+      const mockFulfillment = {
+        id: 'fulf-1',
+        status: 'queued',
+      };
+
+      const mockOrderItems = [
+        { catalog_item_id: 'cat-item-1', quantity: 2 },
+      ];
+
+      const rpcCalls: { rpcName: string; params: any }[] = [];
+      const updateCalls: { table: string; payload: any }[] = [];
+      const insertCalls: { table: string; payload: any }[] = [];
+
+      vi.mocked(getSupabase).mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === 'payments') {
+            return {
+              ...createChainableMock(mockPayment),
+              update: vi.fn((payload) => {
+                updateCalls.push({ table: 'payments', payload });
+                return createChainableMock([mockPayment]);
+              }),
+            };
+          }
+          if (table === 'transactions') {
+            return {
+              ...createChainableMock(mockOrder),
+              update: vi.fn((payload) => {
+                updateCalls.push({ table: 'transactions', payload });
+                return createChainableMock([mockOrder]);
+              }),
+            };
+          }
+          if (table === 'fulfillments') {
+            return {
+              ...createChainableMock(mockFulfillment),
+              update: vi.fn((payload) => {
+                updateCalls.push({ table: 'fulfillments', payload });
+                return createChainableMock([mockFulfillment]);
+              }),
+            };
+          }
+          if (table === 'fulfillment_events') {
+            return {
+              insert: vi.fn((payload) => {
+                insertCalls.push({ table: 'fulfillment_events', payload });
+                return createChainableMock([payload]);
+              }),
+            };
+          }
+          if (table === 'order_items') {
+            return createChainableMock(mockOrderItems);
+          }
+          return createChainableMock([]);
+        }),
+        rpc: vi.fn((rpcName, params) => {
+          rpcCalls.push({ rpcName, params });
+          return Promise.resolve({ data: { success: true }, error: null });
+        }),
+      } as any);
+
+      req.params = { id: 'payment-full-order' };
+      req.body = { reason: 'Defective item returned' };
+      req.user = { userId: 'staff-123', role: 'admin', tenantId: 'tenant-1', scope: 'tenant_admin' };
+
+      await refundPayment(req as Request, res as Response, next as NextFunction);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Payment refunded successfully',
+      });
+
+      // Verify transaction cancelled
+      const statusUpdate = updateCalls.find((u) => u.table === 'transactions' && u.payload.status === 'cancelled');
+      expect(statusUpdate).toBeDefined();
+      expect(statusUpdate?.payload.status).toBe('cancelled');
+
+      // Verify fulfillment cancelled
+      const fulfUpdate = updateCalls.find((u) => u.table === 'fulfillments');
+      expect(fulfUpdate).toBeDefined();
+      expect(fulfUpdate?.payload.status).toBe('cancelled');
+
+      // Verify fulfillment event inserted
+      const fulfEvent = insertCalls.find((i) => i.table === 'fulfillment_events');
+      expect(fulfEvent).toBeDefined();
+      expect(fulfEvent?.payload.event_type).toBe('cancelled');
+
+      // Verify inventory restoration RPC called
+      const invRpc = rpcCalls.find((r) => r.rpcName === 'restore_inventory_for_order_items');
+      expect(invRpc).toBeDefined();
+      expect(invRpc?.params.p_items).toEqual([{ catalog_item_id: 'cat-item-1', quantity: 2 }]);
+    });
   });
 });

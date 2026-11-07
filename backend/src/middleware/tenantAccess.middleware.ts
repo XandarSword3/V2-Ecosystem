@@ -323,11 +323,14 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
       req.tenant = tenant;
       return next();
     }
-    // Slug unknown — try platform-root fallback before 404
-    const platformRoot = await lookupPlatformRootTenant();
-    if (platformRoot) {
-      req.tenant = platformRoot;
-      return next();
+    // Only in non-production environments with the literal 'default' placeholder
+    // slug may we fallback to platform-root; all other unknown slugs MUST 404 fail-closed.
+    if (process.env.NODE_ENV !== 'production' && tenantSlugHeader === 'default') {
+      const platformRoot = await lookupPlatformRootTenant();
+      if (platformRoot) {
+        req.tenant = platformRoot;
+        return next();
+      }
     }
     res.status(404).json({ success: false, error: 'Tenant not found' });
     return;
@@ -448,18 +451,9 @@ export async function validateTenantBilling(req: Request, res: Response, next: N
  * Equivalent to app.use(resolveTenant, validateTenantBilling).
  */
 export async function tenantGate(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const startTime = Date.now();
-  const requestId = (req as any).requestId || Math.random().toString(36).substring(7);
-  (req as any).requestId = requestId;
-  const stack = new Error().stack;
-  console.log(`[TenantGate] START - RequestID: ${requestId} - called from: ${stack?.split('\n')[2]?.trim() || 'unknown'}`);
   await resolveTenant(req, res, () => {
-    const resolveTime = Date.now() - startTime;
-    console.log(`[TenantGate] RequestID: ${requestId} - resolveTenant: ${resolveTime}ms`);
     validateTenantBilling(req, res, next);
   });
-  const totalTime = Date.now() - startTime;
-  console.log(`[TenantGate] RequestID: ${requestId} - total: ${totalTime}ms`);
 }
 
 /**

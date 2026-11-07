@@ -5,16 +5,19 @@ import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Building2, Users, Calendar, DollarSign } from 'lucide-react';
+import { Building2, Users, Calendar, DollarSign, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 
 interface Tenant {
   id: string;
-  slug: string;
-  name: string;
+  subdomain: string;
+  name?: string;
   billing_status: string;
   subscription_tier: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
+  mrr?: number;
+  email?: string | null;
 }
 
 export default function TenantsPage() {
@@ -26,16 +29,34 @@ export default function TenantsPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get('/admin/tenants');
-      setTenants(res.data.data ?? []);
+      const res = await api.get('/platform/tenants');
+      const rawList = res.data.data ?? [];
+      setTenants(
+        rawList.map((t: any) => ({
+          id: t.id,
+          subdomain: t.subdomain || t.slug || 'unknown',
+          name: t.name || t.subdomain || 'Tenant',
+          billing_status: t.billing_status || 'trialing',
+          subscription_tier: t.subscription_tier || 'starter',
+          created_at: t.created_at || new Date().toISOString(),
+          mrr: t.mrr,
+          email: t.email,
+        }))
+      );
     } catch (err: any) {
-      setError(err?.response?.data?.error ?? 'Failed to load tenants');
+      setError(
+        err?.response?.status === 403
+          ? 'Platform administrator access is required to manage SaaS tenants.'
+          : err?.response?.data?.error ?? 'Failed to load tenants'
+      );
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchTenants(); }, [fetchTenants]);
+  useEffect(() => {
+    fetchTenants();
+  }, [fetchTenants]);
 
   const getBillingStatusColor = (status: string) => {
     switch (status) {
@@ -57,11 +78,17 @@ export default function TenantsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tenants</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Tenants (Engine E)</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage all platform tenants, subscriptions, and billing status
+            Manage all platform tenants, SaaS subscriptions, and billing status
           </p>
         </div>
+        <Link href="/platform-admin">
+          <Button variant="outline" size="sm" className="gap-2">
+            <ExternalLink className="h-4 w-4" />
+            Platform Control Plane
+          </Button>
+        </Link>
       </div>
 
       {error && (
@@ -72,14 +99,14 @@ export default function TenantsPage() {
 
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3].map(i => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-xl border bg-card h-40 animate-pulse" />
           ))}
         </div>
       ) : tenants.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-20 text-center">
           <Building2 className="h-10 w-10 text-muted-foreground mb-3 opacity-40" />
-          <p className="font-medium text-muted-foreground">No tenants yet</p>
+          <p className="font-medium text-muted-foreground">No tenants provisioned yet</p>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -101,7 +128,7 @@ export default function TenantsPage() {
                       <Users className="h-3.5 w-3.5" />
                       Tier
                     </p>
-                    <p className="font-semibold">{tenant.subscription_tier}</p>
+                    <p className="font-semibold uppercase text-xs">{tenant.subscription_tier}</p>
                   </div>
                   <div className="rounded-lg bg-muted/50 px-3 py-2">
                     <p className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1">
@@ -113,8 +140,13 @@ export default function TenantsPage() {
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-3 font-mono">
-                  Slug: {tenant.slug}
+                {tenant.email && (
+                  <p className="text-xs text-muted-foreground mt-2 truncate">
+                    Owner: {tenant.email}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1 font-mono">
+                  Subdomain: {tenant.subdomain}
                 </p>
               </CardContent>
             </div>
