@@ -300,12 +300,23 @@ export function createStatefulDbHarness(): StatefulHarness {
         return Promise.resolve({ data: { success: true }, error: null });
       }
 
+      if (fnName === 'increment_token_version') {
+        const userId = args?.p_user_id || args?.user_id;
+        const users = getTable('users');
+        const user = users.find((u) => u.id === userId);
+        if (user) {
+          user.token_version = (user.token_version || 0) + 1;
+        }
+        return Promise.resolve({ data: { success: true }, error: null });
+      }
+
       return Promise.resolve({ data: { success: true }, error: null });
     },
   };
 
   return {
     client,
+    supabase: client,
     seed,
     getTable,
     getRpcCalls,
