@@ -538,17 +538,18 @@ export function OperationsBoard({
       >
         {columns.map((col, idx) => {
           const nextState = idx < columns.length - 1 ? (columns[idx + 1].state as string) : null;
+          const canUpdate = auth.hasPermission(Perm.ORDER_UPDATE);
 
           return (
             <WorkQueue
               key={col.state}
               column={col}
               nextState={nextState}
-              onAdvanceOrder={handleAdvanceOrder}
-              onAdvanceItem={handleAdvanceItem}
-              onTogglePriority={handleTogglePriority}
-              onCancelOrder={handleCancelOrder}
-              onExtendEta={handleExtendEta}
+              onAdvanceOrder={canUpdate ? handleAdvanceOrder : undefined}
+              onAdvanceItem={canUpdate ? handleAdvanceItem : undefined}
+              onTogglePriority={canUpdate ? handleTogglePriority : undefined}
+              onCancelOrder={canUpdate ? handleCancelOrder : undefined}
+              onExtendEta={canUpdate ? handleExtendEta : undefined}
               onPrintTicket={handlePrintTicket}
               disabled={pendingAdvanceIds.size > 0}
             />

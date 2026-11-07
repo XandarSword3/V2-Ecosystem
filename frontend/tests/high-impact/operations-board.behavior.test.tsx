@@ -27,9 +27,11 @@ vi.mock('next-intl', () => ({
   useTranslations: () => { const t: any = (key: string) => key; t.has = () => false; t.rich = (k: string) => k; t.raw = (k: string) => k; return t; },
 }));
 
+const mockHasPermission = vi.fn().mockReturnValue(true);
+
 vi.mock('@/lib/authorization', () => ({
   useAuthorization: () => ({
-    hasPermission: () => true,
+    hasPermission: (perm: string) => mockHasPermission(perm),
     propertyId: 'prop-1',
   }),
   Perm: {
@@ -124,6 +126,7 @@ const mockOrders: WorkItemData[] = [
 describe('Phase F8: Staff Engine A Operations Surface', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHasPermission.mockReturnValue(true);
     socketListeners = {};
     socketEmits = [];
   });
@@ -269,6 +272,34 @@ describe('Phase F8: Staff Engine A Operations Surface', () => {
         expect(screen.getByTestId('queue-count-queued')).toHaveTextContent('0');
         expect(screen.getByTestId('queue-count-ready')).toHaveTextContent('2');
       });
+    });
+
+    it('hides advance order and line item action buttons when staff lacks ORDER_UPDATE permission', async () => {
+      // Negative RBAC test: user lacks order:update permission
+      mockHasPermission.mockReturnValue(false);
+
+      apiGetMock.mockResolvedValueOnce({
+        data: { success: true, data: mockOrders },
+      });
+
+      render(
+        <OperationsBoard
+          slug="restaurant"
+          moduleName="Seaside Grill"
+          moduleId="mod-1"
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('operations-board')).toBeInTheDocument();
+      });
+
+      // Work items render
+      expect(screen.getByText('#101')).toBeInTheDocument();
+
+      // But advance order button and line item advance buttons MUST NOT be rendered
+      expect(screen.queryByTestId('advance-order-ord-1')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('advance-line-item-1')).not.toBeInTheDocument();
     });
   });
 
