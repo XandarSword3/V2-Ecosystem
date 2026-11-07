@@ -1,298 +1,245 @@
-import { createMockReqRes, createChainableMock } from '../utils';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createStatefulDbHarness } from '../../helpers/stateful-db-harness';
+import { createMockReqRes } from '../utils';
 
-// Mock dependencies
+const harness = createStatefulDbHarness();
+
 vi.mock('../../../src/database/connection', () => ({
-  getSupabase: vi.fn()
+  getSupabase: () => harness.client,
+}));
+
+vi.mock('../../../src/database/connection.js', () => ({
+  getSupabase: () => harness.client,
+}));
+
+vi.mock('../../../src/security/scoped-client.js', () => ({
+  getScopedClient: () => harness.client,
+  requireTenantScope: (req: any) => req?.user?.tenantId || 'tenant-1',
+  tenantContextFor: (req: any) => ({ tenantId: req?.user?.tenantId || 'tenant-1', actorId: req?.user?.userId }),
 }));
 
 vi.mock('../../../src/utils/activityLogger', () => ({
-  logActivity: vi.fn().mockResolvedValue(undefined)
+  logActivity: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { getSupabase } from '../../../src/database/connection';
 import { getRoles, createRole, updateRole, deleteRole } from '../../../src/modules/admin/controllers/roles.controller';
 
-describe('RolesController', () => {
+describe('RolesController (Genuine Stateful Database Verification)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    harness.clear();
   });
 
   describe('getRoles', () => {
-    it('should return roles with user and permission counts', async () => {
-      const mockRoles = [
-        { id: 'role-1', name: 'admin', display_name: 'Administrator' },
-        { id: 'role-2', name: 'staff', display_name: 'Staff' }
-      ];
-      const mockUserRoles = [
-        { role_id: 'role-1' },
-        { role_id: 'role-1' },
-        { role_id: 'role-2' }
-      ];
-      const mockRolePerms = [
+    it('returns roles with accurately computed user and permission counts from stateful tables', async () => {
+      harness.seed('roles', [
+        { id: 'role-1', name: 'admin', display_name: 'Administrator', tenant_id: 'tenant-1' },
+        { id: 'role-2', name: 'staff', display_name: 'Staff', tenant_id: 'tenant-1' },
+      ]);
+
+      harness.seed('user_roles', [
+        { role_id: 'role-1', user_id: 'u-1', tenant_id: 'tenant-1' },
+        { role_id: 'role-1', user_id: 'u-2', tenant_id: 'tenant-1' },
+        { role_id: 'role-2', user_id: 'u-3', tenant_id: 'tenant-1' },
+      ]);
+
+      harness.seed('role_permissions', [
         { role_id: 'role-1', permission_id: 'perm-1' },
         { role_id: 'role-1', permission_id: 'perm-2' },
-        { role_id: 'role-2', permission_id: 'perm-1' }
-      ];
+        { role_id: 'role-2', permission_id: 'perm-1' },
+      ]);
 
-      const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'roles') return createChainableMock(mockRoles);
-        if (table === 'user_roles') return createChainableMock(mockUserRoles);
-        if (table === 'role_permissions') return createChainableMock(mockRolePerms);
-        return createChainableMock([]);
+      const { req, res, next } = createMockReqRes({
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
       });
 
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
-
-      const { req, res, next } = createMockReqRes();
       await getRoles(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        data: expect.arrayContaining([
-          expect.objectContaining({
-            id: 'role-1',
-            users_count: 2,
-            permissions_count: 2
-          }),
-          expect.objectContaining({
-            id: 'role-2',
-            users_count: 1,
-            permissions_count: 1
-          })
-        ])
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'role-1',
+              users_count: 2,
+              permissions_count: 2,
+            }),
+            expect.objectContaining({
+              id: 'role-2',
+              users_count: 1,
+              permissions_count: 1,
+            }),
+          ]),
+        })
+      );
     });
 
-    it('should return empty array when no roles', async () => {
-      const fromMock = vi.fn().mockImplementation(() => createChainableMock([]));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+    it('returns empty array when no roles exist for tenant', async () => {
+      harness.seed('roles', []);
 
-      const { req, res, next } = createMockReqRes();
+      const { req, res, next } = createMockReqRes({
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
+      });
+
       await getRoles(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: []
+        data: [],
       });
     });
 
-    it('should handle database errors', async () => {
-      const fromMock = vi.fn().mockImplementation(() => {
-        throw new Error('Database error');
-      });
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+    it('handles simulated database errors by passing error to next', async () => {
+      harness.simulateError('roles', { message: 'Database query timeout' });
 
       const { req, res, next } = createMockReqRes();
       await getRoles(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(Error));
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Database query timeout' }));
     });
   });
 
   describe('createRole', () => {
-    it('should create role successfully', async () => {
-      const mockRole = { id: 'role-1', name: 'manager', display_name: 'Manager' };
-
-      const queryBuilder = {
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockImplementation(() => Promise.resolve({ data: mockRole, error: null }))
-      };
-
-      vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
+    it('creates role successfully and persists it in the database table', async () => {
+      harness.seed('roles', []);
 
       const { req, res, next } = createMockReqRes({
         body: {
-          name: 'manager',
-          displayName: 'Manager',
-          description: 'Management role',
-          businessUnit: 'property'
+          name: 'concierge',
+          displayName: 'Guest Concierge',
+          description: 'Front-desk concierge service role',
+          businessUnit: 'property',
         },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
       });
 
       await createRole(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(201);
-      expect(res.json).toHaveBeenCalledWith({
-        success: true,
-        data: mockRole
-      });
+      const rolesInDb = harness.getTable('roles');
+      expect(rolesInDb.length).toBe(1);
+      expect(rolesInDb[0].name).toBe('concierge');
+      expect(rolesInDb[0].display_name).toBe('Guest Concierge');
     });
 
-    it('should handle creation errors', async () => {
-      const queryBuilder = {
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: new Error('Duplicate') }))
-      };
-
-      vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
+    it('handles database creation error by calling next', async () => {
+      harness.simulateError('roles', { message: 'Unique constraint violation: role name exists' });
 
       const { req, res, next } = createMockReqRes({
         body: { name: 'duplicate' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
       });
 
       await createRole(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(Error));
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Unique constraint violation: role name exists' }));
     });
   });
 
   describe('updateRole', () => {
-    it('should update role successfully', async () => {
-      const mockRole = { id: 'role-1', name: 'updated-role' };
-
-      const queryBuilder = {
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: mockRole, error: null }))
-      };
-
-      vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
+    it('updates role successfully and mutates table in stateful db', async () => {
+      harness.seed('roles', [
+        {
+          id: 'role-update-1',
+          name: 'old-role-name',
+          display_name: 'Old Role',
+          tenant_id: 'tenant-1',
+        },
+      ]);
 
       const { req, res, next } = createMockReqRes({
-        params: { id: 'role-1' },
-        body: { name: 'updated-role', displayName: 'Updated Role' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
+        params: { id: 'role-update-1' },
+        body: {
+          name: 'updated-role-name',
+          displayName: 'Updated Role Display',
+        },
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
       });
 
       await updateRole(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith({
-        success: true,
-        data: mockRole
-      });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+        })
+      );
+
+      // Verify real state mutation
+      const updated = harness.getTable('roles').find((r) => r.id === 'role-update-1');
+      expect(updated?.name).toBe('updated-role-name');
+      expect(updated?.display_name).toBe('Updated Role Display');
     });
 
-    it('should handle update errors', async () => {
-      const queryBuilder = {
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        maybeSingle: vi.fn().mockImplementation(() => Promise.resolve({ data: null, error: new Error('Update failed') }))
-      };
-
-      vi.mocked(getSupabase).mockReturnValue({ from: vi.fn().mockReturnValue(queryBuilder) } as any);
+    it('handles update errors by calling next', async () => {
+      harness.simulateError('roles', { message: 'Database lock timeout' });
 
       const { req, res, next } = createMockReqRes({
         params: { id: 'role-1' },
         body: { name: 'test' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
       });
 
       await updateRole(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(Error));
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'Database lock timeout' }));
     });
   });
 
   describe('deleteRole', () => {
-    it('should delete role successfully', async () => {
-      // deleteRole checks for assigned users, deletes permissions, then deletes role
-      const mockFrom = vi.fn().mockImplementation((table: string) => {
-        if (table === 'user_roles') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ count: 0 })
-            })
-          };
-        }
-        if (table === 'role_permissions') {
-          return {
-            delete: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ error: null })
-            })
-          };
-        }
-        if (table === 'app_role_permissions') {
-          return {
-            delete: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ error: null })
-              })
-            })
-          };
-        }
-        if (table === 'roles') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'role-1', name: 'admin' }, error: null })
-                }),
-                maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'role-1', name: 'admin' }, error: null })
-              })
-            }),
-            delete: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ error: null })
-              })
-            })
-          };
-        }
-        return {};
-      });
-
-      vi.mocked(getSupabase).mockReturnValue({
-        from: mockFrom
-      } as any);
+    it('deletes role from stateful database and cascades deletion of role permissions', async () => {
+      harness.seed('roles', [
+        { id: 'role-to-delete', name: 'temp-role', tenant_id: 'tenant-1' },
+      ]);
+      harness.seed('user_roles', []); // No assigned users
+      harness.seed('role_permissions', [
+        { role_id: 'role-to-delete', permission_id: 'perm-1' },
+      ]);
+      harness.seed('app_role_permissions', [
+        { role_name: 'temp-role', permission_slug: 'module:temp:view', tenant_id: 'tenant-1' },
+      ]);
 
       const { req, res, next } = createMockReqRes({
-        params: { id: 'role-1' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
+        params: { id: 'role-to-delete' },
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
       });
 
       await deleteRole(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        message: 'Role deleted successfully'
+        message: 'Role deleted successfully',
       });
+
+      // Verify row is actually removed from database
+      const remainingRoles = harness.getTable('roles');
+      expect(remainingRoles.some((r) => r.id === 'role-to-delete')).toBe(false);
     });
 
-    it('should handle delete errors', async () => {
-      const mockFrom = vi.fn().mockImplementation((table: string) => {
-        if (table === 'user_roles') {
-          return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ count: 0 }) }) };
-        }
-        if (table === 'role_permissions') {
-          return { delete: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) };
-        }
-        if (table === 'app_role_permissions') {
-          return { delete: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }) }) };
-        }
-        if (table === 'roles') {
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'role-1', name: 'admin' }, error: null })
-                })
-              })
-            }),
-            delete: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue({ error: new Error('Delete failed') })
-              })
-            })
-          };
-        }
-        return {};
-      });
-
-      vi.mocked(getSupabase).mockReturnValue({ from: mockFrom } as any);
+    it('prevents deletion if role still has assigned users', async () => {
+      harness.seed('roles', [
+        { id: 'role-with-users', name: 'active-staff', tenant_id: 'tenant-1' },
+      ]);
+      harness.seed('user_roles', [
+        { role_id: 'role-with-users', user_id: 'u-1', tenant_id: 'tenant-1' },
+      ]);
 
       const { req, res, next } = createMockReqRes({
-        params: { id: 'role-1' },
-        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' }
+        params: { id: 'role-with-users' },
+        user: { id: 'admin-1', role: 'admin', userId: 'admin-1', tenantId: 'tenant-1', scope: 'tenant_admin' },
       });
 
       await deleteRole(req, res, next);
 
-      expect(next).toHaveBeenCalledWith(expect.any(Error));
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: expect.stringContaining('Cannot delete role with assigned users'),
+        })
+      );
+
+      // Verify role was NOT deleted
+      expect(harness.getTable('roles').length).toBe(1);
     });
   });
 });

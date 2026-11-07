@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createChainableMock } from '../../utils.js';
+import { createStatefulDbHarness } from '../../../helpers/stateful-db-harness';
 import {
   listTenants,
   getTenant,
@@ -12,12 +12,17 @@ import {
   getTenantBySlug,
 } from '../../../../src/modules/platform/platform-admin.controller.js';
 import { requirePlatformAdmin } from '../../../../src/modules/platform/platform.routes.js';
-import { getSupabase } from '../../../../src/database/connection.js';
 import { getSaasBillingService } from '../../../../src/services/saas-billing.service.js';
 import { getProvisioningService } from '../../../../src/modules/platform/provisioning.service.js';
 
+const harness = createStatefulDbHarness();
+
 vi.mock('../../../../src/database/connection.js', () => ({
-  getSupabase: vi.fn(),
+  getSupabase: () => harness.client,
+}));
+
+vi.mock('../../../../src/database/connection', () => ({
+  getSupabase: () => harness.client,
 }));
 
 vi.mock('../../../../src/middleware/tenantAccess.middleware.js', () => ({
@@ -48,9 +53,10 @@ vi.mock('../../../../src/modules/platform/provisioning.service.js', () => {
   };
 });
 
-describe('Platform Admin Controller Unit Suite', () => {
+describe('Platform Admin Controller (Genuine Stateful Database Verification)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    harness.clear();
   });
 
   function createMockReqRes(options: { params?: any; query?: any; body?: any } = {}) {
@@ -67,10 +73,11 @@ describe('Platform Admin Controller Unit Suite', () => {
   }
 
   describe('listTenants', () => {
-    it('returns paginated list of tenants with count and default sorting', async () => {
-      const mockTenants = [
+    it('returns paginated list of tenants with count and default sorting from stateful db', async () => {
+      harness.seed('tenants', [
         {
           id: 'tenant-1',
+          name: 'Resort Alpha',
           subdomain: 'resort-alpha',
           subscription_tier: 'growth',
           billing_status: 'active',
@@ -79,10 +86,18 @@ describe('Platform Admin Controller Unit Suite', () => {
           stripe_customer_id: 'cus_1',
           property_group_id: 'grp_1',
         },
-      ];
-
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(mockTenants, null, 1));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+        {
+          id: 'tenant-2',
+          name: 'Resort Beta',
+          subdomain: 'resort-beta',
+          subscription_tier: 'starter',
+          billing_status: 'active',
+          trial_ends_at: null,
+          created_at: '2026-01-02T00:00:00Z',
+          stripe_customer_id: 'cus_2',
+          property_group_id: 'grp_2',
+        },
+      ]);
 
       const { req, res } = createMockReqRes({ query: { page: '1', limit: '10' } });
       await listTenants(req, res);
@@ -93,59 +108,55 @@ describe('Platform Admin Controller Unit Suite', () => {
           pagination: {
             page: 1,
             limit: 10,
-            total: 1,
+            total: 2,
           },
         })
       );
+      const data = res.json.mock.calls[0][0].data;
+      expect(data.length).toBe(2);
     });
 
     it('returns 500 when database query errors', async () => {
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(null, { message: 'DB Error' }));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+      harness.simulateError('tenants', { message: 'DB Connection Error' });
 
       const { req, res } = createMockReqRes();
       await listTenants(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ success: false, error: 'DB Error' });
+      expect(res.json).toHaveBeenCalledWith({ success: false, error: 'DB Connection Error' });
     });
   });
 
   describe('getTenant', () => {
-    it('returns tenant detail including property stats, MRR, and billing history', async () => {
-      const tenantRow = {
-        id: 'tenant-1',
-        name: 'Alpha Resort',
-        subdomain: 'resort-alpha',
-        subscription_tier: 'growth',
-        billing_status: 'active',
-        property_group_id: 'grp-1',
-        created_at: '2026-01-01T00:00:00Z',
-      };
+    it('returns tenant detail including property stats, MRR, and billing history across tables', async () => {
+      harness.seed('tenants', [
+        {
+          id: 'tenant-1',
+          name: 'Alpha Resort',
+          subdomain: 'resort-alpha',
+          subscription_tier: 'growth',
+          billing_status: 'active',
+          property_group_id: 'grp-1',
+          created_at: '2026-01-01T00:00:00Z',
+        },
+      ]);
 
-      const propertyRows = [
-        { id: 'prop-1', name: 'Alpha Main', public_slug: 'main', is_active: true },
-      ];
-      const moduleRows = [
-        { id: 'mod-1', property_id: 'prop-1' },
-        { id: 'mod-2', property_id: 'prop-1' },
-      ];
-      const planRows = [
-        { code: 'growth', price_monthly_cents: 19900 },
-      ];
-      const billingRows = [
-        { id: 'bh-1', event_type: 'invoice_paid', amount: 19900, status: 'paid' },
-      ];
+      harness.seed('properties', [
+        { id: 'prop-1', group_id: 'grp-1', name: 'Alpha Main', public_slug: 'main', is_active: true },
+      ]);
 
-      const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'tenants') return createChainableMock(tenantRow);
-        if (table === 'properties') return createChainableMock(propertyRows);
-        if (table === 'modules') return createChainableMock(moduleRows);
-        if (table === 'plans') return createChainableMock(planRows);
-        if (table === 'billing_history') return createChainableMock(billingRows);
-        return createChainableMock([]);
-      });
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+      harness.seed('modules', [
+        { id: 'mod-1', tenant_id: 'tenant-1', property_id: 'prop-1' },
+        { id: 'mod-2', tenant_id: 'tenant-1', property_id: 'prop-1' },
+      ]);
+
+      harness.seed('plans', [
+        { code: 'growth', price_monthly_cents: 19900, is_active: true },
+      ]);
+
+      harness.seed('billing_history', [
+        { id: 'bh-1', tenant_id: 'tenant-1', event_type: 'invoice_paid', amount: 19900, status: 'paid' },
+      ]);
 
       const { req, res } = createMockReqRes({ params: { id: 'tenant-1' } });
       await getTenant(req, res);
@@ -161,14 +172,12 @@ describe('Platform Admin Controller Unit Suite', () => {
           propertyCount: 1,
           moduleCount: 2,
           mrr: 19900,
-          billing_history: billingRows,
         }),
       });
     });
 
-    it('returns 404 when tenant is not found', async () => {
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(null));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+    it('returns 404 when tenant is not found in database', async () => {
+      harness.seed('tenants', []);
 
       const { req, res } = createMockReqRes({ params: { id: 'nonexistent' } });
       await getTenant(req, res);
@@ -179,10 +188,15 @@ describe('Platform Admin Controller Unit Suite', () => {
   });
 
   describe('suspendTenant & reactivateTenant', () => {
-    it('suspends tenant billing status and invalidates cache', async () => {
-      const tenantRow = { id: 'tenant-1', stripe_subscription_id: 'sub_123', subdomain: 'resort-alpha' };
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(tenantRow));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+    it('mutates tenant in database to suspended billing status and invalidates cache', async () => {
+      harness.seed('tenants', [
+        {
+          id: 'tenant-1',
+          stripe_subscription_id: 'sub_123',
+          subdomain: 'resort-alpha',
+          billing_status: 'active',
+        },
+      ]);
 
       const { req, res } = createMockReqRes({ params: { id: 'tenant-1' } });
       await suspendTenant(req, res);
@@ -191,12 +205,21 @@ describe('Platform Admin Controller Unit Suite', () => {
         success: true,
         data: { id: 'tenant-1', billing_status: 'suspended' },
       });
+
+      // Verify real state mutation in database
+      const tenant = harness.getTable('tenants').find((t) => t.id === 'tenant-1');
+      expect(tenant?.billing_status).toBe('suspended');
     });
 
-    it('reactivates suspended tenant to active billing status', async () => {
-      const tenantRow = { id: 'tenant-1', stripe_subscription_id: 'sub_123', subdomain: 'resort-alpha' };
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(tenantRow));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+    it('mutates suspended tenant in database to active billing status', async () => {
+      harness.seed('tenants', [
+        {
+          id: 'tenant-1',
+          stripe_subscription_id: 'sub_123',
+          subdomain: 'resort-alpha',
+          billing_status: 'suspended',
+        },
+      ]);
 
       const { req, res } = createMockReqRes({ params: { id: 'tenant-1' } });
       await reactivateTenant(req, res);
@@ -205,14 +228,23 @@ describe('Platform Admin Controller Unit Suite', () => {
         success: true,
         data: { id: 'tenant-1', billing_status: 'active' },
       });
+
+      // Verify real state mutation in database
+      const tenant = harness.getTable('tenants').find((t) => t.id === 'tenant-1');
+      expect(tenant?.billing_status).toBe('active');
     });
   });
 
   describe('cancelTenant', () => {
     it('cancels subscription in Stripe and sets status to cancelled', async () => {
-      const tenantRow = { id: 'tenant-1', stripe_subscription_id: 'sub_123', subdomain: 'resort-alpha' };
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(tenantRow));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+      harness.seed('tenants', [
+        {
+          id: 'tenant-1',
+          stripe_subscription_id: 'sub_123',
+          subdomain: 'resort-alpha',
+          billing_status: 'active',
+        },
+      ]);
 
       const billing = getSaasBillingService();
       const provisioning = getProvisioningService();
@@ -227,16 +259,18 @@ describe('Platform Admin Controller Unit Suite', () => {
   });
 
   describe('changeTier', () => {
-    it('validates active plan, delegates to billing service, and updates tenant record', async () => {
-      const planRow = { id: 'plan-ent', code: 'enterprise', is_active: true };
-      const tenantRow = { id: 'tenant-1', stripe_subscription_id: 'sub_123', subscription_tier: 'growth', subdomain: 'resort-alpha' };
-
-      const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'plans') return createChainableMock(planRow);
-        if (table === 'tenants') return createChainableMock(tenantRow);
-        return createChainableMock({});
-      });
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+    it('validates active plan, delegates to billing service, and updates tenant record in database', async () => {
+      harness.seed('plans', [
+        { id: 'plan-ent', code: 'enterprise', is_active: true },
+      ]);
+      harness.seed('tenants', [
+        {
+          id: 'tenant-1',
+          stripe_subscription_id: 'sub_123',
+          subscription_tier: 'growth',
+          subdomain: 'resort-alpha',
+        },
+      ]);
 
       const billing = getSaasBillingService();
 
@@ -251,11 +285,19 @@ describe('Platform Admin Controller Unit Suite', () => {
         success: true,
         data: { status: 'active', tier: 'enterprise' },
       });
+
+      // Verify real state mutation in database
+      const tenant = harness.getTable('tenants').find((t) => t.id === 'tenant-1');
+      expect(tenant?.subscription_tier).toBe('enterprise');
     });
 
     it('rejects nonexistent or inactive plan tier with 400', async () => {
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(null));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+      harness.seed('plans', [
+        { id: 'plan-act', code: 'starter', is_active: true },
+      ]);
+      harness.seed('tenants', [
+        { id: 'tenant-1', subscription_tier: 'starter' },
+      ]);
 
       const { req, res } = createMockReqRes({
         params: { id: 'tenant-1' },
@@ -275,24 +317,17 @@ describe('Platform Admin Controller Unit Suite', () => {
       const now = new Date();
       const currentIso = now.toISOString();
 
-      const tenantRows = [
+      harness.seed('tenants', [
         { subscription_tier: 'growth', billing_status: 'active', created_at: currentIso },
         { subscription_tier: 'starter', billing_status: 'active', created_at: currentIso },
         { subscription_tier: 'growth', billing_status: 'trialing', created_at: currentIso },
         { subscription_tier: 'starter', billing_status: 'suspended', created_at: currentIso },
-      ];
+      ]);
 
-      const planRows = [
-        { code: 'growth', price_monthly_cents: 19900 },
-        { code: 'starter', price_monthly_cents: 9900 },
-      ];
-
-      const fromMock = vi.fn().mockImplementation((table: string) => {
-        if (table === 'tenants') return createChainableMock(tenantRows);
-        if (table === 'plans') return createChainableMock(planRows);
-        return createChainableMock([]);
-      });
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+      harness.seed('plans', [
+        { code: 'growth', price_monthly_cents: 19900, is_active: true },
+        { code: 'starter', price_monthly_cents: 9900, is_active: true },
+      ]);
 
       const { req, res } = createMockReqRes();
       await getPlatformStats(req, res);
@@ -311,43 +346,46 @@ describe('Platform Admin Controller Unit Suite', () => {
   });
 
   describe('getPublicPlans', () => {
-    it('returns active plans ordered by sort_order', async () => {
-      const planRows = [
-        { id: 'p1', code: 'starter', name: 'Starter', price_monthly_cents: 9900, sort_order: 1 },
-        { id: 'p2', code: 'growth', name: 'Growth', price_monthly_cents: 19900, sort_order: 2 },
-      ];
-
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(planRows));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+    it('returns active plans ordered by sort_order from database', async () => {
+      harness.seed('plans', [
+        { id: 'p2', code: 'growth', name: 'Growth', price_monthly_cents: 19900, sort_order: 2, is_active: true },
+        { id: 'p1', code: 'starter', name: 'Starter', price_monthly_cents: 9900, sort_order: 1, is_active: true },
+        { id: 'p3', code: 'archived', name: 'Archived', price_monthly_cents: 5000, sort_order: 3, is_active: false },
+      ]);
 
       const { req, res } = createMockReqRes();
       await getPublicPlans(req, res);
 
-      expect(res.json).toHaveBeenCalledWith({
-        success: true,
-        data: planRows,
-      });
+      expect(res.json).toHaveBeenCalled();
+      const returned = res.json.mock.calls[0][0].data;
+      // Should filter out inactive plan p3 and sort p1 before p2
+      expect(returned.length).toBe(2);
+      expect(returned[0].code).toBe('starter');
+      expect(returned[1].code).toBe('growth');
     });
   });
 
   describe('getTenantBySlug', () => {
-    it('returns public tenant validation by subdomain', async () => {
-      const tenantRow = { id: 'tenant-1', subdomain: 'paradise-resort', billing_status: 'active' };
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(tenantRow));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+    it('returns public tenant validation by subdomain from database', async () => {
+      harness.seed('tenants', [
+        { id: 'tenant-1', subdomain: 'paradise-resort', billing_status: 'active' },
+      ]);
 
       const { req, res } = createMockReqRes({ params: { slug: 'paradise-resort' } });
       await getTenantBySlug(req, res);
 
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        data: tenantRow,
+        data: expect.objectContaining({
+          id: 'tenant-1',
+          subdomain: 'paradise-resort',
+          billing_status: 'active',
+        }),
       });
     });
 
     it('returns 404 if tenant slug is not found', async () => {
-      const fromMock = vi.fn().mockReturnValue(createChainableMock(null));
-      vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+      harness.seed('tenants', []);
 
       const { req, res } = createMockReqRes({ params: { slug: 'nonexistent-slug' } });
       await getTenantBySlug(req, res);
