@@ -478,12 +478,12 @@ export default function DynamicMenuPage() {
         <motion.div variants={fadeInUp}>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg">
-              <UtensilsCrossed className="w-6 h-6 text-white" />
+              <Package className="w-6 h-6 text-white" />
             </div>
-            {currentModule.name} Menu
+            {currentModule.name} Catalog
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-2">
-            Manage menu items for {currentModule.name}
+            Manage catalog items and offerings for {currentModule.name}
           </p>
         </motion.div>
 
@@ -498,7 +498,7 @@ export default function DynamicMenuPage() {
             className="flex items-center gap-2"
           >
             <Upload className="w-4 h-4" />
-            Import Menu
+            Import Catalog
           </Button>
           {/* F2: gate catalog create on catalog:write permission */}
           {auth.hasPermission(Perm.CATALOG_WRITE) && (
@@ -521,7 +521,7 @@ export default function DynamicMenuPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <Input
-                  placeholder="Search menu items..."
+                  placeholder="Search catalog items..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -578,8 +578,8 @@ export default function DynamicMenuPage() {
         ) : filteredItems.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 text-slate-400" />
-              <p className="text-slate-500 dark:text-slate-400">No menu items found</p>
+              <Package className="w-12 h-12 mx-auto mb-4 text-slate-400" />
+              <p className="text-slate-500 dark:text-slate-400">No catalog items found</p>
               <Button onClick={openCreateModal} className="mt-4">
                 Add your first item
               </Button>
@@ -760,7 +760,7 @@ export default function DynamicMenuPage() {
                 <div className="px-6 pt-4 border-b border-slate-200 dark:border-slate-700">
                   <TabsList className="grid grid-cols-3 w-full">
                     <TabsTrigger value="details" className="flex items-center gap-2">
-                      <UtensilsCrossed className="w-4 h-4" />
+                      <Package className="w-4 h-4" />
                       Basic Details
                     </TabsTrigger>
                     <TabsTrigger value="recipe" className="flex items-center gap-2">
@@ -787,7 +787,7 @@ export default function DynamicMenuPage() {
                           setFormData({ ...formData, name: e.target.value });
                           if (formErrors.name) setFormErrors({ ...formErrors, name: false });
                         }}
-                        placeholder="e.g., Grilled Chicken"
+                        placeholder="e.g., Resort T-Shirt or Club Sandwich"
                         error={formErrors.name}
                         helperText={formErrors.name ? 'Name is required' : undefined}
                       />
@@ -813,7 +813,7 @@ export default function DynamicMenuPage() {
                       <textarea
                         value={formData.description || ''}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        placeholder="Describe the dish..."
+                        placeholder="Describe the item..."
                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-orange-500"
                         rows={3}
                       />
@@ -886,12 +886,13 @@ export default function DynamicMenuPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Prep Time (min)
+                        Fulfillment / Prep Time (min)
                       </label>
                       <Input
                         type="number"
                         value={formData.preparation_time || ''}
                         onChange={(e) => setFormData({ ...formData, preparation_time: parseInt(e.target.value) })}
+                        placeholder="e.g. 15"
                       />
                     </div>
                   </div>
@@ -946,30 +947,39 @@ export default function DynamicMenuPage() {
                       />
                       <span className="text-sm text-slate-700 dark:text-slate-300">Featured</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.is_vegetarian ?? false}
-                        onChange={(e) => setFormData({ ...formData, is_vegetarian: e.target.checked })}
-                        className="w-4 h-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                      />
-                      <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                        <Leaf className="w-4 h-4 text-green-500" />
-                        Vegetarian
-                      </span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.is_spicy ?? false}
-                        onChange={(e) => setFormData({ ...formData, is_spicy: e.target.checked })}
-                        className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                      />
-                      <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                        <Flame className="w-4 h-4 text-red-500" />
-                        Spicy
-                      </span>
-                    </label>
+                    {/* Optional Hospitality & F&B Attributes */}
+                    <div className="w-full mt-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                      <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
+                        <ChefHat className="w-3.5 h-3.5" />
+                        Hospitality / Dietary Options (Optional)
+                      </div>
+                      <div className="flex flex-wrap gap-4 items-center">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.is_vegetarian ?? false}
+                            onChange={(e) => setFormData({ ...formData, is_vegetarian: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                          />
+                          <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                            <Leaf className="w-4 h-4 text-green-500" />
+                            Vegetarian
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.is_spicy ?? false}
+                            onChange={(e) => setFormData({ ...formData, is_spicy: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                          />
+                          <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                            <Flame className="w-4 h-4 text-red-500" />
+                            Spicy
+                          </span>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </TabsContent>
 

@@ -50,6 +50,7 @@ export const ENGINE_TO_LEGACY_TEMPLATE_TYPE: Partial<Record<EngineType, string>>
   time_exclusive_reservation: 'multi_day_booking',
   shared_capacity_access:     'session_access',
   ongoing_entitlement:        'subscription',
+  platform_entitlement:       'saas_subscription',
 };
 
 export interface StateTransition<TStatus extends string = string> {

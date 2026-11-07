@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getStoredPropertyId } from './property-id';
+import { validateApiRoute } from './api-contract';
 
 // ---------------------------------------------------------------------------
 // In-memory access token store.
@@ -270,6 +271,12 @@ const getCookie = (name: string): string | undefined => {
 // Request interceptor to add auth token, CSRF token, and check expiration
 api.interceptors.request.use(
   async (config) => {
+    if (process.env.NODE_ENV !== 'production' && config.url) {
+      const validation = validateApiRoute(config.url);
+      if (!validation.valid && validation.error) {
+        console.warn(`[API Contract Warning] ${validation.error}`);
+      }
+    }
     if (typeof window !== 'undefined') {
       let token = memoryTokenStore.get();
 
