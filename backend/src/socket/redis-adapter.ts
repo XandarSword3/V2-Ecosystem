@@ -23,31 +23,35 @@ let subClient: RedisClientType;
 export const configureSocketRedisAdapter = async (
   io: SocketIOServer
 ): Promise<void> => {
-  // Create Redis clients for pub/sub
-  pubClient = createClient({ url: REDIS_URL });
-  subClient = pubClient.duplicate();
+  try {
+    // Create Redis clients for pub/sub
+    pubClient = createClient({ url: REDIS_URL });
+    subClient = pubClient.duplicate();
 
-  // Error handling
-  pubClient.on('error', (err: Error) => {
-    logger.error(`[Socket.io Redis] Pub client error: ${err.message}`);
-  });
+    // Error handling
+    pubClient.on('error', (err: Error) => {
+      logger.error(`[Socket.io Redis] Pub client error: ${err.message}`);
+    });
 
-  subClient.on('error', (err: Error) => {
-    logger.error(`[Socket.io Redis] Sub client error: ${err.message}`);
-  });
+    subClient.on('error', (err: Error) => {
+      logger.error(`[Socket.io Redis] Sub client error: ${err.message}`);
+    });
 
-  // Connect clients
-  await Promise.all([
-    pubClient.connect(),
-    subClient.connect(),
-  ]);
+    // Connect clients
+    await Promise.all([
+      pubClient.connect(),
+      subClient.connect(),
+    ]);
 
-  logger.info('[Socket.io Redis] Connected to Redis for pub/sub');
+    logger.info('[Socket.io Redis] Connected to Redis for pub/sub');
 
-  // Configure adapter
-  io.adapter(createAdapter(pubClient, subClient));
-  
-  logger.info('[Socket.io Redis] Adapter configured successfully');
+    // Configure adapter
+    io.adapter(createAdapter(pubClient, subClient));
+    
+    logger.info('[Socket.io Redis] Adapter configured successfully');
+  } catch (err: any) {
+    logger.warn(`[Socket.io Redis] Redis adapter unavailable (${err?.message}), continuing with in-memory adapter.`);
+  }
 };
 
 /**

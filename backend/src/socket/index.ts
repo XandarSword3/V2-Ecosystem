@@ -3,6 +3,7 @@ import { Server, Socket } from 'socket.io';
 import { config } from "../config/index";
 import { logger } from "../utils/logger.js";
 import { verifyToken } from "../modules/auth/auth.utils.js";
+import { configureSocketRedisAdapter } from './redis-adapter.js';
 
 // Matches any subdomain (including multi-level, e.g. resort-1.tenant-a.v2platform.local)
 // used by the property-level dev URLs introduced in session 7-8.
@@ -191,6 +192,13 @@ export function initializeSocketServer(httpServer: HttpServer) {
     // Allow request buffering during connection
     maxHttpBufferSize: 1e6,    // 1MB
   });
+
+  // Configure Redis adapter for multi-instance cluster scalability if enabled
+  if (process.env.REDIS_URL || process.env.NODE_ENV === 'production') {
+    configureSocketRedisAdapter(io).catch((err) => {
+      logger.warn('[Socket.io] Failed to bind Redis adapter, using in-memory mode', err);
+    });
+  }
 
   // --- SHARED CONNECTION LOGIC ---
   const handleConnection = (socket: Socket, namespaceType: 'admin' | 'public') => {
