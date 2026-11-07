@@ -5,42 +5,9 @@ import { FulfillmentModeSelector } from '@/components/customer/FulfillmentModeSe
 import { DestinationRequirementsEditor, type ServiceLocationItem } from '@/components/customer/DestinationRequirementsEditor';
 import { CANONICAL_ENGINE_A_CAPABILITIES, type FulfillmentOption, type FulfillmentMode } from '@/lib/engine-a/types';
 
-// Mock next-intl
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => {
-    const translations: Record<string, string> = {
-      selectFulfillmentMode: 'Select Fulfillment Method',
-      fulfillmentModeOnPremise: 'On-Premise',
-      fulfillmentDescOnPremise: 'Service or pickup at our physical location',
-      fulfillmentModePickup: 'Pickup',
-      fulfillmentDescPickup: 'Collect your order at the designated counter',
-      fulfillmentModeLocalDelivery: 'Local Delivery',
-      fulfillmentDescLocalDelivery: 'Delivered directly to your local address',
-      fulfillmentModeDigitalDelivery: 'Digital Delivery',
-      fulfillmentDescDigitalDelivery: 'Instant digital delivery to your account or email',
-      fulfillmentModeShipment: 'Shipment',
-      fulfillmentDescShipment: 'Shipped via courier to your destination',
-      fulfillmentModeServiceExecution: 'Service Execution',
-      fulfillmentDescServiceExecution: 'Executed at designated service station or chair',
-      fulfillmentModeNone: 'Direct Settlement (No Fulfillment)',
-      fulfillmentDescNone: 'Direct commercial transaction with no physical delivery',
-      selectLocationOrTable: 'Select Table / Location',
-      occupied: 'Occupied',
-      selected: 'Selected',
-      available: 'Available',
-      pickupNotes: 'Pickup Instructions (Optional)',
-      deliveryAddress: 'Delivery Address',
-      shippingAddress: 'Shipping Address',
-      digitalDeliveryHandle: 'Recipient Email or Digital Account',
-      pickupNotesPlaceholder: 'e.g. Will pick up in 20 minutes',
-      addressPlaceholder: 'Street address, building/suite, city, postal code, special delivery directions',
-      digitalAccountPlaceholder: 'e.g. user@example.com',
-      serviceStationPlaceholder: 'e.g. Spa Treatment Room 3, Station B',
-      fulfillmentNoneNotice: 'This transaction settles directly with no physical fulfillment required.',
-    };
-    return translations[key] || '';
-  },
-}));
+// next-intl resolution is provided by the canonical mock in tests/setup.ts —
+// both FulfillmentModeSelector and DestinationSelector use useTranslations('common'),
+// whose keys resolve to the real English messages.
 
 describe('FulfillmentModeSelector — Phase F4 Canonical Modes Presentation', () => {
   const allSevenOptions: FulfillmentOption[] = [
@@ -141,7 +108,7 @@ describe('DestinationRequirementsEditor — Phase F4 Destination Semantics', () 
       />
     );
 
-    expect(screen.getByTestId('destination-editor-on-premise')).toBeDefined();
+    expect(screen.getByTestId('destination-selector-on-premise')).toBeDefined();
     expect(screen.getByTestId('location-option-loc-1')).toBeDefined();
     expect(screen.getByTestId('location-option-loc-2')).toBeDefined();
     expect(screen.queryByTestId('location-option-loc-3')).toBeNull(); // Inactive excluded
@@ -184,7 +151,7 @@ describe('DestinationRequirementsEditor — Phase F4 Destination Semantics', () 
       />
     );
 
-    expect(screen.getByTestId('destination-editor-pickup')).toBeDefined();
+    expect(screen.getByTestId('destination-selector-pickup')).toBeDefined();
     const input = screen.getByPlaceholderText(/pick up in 20 minutes/i);
     fireEvent.change(input, { target: { value: 'Ready by 5pm' } });
     expect(handleChange).toHaveBeenCalledWith('pickup_location', 'Ready by 5pm');
@@ -201,7 +168,7 @@ describe('DestinationRequirementsEditor — Phase F4 Destination Semantics', () 
       />
     );
 
-    expect(screen.getByTestId('destination-editor-delivery')).toBeDefined();
+    expect(screen.getByTestId('destination-selector-delivery')).toBeDefined();
     const textarea = screen.getByPlaceholderText(/street address/i);
     fireEvent.change(textarea, { target: { value: '123 Palm Grove Ave' } });
     expect(handleChange).toHaveBeenCalledWith('address', '123 Palm Grove Ave');
@@ -218,7 +185,7 @@ describe('DestinationRequirementsEditor — Phase F4 Destination Semantics', () 
       />
     );
 
-    expect(screen.getByTestId('destination-editor-digital')).toBeDefined();
+    expect(screen.getByTestId('destination-selector-digital')).toBeDefined();
     const input = screen.getByPlaceholderText(/user@example.com/i);
     fireEvent.change(input, { target: { value: 'alessandro@example.com' } });
     expect(handleChange).toHaveBeenCalledWith('digital_account', 'alessandro@example.com');
@@ -235,7 +202,7 @@ describe('DestinationRequirementsEditor — Phase F4 Destination Semantics', () 
       />
     );
 
-    expect(screen.getByTestId('destination-editor-service')).toBeDefined();
+    expect(screen.getByTestId('destination-selector-service')).toBeDefined();
     const input = screen.getByPlaceholderText(/spa treatment room/i);
     fireEvent.change(input, { target: { value: 'Room 102' } });
     expect(handleChange).toHaveBeenCalledWith('service_location', 'Room 102');

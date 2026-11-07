@@ -110,7 +110,7 @@ describe('Admin bookings route behavior', () => {
     });
 
     await waitFor(() => {
-      expect(toastSuccessMock).toHaveBeenCalledWith('success.updated');
+      expect(toastSuccessMock).toHaveBeenCalledWith('Successfully updated');
     });
 
     const updatedRow = screen.getByText('BK-001').closest('tr');
@@ -129,7 +129,7 @@ describe('Admin bookings route behavior', () => {
     expect(within(modalCard as HTMLElement).getByText('alice@example.com')).toBeInTheDocument();
     expect(within(modalCard as HTMLElement).getByText('Palm AccommodationUnit')).toBeInTheDocument();
 
-    expect(toastSuccessMock).toHaveBeenCalledWith('success.updated');
+    expect(toastSuccessMock).toHaveBeenCalledWith('Successfully updated');
   });
 
   it('shows an error toast when initial bookings fetch fails', async () => {
@@ -138,7 +138,7 @@ describe('Admin bookings route behavior', () => {
     render(<DynamicBookingsPage />);
 
     await waitFor(() => {
-      expect(toastErrorMock).toHaveBeenCalledWith('errors.failedToLoad');
+      expect(toastErrorMock).toHaveBeenCalledWith('Failed to load data');
     });
   });
 });

@@ -47,7 +47,7 @@ const router = Router();
 // Platform admin guard
 // ============================================
 
-async function requirePlatformAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requirePlatformAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!(req.user as any)?.isPlatformAdmin) {
     res.status(403).json({ success: false, error: 'Platform administrator access required' });
     return;

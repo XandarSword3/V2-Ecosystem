@@ -110,8 +110,16 @@ describe('module-utils', () => {
     expect(getModuleStatLabel(bookingModule)).toBe('Units Available');
     expect(getModuleStatLabel(sessionModule)).toBe('Daily Visitors');
 
-    expect(getModuleStatPlaceholder(menuModule)).toBe(50);
-    expect(getModuleStatPlaceholder(bookingModule)).toBe(10);
-    expect(getModuleStatPlaceholder(sessionModule)).toBe(100);
+    // Clean empty state (0) when no metadata/counts are configured (no fabricated dummy numbers)
+    expect(getModuleStatPlaceholder(menuModule)).toBe(0);
+    expect(getModuleStatPlaceholder(bookingModule)).toBe(0);
+    expect(getModuleStatPlaceholder(sessionModule)).toBe(0);
+
+    // Reads real counts when provided in metadata or item_count
+    const moduleWithMetadata = createModule({ metadata: { item_count: 42 } });
+    expect(getModuleStatPlaceholder(moduleWithMetadata)).toBe(42);
+
+    const moduleWithDirectCount = createModule({ item_count: 15 });
+    expect(getModuleStatPlaceholder(moduleWithDirectCount)).toBe(15);
   });
 });

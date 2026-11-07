@@ -35,6 +35,7 @@ vi.mock('@/stores/settingsStore', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
   useRouter: () => ({
     push: pushMock,
   }),
@@ -133,8 +134,8 @@ describe('BookingService behavior', () => {
     useQueryMock.mockReturnValueOnce({ data: null, isLoading: false, error: new Error('failed') });
     render(<BookingService module={moduleData as any} />);
 
-    expect(screen.getByText('error')).toBeInTheDocument();
-    expect(screen.getByText('tryAgainLater')).toBeInTheDocument();
+    expect(screen.getByText('An error occurred')).toBeInTheDocument();
+    expect(screen.getByText('Please try again later')).toBeInTheDocument();
   });
 
   it('renders units with featured badge, stats, amenities, and placeholder image fallback', () => {
@@ -164,7 +165,7 @@ describe('BookingService behavior', () => {
     expect(screen.getAllByText('/ night').length).toBeGreaterThan(0);
     expect(screen.getAllByText('40% deposit required')[0]).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole('button', { name: /booknow/i })[0]);
+    await user.click(screen.getAllByRole('button', { name: /book now/i })[0]);
     expect(pushMock).toHaveBeenCalledWith('/accommodation_units/unit-1?module=mod-booking');
   });
 

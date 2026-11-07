@@ -24,7 +24,7 @@ vi.mock('@/lib/api', () => ({
 }));
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => { const t: any = (key: string) => key; t.has = () => false; t.rich = (k: string) => k; t.raw = (k: string) => k; return t; },
 }));
 
 vi.mock('@/lib/authorization', () => ({

@@ -948,10 +948,21 @@ export async function processRefundById(
   const supabase = getSupabase();
   const client = tenantContext ? getScopedClient(tenantContext) : supabase;
 
-  const { data: payment, error: fetchError } = await client.from('payments')
+  let { data: payment, error: fetchError } = await client.from('payments')
     .select('*')
     .eq('id', paymentId)
     .maybeSingle();
+
+  if (!payment && !fetchError) {
+    const fallback = await client.from('payments')
+      .select('*')
+      .eq('reference_id', paymentId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    payment = fallback.data;
+    fetchError = fallback.error;
+  }
 
   if (fetchError || !payment) throw new Error('Payment record not found');
   if (payment.status === 'refunded') throw new Error('Payment is already refunded');
@@ -989,7 +1000,7 @@ export async function processRefundById(
   const { error: updateError } = await client
     .from('payments')
     .update(refundDetails)
-    .eq('id', paymentId);
+    .eq('id', payment.id);
 
   if (updateError) throw updateError;
 

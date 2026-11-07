@@ -22,8 +22,17 @@ class MockResizeObserver {
 vi.stubGlobal('ResizeObserver', MockResizeObserver);
 
 // ─── next-intl ──────────────────────────────────────────
+// Translators must carry the full next-intl surface (has/rich/raw) —
+// Header and other components call t.has(key) and a bare function
+// crashes every render tree that includes them.
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => {
+    const t: any = (key: string) => key;
+    t.has = () => false;
+    t.rich = (key: string) => key;
+    t.raw = (key: string) => key;
+    return t;
+  },
   NextIntlClientProvider: ({ children }: any) => children,
 }));
 

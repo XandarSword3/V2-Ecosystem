@@ -55,11 +55,17 @@ vi.mock('next/link', () => ({
 
 vi.mock('next-intl', () => ({
   useLocale: () => 'en',
-  useTranslations: (ns: string) => (key: string, values?: { year?: number }) => {
-    if (ns === 'footer' && key === 'copyright') {
-      return `copyright ${values?.year}`;
-    }
-    return key;
+  useTranslations: (ns: string) => {
+    const t: any = (key: string, values?: { year?: number }) => {
+      if (ns === 'footer' && key === 'copyright') {
+        return `copyright ${values?.year}`;
+      }
+      return key;
+    };
+    t.has = (k: string) => ns === 'footer' && k === 'copyright';
+    t.rich = (k: string) => t(k);
+    t.raw = (k: string) => t(k);
+    return t;
   },
 }));
 
@@ -97,10 +103,10 @@ describe('Footer behavior', () => {
   it('renders quick links from active customer modules and gift cards', () => {
     render(<Footer />);
 
-    expect(screen.getByRole('link', { name: /MenuService/i })).toHaveAttribute('href', '/menu_service');
-    expect(screen.getByRole('link', { name: /pool/i })).toHaveAttribute('href', '/capacity');
+    expect(screen.getByRole('link', { name: /MenuService/i })).toHaveAttribute('href', '/default/menu_service');
+    expect(screen.getByRole('link', { name: /pool/i })).toHaveAttribute('href', '/default/capacity');
     expect(screen.queryByRole('link', { name: /snackBar/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /giftCards/i })).toHaveAttribute('href', '/giftcards');
+    expect(screen.getByRole('link', { name: /giftCards/i })).toHaveAttribute('href', '/default/giftcards');
   });
 
   it('filters out CMS socials with empty URLs', () => {

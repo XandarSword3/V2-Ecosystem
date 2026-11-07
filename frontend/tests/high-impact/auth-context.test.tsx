@@ -29,39 +29,49 @@ vi.mock('../../src/lib/logger', () => ({
   },
 }));
 
-vi.mock('@/stores/cartStore', () => ({
-  useCartStore: (selector?: any) => {
-    const state = { clearCart: vi.fn() };
-    return selector ? selector(state) : state;
-  },
-}));
+vi.mock('@/stores/cartStore', () => {
+  // Stable singleton: AuthProvider's clearLocalSession depends on clearCart,
+  // and its validateSession effect depends on clearLocalSession — a fresh
+  // function per selector call re-runs session validation on every render.
+  const stableCart = { clearCart: () => {} };
+  return {
+    useCartStore: (selector?: any) => (selector ? selector(stableCart) : stableCart),
+  };
+});
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: routerPushMock,
-  }),
-}));
+vi.mock('next/navigation', () => {
+  // Stable singleton: useRouter feeds the validateSession effect deps through
+  // AuthProvider's callbacks — a fresh router object per render re-triggers
+  // session validation, exhausting queued mock responses and clearing the
+  // session the real backend would have kept valid.
+  const stableRouter = { push: (...args: unknown[]) => routerPushMock(...args) };
+  return {
+    useParams: () => ({}),
+    useRouter: () => stableRouter,
+  };
+});
 
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: vi.fn().mockReturnValue({ data: undefined, isLoading: false, error: null, refetch: vi.fn() }),
-  useMutation: vi.fn().mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
-  useQueryClient: () => ({
+vi.mock('@tanstack/react-query', () => {
+  // Real useQueryClient returns the same client instance for the provider's
+  // lifetime. Returning a fresh object per call destabilizes AuthProvider's
+  // effect deps (queryClient feeds clearLocalSession) and re-triggers
+  // validateSession on every render — so the stub must be a singleton.
+  const queryClientStub = {
+    clear: vi.fn(),
     invalidateQueries: vi.fn(),
     setQueryData: vi.fn(),
     getQueryData: vi.fn(),
     refetchQueries: vi.fn(),
-    clear: vi.fn(),
     resetQueries: vi.fn(),
-  }),
-  QueryClient: vi.fn().mockImplementation(() => ({
-    clear: vi.fn(),
-    invalidateQueries: vi.fn(),
-    setQueryData: vi.fn(),
-    getQueryData: vi.fn(),
-    resetQueries: vi.fn(),
-  })),
-  QueryClientProvider: ({ children }: any) => children,
-}));
+  };
+  return {
+    useQuery: vi.fn().mockReturnValue({ data: undefined, isLoading: false, error: null, refetch: vi.fn() }),
+    useMutation: vi.fn().mockReturnValue({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
+    useQueryClient: () => queryClientStub,
+    QueryClient: vi.fn().mockImplementation(() => ({ ...queryClientStub })),
+    QueryClientProvider: ({ children }: any) => children,
+  };
+});
 
 async function loadAuthModule() {
   return import('../../src/lib/auth-context');
@@ -95,6 +105,14 @@ describe('auth context', () => {
         },
       },
     });
+    // F2: session validation fetches '/auth/me' first, then
+    // '/auth/me/permissions' from the backend permission cache.
+    apiGetMock.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: { permissions: ['bookings:read'] },
+      },
+    });
 
     const mod = await loadAuthModule();
     const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -104,6 +122,9 @@ describe('auth context', () => {
     const hook = renderHook(() => mod.useAuth(), { wrapper });
 
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    console.log('DEBUG apiGet calls:', JSON.stringify(apiGetMock.mock.calls));
+    console.log('DEBUG state:', JSON.stringify(hook.result.current));
+    console.log('DEBUG stored user:', localStorage.getItem('user'));
     expect(apiGetMock).toHaveBeenCalledWith('/auth/me');
     expect(hook.result.current.isAuthenticated).toBe(true);
     expect(hook.result.current.user).toMatchObject({
@@ -295,7 +316,10 @@ describe('auth context', () => {
       hook.result.current.logout();
     });
 
-    expect(apiPostMock).toHaveBeenCalledWith('/auth/logout', { refreshToken: 'logout-refresh' });
+    // Refresh token is an httpOnly cookie consumed server-side
+    // (auth.controller.ts logout() reads req.cookies.refreshToken) —
+    // the frontend posts no body.
+    expect(apiPostMock).toHaveBeenCalledWith('/auth/logout');
     expect(memoryTokenStoreClear).toHaveBeenCalled();
     expect(localStorage.getItem('user')).toBeNull();
     expect(hook.result.current.user).toBeNull();

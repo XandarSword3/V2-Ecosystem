@@ -6,6 +6,7 @@ const pushMock = vi.hoisted(() => vi.fn());
 const setThemeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({
+  useParams: () => ({ property: 'resort-main' }),
   useRouter: () => ({ push: pushMock }),
 }));
 
@@ -29,6 +30,22 @@ vi.mock('framer-motion', async () => {
 });
 
 import AppearanceSettingsPage from '../../src/app/[property]/admin/settings/appearance/page';
+// Property context mock — pages under [property] consume useProperty();
+// without a provider the render tree crashes before any assertion runs.
+vi.mock('@/context/PropertyContext', () => ({
+  PropertyProvider: ({ children }: any) => children,
+  useProperty: () => ({
+    properties: [
+      { id: 'prop-1', name: 'Test Property', public_slug: 'resort-main', slug: 'resort-main' },
+    ],
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', public_slug: 'resort-main', slug: 'resort-main' },
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 
 describe('Admin appearance settings route coverage', () => {
   beforeEach(() => {
@@ -52,6 +69,6 @@ describe('Admin appearance settings route coverage', () => {
 
     await user.click(screen.getByRole('button', { name: /brand settings/i }));
 
-    expect(pushMock).toHaveBeenCalledWith('/admin/settings/brand');
+    expect(pushMock).toHaveBeenCalledWith('/resort-main/admin/settings/brand');
   });
 });

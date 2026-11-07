@@ -10,10 +10,17 @@ import { useCartStore } from '@/stores/cartStore';
 
 // Mock next-intl
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string, params?: Record<string, any>) => {
-    if (params?.name) return `${key}: ${params.name}`;
-    return key;
+  useTranslations: () => {
+    const t: any = (key: string, params?: Record<string, any>) => {
+      if (params?.name) return `${key}: ${params.name}`;
+      return key;
+    };
+    t.has = () => false;
+    t.rich = (k: string) => k;
+    t.raw = (k: string) => k;
+    return t;
   },
+  useLocale: () => 'en',
 }));
 
 // Mock next/navigation

@@ -9,7 +9,6 @@ import {
   Clock,
   AlertCircle,
   Sparkles,
-  ChefHat,
   Package,
   Truck,
   Download,
@@ -82,8 +81,9 @@ export function FulfillmentTimeline({
 
   // Normalize state and find active step index
   const normalizedCurrent = (currentState || '').toLowerCase() as FulfillmentState;
-  const terminalStates = ['handed_off', 'delivered', 'collected', 'completed'];
-  const hasFinished = isCompleted || terminalStates.includes(normalizedCurrent);
+  const lastStep = steps[steps.length - 1];
+  const isTerminalState = normalizedCurrent === lastStep || (normalizedCurrent as string) === 'completed';
+  const hasFinished = isCompleted || isTerminalState;
 
   let activeIndex = steps.indexOf(normalizedCurrent);
   if (activeIndex === -1) {

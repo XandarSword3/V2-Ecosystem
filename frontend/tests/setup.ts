@@ -50,17 +50,34 @@ vi.mock('next/image', () => ({
 
 // Mock next-intl
 const enMessages = require('../messages/en.json');
-vi.mock('next-intl', () => ({
-  useTranslations: (ns?: string) => (key: string, values?: any) => {
-    const dict = ns ? enMessages[ns] || enMessages.common || {} : enMessages.common || {};
-    let text = dict[key] || enMessages.checkout?.[key] || enMessages.common?.[key] || key;
-    if (typeof text === 'string' && values) {
-      for (const [k, v] of Object.entries(values)) {
-        text = text.replace(new RegExp(`\\{${k}[^}]*\\}`, 'g'), String(v));
-      }
+function resolveMockMessage(ns: string | undefined, key: string, values?: any): string {
+  const dict = ns ? enMessages[ns] || enMessages.common || {} : enMessages.common || {};
+  // Deep-resolve dot-path keys ('preferences.animations.enableAll' ->
+  // dict.preferences.animations.enableAll) — real next-intl nests messages.
+  let text = dict[key];
+  if (text === undefined && key.includes('.')) {
+    text = key.split('.').reduce<any>((node, part) => (node && typeof node === 'object' ? node[part] : undefined), dict);
+  }
+  text = text || enMessages.checkout?.[key] || enMessages.common?.[key] || key;
+  if (typeof text === 'string' && values) {
+    for (const [k, v] of Object.entries(values)) {
+      text = text.replace(new RegExp(`\\{${k}[^}]*\\}`, 'g'), String(v));
     }
-    return text;
-  },
+  }
+  return text;
+}
+const mockTranslator = (ns?: string) => {
+  const t = (key: string, values?: any) => resolveMockMessage(ns, key, values);
+  // Real next-intl translators expose has/rich/raw — several components call
+  // them (e.g. Header's t.has(key)); a bare function crashes those renders.
+  (t as any).has = (key: string) => resolveMockMessage(ns, key) !== key;
+  (t as any).rich = (key: string, values?: any) => resolveMockMessage(ns, key, values);
+  (t as any).raw = (key: string) => resolveMockMessage(ns, key);
+  (t as any).markForHydration = (key: string) => key;
+  return t;
+};
+vi.mock('next-intl', () => ({
+  useTranslations: (ns?: string) => mockTranslator(ns),
   useLocale: () => 'en',
   useFormatter: () => ({
     number: (n: number) => n.toString(),
@@ -118,6 +135,10 @@ class IntersectionObserver {
   constructor() {}
 }
 global.IntersectionObserver = IntersectionObserver as any;
+
+// jsdom does not implement window.scrollTo; framer-motion and several pages
+// (scrollTo on data load) trigger it during tests.
+window.scrollTo = vi.fn() as any;
 
 // Suppress console errors during tests (optional)
 const originalError = console.error;

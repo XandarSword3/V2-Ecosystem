@@ -21,28 +21,6 @@ vi.mock('framer-motion', async () => {
   };
 });
 
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => {
-    const dictionary: Record<string, string> = {
-      'preferences.title': 'Preferences',
-      'preferences.subtitle': 'Customize your experience',
-      'preferences.animations.title': 'Animations',
-      'preferences.animations.enableAll': 'Enable all animations',
-      'preferences.animations.enableAllDesc': 'Turn motion effects on or off',
-      'preferences.transitions.title': 'Page transitions',
-      'preferences.transitions.enable': 'Enable transitions',
-      'preferences.transitions.enableDesc': 'Use animated page transitions',
-      'preferences.transitions.style': 'Transition style',
-      'preferences.loading.title': 'Loading animation',
-      'preferences.loading.enable': 'Enable loading animation',
-      'preferences.loading.enableDesc': 'Show loading effects',
-      'preferences.done': 'Done',
-    };
-
-    return dictionary[key] || key;
-  },
-}));
-
 import { UserPreferencesModal } from '../../src/components/settings/UserPreferencesModal';
 import { useSettingsStore } from '../../src/stores/settingsStore';
 
@@ -65,7 +43,7 @@ describe('User preferences modal component coverage', () => {
     const dialog = screen.getByRole('dialog', { name: 'User Preferences' });
     expect(dialog).toBeInTheDocument();
 
-    const animationLabel = screen.getByText('Enable all animations');
+    const animationLabel = screen.getByText('Enable Animations');
     const animationRow = animationLabel.closest('div')?.parentElement;
     if (animationRow) {
       const toggle = within(animationRow).getByRole('button');

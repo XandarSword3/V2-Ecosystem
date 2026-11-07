@@ -1405,6 +1405,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
                                 size="sm"
                                 variant="outline"
                                 className="flex-1"
+                                data-testid="icon-printer"
                                 onClick={() => printReceipt(order.id)}
                               >
                                 <Printer className="h-4 w-4" />
@@ -2233,7 +2234,7 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="staff-shift-title" onKeyDown={(e) => { if (e.key === 'Escape') setShowShiftModal(false); }}>
           <Card className="max-w-md w-full">
             <CardHeader>
-              <CardTitle>End Shift</CardTitle>
+              <CardTitle><span id="staff-shift-title">End Shift</span></CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">

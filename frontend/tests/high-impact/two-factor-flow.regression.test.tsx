@@ -53,6 +53,7 @@ vi.mock('framer-motion', async () => {
 });
 
 vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
   useRouter: () => ({ replace: replaceMock }),
 }));
 
@@ -89,7 +90,8 @@ vi.mock('@/types', () => ({
 }));
 
 vi.mock('next-intl', () => ({
-  useTranslations: (prefix: string) => (key: string) => {
+  useTranslations: (prefix: string) => {
+    const t: any = (key: string) => {
     const translations: Record<string, string> = {
       email: 'Email',
       password: 'Password',
@@ -109,6 +111,11 @@ vi.mock('next-intl', () => ({
       backToHome: '← Back to Home',
     };
     return translations[key] || key;
+  };
+  t.has = (k: string) => translations[k] !== undefined;
+  t.rich = (k: string) => t(k);
+  t.raw = (k: string) => t(k);
+  return t;
   },
 }));
 

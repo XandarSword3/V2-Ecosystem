@@ -31,6 +31,7 @@ vi.mock('framer-motion', async () => {
 });
 
 vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
   useRouter: () => ({ replace: replaceMock }),
 }));
 

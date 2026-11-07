@@ -92,8 +92,8 @@ export default function BusinessOverviewPage() {
               const res = await api.get('/admin/modules');
               const mods = res.data?.data || [];
               return mods.filter(
-                (m: { engine_type?: string; template_type?: string }) =>
-                  m.engine_type === 'instant_transaction' || m.template_type === 'menu_service'
+                (m: { engine_type?: string }) =>
+                  m.engine_type === 'instant_transaction'
               ).length;
             },
           },

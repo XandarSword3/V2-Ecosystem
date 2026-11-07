@@ -234,7 +234,7 @@ export function TwoFactorSettings() {
             <div className="flex justify-center p-4 bg-white rounded-lg">
               <img
                 src={setupData.qrCodeDataUrl}
-                alt={t('2faQrCode')}
+                alt={t('2faQrCode') || '2FA QR Code'}
                 className="w-48 h-48"
               />
             </div>
@@ -272,7 +272,7 @@ export function TwoFactorSettings() {
                 }}
                 className="flex-1"
               >
-                {t('cancel')}</Button>
+                {t('cancel') || 'Cancel'}</Button>
               <Button
                 onClick={enableTwoFactor}
                 disabled={processing || verificationCode.length !== 6}
@@ -283,7 +283,7 @@ export function TwoFactorSettings() {
                 ) : (
                   <Check className="w-4 h-4 mr-2" />
                 )}
-                {t('verifyEnable')}</Button>
+                {t('verifyEnable') || 'Verify & Enable'}</Button>
             </div>
           </div>
         )}
@@ -335,7 +335,7 @@ export function TwoFactorSettings() {
             </Button>
 
             <Button onClick={finishSetup} className="w-full">
-              {t('iveSavedMyCodes')}</Button>
+              {t('iveSavedMyCodes') || "I've saved my codes"}</Button>
           </div>
         )}
 
@@ -382,7 +382,7 @@ export function TwoFactorSettings() {
                 }}
                 className="flex-1"
               >
-                {t('cancel')}</Button>
+                {t('cancel') || 'Cancel'}</Button>
               <Button
                 variant="danger"
                 onClick={disableTwoFactor}
@@ -394,7 +394,7 @@ export function TwoFactorSettings() {
                 ) : (
                   <ShieldOff className="w-4 h-4 mr-2" />
                 )}
-                {t('disable2fa')}</Button>
+                {t('disable2fa') || 'Disable 2FA'}</Button>
             </div>
           </div>
         )}

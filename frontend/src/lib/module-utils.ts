@@ -45,6 +45,16 @@ export interface Module {
     [key: string]: string | number | boolean | undefined;
   };
   sort_order: number;
+  metadata?: {
+    item_count?: number;
+    total_items?: number;
+    [key: string]: unknown;
+  };
+  stats?: {
+    count?: number;
+    [key: string]: unknown;
+  };
+  item_count?: number;
 }
 
 /**
@@ -165,18 +175,22 @@ export function getModuleStatLabel(module: Module): string {
 }
 
 /**
- * Get a placeholder stat value for a module
- * In production, this should be fetched from the actual module data
+ * Get a real stat value for a module.
+ * Reads real counts from module metadata/stats if available, otherwise returns 0 (clean empty state)
+ * rather than fabricating dummy placeholder numbers.
  */
 export function getModuleStatPlaceholder(module: Module): number {
-  switch (module.engine_type) {
-    case 'instant_transaction':
-      return 50;
-    case 'time_exclusive_reservation':
-      return 10;
-    case 'shared_capacity_access':
-      return 100;
-    default:
-      return 25;
+  if (typeof module.item_count === 'number') {
+    return module.item_count;
   }
+  if (typeof module.metadata?.item_count === 'number') {
+    return module.metadata.item_count;
+  }
+  if (typeof module.metadata?.total_items === 'number') {
+    return module.metadata.total_items;
+  }
+  if (typeof module.stats?.count === 'number') {
+    return module.stats.count;
+  }
+  return 0;
 }

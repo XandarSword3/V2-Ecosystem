@@ -12,6 +12,7 @@ import { hospitalityFulfillmentStateMachine } from '../../../src/adapters/hospit
 import { timeExclusiveReservationStateMachine } from '../../../src/engines/definitions/time-exclusive-reservation.js';
 import { sharedCapacityAccessStateMachine } from '../../../src/engines/definitions/shared-capacity-access.js';
 import { ongoingEntitlementStateMachine } from '../../../src/engines/definitions/ongoing-entitlement.js';
+import { platformEntitlementStateMachine } from '../../../src/engines/definitions/platform-entitlement.js';
 
 // ============================================
 // Engine A: Instant Transaction — LAYERED state model (plan Phase 3)
@@ -505,6 +506,79 @@ describe('StateMachine - Generic Features', () => {
       const check = sm.canTransition('pending', 'start_preparation', 'staff');
       expect(check.allowed).toBe(false);
       expect(check.error).toBeDefined();
+    });
+  });
+
+  // ============================================
+  // Engine E: Platform Entitlement
+  // ============================================
+
+  describe('StateMachine - Platform Entitlement (Engine E)', () => {
+    let sm: StateMachine;
+
+    beforeEach(() => {
+      sm = new StateMachine(platformEntitlementStateMachine as any);
+    });
+
+    it('has trialing as initial state and cancelled as terminal state', () => {
+      expect(sm.getInitialState()).toBe('trialing');
+      expect(sm.isTerminal('cancelled')).toBe(true);
+      expect(sm.isTerminal('active')).toBe(false);
+      expect(sm.isTerminal('suspended')).toBe(false);
+      expect(sm.isTerminal('past_due')).toBe(false);
+    });
+
+    it('converts trialing to active on activate by system actor', async () => {
+      const res = await sm.transition('trialing', 'activate', 'system');
+      expect(res.success).toBe(true);
+      expect(res.newState).toBe('active');
+    });
+
+    it('renews active subscription on renew by system', async () => {
+      const res = await sm.transition('active', 'renew', 'system');
+      expect(res.success).toBe(true);
+      expect(res.newState).toBe('active');
+    });
+
+    it('transitions active to past_due on payment_failed', async () => {
+      const res = await sm.transition('active', 'payment_failed', 'system');
+      expect(res.success).toBe(true);
+      expect(res.newState).toBe('past_due');
+    });
+
+    it('recovers past_due back to active on payment_recovered', async () => {
+      const res = await sm.transition('past_due', 'payment_recovered', 'system');
+      expect(res.success).toBe(true);
+      expect(res.newState).toBe('active');
+    });
+
+    it('suspends past_due tenant when dunning retries are exhausted', async () => {
+      const res = await sm.transition('past_due', 'suspend', 'system');
+      expect(res.success).toBe(true);
+      expect(res.newState).toBe('suspended');
+    });
+
+    it('reactivates suspended tenant to active on reactivate by admin or system', async () => {
+      const res = await sm.transition('suspended', 'reactivate', 'admin');
+      expect(res.success).toBe(true);
+      expect(res.newState).toBe('active');
+    });
+
+    it('cancels from suspended, active, or trialing to terminal cancelled state', async () => {
+      const resSuspended = await sm.transition('suspended', 'cancel', 'admin');
+      expect(resSuspended.newState).toBe('cancelled');
+
+      const resActive = await sm.transition('active', 'cancel', 'admin');
+      expect(resActive.newState).toBe('cancelled');
+
+      const resTrial = await sm.transition('trialing', 'cancel', 'admin');
+      expect(resTrial.newState).toBe('cancelled');
+    });
+
+    it('blocks transitions out of cancelled terminal state', async () => {
+      await expect(sm.transition('cancelled', 'reactivate', 'admin')).rejects.toThrow(
+        StateMachineError
+      );
     });
   });
 

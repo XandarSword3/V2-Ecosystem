@@ -49,7 +49,7 @@ interface MenuItemData {
   track_inventory?: boolean;
 }
 
-export function MenuService({ module }: MenuServiceProps) {
+export function CatalogShell({ module }: MenuServiceProps) {
   const tCommon = useTranslations('common');
   const { translateContent } = useContentTranslation();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -311,7 +311,7 @@ export function MenuService({ module }: MenuServiceProps) {
         description={module.description}
         headerColor={headerColor}
         accentColor={accentColor}
-        badgeText={typeof module.settings?.badge_text === 'string' ? module.settings.badge_text : 'Fresh & Delicious'}
+        badgeText={typeof module.settings?.badge_text === 'string' ? module.settings.badge_text : (module.settings?.is_food_service ? 'Fresh & Delicious' : 'Featured')}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-6 relative z-10">
@@ -319,7 +319,7 @@ export function MenuService({ module }: MenuServiceProps) {
         <GlassSearch
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder={`Search ${module.name} menu...`}
+          placeholder={typeof module.settings?.search_placeholder === 'string' ? module.settings.search_placeholder : `Search ${module.name}...`}
           className="mb-8"
         />
 
@@ -334,7 +334,7 @@ export function MenuService({ module }: MenuServiceProps) {
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Flame className="w-6 h-6 text-orange-500" />
                 <span className="bg-gradient-to-r from-orange-500 via-red-500 to-amber-500 bg-clip-text text-transparent">
-                  {tCommon('featuredDishes')}
+                  {module.settings?.is_food_service ? tCommon('featuredDishes') : (tCommon('featured') || 'Featured Items')}
                 </span>
               </h2>
               <button
@@ -544,3 +544,5 @@ export function MenuService({ module }: MenuServiceProps) {
     </div>
   );
 }
+
+export const MenuService = CatalogShell;

@@ -34,6 +34,22 @@ vi.mock('sonner', () => ({
 }));
 
 import TaxConfigurationPage from '../../src/app/[property]/admin/settings/tax/page';
+// Property context mock — pages under [property] consume useProperty();
+// without a provider the render tree crashes before any assertion runs.
+vi.mock('@/context/PropertyContext', () => ({
+  PropertyProvider: ({ children }: any) => children,
+  useProperty: () => ({
+    properties: [
+      { id: 'prop-1', name: 'Test Property', public_slug: 'resort-main', slug: 'resort-main' },
+    ],
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', public_slug: 'resort-main', slug: 'resort-main' },
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 
 const taxConfigSeed = {
   default_rate: 11,
@@ -96,7 +112,7 @@ describe('Admin tax route coverage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('Tax Configuration')).toBeInTheDocument();
+    expect(await screen.findByText('Tax & Fee Configuration')).toBeInTheDocument();
 
     await user.click(screen.getAllByRole('button', { name: /Save Changes/i })[0]);
 
@@ -104,7 +120,7 @@ describe('Admin tax route coverage', () => {
       expect(apiPutMock).toHaveBeenCalledWith('/admin/settings/tax', expect.any(Object));
     });
 
-    expect(toastSuccessMock).toHaveBeenCalledWith('Tax configuration saved');
+    expect(toastSuccessMock).toHaveBeenCalledWith('Tax & Fee configuration saved successfully');
   });
 
   it('shows validation error when adding a rate without required fields', async () => {
@@ -112,13 +128,14 @@ describe('Admin tax route coverage', () => {
 
     renderPage();
 
-    await screen.findByText('Tax Configuration');
+    await screen.findByText('Tax & Fee Configuration');
 
-    await user.click(screen.getAllByRole('button', { name: /Add Rate/i })[0]);
-    expect(await screen.findByText('Add Tax Rate')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: /Add Tax or Fee Rate/i })[0]);
+    expect(await screen.findByText('Add New Tax or Service Charge Rate')).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole('button', { name: /Add Rate/i })[1]);
+    // Submit the empty form from inside the modal
+    await user.click(screen.getByRole('button', { name: /Add Rate/i }));
 
-    expect(toastErrorMock).toHaveBeenCalledWith('Please fill in required fields');
+    expect(toastErrorMock).toHaveBeenCalledWith('Please fill in required rate name and percentage');
   });
 });

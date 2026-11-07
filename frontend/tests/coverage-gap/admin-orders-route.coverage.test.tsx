@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiGetMock = vi.hoisted(() => vi.fn());
 const apiPutMock = vi.hoisted(() => vi.fn());
+const apiPostMock = vi.hoisted(() => vi.fn());
 const socketOnMock = vi.hoisted(() => vi.fn());
 const socketOffMock = vi.hoisted(() => vi.fn());
 const toastSuccessMock = vi.hoisted(() => vi.fn());
@@ -33,6 +34,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     get: apiGetMock,
     put: apiPutMock,
+    post: apiPostMock,
   },
 }));
 
@@ -69,76 +71,82 @@ vi.mock('@/context/PropertyContext', () => ({
   PropertyProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+// Real useAuthorization consumes useAuth() — mock the auth source so the page
+// resolves roles/permissions through the actual authorization layer.
+vi.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({
+    user: {
+      id: 'usr-tenant-admin',
+      email: 'tenant.admin@v2ecosystem.test',
+      scope: 'tenant_admin',
+      roles: ['tenant_admin'],
+      permissions: [],
+    },
+    isAuthenticated: true,
+    isLoading: false,
+    permissionsStatus: 'unavailable',
+  }),
+}));
+
 import AdminOrdersPage from '../../src/app/[property]/admin/orders/page';
 
 describe('Admin orders route coverage', () => {
   beforeEach(() => {
     apiGetMock.mockReset();
     apiPutMock.mockReset();
+    apiPostMock.mockReset();
     socketOnMock.mockClear();
     socketOffMock.mockClear();
     toastSuccessMock.mockReset();
     socketEventHandlers.clear();
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/admin/modules') {
+      // Unified cross-engine endpoint (F11): the page no longer queries
+      // /admin/modules or /staff/modules/{slug}/orders.
+      if (url === '/admin/transactions') {
         return Promise.resolve({
           data: {
-            data: [
-              { id: 'mod-1', slug: 'lagoon', name: 'Lagoon', template_type: 'menu_service', is_active: true },
-              { id: 'mod-2', slug: 'kiosk', name: 'Kiosk', template_type: 'menu_service', is_active: true },
-            ],
+            data: {
+              modules: [
+                { slug: 'lagoon', name: 'Lagoon' },
+                { slug: 'kiosk', name: 'Kiosk' },
+              ],
+              transactions: [
+                {
+                  id: 'rest-1',
+                  engineType: 'menu_service',
+                  module: { slug: 'lagoon', name: 'Lagoon' },
+                  transactionState: 'pending',
+                  fulfillmentStatus: null,
+                  amount: 28,
+                  customerName: 'Alice',
+                  reference: 'R-001',
+                  createdAt: '2025-01-01T10:00:00.000Z',
+                  updatedAt: '2025-01-01T10:00:00.000Z',
+                },
+                {
+                  id: 'kiosk-1',
+                  engineType: 'menu_service',
+                  module: { slug: 'kiosk', name: 'Kiosk' },
+                  transactionState: 'ready',
+                  fulfillmentStatus: null,
+                  amount: 12,
+                  customerName: 'Bob',
+                  reference: 'S-010',
+                  createdAt: '2025-01-01T09:00:00.000Z',
+                  updatedAt: '2025-01-01T09:00:00.000Z',
+                },
+              ],
+            },
           },
         });
       }
 
-      if (url === '/staff/modules/lagoon/orders') {
-        return Promise.resolve({
-          data: {
-            data: [
-              {
-                id: 'rest-1',
-                order_number: 'R-001',
-                status: 'pending',
-                total_amount: 28,
-                items: [
-                  { id: 'i1', name: 'Burger', quantity: 2, unit_price: 10 },
-                  { id: 'i2', name: 'Fries', quantity: 1, unit_price: 8 },
-                ],
-                table_number: 'T5',
-                customer_name: 'Alice',
-                customer_notes: 'No onions',
-                created_at: '2025-01-01T10:00:00.000Z',
-                updated_at: '2025-01-01T10:00:00.000Z',
-              },
-            ],
-          },
-        });
-      }
-
-      if (url === '/staff/modules/kiosk/orders') {
-        return Promise.resolve({
-          data: {
-            data: [
-              {
-                id: 'kiosk-1',
-                order_number: 'S-010',
-                status: 'ready',
-                total_amount: 12,
-                items: [{ id: 'i3', name: 'Cookie Box', quantity: 1, unit_price: 12 }],
-                customer_name: 'Bob',
-                created_at: '2025-01-01T09:00:00.000Z',
-                updated_at: '2025-01-01T09:00:00.000Z',
-              },
-            ],
-          },
-        });
-      }
-
-      return Promise.resolve({ data: { data: [] } });
+      return Promise.resolve({ data: { data: { transactions: [], modules: [] } } });
     });
 
     apiPutMock.mockResolvedValue({ data: { success: true } });
+    apiPostMock.mockResolvedValue({ data: { success: true } });
   });
 
   it('renders orders, filters, updates status, and opens detail modal', async () => {
@@ -150,7 +158,9 @@ describe('Admin orders route coverage', () => {
     expect(await screen.findByText('#R-001')).toBeInTheDocument();
     expect(screen.getByText('#S-010')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /Confirm/i }));
+    // Both seeded transactions are pending at the transaction layer, so each
+    // card renders a Confirm action — click the first card's (rest-1).
+    await user.click(screen.getAllByRole('button', { name: /Confirm/i })[0]);
 
     await waitFor(() => {
       expect(apiPutMock).toHaveBeenCalledWith('/staff/modules/lagoon/orders/rest-1/status', {
@@ -169,7 +179,7 @@ describe('Admin orders route coverage', () => {
 
     expect(screen.getByText('#S-010')).toBeInTheDocument();
 
-    const viewButtons = screen.getAllByRole('button', { name: /Eye/i });
+    const viewButtons = screen.getAllByRole('button', { name: /view order/i });
     expect(viewButtons.length).toBeGreaterThan(0);
     await user.click(viewButtons[0]);
 
@@ -206,5 +216,67 @@ describe('Admin orders route coverage', () => {
     });
 
     expect(screen.getAllByText('Completed').length).toBeGreaterThan(0);
+  });
+
+  it('allows single-click void/cancel of active orders from card and modal', async () => {
+    const user = userEvent.setup();
+
+    render(<AdminOrdersPage />);
+
+    expect(await screen.findByText('#R-001')).toBeInTheDocument();
+
+    // Find and click the void button on the first card
+    const voidButtons = screen.getAllByRole('button', { name: /void order/i });
+    expect(voidButtons.length).toBeGreaterThan(0);
+    await user.click(voidButtons[0]);
+
+    await waitFor(() => {
+      expect(apiPutMock).toHaveBeenCalledWith('/staff/modules/lagoon/orders/rest-1/status', {
+        status: 'cancelled',
+      });
+    });
+
+    expect(toastSuccessMock).toHaveBeenCalledWith('Order voided / cancelled');
+
+    // Open detail modal for second order and void from inside modal
+    const viewButtons = screen.getAllByRole('button', { name: /view order/i });
+    await user.click(viewButtons[1]);
+
+    const modalVoidButton = await screen.findByRole('button', { name: /void \/ cancel order/i });
+    expect(modalVoidButton).toBeInTheDocument();
+    await user.click(modalVoidButton);
+
+    await waitFor(() => {
+      expect(apiPutMock).toHaveBeenCalledWith('/staff/modules/kiosk/orders/kiosk-1/status', {
+        status: 'cancelled',
+      });
+    });
+  });
+
+  it('allows refunding an order payment from the detail modal', async () => {
+    const user = userEvent.setup();
+
+    render(<AdminOrdersPage />);
+
+    expect(await screen.findByText('#R-001')).toBeInTheDocument();
+
+    // First confirm order rest-1
+    await user.click(screen.getAllByRole('button', { name: /Confirm/i })[0]);
+
+    // Open detail modal for order rest-1 (now confirmed)
+    const viewButtons = screen.getAllByRole('button', { name: /view order/i });
+    await user.click(viewButtons[0]);
+
+    const refundButton = await screen.findByRole('button', { name: /refund payment/i });
+    expect(refundButton).toBeInTheDocument();
+    await user.click(refundButton);
+
+    await waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith('/payments/transactions/rest-1/refund', {
+        reason: 'Admin refund from orders dashboard',
+      });
+    });
+
+    expect(toastSuccessMock).toHaveBeenCalledWith('Refund processed successfully');
   });
 });

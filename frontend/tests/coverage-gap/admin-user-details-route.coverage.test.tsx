@@ -35,6 +35,22 @@ vi.mock('sonner', () => ({
 }));
 
 import UserDetailsPage from '../../src/app/[property]/admin/users/[id]/page';
+// Property context mock — pages under [property] consume useProperty();
+// without a provider the render tree crashes before any assertion runs.
+vi.mock('@/context/PropertyContext', () => ({
+  PropertyProvider: ({ children }: any) => children,
+  useProperty: () => ({
+    properties: [
+      { id: 'prop-1', name: 'Test Property', public_slug: 'resort-main', slug: 'resort-main' },
+    ],
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', public_slug: 'resort-main', slug: 'resort-main' },
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 
 describe('Admin user details route coverage', () => {
   beforeEach(() => {
@@ -130,38 +146,12 @@ describe('Admin user details route coverage', () => {
       });
     });
 
-    await user.click(screen.getByRole('button', { name: /Manage Roles/i }));
-
-    await screen.findByRole('heading', { name: /Manage Roles/i });
-
-    const adminCheckbox = screen.getByRole('checkbox', { name: /Admin/i });
-    await user.click(adminCheckbox);
-
-    const roleHeading = screen.getByRole('heading', { name: /Manage Roles/i });
-    const roleModal = roleHeading.closest('div[class*="rounded"]') || roleHeading.parentElement;
-    const saveRoleButton = roleModal instanceof HTMLElement
-      ? within(roleModal).getByRole('button', { name: /Save/i })
-      : screen.getByRole('button', { name: /Save/i });
-    await user.click(saveRoleButton);
-
-    await waitFor(() => {
-      expect(apiPutMock).toHaveBeenCalledWith('/admin/users/user-1/roles', {
-        roles: expect.arrayContaining(['staff', 'admin']),
-      });
-    });
-
-    await user.click(screen.getAllByRole('button', { name: 'Grant' })[0]);
-    await user.click(screen.getByRole('button', { name: 'Save Changes' }));
-
-    await waitFor(() => {
-      expect(apiPutMock).toHaveBeenCalledWith('/admin/users/user-1/permissions', {
-        permissions: expect.arrayContaining([
-          expect.objectContaining({ permission_slug: 'orders.view', is_granted: true }),
-        ]),
-      });
-    });
-
-    expect(routerRefreshMock).toHaveBeenCalled();
+    // Authorization card is read-only: users.scope is the single source of
+    // truth; legacy role tables are frozen (no Manage Roles / Grant UI).
+    expect(screen.getByText('Authorization')).toBeInTheDocument();
+    expect(screen.getByText('Scope')).toBeInTheDocument();
+    expect(screen.getByText('Derived roles')).toBeInTheDocument();
+    expect(screen.getByText('staff')).toBeInTheDocument();
   });
 
   it('shows fallback when loading user details fails', async () => {

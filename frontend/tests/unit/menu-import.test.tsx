@@ -10,7 +10,7 @@ vi.mock('@/lib/api');
 vi.mock('@/lib/settings-context');
 vi.mock('next/navigation');
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => { const t: any = (key: string) => key; t.has = () => false; t.rich = (k: string) => k; t.raw = (k: string) => k; return t; },
 }));
 vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn() },

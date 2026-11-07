@@ -16,7 +16,7 @@ const toastMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => () => undefined,
+  useTranslations: () => { const t: any = () => undefined; return t; },
 }));
 
 vi.mock('@/lib/api', () => ({

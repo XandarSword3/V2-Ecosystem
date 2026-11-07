@@ -35,9 +35,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/resort-main/villas/unit-villa-101',
 }));
 
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
-}));
+// next-intl resolution comes from the canonical mock in tests/setup.ts, which
+// maps keys through messages/en.json so labels like 'Book Now •', 'Deposit:',
+// and 'Pay with Card' render exactly as in production.
 
 vi.mock('@/lib/translate', () => ({
   useContentTranslation: () => ({
@@ -251,7 +251,7 @@ describe('DynamicUnitDetailPage — F5 Server Pricing Authority & Money Integrit
     fireEvent.change(dateInputs[1], { target: { value: '2026-10-05' } });
 
     await waitFor(() => {
-      expect(screen.getByText(/Deposit: \$250\.00/i)).toBeDefined();
+      expect(screen.getByText(/Deposit:\$250\.00/i)).toBeDefined();
     });
     // Ensure no hardcoded percentage is shown
     expect(screen.queryByText(/30%/i)).toBeNull();
@@ -298,13 +298,17 @@ describe('DynamicUnitDetailPage — F5 Server Pricing Authority & Money Integrit
     const cardButton = screen.getByRole('button', { name: /Pay with Card/i });
     fireEvent.click(cardButton);
 
-    // Fill required customer details
-    const phoneInput = screen.getByPlaceholderText(/Phone Number \*/i);
+    // Fill required customer details (name + email are validated before submit)
+    fireEvent.change(screen.getByPlaceholderText(/Full Name/i), { target: { value: 'Alice KWD' } });
+    fireEvent.change(screen.getByPlaceholderText(/Email/i), { target: { value: 'kwd@example.com' } });
+    const phoneInput = screen.getByPlaceholderText(/Phone Number/i);
     fireEvent.change(phoneInput, { target: { value: '+96512345678' } });
 
     // Submit booking to trigger StripePayment modal
+    // (fireEvent.submit dispatches the form's submit event directly — button
+    // click implicit submission is not implemented by the test DOM.)
     const submitButton = screen.getByRole('button', { name: /Book Now •/i });
-    fireEvent.click(submitButton);
+    fireEvent.submit(submitButton.closest('form') as HTMLFormElement);
 
     // Verify StripePayment receives exact server currency KWD (not hardcoded USD)
     await waitFor(() => {
@@ -348,11 +352,14 @@ describe('DynamicUnitDetailPage — F5 Server Pricing Authority & Money Integrit
     const cardButton = screen.getByRole('button', { name: /Pay with Card/i });
     fireEvent.click(cardButton);
 
-    const phoneInput = screen.getByPlaceholderText(/Phone Number \*/i);
+    // Fill required customer details (name + email are validated before submit)
+    fireEvent.change(screen.getByPlaceholderText(/Full Name/i), { target: { value: 'Ali BHD' } });
+    fireEvent.change(screen.getByPlaceholderText(/Email/i), { target: { value: 'bhd@example.com' } });
+    const phoneInput = screen.getByPlaceholderText(/Phone Number/i);
     fireEvent.change(phoneInput, { target: { value: '+97312345678' } });
 
     const submitButton = screen.getByRole('button', { name: /Book Now •/i });
-    fireEvent.click(submitButton);
+    fireEvent.submit(submitButton.closest('form') as HTMLFormElement);
 
     await waitFor(() => {
       expect(screen.getByTestId('stripe-payment-modal')).toBeDefined();

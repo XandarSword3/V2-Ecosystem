@@ -196,8 +196,8 @@ describe('CustomizationSelector behavior', () => {
     );
 
     await screen.findByText('Choose Base');
-  await user.click(await screen.findByText('Cheese Base'));
-    await user.click(screen.getByRole('button', { name: /confirmselection/i }));
+    await user.click(await screen.findByText('Cheese Base'));
+    await user.click(screen.getByRole('button', { name: /confirm.*selection/i }));
 
     await waitFor(() => {
       expect(onConfirm).toHaveBeenCalledWith(
@@ -283,6 +283,6 @@ describe('CustomizationSelector behavior', () => {
       />
     );
 
-    await screen.findByText('noCustomizationsAvailable');
+    expect(await screen.findByText(/no customization options available/i)).toBeInTheDocument();
   });
 });

@@ -89,10 +89,14 @@ describe('module-builder-store', () => {
   });
 
   describe('setLayout with history', () => {
-    it('sets the layout', () => {
+    it('sets the layout (normalizing root z-order position)', () => {
       const layout = [{ id: 'b1', type: 'hero' as any, props: {}, children: [] }];
       useModuleBuilderStore.getState().setLayout(layout);
-      expect(useModuleBuilderStore.getState().layout).toEqual(layout);
+      // syncZIndex invariant: root blocks get position.z = idx + 1 so canvas
+      // z-order and array order stay synchronized.
+      expect(useModuleBuilderStore.getState().layout).toEqual([
+        { id: 'b1', type: 'hero' as any, props: {}, children: [], position: { z: 1 } },
+      ]);
     });
 
     it('pushes previous layout to history', () => {

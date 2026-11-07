@@ -127,10 +127,14 @@ describe('api client', () => {
     const expiring = makeTokenWithExp(Date.now() + 30_000);
     mod.memoryTokenStore.set(expiring);
 
+    // POST /auth/refresh returns { success, data: { user, tokens: { accessToken } } }
+    // — see backend/src/modules/auth/auth.controller.ts refreshToken().
     axiosPostMock.mockResolvedValue({
       data: {
+        success: true,
         data: {
-          accessToken: 'new-access',
+          user: { id: 'user-1' },
+          tokens: { accessToken: 'new-access' },
         },
       },
     });
@@ -173,8 +177,10 @@ describe('api client', () => {
 
     axiosPostMock.mockResolvedValue({
       data: {
+        success: true,
         data: {
-          accessToken: 'a401',
+          user: { id: 'user-1' },
+          tokens: { accessToken: 'a401' },
         },
       },
     });
@@ -234,12 +240,11 @@ describe('api client', () => {
     await mod.modulesApi.delete('module-1', true);
 
     await mod.inventoryApi.getItems({ page: 1 });
-    await mod.inventoryApi.getRecipe('menu-item-1');
-    await mod.inventoryApi.updateRecipe('menu-item-1', [{ ingredientId: 'ing-1', quantity: 2 }]);
-    await mod.inventoryApi.getSessionRecipe('session-1');
-    await mod.inventoryApi.updateSessionRecipe('session-1', [{ ingredientId: 'ing-2', quantity: 1 }]);
+    await mod.inventoryApi.getItems({ page: 2, category: 'beverages' });
 
     await mod.paymentsApi.createPaymentIntent({ amount: 1500, referenceType: 'order', referenceId: 'order-1' });
+    await mod.paymentsApi.recordCashPayment({ referenceType: 'order', referenceId: 'order-2', amount: 900 });
+    await mod.paymentsApi.postRoomCharge({ orderId: 'order-3', bookingId: 'booking-1' });
     await mod.supportApi.submitContact({
       name: 'Support User',
       email: 'support@v2-hub.test',

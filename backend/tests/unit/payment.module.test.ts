@@ -203,5 +203,44 @@ describe('Payment Controller', () => {
         error: 'Payment is already refunded',
       });
     });
+
+    it('should find and refund payment using order reference_id when id does not match payment id directly', async () => {
+      const mockPayment = {
+        id: 'real-payment-id-999',
+        amount: '35.00',
+        method: 'cash',
+        status: 'completed',
+        reference_type: 'instant_transaction',
+        reference_id: 'order-xyz',
+        notes: 'Original note',
+      };
+
+      let lookupCount = 0;
+      vi.mocked(getSupabase).mockReturnValue({
+        from: vi.fn((table: string) => {
+          if (table === 'payments') {
+            lookupCount++;
+            if (lookupCount === 1) {
+              // Direct ID lookup fails
+              return createChainableMock(null);
+            }
+            // Fallback reference_id lookup finds payment
+            return createChainableMock(mockPayment);
+          }
+          return createChainableMock([]);
+        }),
+      } as any);
+
+      req.params = { id: 'order-xyz' };
+      req.body = { reason: 'Incorrect order' };
+      req.user = { userId: 'staff-123', role: 'staff', tenantId: 'tenant-1', scope: 'tenant_admin' };
+
+      await refundPayment(req as Request, res as Response, next as NextFunction);
+
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Payment refunded successfully',
+      });
+    });
   });
 });

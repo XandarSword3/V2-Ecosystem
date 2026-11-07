@@ -1,41 +1,38 @@
+/**
+ * Account Lockout Service Unit Tests
+ * 
+ * Verifies real business logic of lockout.service:
+ * - Tracking failed attempts & window expiry
+ * - Progressive delay calculation
+ * - Captcha enforcement threshold
+ * - Full account lockout & duration
+ * - Security alert email notification
+ * - Admin manual unlock
+ * - Turnstile token validation
+ */
 
-// Mock supabase
-vi.mock('../../../../src/lib/supabase', () => ({
-  supabase: {
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: null, error: null }),
-          gte: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }),
-      insert: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { id: 'lock-1' }, error: null }),
-        }),
-      }),
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
-      delete: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const { mockCache, mockSendEmail } = vi.hoisted(() => ({
+  mockCache: new Map<string, any>(),
+  mockSendEmail: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('../../../../src/utils/cache', () => ({
+  cache: {
+    get: vi.fn(async (key: string) => mockCache.get(key) || null),
+    set: vi.fn(async (key: string, val: any) => {
+      mockCache.set(key, val);
+    }),
+    del: vi.fn(async (key: string) => {
+      mockCache.delete(key);
     }),
   },
 }));
 
-// Mock ioredis
-vi.mock('ioredis', () => ({
-  default: class MockRedis {
-    get = vi.fn().mockResolvedValue(null);
-    set = vi.fn().mockResolvedValue('OK');
-    del = vi.fn().mockResolvedValue(1);
-    setex = vi.fn().mockResolvedValue('OK');
-    incr = vi.fn().mockResolvedValue(1);
-    expire = vi.fn().mockResolvedValue(1);
-    hgetall = vi.fn().mockResolvedValue({});
-    hmset = vi.fn().mockResolvedValue('OK');
-    hincrby = vi.fn().mockResolvedValue(1);
+vi.mock('../../../../src/services/email.service', () => ({
+  emailService: {
+    sendEmail: mockSendEmail,
   },
 }));
 
@@ -50,125 +47,115 @@ vi.mock('../../../../src/utils/logger', () => ({
 
 import * as lockoutService from '../../../../src/modules/auth/lockout.service';
 
-describe('LockoutService', () => {
+describe('LockoutService (Real Behavior & Branches)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockCache.clear();
   });
 
-  describe('exported functions', () => {
-    it('should export isAccountLocked function', () => {
-      expect(typeof lockoutService.isAccountLocked).toBe('function');
+  describe('Failed Login Progression & Lockout Thresholds', () => {
+    it('initial attempt returns no delay and 4 remaining attempts', async () => {
+      const res = await lockoutService.recordFailedAttempt('user@example.com');
+      expect(res.locked).toBe(false);
+      expect(res.remainingAttempts).toBe(4);
+      expect(res.requiresCaptcha).toBe(false);
+      expect(res.delayMs).toBe(0);
+
+      const isLocked = await lockoutService.isAccountLocked('user@example.com');
+      expect(isLocked.locked).toBe(false);
     });
 
-    it('should export isCaptchaRequired function', () => {
-      expect(typeof lockoutService.isCaptchaRequired).toBe('function');
+    it('requires CAPTCHA after 3 failed attempts and gives progressive delay', async () => {
+      await lockoutService.recordFailedAttempt('user@example.com');
+      await lockoutService.recordFailedAttempt('user@example.com');
+      const res3 = await lockoutService.recordFailedAttempt('user@example.com');
+
+      expect(res3.requiresCaptcha).toBe(true);
+      expect(res3.remainingAttempts).toBe(2);
+      expect(res3.delayMs).toBe(5000); // progressiveDelays[2]
+
+      const captchaReq = await lockoutService.isCaptchaRequired('user@example.com');
+      expect(captchaReq).toBe(true);
+
+      const delay = await lockoutService.getProgressiveDelay('user@example.com');
+      expect(delay).toBe(15000); // 3 attempts -> index 3
     });
 
-    it('should export getProgressiveDelay function', () => {
-      expect(typeof lockoutService.getProgressiveDelay).toBe('function');
+    it('locks account on 5th failed attempt and triggers email notification', async () => {
+      for (let i = 0; i < 4; i++) {
+        await lockoutService.recordFailedAttempt('target@example.com', 'target@example.com');
+      }
+
+      const res5 = await lockoutService.recordFailedAttempt(
+        'target@example.com',
+        'target@example.com',
+        '192.168.1.1',
+        'Mozilla/5.0'
+      );
+
+      expect(res5.locked).toBe(true);
+      expect(res5.remainingAttempts).toBe(0);
+
+      const lockedCheck = await lockoutService.isAccountLocked('target@example.com');
+      expect(lockedCheck.locked).toBe(true);
+      expect(lockedCheck.message).toMatch(/Account is locked due to too many failed login attempts/);
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(1);
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'target@example.com',
+          subject: expect.stringContaining('Account Temporarily Locked'),
+        })
+      );
     });
 
-    it('should export recordFailedAttempt function', () => {
-      expect(typeof lockoutService.recordFailedAttempt).toBe('function');
-    });
+    it('clears lockout on successful login', async () => {
+      await lockoutService.recordFailedAttempt('user@example.com');
+      await lockoutService.recordFailedAttempt('user@example.com');
 
-    it('should export recordSuccessfulLogin function', () => {
-      expect(typeof lockoutService.recordSuccessfulLogin).toBe('function');
-    });
+      await lockoutService.recordSuccessfulLogin('user@example.com');
 
-    it('should export unlockAccount function', () => {
-      expect(typeof lockoutService.unlockAccount).toBe('function');
-    });
-
-    it('should export getLockoutStatus function', () => {
-      expect(typeof lockoutService.getLockoutStatus).toBe('function');
-    });
-
-    it('should export applyProgressiveDelay function', () => {
-      expect(typeof lockoutService.applyProgressiveDelay).toBe('function');
-    });
-
-    it('should export verifyCaptchaToken function', () => {
-      expect(typeof lockoutService.verifyCaptchaToken).toBe('function');
+      const status = await lockoutService.getLockoutStatus('user@example.com');
+      expect(status.failedAttempts).toBe(0);
+      expect(status.isLocked).toBe(false);
     });
   });
 
-  describe('verifyCaptchaToken', () => {
-    it('should reject empty or missing token', async () => {
+  describe('Admin Unlock and Status View', () => {
+    it('returns false when trying to unlock an account that is not locked', async () => {
+      const res = await lockoutService.unlockAccount('notlocked@example.com', 'admin-1');
+      expect(res.success).toBe(false);
+      expect(res.message).toBe('Account is not currently locked');
+    });
+
+    it('successfully unlocks a locked account', async () => {
+      for (let i = 0; i < 5; i++) {
+        await lockoutService.recordFailedAttempt('locked@example.com', 'locked@example.com');
+      }
+
+      const statusBefore = await lockoutService.getLockoutStatus('locked@example.com');
+      expect(statusBefore.isLocked).toBe(true);
+      expect(statusBefore.failedAttempts).toBe(5);
+
+      const unlockRes = await lockoutService.unlockAccount('locked@example.com', 'admin-1');
+      expect(unlockRes.success).toBe(true);
+      expect(unlockRes.message).toBe('Account has been unlocked successfully');
+
+      const statusAfter = await lockoutService.getLockoutStatus('locked@example.com');
+      expect(statusAfter.isLocked).toBe(false);
+    });
+  });
+
+  describe('Turnstile / Captcha Verification', () => {
+    it('rejects missing or empty tokens', async () => {
       expect(await lockoutService.verifyCaptchaToken()).toBe(false);
       expect(await lockoutService.verifyCaptchaToken('')).toBe(false);
       expect(await lockoutService.verifyCaptchaToken('   ')).toBe(false);
     });
 
-    it('should accept valid tokens in test/development environment', async () => {
-      expect(await lockoutService.verifyCaptchaToken('valid-test-token-12345')).toBe(true);
+    it('accepts valid test tokens in test environment', async () => {
+      expect(await lockoutService.verifyCaptchaToken('valid-token-sample')).toBe(true);
       expect(await lockoutService.verifyCaptchaToken('XXXX.DUMMY.TOKEN.XXXX')).toBe(true);
-    });
-  });
-
-  describe('lockout thresholds', () => {
-    it('should have a default max attempts value', () => {
-      // Default is typically 5 attempts
-      expect(5).toBeGreaterThan(0);
-    });
-
-    it('should have a lockout duration', () => {
-      // Lockout duration in minutes
-      expect(15).toBeGreaterThan(0);
-    });
-  });
-
-  describe('progressive delay levels', () => {
-    it('should support level 1 delay', () => {
-      expect(1).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should support level 2 delay', () => {
-      expect(2).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should support level 3 delay', () => {
-      expect(5).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should support level 4 delay', () => {
-      expect(10).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should support level 5 delay', () => {
-      expect(30).toBeGreaterThanOrEqual(0);
-    });
-  });
-
-  describe('lockout reasons', () => {
-    it('should support failed_password reason', () => {
-      expect('failed_password').toBe('failed_password');
-    });
-
-    it('should support failed_2fa reason', () => {
-      expect('failed_2fa').toBe('failed_2fa');
-    });
-
-    it('should support suspicious_activity reason', () => {
-      expect('suspicious_activity').toBe('suspicious_activity');
-    });
-
-    it('should support admin_locked reason', () => {
-      expect('admin_locked').toBe('admin_locked');
-    });
-  });
-
-  describe('unlock methods', () => {
-    it('should support automatic unlock', () => {
-      expect('automatic').toBe('automatic');
-    });
-
-    it('should support admin unlock', () => {
-      expect('admin').toBe('admin');
-    });
-
-    it('should support password_reset unlock', () => {
-      expect('password_reset').toBe('password_reset');
     });
   });
 });

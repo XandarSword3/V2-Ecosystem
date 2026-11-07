@@ -11,7 +11,7 @@ vi.mock('@/lib/offline/offline-storage', () => ({
 
 // Mock translations
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => { const t: any = (key: string) => key; t.has = () => false; t.rich = (k: string) => k; t.raw = (k: string) => k; return t; },
 }));
 
 import { cacheManager } from '@/lib/offline/offline-storage';

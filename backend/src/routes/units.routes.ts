@@ -292,7 +292,7 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
         status: 'pending',
         amount: pricing.totalAmount,
         tax_amount: pricing.taxAmount ?? 0,
-        net_amount: pricing.netAmount ?? pricing.totalAmount,
+        net_amount: (pricing.totalAmount ?? 0) - (pricing.taxAmount ?? 0),
         metadata: {
           unit_id,
           check_in_date,

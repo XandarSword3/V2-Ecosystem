@@ -381,6 +381,21 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
 
       if (!activeBlock || !overBlock) return state;
 
+      // Helper to rebuild layout with modified parent at given path
+      const rebuildLayout = (nodes: UIBlock[], path: UIBlock[], newParent: UIBlock[]): UIBlock[] => {
+        if (path.length === 0) return newParent;
+        const [first, ...rest] = path;
+        return nodes.map((node) => {
+          if (node.id === first.id) {
+            return { ...node, children: rebuildLayout(node.children || [], rest, newParent) };
+          }
+          if (node.children) {
+            return { ...node, children: rebuildLayout(node.children, path, newParent) };
+          }
+          return node;
+        });
+      };
+
       // Check if overBlock is a container and we should move into it
       const isOverContainer = overBlock.type === 'container' || 
                             overBlock.type === 'grid' || 
@@ -416,39 +431,21 @@ export const useModuleBuilderStore = create<ModuleBuilderStore>((set, get) => ({
         return { layout: newLayout, history: newHistory, _futureStates: [] };
       }
 
-      // If same parent, just reorder
+      // If same parent, just reorder — arrayMove semantics: drop the active
+      // block at the over block's original index (consistent with the
+      // different-parent branch below). Never mutate state.layout in place.
       if (activeInfo.parent === overInfo.parent) {
-        const newLayout = [...state.layout];
-        const parent = activeInfo.parent;
-        const oldIndex = activeInfo.index;
-        const newIndex = overInfo.index;
-        
-        // Adjust index if moving down
-        const adjustedNewIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
-        
-        const [moved] = parent.splice(oldIndex, 1);
-        parent.splice(adjustedNewIndex, 0, moved);
-        
+        const parentClone = [...activeInfo.parent];
+        const [moved] = parentClone.splice(activeInfo.index, 1);
+        parentClone.splice(overInfo.index, 0, moved);
+
+        const newLayout = rebuildLayout(state.layout, activeInfo.path, parentClone);
         const newHistory = [...state.history, [...state.layout]].slice(-50);
         return { layout: newLayout, history: newHistory, _futureStates: [] };
       }
 
-      // Moving between different parents (both at root or nested)
-      // Helper to rebuild layout with modified parent at given path
-      const rebuildLayout = (nodes: UIBlock[], path: UIBlock[], newParent: UIBlock[]): UIBlock[] => {
-        if (path.length === 0) return newParent;
-        const [first, ...rest] = path;
-        return nodes.map((node) => {
-          if (node.id === first.id) {
-            return { ...node, children: rebuildLayout(node.children || [], rest, newParent) };
-          }
-          if (node.children) {
-            return { ...node, children: rebuildLayout(node.children, path, newParent) };
-          }
-          return node;
-        });
-      };
 
+      // Moving between different parents (both at root or nested)
       // Remove from old parent
       const layoutWithoutActive = (() => {
         const removeFromParent = (nodes: UIBlock[]): UIBlock[] => {

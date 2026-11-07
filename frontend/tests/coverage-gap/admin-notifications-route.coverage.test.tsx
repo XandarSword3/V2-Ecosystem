@@ -163,7 +163,7 @@ describe('Admin notifications route coverage', () => {
       );
     });
 
-    expect(toastSuccessMock).toHaveBeenCalledWith('notifications.sent');
+    expect(toastSuccessMock).toHaveBeenCalledWith('Notification sent successfully!');
   });
 
   it('shows validation error when required send fields are missing', async () => {
@@ -173,9 +173,9 @@ describe('Admin notifications route coverage', () => {
 
     await screen.findByText('Manage notifications, templates, and broadcasts');
 
-    await user.click(screen.getByRole('button', { name: /notifications\.sendNotification/i }));
+    await user.click(screen.getByRole('button', { name: /send notification/i }));
     await user.click(screen.getByRole('button', { name: /send now/i }));
 
-    expect(toastErrorMock).toHaveBeenCalledWith('errors.required');
+    expect(toastErrorMock).toHaveBeenCalledWith('This field is required');
   });
 });

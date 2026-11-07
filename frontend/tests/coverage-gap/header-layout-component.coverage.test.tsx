@@ -65,20 +65,8 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({}),
 }));
 
-vi.mock('next-intl', () => ({
-  useLocale: () => localeState.value,
-  useTranslations: () => (key: string) => {
-    const dictionary: Record<string, string> = {
-      home: 'Home',
-      settings: 'Settings',
-      signIn: 'Sign In',
-      myProfile: 'My Profile',
-      register: 'Register',
-      accommodation_units: 'AccommodationUnits',
-    };
-    return dictionary[key] || key;
-  },
-}));
+// next-intl comes from the canonical setup mock — it resolves real English
+// from messages/en.json (including nested dot-path keys under ns).
 
 vi.mock('@/lib/settings-context', () => ({
   DEFAULT_BRAND_NAME: 'V2 Resort',

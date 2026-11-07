@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ModuleCartPage from '@/app/[property]/[slug]/cart/page';
@@ -16,9 +16,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
-}));
+// The canonical next-intl mock from tests/setup.ts resolves message keys to the
+// real English strings in messages/en.json — do not shadow it here with a raw-key
+// translator (that masked 'Place Order' / step labels and broke these suites).
 
 vi.mock('@/lib/settings-context', () => ({
   DEFAULT_BRAND_NAME: 'V2 Resort',
@@ -101,6 +101,19 @@ function renderWithProviders(ui: React.ReactElement) {
   );
 }
 
+/**
+ * The canonical 5-step GenericCheckoutWorkflow starts on the review step and does
+ * NOT auto-advance. The "Place Order • $X" CTA and the server pricing breakdown
+ * panel only render once the user has walked review → customer → fulfillment →
+ * payment. Real customer/fulfillment data is preloaded via the cart store
+ * (Alice Doe / table-uuid-1), so all forward gates pass once pricing resolves.
+ */
+async function walkToPaymentStep() {
+  fireEvent.click(await screen.findByText('Continue to Customer Details'));
+  fireEvent.click(await screen.findByText('Continue to Fulfillment'));
+  fireEvent.click(await screen.findByText('Continue to Payment'));
+}
+
 describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount Interaction Flows', () => {
   beforeEach(() => {
     mockGet.mockReset();
@@ -174,11 +187,12 @@ describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount 
       );
     });
 
-    // Authoritative $16.00 unit price and line total must be displayed
-    await waitFor(() => {
-      expect(screen.getByText('$16.00 each')).toBeDefined();
-      expect(screen.getByText('Place Order • $17.60')).toBeDefined();
-    });
+    // Authoritative $16.00 unit price and line total must be displayed (review step)
+    await screen.findByText('$16.00 each');
+
+    // Walk the canonical 5-step workflow to the payment step, where the CTA lives
+    await walkToPaymentStep();
+    await screen.findByText('Place Order • $17.60');
 
     // The client's $999 price MUST NOT appear anywhere in the document
     expect(screen.queryByText(/999/)).toBeNull();
@@ -224,20 +238,20 @@ describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount 
     renderWithProviders(<ModuleCartPage />);
 
     // Step 1: Initial preview resolves without coupon ($55.00)
-    await waitFor(() => {
-      expect(screen.getByText('Place Order • $55.00')).toBeDefined();
-    });
+    await screen.findByText('$50.00 each');
+    await walkToPaymentStep();
+    await screen.findByText('Place Order • $55.00');
 
     // Step 2: User applies coupon SAVE20 via cartStore
     act(() => {
       useCartStore.getState().setCouponForModule('mod-restaurant-1', 'SAVE20');
     });
 
-    // Step 3: Preview re-runs, and server returns $12 discount and $43.00 total
+    // Step 3: Preview re-runs (debounced), server returns $12 discount and $43.00 total
     await waitFor(() => {
       expect(screen.getAllByText('-$12.00').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Place Order • $43.00')).toBeDefined();
-    });
+    }, { timeout: 5000 });
 
     // Step 4: User removes coupon
     act(() => {
@@ -248,7 +262,7 @@ describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount 
     await waitFor(() => {
       expect(screen.getByText('Place Order • $55.00')).toBeDefined();
       expect(screen.queryByText('-$12.00')).toBeNull();
-    });
+    }, { timeout: 5000 });
   });
 
   it('handles gift card and loyalty points interactions through server-authoritative preview', async () => {
@@ -300,9 +314,9 @@ describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount 
     renderWithProviders(<ModuleCartPage />);
 
     // Wait for initial render without discounts ($55.00)
-    await waitFor(() => {
-      expect(screen.getByText('Place Order • $55.00')).toBeDefined();
-    });
+    await screen.findByText('$50.00 each');
+    await walkToPaymentStep();
+    await screen.findByText('Place Order • $55.00');
 
     // Apply Gift Card
     act(() => {
@@ -312,7 +326,7 @@ describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount 
     await waitFor(() => {
       expect(screen.getAllByText('-$20.00').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Place Order • $35.00')).toBeDefined();
-    });
+    }, { timeout: 5000 });
 
     // Apply Loyalty Points
     act(() => {
@@ -321,12 +335,14 @@ describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount 
 
     await waitFor(() => {
       expect(screen.getAllByText('-$5.00').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText('-$25.00').length).toBeGreaterThanOrEqual(1); // Total savings
+      // Savings surface as per-instrument server discount rows (gift -$20.00 +
+      // loyalty -$5.00), not an aggregated "total savings" row — the total drops
+      // to $30.00 instead.
       expect(screen.getByText('Place Order • $30.00')).toBeDefined();
-    });
+    }, { timeout: 5000 });
   });
 
-  it('disables place order button and shows pricing unavailable when pricing preview encounters an error', async () => {
+  it('blocks the checkout before payment and disables the continue CTA when pricing preview encounters an error', async () => {
     mockPost.mockImplementation(async (url: string) => {
       if (url === '/pricing/preview') {
         const err: any = new Error('Out of stock for Signature Burger');
@@ -338,13 +354,24 @@ describe('ModuleCartPage — Authoritative Server Pricing Invariants & Discount 
 
     renderWithProviders(<ModuleCartPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Pricing update failed')).toBeDefined();
-      expect(screen.getByText('Out of stock for Signature Burger')).toBeDefined();
-      expect(screen.getByText('Pricing unavailable')).toBeDefined();
-      const placeOrderBtn = screen.getByRole('button', { name: /Pricing Error/i });
-      expect(placeOrderBtn).toBeDefined();
-      expect((placeOrderBtn as HTMLButtonElement).disabled).toBe(true);
-    }, { timeout: 3000 });
+    // With authoritative pricing broken the user can still walk review and
+    // customer steps, but the fulfillment step gates the workflow: it surfaces
+    // the pricing failure banner and disables + relabels the continue CTA.
+    fireEvent.click(await screen.findByText('Continue to Customer Details'));
+    fireEvent.click(await screen.findByText('Continue to Fulfillment'));
+
+    expect(
+      await screen.findByText(
+        'Pricing calculation failed for this destination. Please verify the destination details.'
+      )
+    ).toBeDefined();
+
+    const continueBtn = await screen.findByRole('button', { name: /Pricing Error/i });
+    expect(continueBtn).toBeDefined();
+    expect((continueBtn as HTMLButtonElement).disabled).toBe(true);
+
+    // The payment step (and its Place Order CTA / "Pricing unavailable" panel)
+    // must be unreachable while pricing is in error.
+    expect(screen.queryByText(/Place Order/)).toBeNull();
   });
 });

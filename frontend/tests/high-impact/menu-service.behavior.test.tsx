@@ -61,6 +61,7 @@ vi.mock('@/stores/settingsStore', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
   useRouter: () => ({
     push: pushMock,
   }),
@@ -188,7 +189,9 @@ describe('MenuService behavior', () => {
     useQueryMock.mockReturnValueOnce({ data: null, isLoading: false, error: new Error('menu failed') });
     render(<MenuService module={restaurantModule as any} />);
 
-    expect(screen.getByText('error')).toBeInTheDocument();
+    // tCommon('error') resolves to the real English copy via the canonical
+    // next-intl harness
+    expect(screen.getByText('An error occurred')).toBeInTheDocument();
   });
 
   it('opens customization flow and adds quantity items for kiosk modules', async () => {

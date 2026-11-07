@@ -51,14 +51,14 @@ describe('offline hydration service', () => {
         return Promise.resolve({
           data: {
             modules: [
-              { id: 'm1', slug: 'menu_service', name: 'MenuService', engine_type: 'menu_service', is_active: true },
-              { id: 'm2', slug: 'cabanas', name: 'Cabanas', engine_type: 'multi_day_booking', is_active: true }
+              { id: 'm1', slug: 'menu-service', name: 'MenuService', engine_type: 'instant_transaction', is_active: true },
+              { id: 'm2', slug: 'cabanas', name: 'Cabanas', engine_type: 'time_exclusive_reservation', is_active: true }
             ]
           }
         });
       }
-      if (url === '/v1/menu_service/items') return Promise.resolve({ data: [{ id: 'item1' }] });
-      if (url === '/v1/menu_service/modifiers') return Promise.resolve({ data: [{ id: 'mod1' }] });
+      if (url === '/v1/menu-service/items') return Promise.resolve({ data: [{ id: 'item1' }] });
+      if (url === '/v1/menu-service/modifiers') return Promise.resolve({ data: [{ id: 'mod1' }] });
       if (url === '/v1/cabanas/bookable_units') return Promise.resolve({ data: [{ id: 'unit1' }] });
       if (url === '/v1/cabanas/bookings') return Promise.resolve({ data: [{ id: 'booking1' }] });
       if (url.includes('/users')) return Promise.resolve({ data: { users: [] } });
@@ -89,7 +89,7 @@ describe('offline hydration service', () => {
       if (url.includes('/admin/modules')) {
         return Promise.resolve({
           data: {
-            modules: [{ id: 'm1', slug: 'test', engine_type: 'menu_service', is_active: true }]
+            modules: [{ id: 'm1', slug: 'test', engine_type: 'instant_transaction', is_active: true }]
           }
         });
       }
@@ -109,8 +109,8 @@ describe('offline hydration service', () => {
         return Promise.resolve({
           data: {
             modules: [
-              { id: 'fail_mod', slug: 'fail', engine_type: 'menu_service', is_active: true },
-              { id: 'ok_mod', slug: 'ok', engine_type: 'session_access', is_active: true }
+              { id: 'fail_mod', slug: 'fail', engine_type: 'instant_transaction', is_active: true },
+              { id: 'ok_mod', slug: 'ok', engine_type: 'shared_capacity_access', is_active: true }
             ]
           }
         });

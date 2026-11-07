@@ -7,5 +7,5 @@ export { FloatingActionButton } from './FloatingActionButton';
 
 // Re-export existing module services
 export { BookingService } from './BookingService';
-export { MenuService } from './MenuService';
+export { MenuService, CatalogShell } from './MenuService';
 export { SessionService } from './SessionService';

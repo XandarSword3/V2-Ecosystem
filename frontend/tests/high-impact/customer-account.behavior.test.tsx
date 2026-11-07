@@ -60,7 +60,13 @@ const translations: Record<string, string> = {
 };
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => translations[key] || key,
+  useTranslations: () => {
+    const t: any = (key: string) => translations[key] || key;
+    t.has = (k: string) => translations[k] !== undefined;
+    t.rich = (k: string) => t(k);
+    t.raw = (k: string) => t(k);
+    return t;
+  },
 }));
 
 vi.mock('next/link', () => ({

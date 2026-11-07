@@ -176,10 +176,11 @@ export default function HomePage() {
 
     return activeModules.slice(0, 4).map(module => {
       const IconComponent = getModuleIcon(module);
+      const statVal = getModuleStatPlaceholder(module);
       return {
-        value: getModuleStatPlaceholder(module),
+        value: statVal,
         label: module.name,
-        suffix: module.engine_type === 'instant_transaction' ? '+' : '',
+        suffix: module.engine_type === 'instant_transaction' && statVal > 0 ? '+' : '',
         icon: <IconComponent className="w-6 h-6" />,
       };
     });

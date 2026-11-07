@@ -32,7 +32,13 @@ vi.mock('../../../../src/services/saas-billing.service.js', () => {
   return {
     getSaasBillingService: () => mockBilling,
     SaasBillingService: {
-      mapStripeToBillingStatus: (status: string) => (status === 'active' ? 'active' : 'trialing'),
+      mapStripeToBillingStatus: (status: string) => {
+        if (status === 'active') return 'active';
+        if (status === 'past_due') return 'past_due';
+        if (status === 'canceled' || status === 'cancelled') return 'cancelled';
+        if (status === 'unpaid') return 'suspended';
+        return 'trialing';
+      },
     },
   };
 });
@@ -413,5 +419,178 @@ describe('SaaS Provisioning & Stripe Webhook Handler', () => {
     expect(provisionSpy).not.toHaveBeenCalled();
 
     provisionSpy.mockRestore();
+  });
+
+  it('should process customer.subscription.updated to upgrade tier and update billing status', async () => {
+    const eventPayload = {
+      id: 'evt_sub_updated_123',
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_test_123',
+          customer: 'cus_test_123',
+          status: 'active',
+          metadata: {
+            tier: 'enterprise',
+          },
+        },
+      },
+    };
+
+    const billing = getSaasBillingService() as any;
+    billing.constructWebhookEvent.mockReturnValue(eventPayload);
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'billing_history') return createChainableMock();
+      if (table === 'tenants') {
+        return createChainableMock({ id: 'tenant-123', subdomain: 'test-resort' });
+      }
+      return createChainableMock({});
+    });
+    vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+    const provisioning = getProvisioningService();
+    const updateSpy = vi.spyOn(provisioning, 'updateBillingStatus').mockResolvedValue(undefined);
+
+    const { req, res } = createSignedWebhookRequest(eventPayload);
+    await handleSaasStripeWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+
+    await vi.waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith('sub_test_123', 'active', 'enterprise');
+    });
+
+    updateSpy.mockRestore();
+  });
+
+  it('should process customer.subscription.deleted to mark tenant cancelled', async () => {
+    const eventPayload = {
+      id: 'evt_sub_deleted_123',
+      type: 'customer.subscription.deleted',
+      data: {
+        object: {
+          id: 'sub_test_123',
+          customer: 'cus_test_123',
+          status: 'canceled',
+        },
+      },
+    };
+
+    const billing = getSaasBillingService() as any;
+    billing.constructWebhookEvent.mockReturnValue(eventPayload);
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'billing_history') return createChainableMock();
+      if (table === 'tenants') {
+        return createChainableMock({ id: 'tenant-123', subdomain: 'test-resort' });
+      }
+      return createChainableMock({});
+    });
+    vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+    const provisioning = getProvisioningService();
+    const updateSpy = vi.spyOn(provisioning, 'updateBillingStatus').mockResolvedValue(undefined);
+
+    const { req, res } = createSignedWebhookRequest(eventPayload);
+    await handleSaasStripeWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+
+    await vi.waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith('sub_test_123', 'cancelled');
+    });
+
+    updateSpy.mockRestore();
+  });
+
+  it('should process invoice.paid to activate or clear dunning', async () => {
+    const eventPayload = {
+      id: 'evt_inv_paid_123',
+      type: 'invoice.paid',
+      data: {
+        object: {
+          id: 'in_test_123',
+          subscription: 'sub_test_123',
+          amount_paid: 19900,
+          currency: 'usd',
+        },
+      },
+    };
+
+    const billing = getSaasBillingService() as any;
+    billing.constructWebhookEvent.mockReturnValue(eventPayload);
+    billing.getSubscription.mockResolvedValue({
+      id: 'sub_test_123',
+      status: 'active',
+    });
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'billing_history') return createChainableMock();
+      if (table === 'tenants') {
+        return createChainableMock({ id: 'tenant-123', subdomain: 'test-resort' });
+      }
+      return createChainableMock({});
+    });
+    vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+    const provisioning = getProvisioningService();
+    const updateSpy = vi.spyOn(provisioning, 'updateBillingStatus').mockResolvedValue(undefined);
+
+    const { req, res } = createSignedWebhookRequest(eventPayload);
+    await handleSaasStripeWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+
+    await vi.waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith('sub_test_123', 'active');
+    });
+
+    updateSpy.mockRestore();
+  });
+
+  it('should process invoice.payment_failed to transition tenant to past_due dunning', async () => {
+    const eventPayload = {
+      id: 'evt_inv_failed_123',
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          id: 'in_test_123',
+          subscription: 'sub_test_123',
+          amount_due: 19900,
+          currency: 'usd',
+        },
+      },
+    };
+
+    const billing = getSaasBillingService() as any;
+    billing.constructWebhookEvent.mockReturnValue(eventPayload);
+
+    const fromMock = vi.fn().mockImplementation((table: string) => {
+      if (table === 'billing_history') return createChainableMock();
+      if (table === 'tenants') {
+        return createChainableMock({ id: 'tenant-123', subdomain: 'test-resort' });
+      }
+      return createChainableMock({});
+    });
+    vi.mocked(getSupabase).mockReturnValue({ from: fromMock } as any);
+
+    const provisioning = getProvisioningService();
+    const updateSpy = vi.spyOn(provisioning, 'updateBillingStatus').mockResolvedValue(undefined);
+
+    const { req, res } = createSignedWebhookRequest(eventPayload);
+    await handleSaasStripeWebhook(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+
+    await vi.waitFor(() => {
+      expect(updateSpy).toHaveBeenCalledWith('sub_test_123', 'past_due');
+    });
+
+    updateSpy.mockRestore();
   });
 });

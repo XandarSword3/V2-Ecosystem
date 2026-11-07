@@ -29,6 +29,7 @@ import {
   AlertCircle,
   Play,
   Eye,
+  RotateCcw,
 } from 'lucide-react';
 
 interface OrderItem {
@@ -42,6 +43,7 @@ interface OrderItem {
 interface Order {
   id: string;
   order_number: string;
+  claim_ticket?: string;
   module_slug: string;
   module_name: string;
   // Transaction layer only — fulfillment is NEVER inferred from status.
@@ -78,6 +80,11 @@ function effectiveState(order: Order): string {
   const mode = (order.fulfillmentMode as FulfillmentMode | null) ?? null;
   const c = canonicalFulfillmentState(order, mode);
   const cfg = getModeStateConfig(mode);
+  // Legacy recovery (endpoint/liquid order without a fulfillment mode):
+  // there is no column set to map into, and resolveColumnKey would collapse
+  // every state to 'pending'. Render the resolved canonical state as-is so
+  // ready/completed/etc. badges keep their truthful label.
+  if (!cfg) return c ? String(c) : 'pending';
   return resolveColumnKey(c, cfg);
 }
 
@@ -138,6 +145,7 @@ export default function AdminOrdersPage() {
       }) => ({
         id: t.id,
         order_number: t.reference,
+        claim_ticket: (t as any).claimTicket || (t as any).metadata?.claim_ticket || (t as any).metadata?.claimTicket,
         module_slug: t.module?.slug || '',
         module_name: t.module?.name || 'Unknown Module',
         // Two-layer states preserved; the page renders via canonicalFulfillmentState
@@ -217,9 +225,32 @@ export default function AdminOrdersPage() {
         )
       );
 
-      toast.success('Order status updated');
+      setSelectedOrder((prev) =>
+        prev && prev.id === orderId
+          ? {
+              ...prev,
+              ...(FULFILLMENT_LAYER_STATES.includes(target as never)
+                ? { fulfillmentStatus: target }
+                : { status: target as Order['status'] }),
+            }
+          : prev
+      );
+
+      toast.success(target === 'cancelled' ? 'Order voided / cancelled' : 'Order status updated');
     } catch (error) {
       toast.error('Failed to update order status');
+    }
+  };
+
+  const handleRefundOrder = async (orderId: string) => {
+    try {
+      await api.post(`/payments/transactions/${orderId}/refund`, {
+        reason: 'Admin refund from orders dashboard',
+      });
+      toast.success('Refund processed successfully');
+      fetchOrders();
+    } catch (error) {
+      toast.error('Failed to process refund');
     }
   };
 
@@ -231,6 +262,7 @@ export default function AdminOrdersPage() {
       return (
         o.id.toLowerCase().includes(query) ||
         o.order_number?.toLowerCase().includes(query) ||
+        o.claim_ticket?.toLowerCase().includes(query) ||
         o.customer_name?.toLowerCase().includes(query) ||
         o.table_number?.toLowerCase().includes(query)
       );
@@ -511,10 +543,22 @@ export default function AdminOrdersPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          aria-label="View order"
                           onClick={() => setSelectedOrder(order)}
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
+                        {auth.hasPermission(Perm.ORDER_UPDATE) && order.status !== 'cancelled' && order.status !== 'completed' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            aria-label="Void order"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-900"
+                            onClick={() => updateOrderStatus(order.id, order.module_slug, 'cancelled')}
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
 
                       {/* Timestamp */}
@@ -586,6 +630,14 @@ export default function AdminOrdersPage() {
                       </p>
                     </div>
                   )}
+                  {selectedOrder.claim_ticket && (
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Claim Ticket</span>
+                      <p className="font-mono font-bold text-slate-900 dark:text-white">
+                        {selectedOrder.claim_ticket}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
@@ -625,6 +677,32 @@ export default function AdminOrdersPage() {
                     {formatCurrency(selectedOrder.total_amount)}
                   </span>
                 </div>
+
+                {auth.hasPermission(Perm.ORDER_UPDATE) && selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'completed' && (
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-300 dark:border-red-800"
+                      onClick={() => updateOrderStatus(selectedOrder.id, selectedOrder.module_slug, 'cancelled')}
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Void / Cancel Order
+                    </Button>
+                  </div>
+                )}
+
+                {auth.hasPermission(Perm.ORDER_UPDATE) && (selectedOrder.status === 'completed' || selectedOrder.status === 'confirmed') && (
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 border-amber-300 dark:border-amber-800"
+                      onClick={() => handleRefundOrder(selectedOrder.id)}
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Refund Payment
+                    </Button>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

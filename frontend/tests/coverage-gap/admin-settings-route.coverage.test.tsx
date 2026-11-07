@@ -13,7 +13,7 @@ const siteSettingsState = vi.hoisted(() => ({
     tagline: 'Premier Property Experience',
     description: 'Luxury resort and activities.',
     moduleSettings: {
-      accommodation_units: {
+      'accommodation-units': {
         displayName: 'Luxury AccommodationUnits',
         checkIn: '3:00 PM',
         checkOut: '11:00 AM',
@@ -31,34 +31,30 @@ const siteSettingsState = vi.hoisted(() => ({
     {
       id: 'mod-1',
       name: 'AccommodationUnits',
-      slug: 'accommodation_units',
-      template_type: 'time_exclusive_reservation',
+      slug: 'accommodation-units',
+      engine_type: 'time_exclusive_reservation',
       sort_order: 1,
       is_active: true,
     },
     {
       id: 'mod-2',
       name: 'Pool',
-      slug: 'capacity',
-      template_type: 'shared_capacity_access',
+      slug: 'pool',
+      engine_type: 'shared_capacity_access',
       sort_order: 2,
       is_active: true,
     },
     {
       id: 'mod-3',
       name: 'MenuService',
-      slug: 'menu_service',
-      template_type: 'menu_service',
+      slug: 'menu-service',
+      engine_type: 'menu_service',
       sort_order: 3,
       is_active: true,
     },
   ],
   refetch: refetchMock,
   loading: false,
-}));
-
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
 }));
 
 vi.mock('framer-motion', async () => {
@@ -105,6 +101,22 @@ vi.mock('sonner', () => ({
 }));
 
 import AdminSettingsPage from '../../src/app/[property]/admin/settings/page';
+// Property context mock — pages under [property] consume useProperty();
+// without a provider the render tree crashes before any assertion runs.
+vi.mock('@/context/PropertyContext', () => ({
+  PropertyProvider: ({ children }: any) => children,
+  useProperty: () => ({
+    properties: [
+      { id: 'prop-1', name: 'Test Property', public_slug: 'resort-main', slug: 'resort-main' },
+    ],
+    activePropertyId: 'prop-1',
+    activeProperty: { id: 'prop-1', name: 'Test Property', public_slug: 'resort-main', slug: 'resort-main' },
+    setActiveProperty: vi.fn(),
+    loading: false,
+    refreshProperties: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 
 describe('Admin settings route coverage', () => {
   beforeEach(() => {
@@ -122,7 +134,8 @@ describe('Admin settings route coverage', () => {
 
     render(<AdminSettingsPage />);
 
-    expect(await screen.findByText('settings')).toBeInTheDocument();
+    // lucide mocks render the icon name next to the title ('SettingsSettings')
+    expect(await screen.findByRole('heading', { level: 1, name: /Settings/ })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Modules/i }));
     expect(await screen.findByText(/Configure display names and settings/i)).toBeInTheDocument();
@@ -166,7 +179,7 @@ describe('Admin settings route coverage', () => {
 
     render(<AdminSettingsPage />);
 
-    await screen.findByText('settings');
+    await screen.findByRole('heading', { level: 1, name: /Settings/ });
 
     await user.click(screen.getByRole('button', { name: /save/i }));
 

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const routerRefreshMock = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
   useRouter: () => ({
     refresh: routerRefreshMock,
     push: vi.fn(),

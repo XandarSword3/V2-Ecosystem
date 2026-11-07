@@ -21,22 +21,20 @@ export type PaymentPlatform = 'ios' | 'android' | 'web';
 export type StripeEnvironment = 'test' | 'live';
 
 // Stripe configuration by environment
-const STRIPE_CONFIG: Record<StripeEnvironment, {
-  secretKey: string;
-  publishableKey: string;
-  webhookSecret: string;
-}> = {
-  test: {
-    secretKey: process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY || '',
-    publishableKey: process.env.STRIPE_TEST_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
-    webhookSecret: process.env.STRIPE_TEST_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET || '',
-  },
-  live: {
-    secretKey: process.env.STRIPE_LIVE_SECRET_KEY || process.env.STRIPE_SECRET_KEY || '',
-    publishableKey: process.env.STRIPE_LIVE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
-    webhookSecret: process.env.STRIPE_LIVE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET || '',
-  },
-};
+function getStripeConfig(env: StripeEnvironment) {
+  return {
+    test: {
+      secretKey: process.env.STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY || '',
+      publishableKey: process.env.STRIPE_TEST_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+      webhookSecret: process.env.STRIPE_TEST_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET || '',
+    },
+    live: {
+      secretKey: process.env.STRIPE_LIVE_SECRET_KEY || process.env.STRIPE_SECRET_KEY || '',
+      publishableKey: process.env.STRIPE_LIVE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+      webhookSecret: process.env.STRIPE_LIVE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET || '',
+    },
+  }[env];
+}
 
 // Merchant info for Apple Pay / Google Pay
 const MERCHANT_INFO = {
@@ -62,7 +60,7 @@ function getEnvironment(): StripeEnvironment {
 // Get Stripe instance for environment
 function getStripeInstance(env?: StripeEnvironment): Stripe {
   const environment = env || getEnvironment();
-  const config = STRIPE_CONFIG[environment];
+  const config = getStripeConfig(environment);
   
   if (!config.secretKey) {
     throw new Error(`Stripe ${environment} secret key not configured`);
@@ -297,7 +295,7 @@ export class StripePlatformService {
       ephemeralKey = await this.createEphemeralKey(customer.id);
     }
 
-    const config = STRIPE_CONFIG[env];
+    const config = getStripeConfig(env);
 
     const result: PaymentIntentResult = {
       paymentIntentId: paymentIntent.id,
@@ -386,7 +384,7 @@ export class StripePlatformService {
    * Verify webhook signature
    */
   verifyWebhookSignature(payload: string | Buffer, signature: string): Stripe.Event {
-    const config = STRIPE_CONFIG[this.environment];
+    const config = getStripeConfig(this.environment);
     
     if (!config.webhookSecret) {
       throw new Error('Webhook secret not configured');
@@ -405,7 +403,7 @@ export class StripePlatformService {
     merchantCountryCode: string;
     merchantName: string;
   } {
-    const config = STRIPE_CONFIG[this.environment];
+    const config = getStripeConfig(this.environment);
 
     return {
       publishableKey: config.publishableKey,

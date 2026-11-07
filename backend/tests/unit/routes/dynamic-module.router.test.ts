@@ -61,6 +61,18 @@ vi.mock('../../../src/utils/qr-security.js', () => ({
   generateQRCodeImage: vi.fn().mockResolvedValue({ dataUrl: 'data:image/png;base64,mockqr' }),
 }));
 
+vi.mock('../../../src/engines/order-status.service.js', () => ({
+  actorForUser: vi.fn().mockReturnValue('staff'),
+  resolveAction: vi.fn(),
+  changeInstantTransactionOrderStatus: vi.fn().mockImplementation((_supabase, params) => {
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      order: { id: params.orderId, status: params.requestedStatus },
+    });
+  }),
+}));
+
 import { getSupabase } from '../../../src/database/connection.js';
 
 describe('DynamicModuleRouter (Unit Tests)', () => {
@@ -403,6 +415,108 @@ describe('DynamicModuleRouter (Unit Tests)', () => {
       const res = await request(app).post('/api/v1/bistro/orders').send({ items: [] });
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('At least one item is required');
+    });
+
+    it('PATCH /orders/:id/status updates order status via engine state machine', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use((req: any, _res: any, next: any) => {
+        req.user = { userId: 'staff-1', roles: ['staff'], tenantId: 'tenant-1' };
+        req.mountedModule = {
+          id: 'mod-rest-1',
+          slug: 'bistro',
+          engine_type: 'instant_transaction',
+          property_id: 'prop-1',
+          tenant_id: 'tenant-1',
+        };
+        next();
+      });
+
+      const router = buildModuleRouter('instant_transaction');
+      app.use('/api/v1/bistro', router);
+
+      // Rejects missing status
+      const badRes = await request(app)
+        .patch('/api/v1/bistro/orders/ord-1/status')
+        .send({});
+      expect(badRes.status).toBe(400);
+      expect(badRes.body.error).toBe('status is required');
+
+      // Successfully updates status
+      const okRes = await request(app)
+        .patch('/api/v1/bistro/orders/ord-1/status')
+        .send({ status: 'ready' });
+      expect(okRes.status).toBe(200);
+      expect(okRes.body.success).toBe(true);
+      expect(okRes.body.data.status).toBe('ready');
+    });
+
+    it('DELETE /orders/:id rejects cancellation if order is not owned by the requesting customer', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use((req: any, _res: any, next: any) => {
+        req.user = { userId: 'customer-attacker', roles: ['customer'], tenantId: 'tenant-1' };
+        req.mountedModule = {
+          id: 'mod-rest-1',
+          slug: 'bistro',
+          engine_type: 'instant_transaction',
+          property_id: 'prop-1',
+          tenant_id: 'tenant-1',
+        };
+        next();
+      });
+
+      // Mock transactions table returning order owned by someone else
+      vi.mocked(getSupabase).mockReturnValue({
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'transactions') {
+            return createChainableMock({ id: 'ord-123', customer_id: 'customer-victim' });
+          }
+          return createChainableMock(null);
+        }),
+      } as any);
+
+      const router = buildModuleRouter('instant_transaction');
+      app.use('/api/v1/bistro', router);
+
+      const res = await request(app).delete('/api/v1/bistro/orders/ord-123');
+      // Returns 404 to avoid leaking existence of another customer's order
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Order not found');
+    });
+
+    it('DELETE /orders/:id successfully cancels order owned by customer', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use((req: any, _res: any, next: any) => {
+        req.user = { userId: 'customer-owner', roles: ['customer'], tenantId: 'tenant-1' };
+        req.mountedModule = {
+          id: 'mod-rest-1',
+          slug: 'bistro',
+          engine_type: 'instant_transaction',
+          property_id: 'prop-1',
+          tenant_id: 'tenant-1',
+        };
+        next();
+      });
+
+      // Mock transactions table returning order owned by this customer
+      vi.mocked(getSupabase).mockReturnValue({
+        from: vi.fn().mockImplementation((table: string) => {
+          if (table === 'transactions') {
+            return createChainableMock({ id: 'ord-123', customer_id: 'customer-owner' });
+          }
+          return createChainableMock(null);
+        }),
+      } as any);
+
+      const router = buildModuleRouter('instant_transaction');
+      app.use('/api/v1/bistro', router);
+
+      const res = await request(app).delete('/api/v1/bistro/orders/ord-123');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.status).toBe('cancelled');
     });
   });
 

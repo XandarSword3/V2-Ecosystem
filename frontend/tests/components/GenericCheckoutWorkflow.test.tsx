@@ -28,20 +28,8 @@ vi.mock('sonner', () => ({
   },
 }));
 
-const enMessages = require('../../messages/en.json');
-vi.mock('next-intl', () => ({
-  useTranslations: (ns?: string) => (key: string, values?: any) => {
-    const dict = ns ? enMessages[ns] || enMessages.common || {} : enMessages.common || {};
-    let text = dict[key] || enMessages.checkout?.[key] || enMessages.common?.[key] || key;
-    if (typeof text === 'string' && values) {
-      for (const [k, v] of Object.entries(values)) {
-        text = text.replace(new RegExp(`\\{${k}[^}]*\\}`, 'g'), String(v));
-      }
-    }
-    return text;
-  },
-  useLocale: () => 'en',
-}));
+// next-intl resolution comes from the canonical mock in tests/setup.ts
+// (message-key lookup against messages/en.json, with has/rich/raw surface).
 
 vi.mock('@/lib/auth-context', () => ({
   useAuth: () => ({

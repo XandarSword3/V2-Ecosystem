@@ -8,6 +8,7 @@ const toastSuccessMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({ isAuthenticated: true }));
 
 vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
   useRouter: () => ({
     push: routerPushMock,
   }),

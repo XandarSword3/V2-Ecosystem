@@ -40,7 +40,20 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/lib/auth-context', () => ({
-  useAuth: () => ({ user: authState.user }),
+  useAuth: () => ({
+    user: {
+      id: 'staff-1',
+      fullName: 'Alex Staff',
+      // F2: action buttons (Accept / Start Prep / Mark Ready) are gated on
+      // order:update — resolve through the static scope matrix.
+      scope: 'tenant_admin',
+      roles: ['tenant_admin'],
+      permissions: [],
+    },
+    isAuthenticated: true,
+    isLoading: false,
+    permissionsStatus: 'unavailable',
+  }),
 }));
 
 vi.mock('@/lib/socket', () => ({
@@ -50,7 +63,13 @@ vi.mock('@/lib/socket', () => ({
 import StaffPOSTemplate from '../../src/components/pos-templates/StaffPOSTemplate';
 
 const MODULE_ID = 'mod-pos-1';
-const MODULE_SLUG = 'menu_service';
+// Canonical slug vocabulary (hyphens-only) — engine_type is menu_service, but
+// URL slugs must use the hyphen form (ARCHITECTURE_LAW.md).
+const MODULE_SLUG = 'menu-service';
+const QUICK_MENU = {
+  categories: [{ id: 'cat-1', name: 'Coffee' }],
+  items: [{ id: 'item-1', name: 'Espresso', price: 3, category_id: 'cat-1' }],
+};
 
 const buildTables = () => [
   {
@@ -171,6 +190,18 @@ const buildKitchenHeavyOrders = () => [
     orderType: 'takeaway',
   },
   {
+    // Queued order: 'queued' is a canonical FULFILLMENT state, so this card
+    // passes the KDS filter and surfaces a START action in the kitchen view.
+    id: 'order-queued',
+    orderNumber: '1005',
+    tableNumber: 'T5',
+    status: 'queued',
+    items: [{ id: 'item-5', name: 'Fries', quantity: 1, unitPrice: 8, status: 'pending' }],
+    totalAmount: 8,
+    createdAt: new Date(Date.now() - 3 * 60000).toISOString(),
+    orderType: 'takeaway',
+  },
+  {
     id: 'order-preparing',
     orderNumber: '1004',
     tableNumber: 'T4',
@@ -225,8 +256,17 @@ function setupActiveShiftApiWithData(
       return Promise.resolve({ data: { data: ordersData } });
     }
 
+    if (url === `/staff/modules/${MODULE_SLUG}/menu`) {
+      return Promise.resolve({ data: { data: QUICK_MENU } });
+    }
+
     if (url === '/staff/shifts/me/current') {
       return Promise.resolve({ data: { data: activeShift } });
+    }
+
+    if (url === '/staff/shifts/shift-1/cash') {
+      // Active-shift cash summary the template loads alongside the shift
+      return Promise.resolve({ data: { totals: { cashIn: 0, cashOut: 0, net: 0 } } });
     }
 
     return Promise.reject(new Error(`Unexpected GET: ${url}`));
@@ -246,8 +286,17 @@ function setupActiveShiftApi() {
       return Promise.resolve({ data: { data: buildOrders() } });
     }
 
+    if (url === `/staff/modules/${MODULE_SLUG}/menu`) {
+      return Promise.resolve({ data: { data: QUICK_MENU } });
+    }
+
     if (url === '/staff/shifts/me/current') {
       return Promise.resolve({ data: { data: activeShift } });
+    }
+
+    if (url === '/staff/shifts/shift-1/cash') {
+      // Active-shift cash summary the template loads alongside the shift
+      return Promise.resolve({ data: { totals: { cashIn: 0, cashOut: 0, net: 0 } } });
     }
 
     return Promise.reject(new Error(`Unexpected GET: ${url}`));
@@ -267,15 +316,24 @@ function setupNoShiftApi() {
       return Promise.resolve({ data: { data: [] } });
     }
 
+    if (url === `/staff/modules/${MODULE_SLUG}/menu`) {
+      return Promise.resolve({ data: { data: QUICK_MENU } });
+    }
+
     if (url === '/staff/shifts/me/current') {
       return Promise.resolve({ data: { data: null } });
+    }
+
+    if (url === '/staff/shifts/shift-1/cash') {
+      // Active-shift cash summary the template loads alongside the shift
+      return Promise.resolve({ data: { totals: { cashIn: 0, cashOut: 0, net: 0 } } });
     }
 
     return Promise.reject(new Error(`Unexpected GET: ${url}`));
   });
 
   apiPostMock.mockImplementation((url: string) => {
-    if (url === '/staff/shifts') {
+    if (url === '/staff/shifts/start') {
       return Promise.resolve({ data: { data: activeShift } });
     }
 
@@ -325,7 +383,7 @@ describe('StaffPOSTemplate behavior', () => {
     await user.click(screen.getByRole('button', { name: /start shift/i }));
 
     await waitFor(() => {
-      expect(apiPostMock).toHaveBeenCalledWith('/staff/shifts', {
+      expect(apiPostMock).toHaveBeenCalledWith('/staff/shifts/start', {
         openingCash: 150,
         moduleId: MODULE_ID,
       });
@@ -344,7 +402,7 @@ describe('StaffPOSTemplate behavior', () => {
 
     await screen.findByText('MenuService Floor');
 
-    expect(socketMock.emit).toHaveBeenCalledWith('join:unit', 'menu_service');
+    expect(socketMock.emit).toHaveBeenCalledWith('join:unit', MODULE_SLUG);
     expect(socketMock.on).toHaveBeenCalledWith('order:new', expect.any(Function));
     expect(socketMock.on).toHaveBeenCalledWith('order:updated', expect.any(Function));
     expect(socketMock.on).toHaveBeenCalledWith('table:update', expect.any(Function));
@@ -397,17 +455,17 @@ describe('StaffPOSTemplate behavior', () => {
     await user.click(screen.getByRole('button', { name: /pay/i }));
 
     const paymentDialog = screen.getByRole('dialog');
-    const paymentButtons = paymentDialog.querySelectorAll('button');
-    await user.click(paymentButtons[0] as HTMLButtonElement);
+    await user.click(within(paymentDialog).getByRole('button', { name: /credit card/i }));
+    await user.click(within(paymentDialog).getByRole('button', { name: /confirm settle/i }));
 
     await waitFor(() => {
       expect(apiPostMock).toHaveBeenCalledWith(
         `/staff/modules/${MODULE_SLUG}/orders/order-ready/pay`,
-        {
+        expect.objectContaining({
           paymentMethod: 'card',
           amount: 55,
-          tip: undefined,
-        }
+          amountPaid: 55,
+        })
       );
     });
 
@@ -420,7 +478,7 @@ describe('StaffPOSTemplate behavior', () => {
 
     setupNoShiftApi();
     apiPostMock.mockImplementation((url: string) => {
-      if (url === '/staff/shifts') {
+      if (url === '/staff/shifts/start') {
         return Promise.reject(new Error('cannot open shift'));
       }
       return Promise.resolve({ data: { success: true } });
@@ -471,9 +529,10 @@ describe('StaffPOSTemplate behavior', () => {
 
     await user.click(screen.getAllByRole('button', { name: /start prep/i })[0]);
     await waitFor(() => {
+      // 'Start Prep' targets the canonical fulfillment state in_progress
       expect(
         apiPatchMock.mock.calls.some(
-          ([, payload]) => (payload as { status?: string }).status === 'preparing'
+          ([, payload]) => (payload as { status?: string }).status === 'in_progress'
         )
       ).toBe(true);
     });
@@ -500,6 +559,7 @@ describe('StaffPOSTemplate behavior', () => {
     await user.click(screen.getAllByRole('button', { name: /pay/i })[0]);
     const paymentDialog = await screen.findByRole('dialog');
     await user.click(within(paymentDialog).getByRole('button', { name: /cash/i }));
+    await user.click(within(paymentDialog).getByRole('button', { name: /confirm settle/i }));
     await waitFor(() => {
       expect(
         apiPostMock.mock.calls.some(
@@ -513,12 +573,16 @@ describe('StaffPOSTemplate behavior', () => {
     });
 
     await user.click(screen.getByRole('button', { name: /kitchen/i }));
-    await screen.findByText('#1003');
-    await user.click(screen.getByRole('button', { name: /start/i }));
+    // Kitchen reads its own kitchenOrders state: the queued order #1005
+    // passes the KDS filter and surfaces a START card (the 'confirmed'
+    // takeaway is transaction-layer only and never renders in the KDS).
+    const kitchenCard = screen.getByText('#1005').closest('.rounded-2xl') as HTMLElement;
+    await user.click(within(kitchenCard).getByRole('button', { name: /play start/i }));
     await waitFor(() => {
+      // Kitchen START maps to the canonical fulfillment state in_progress
       expect(
         apiPatchMock.mock.calls.some(
-          ([, payload]) => (payload as { status?: string }).status === 'preparing'
+          ([, payload]) => (payload as { status?: string }).status === 'in_progress'
         )
       ).toBe(true);
     });
@@ -553,7 +617,8 @@ describe('StaffPOSTemplate behavior', () => {
 
     await user.click(screen.getAllByRole('button', { name: /pay/i })[0]);
     const paymentDialog = await screen.findByRole('dialog');
-    await user.click(within(paymentDialog).getAllByRole('button')[0]);
+    await user.click(within(paymentDialog).getByRole('button', { name: /credit card/i }));
+    await user.click(within(paymentDialog).getByRole('button', { name: /confirm settle/i }));
     await waitFor(() => {
       expect(toastErrorMock).toHaveBeenCalledWith('Payment failed');
     });
@@ -574,16 +639,22 @@ describe('StaffPOSTemplate behavior', () => {
     await user.click(screen.getAllByRole('button', { name: /settle/i })[0]);
     const paymentDialog = await screen.findByRole('dialog');
     await user.click(within(paymentDialog).getByRole('button', { name: /gift card/i }));
+    await user.click(within(paymentDialog).getByRole('button', { name: /confirm settle/i }));
 
     await waitFor(() => {
       expect(apiPostMock).toHaveBeenCalledWith(
         `/staff/modules/${MODULE_SLUG}/orders/order-ready/pay`,
-        { paymentMethod: 'gift_card', amount: 55, tip: undefined }
+        expect.objectContaining({ paymentMethod: 'gift_card', amount: 55 })
       );
     });
 
+    // Successful payment opens the itemized receipt dialog alongside the
+    // other modals — dismiss it before continuing to End Shift.
+    const receiptDialog = await screen.findByRole('dialog', { name: /payment successful/i });
+    await user.click(within(receiptDialog).getByRole('button', { name: /new order/i }));
+
     await user.click(screen.getByRole('button', { name: /end shift/i }));
-    const firstShiftDialog = await screen.findByRole('dialog');
+    const firstShiftDialog = await screen.findByRole('dialog', { name: /end shift/i });
     await user.type(within(firstShiftDialog).getByPlaceholderText('0.00'), '175');
     await user.click(within(firstShiftDialog).getByRole('button', { name: /^end shift$/i }));
 
@@ -609,7 +680,7 @@ describe('StaffPOSTemplate behavior', () => {
 
     await screen.findByText('MenuService Floor');
     await user.click(screen.getByRole('button', { name: /end shift/i }));
-    const secondShiftDialog = await screen.findByRole('dialog');
+    const secondShiftDialog = await screen.findByRole('dialog', { name: /end shift/i });
     await user.type(within(secondShiftDialog).getByPlaceholderText('0.00'), '180');
     await user.click(within(secondShiftDialog).getByRole('button', { name: /^end shift$/i }));
 
@@ -690,7 +761,9 @@ describe('StaffPOSTemplate behavior', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryAllByText('preparing').length).toBeGreaterThan(0);
+      // The orders-view badge renders the canonical fulfillment state:
+      // legacy 'preparing' socket payloads map to in_progress → "in progress"
+      expect(screen.queryAllByText('in progress').length).toBeGreaterThan(0);
     });
 
     act(() => {
@@ -702,7 +775,8 @@ describe('StaffPOSTemplate behavior', () => {
       });
     });
 
-    await user.click(screen.getByRole('button', { name: /floor/i }));
+    // 'floor' mode is the Stations tab ("Floor Map" is the floorplan view)
+    await user.click(screen.getByRole('button', { name: /stations/i }));
     await user.click(screen.getByText('T2'));
     await screen.findByText('Table T2');
   });

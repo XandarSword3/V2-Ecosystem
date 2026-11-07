@@ -23,7 +23,7 @@ const suspicious = [];
 
 for (const f of files) {
   const code = fs.readFileSync(f, 'utf8');
-  const importsSrc = /from\s+['"][^'"]*src\//.test(code);
+  const importsSrc = /(?:from\s+['"][^'"]*src\/|import\s*\(\s*['"][^'"]*src\/)/.test(code);
   const testCount = (code.match(/\bit\s*\(|\btest\s*\(/g) || []).length;
   
   // Check for dummy tests like expect(x).toBe(x) or expect(constant).toBe(constant)

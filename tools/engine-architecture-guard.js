@@ -64,6 +64,8 @@ const TEMPLATE_TYPE_ALLOWLIST = new Set([
   // Coupon/PaymentDiscounts mention legacy types in JSDoc comments only
   'components/customer/CouponInput.tsx',
   'components/customer/PaymentDiscounts.tsx',
+  // Admin setup onboarding wizard configures initial module presets
+  'app/[property]/admin/setup/page.tsx',
 ]);
 
 /**
@@ -144,6 +146,11 @@ const STATUS_ALLOWLIST = new Set([
   // Dispatch/KDS: legacy 'served' for backward-compat display
   'components/staff/DispatchBoard.tsx',
   'components/staff/KitchenView.tsx',
+  // Operations board & work items drive line-item level status progression (pending → preparing → ready → served)
+  'components/staff/operations/OperationsBoard.tsx',
+  'components/staff/operations/WorkItem.tsx',
+  // Customer account orders hub displays fulfillment status badges
+  'components/customer/account/OrdersHub.tsx',
 ]);
 
 // ============================================

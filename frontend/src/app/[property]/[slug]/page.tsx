@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useSiteSettings } from '@/lib/settings-context';
-import { MenuService } from '@/components/modules/MenuService';
+import { MenuService, CatalogShell } from '@/components/modules/MenuService';
 import { BookingService } from '@/components/modules/BookingService';
 import { SessionService } from '@/components/modules/SessionService';
 import { DynamicModuleRenderer } from '@/components/module-builder/DynamicModuleRenderer';
@@ -105,7 +105,7 @@ export default function ModulePage() {
       case 'instant_transaction':
         return (
           <CommerceShell>
-            <MenuService module={currentModule} />
+            <CatalogShell module={currentModule} />
           </CommerceShell>
         );
       case 'time_exclusive_reservation':

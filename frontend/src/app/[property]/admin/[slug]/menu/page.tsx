@@ -95,8 +95,10 @@ interface Ingredient {
   id: string;
   name: string;
   unit: string;
-  stock_quantity: number;
+  stock_quantity?: number;
+  current_stock?: number;
   cost_per_unit: number;
+  sku?: string;
 }
 
 interface CustomizationGroup {
@@ -155,6 +157,7 @@ export default function DynamicMenuPage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [recipeItems, setRecipeItems] = useState<RecipeItem[]>([]);
+  const [trackingMode, setTrackingMode] = useState<'direct' | 'recipe' | 'none'>('none');
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [groupSearch, setGroupSearch] = useState('');
 
@@ -202,7 +205,8 @@ export default function DynamicMenuPage() {
       }));
       setItems(transformedItems);
       setCategories(catRes.data.data || []);
-      setIngredients(ingredientsRes.data?.data || []);
+      const ingData = Array.isArray(ingredientsRes.data) ? ingredientsRes.data : (ingredientsRes.data?.data || []);
+      setIngredients(ingData);
       setCustomizationGroups(groupsRes.data || []);
     } catch (error) {
       toast.error('Failed to fetch menu data');
@@ -228,6 +232,7 @@ export default function DynamicMenuPage() {
       preparation_time: 15,
     });
     setRecipeItems([]);
+    setTrackingMode('none');
     setSelectedGroups([]);
     setFormErrors({});
     setActiveTab('details');
@@ -238,13 +243,47 @@ export default function DynamicMenuPage() {
     setEditingItem(item);
     setFormData({ ...item });
     setFormErrors({});
-    setRecipeItems(item.recipe || []);
+    const currentRecipe = item.recipe || [];
+    setRecipeItems(currentRecipe);
+    if (currentRecipe.length === 1 && Number(currentRecipe[0].quantity) === 1) {
+      setTrackingMode('direct');
+    } else if (currentRecipe.length > 0) {
+      setTrackingMode('recipe');
+    } else {
+      setTrackingMode('none');
+    }
     setSelectedGroups(item.customization_group_ids || []);
     setActiveTab('details');
     setShowModal(true);
   };
 
-  // Recipe management
+  // Recipe & Inventory management
+  const handleTrackingModeChange = (mode: 'direct' | 'recipe' | 'none') => {
+    setTrackingMode(mode);
+    if (mode === 'none') {
+      setRecipeItems([]);
+    } else if (mode === 'direct') {
+      const currentId = recipeItems[0]?.ingredient_id || ingredients[0]?.id;
+      const ing = ingredients.find(i => i.id === currentId);
+      if (ing) {
+        setRecipeItems([{ ingredient_id: ing.id, quantity: 1, unit: ing.unit }]);
+      } else {
+        setRecipeItems([]);
+      }
+    } else if (mode === 'recipe') {
+      if (recipeItems.length === 0 && ingredients.length > 0) {
+        setRecipeItems([{ ingredient_id: ingredients[0].id, quantity: 1, unit: ingredients[0].unit }]);
+      }
+    }
+  };
+
+  const handleDirectStockSelect = (ingredientId: string) => {
+    const ing = ingredients.find(i => i.id === ingredientId);
+    if (ing) {
+      setRecipeItems([{ ingredient_id: ing.id, quantity: 1, unit: ing.unit }]);
+    }
+  };
+
   const addRecipeItem = () => {
     if (ingredients.length === 0) return;
     setRecipeItems([
@@ -725,8 +764,8 @@ export default function DynamicMenuPage() {
                       Basic Details
                     </TabsTrigger>
                     <TabsTrigger value="recipe" className="flex items-center gap-2">
-                      <ChefHat className="w-4 h-4" />
-                      Recipe
+                      <Package className="w-4 h-4" />
+                      Inventory & Recipe
                     </TabsTrigger>
                     <TabsTrigger value="customizations" className="flex items-center gap-2">
                       <Layers className="w-4 h-4" />
@@ -936,87 +975,225 @@ export default function DynamicMenuPage() {
 
                 {/* Recipe Tab */}
                 <TabsContent value="recipe" className="p-6 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-slate-900 dark:text-white">Recipe & Ingredients</h4>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Define ingredients and quantities for inventory tracking
-                      </p>
-                    </div>
-                    <Button
-                      onClick={addRecipeItem}
-                      disabled={ingredients.length === 0}
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Ingredient
-                    </Button>
+                  <div>
+                    <h4 className="font-medium text-slate-900 dark:text-white">Inventory & Recipe Tracking</h4>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Configure stock deduction mode for this catalog item
+                    </p>
                   </div>
 
-                  {ingredients.length === 0 ? (
-                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                      <Package className="w-12 h-12 mx-auto mb-3 text-slate-400" />
-                      <p className="text-slate-500 dark:text-slate-400">No ingredients available</p>
-                      <p className="text-sm text-slate-400 dark:text-slate-500">
-                        Add ingredients in Inventory management first
-                      </p>
-                    </div>
-                  ) : recipeItems.length === 0 ? (
-                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                      <ChefHat className="w-12 h-12 mx-auto mb-3 text-slate-400" />
-                      <p className="text-slate-500 dark:text-slate-400">No recipe defined</p>
-                      <p className="text-sm text-slate-400 dark:text-slate-500">
-                        Click &quot;Add Ingredient&quot; to start building the recipe
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {recipeItems.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg"
-                        >
-                          <select
-                            value={item.ingredient_id}
-                            onChange={(e) => updateRecipeItem(index, 'ingredient_id', e.target.value)}
-                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
-                          >
-                            {ingredients.map(ing => (
-                              <option key={ing.id} value={ing.id}>{ing.name}</option>
-                            ))}
-                          </select>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.quantity}
-                            onChange={(e) => updateRecipeItem(index, 'quantity', parseFloat(e.target.value))}
-                            className="w-24"
-                            placeholder="Qty"
-                          />
-                          <span className="text-sm text-slate-500 dark:text-slate-400 w-16">
-                            {item.unit || ingredients.find(i => i.id === item.ingredient_id)?.unit || 'unit'}
-                          </span>
-                          <button
-                            onClick={() => removeRecipeItem(index)}
-                            className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                  {/* Mode Selector */}
+                  <div className="grid grid-cols-3 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => handleTrackingModeChange('direct')}
+                      className={`py-2 px-3 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                        trackingMode === 'direct'
+                          ? 'bg-white dark:bg-slate-900 text-brand shadow-sm font-semibold'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Direct Stock (1:1)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTrackingModeChange('recipe')}
+                      className={`py-2 px-3 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                        trackingMode === 'recipe'
+                          ? 'bg-white dark:bg-slate-900 text-brand shadow-sm font-semibold'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Multi-Ingredient Recipe
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTrackingModeChange('none')}
+                      className={`py-2 px-3 text-xs sm:text-sm font-medium rounded-md transition-all ${
+                        trackingMode === 'none'
+                          ? 'bg-white dark:bg-slate-900 text-brand shadow-sm font-semibold'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Untracked
+                    </button>
+                  </div>
+
+                  {/* Direct 1:1 Stock Mode */}
+                  {trackingMode === 'direct' && (
+                    <div className="space-y-4">
+                      {ingredients.length === 0 ? (
+                        <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                          <Package className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                          <p className="text-slate-500 dark:text-slate-400">No inventory items available</p>
+                          <p className="text-sm text-slate-400 dark:text-slate-500">
+                            Add items in Inventory management first to link stock
+                          </p>
                         </div>
-                      ))}
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                              Linked Inventory Item
+                            </label>
+                            <select
+                              value={recipeItems[0]?.ingredient_id || ''}
+                              onChange={(e) => handleDirectStockSelect(e.target.value)}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            >
+                              <option value="" disabled>Select an inventory item...</option>
+                              {ingredients.map(ing => (
+                                <option key={ing.id} value={ing.id}>
+                                  {ing.name} {ing.sku ? `(SKU: ${ing.sku})` : ''} - Stock: {ing.current_stock ?? ing.stock_quantity ?? 0} {ing.unit}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Each sale of this menu item directly depletes 1 unit of the linked inventory item.
+                            </p>
+                          </div>
+
+                          {/* Live KPI Cards */}
+                          {(() => {
+                            const selectedIng = ingredients.find(i => i.id === recipeItems[0]?.ingredient_id);
+                            if (!selectedIng) return null;
+                            const stock = selectedIng.current_stock ?? selectedIng.stock_quantity ?? 0;
+                            const cost = selectedIng.cost_per_unit || 0;
+                            const price = Number(formData.price) || 0;
+                            const margin = price > 0 ? (((price - cost) / price) * 100).toFixed(1) : '0.0';
+
+                            return (
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                                <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">SKU</div>
+                                  <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                    {selectedIng.sku || 'N/A'}
+                                  </div>
+                                </div>
+                                <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">Available Stock</div>
+                                  <div className={`text-sm font-semibold ${stock > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                                    {stock} {selectedIng.unit}
+                                  </div>
+                                </div>
+                                <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">Unit Cost</div>
+                                  <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                                    {formatCurrency(cost)}
+                                  </div>
+                                </div>
+                                <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">Gross Margin</div>
+                                  <div className={`text-sm font-semibold ${Number(margin) >= 50 ? 'text-emerald-600 dark:text-emerald-400' : Number(margin) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                                    {margin}%
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </>
+                      )}
                     </div>
                   )}
 
-                  {recipeItems.length > 0 && (
-                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                      <p className="text-sm text-amber-800 dark:text-amber-200">
-                        <strong>Estimated Cost:</strong>{' '}
-                        {formatCurrency(
-                          recipeItems.reduce((sum, item) => {
-                            const ing = ingredients.find(i => i.id === item.ingredient_id);
-                            return sum + (ing?.cost_per_unit || 0) * item.quantity;
-                          }, 0)
-                        )}
+                  {/* Multi-Ingredient Recipe Mode */}
+                  {trackingMode === 'recipe' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Define multiple ingredients and quantities deducted per order.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={addRecipeItem}
+                          disabled={ingredients.length === 0}
+                          className="flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Ingredient
+                        </Button>
+                      </div>
+
+                      {ingredients.length === 0 ? (
+                        <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                          <Package className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                          <p className="text-slate-500 dark:text-slate-400">No ingredients available</p>
+                          <p className="text-sm text-slate-400 dark:text-slate-500">
+                            Add ingredients in Inventory management first
+                          </p>
+                        </div>
+                      ) : recipeItems.length === 0 ? (
+                        <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                          <ChefHat className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                          <p className="text-slate-500 dark:text-slate-400">No recipe defined</p>
+                          <p className="text-sm text-slate-400 dark:text-slate-500">
+                            Click &quot;Add Ingredient&quot; to start building the recipe
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {recipeItems.map((item, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                            >
+                              <select
+                                value={item.ingredient_id}
+                                onChange={(e) => updateRecipeItem(index, 'ingredient_id', e.target.value)}
+                                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                              >
+                                {ingredients.map(ing => (
+                                  <option key={ing.id} value={ing.id}>{ing.name}</option>
+                                ))}
+                              </select>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={item.quantity}
+                                onChange={(e) => updateRecipeItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                className="w-24"
+                                placeholder="Qty"
+                              />
+                              <span className="text-sm text-slate-500 dark:text-slate-400 w-16">
+                                {item.unit || ingredients.find(i => i.id === item.ingredient_id)?.unit || 'unit'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeRecipeItem(index)}
+                                className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {recipeItems.length > 0 && (
+                        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                          <p className="text-sm text-amber-800 dark:text-amber-200">
+                            <strong>Estimated Cost:</strong>{' '}
+                            {formatCurrency(
+                              recipeItems.reduce((sum, item) => {
+                                const ing = ingredients.find(i => i.id === item.ingredient_id);
+                                return sum + (ing?.cost_per_unit || 0) * item.quantity;
+                              }, 0)
+                            )}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Untracked Mode */}
+                  {trackingMode === 'none' && (
+                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg border border-dashed border-slate-200 dark:border-slate-800">
+                      <Package className="w-10 h-10 mx-auto mb-2 text-slate-400" />
+                      <p className="font-medium text-slate-700 dark:text-slate-300">Untracked Item</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1">
+                        No inventory links are attached to this item. Sales will not deduct stock from the inventory catalog.
                       </p>
                     </div>
                   )}

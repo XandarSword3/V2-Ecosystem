@@ -115,7 +115,9 @@ describe('GiftCardPurchase behavior', () => {
 
     await user.click(await screen.findByRole('button', { name: /Classic/i }));
 
-    const purchaseButton = screen.getByRole('button', { name: /Purchase \$50\.00/i });
+    // Button label concatenates t('purchase') + formatCurrency → "Purchase$50.00"
+    // (icon mock adds the leading "CreditCard" text to the accessible name)
+    const purchaseButton = screen.getByRole('button', { name: /purchase\s*\$?50/i });
     expect(purchaseButton).toBeDisabled();
 
     fireEvent.change(screen.getByPlaceholderText('Your name (will appear on card)'), {
@@ -125,8 +127,8 @@ describe('GiftCardPurchase behavior', () => {
       target: { value: 'maya@example.com' },
     });
 
-    expect(screen.getByRole('button', { name: /Purchase \$50\.00/i })).not.toBeDisabled();
-    await user.click(screen.getByRole('button', { name: /Purchase \$50\.00/i }));
+    expect(screen.getByRole('button', { name: /purchase\s*\$?50/i })).not.toBeDisabled();
+    await user.click(screen.getByRole('button', { name: /purchase\s*\$?50/i }));
 
     await waitFor(() => {
       expect(apiPostMock).toHaveBeenCalledWith('/giftcards/purchase',

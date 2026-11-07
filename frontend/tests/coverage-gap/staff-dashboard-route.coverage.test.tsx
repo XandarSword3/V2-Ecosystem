@@ -18,6 +18,7 @@ const authState = vi.hoisted(() => ({
 }));
 
 const siteSettingsState = vi.hoisted(() => ({
+  settings: { siteName: 'V2 Resort' },
   modules: [
     { id: 'm-1', name: 'Spa Services', slug: 'spa', is_active: true, template_type: 'session_access' },
   ],
@@ -43,6 +44,7 @@ vi.mock('framer-motion', async () => {
 });
 
 vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
   useRouter: () => ({
     push: routerPushMock,
     replace: vi.fn(),
@@ -50,15 +52,6 @@ vi.mock('next/navigation', () => ({
     back: vi.fn(),
     prefetch: vi.fn(),
   }),
-}));
-
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string, values?: { count?: number }) => {
-    if (typeof values?.count === 'number') {
-      return `${key}:${values.count}`;
-    }
-    return key;
-  },
 }));
 
 vi.mock('@/lib/auth-context', () => ({
@@ -132,7 +125,7 @@ describe('Staff dashboard route coverage', () => {
     ];
 
     apiGetMock.mockImplementation((url: string) => {
-      if (url === '/transactions/live') {
+      if (url === '/staff/transactions/live') {
         return Promise.resolve({
           data: {
             data: [
@@ -158,7 +151,7 @@ describe('Staff dashboard route coverage', () => {
     render(<StaffDashboard />);
 
     await waitFor(() => {
-      expect(apiGetMock).toHaveBeenCalledWith('/transactions/live', expect.any(Object));
+      expect(apiGetMock).toHaveBeenCalledWith('/staff/transactions/live', expect.any(Object));
     });
 
     await screen.findByText('Spa Services');

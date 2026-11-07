@@ -5,42 +5,9 @@ import ModuleCartPage from '@/app/[property]/[slug]/cart/page';
 import { useCartStore } from '@/stores/cartStore';
 import { api } from '@/lib/api';
 
-// Mock next-intl
-vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => {
-    const translations: Record<string, string> = {
-      selectFulfillmentMode: 'Select Fulfillment Method',
-      fulfillmentModeOnPremise: 'On-Premise',
-      fulfillmentDescOnPremise: 'Service or pickup at our physical location',
-      fulfillmentModePickup: 'Pickup',
-      fulfillmentDescPickup: 'Collect your order at the designated counter',
-      fulfillmentModeLocalDelivery: 'Local Delivery',
-      fulfillmentDescLocalDelivery: 'Delivered directly to your local address',
-      fulfillmentModeDigitalDelivery: 'Digital Delivery',
-      fulfillmentDescDigitalDelivery: 'Instant digital delivery to your account or email',
-      fulfillmentModeShipment: 'Shipment',
-      fulfillmentDescShipment: 'Shipped via courier to your destination',
-      fulfillmentModeServiceExecution: 'Service Execution',
-      fulfillmentDescServiceExecution: 'Executed at designated service station or chair',
-      fulfillmentModeNone: 'Direct Settlement (No Fulfillment)',
-      fulfillmentDescNone: 'Direct commercial transaction with no physical delivery',
-      selectLocationOrTable: 'Select Table / Location',
-      occupied: 'Occupied',
-      selected: 'Selected',
-      available: 'Available',
-      pickupNotesPlaceholder: 'e.g. Will pick up in 20 minutes',
-      addressPlaceholder: 'Street address, building/suite, city, postal code, special delivery directions',
-      digitalAccountPlaceholder: 'e.g. user@example.com',
-      serviceStationPlaceholder: 'e.g. Spa Treatment Room 3, Station B',
-      fulfillmentNoneNotice: 'This transaction settles directly with no physical fulfillment required.',
-      orderPlaced: 'Order placed successfully!',
-      cartEmpty: 'Your cart is empty',
-      enterName: 'Please enter your name',
-      enterPhone: 'Please enter your phone number',
-    };
-    return translations[key] || '';
-  },
-}));
+// next-intl resolution is provided by the canonical mock in tests/setup.ts —
+// this file's components ('checkout' and 'common' namespaces) resolve through
+// messages/en.json, so with real labels everywhere.
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -224,16 +191,23 @@ describe('CustomerCommerceFlow — Phase F4 End-to-End Commerce Lifecycle', () =
     expect(screen.getAllByText('Seafood Pasta').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('Sun Hat')).toBeNull();
 
-    // Advance to Step 2
-    const continueBtn = screen.getByText(/Continue to Details/i);
-    fireEvent.click(continueBtn);
+    // Canonical 5-step workflow: Step 1 review -> Step 2 customer
+    fireEvent.click(screen.getByText(/Continue to Customer Details/i));
 
-    // Wait for Step 2 customer inputs
+    // Step 2: Fill customer name and phone (canonical placeholders)
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/Sarah Connor/i)).toBeDefined();
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Sarah Connor/i), { target: { value: 'Alessandro Rossi' } });
+    fireEvent.change(screen.getByPlaceholderText(/\+1 555 /i), { target: { value: '+1234567890' } });
+
+    // Step 3: fulfillment — mode selector + destination selector
+    fireEvent.click(screen.getByText(/Continue to Fulfillment/i));
+
+    // Verify canonical fulfillment options are rendered
     await waitFor(() => {
       expect(screen.getByTestId('fulfillment-mode-selector')).toBeDefined();
     });
-
-    // Verify canonical fulfillment options are rendered
     expect(screen.getByTestId('mode-option-on_premise')).toBeDefined();
     expect(screen.getByTestId('mode-option-pickup')).toBeDefined();
     expect(screen.getByTestId('mode-option-local_delivery')).toBeDefined();
@@ -250,15 +224,8 @@ describe('CustomerCommerceFlow — Phase F4 End-to-End Commerce Lifecycle', () =
     // Select Table 1 (available)
     fireEvent.click(screen.getByTestId('location-option-loc-1'));
 
-    // Fill customer name and phone
-    const nameInput = screen.getByPlaceholderText(/Enter your full name/i);
-    const phoneInput = screen.getByPlaceholderText(/Enter your phone number/i);
-    fireEvent.change(nameInput, { target: { value: 'Alessandro Rossi' } });
-    fireEvent.change(phoneInput, { target: { value: '+1234567890' } });
-
-    // Advance to Step 3
-    const paymentStepBtn = screen.getByText(/Continue to Payment/i);
-    fireEvent.click(paymentStepBtn);
+    // Step 4: payment
+    fireEvent.click(screen.getByText(/Continue to Payment/i));
 
     // Click Place Order (Cash Payment)
     await waitFor(() => {
@@ -286,8 +253,15 @@ describe('CustomerCommerceFlow — Phase F4 End-to-End Commerce Lifecycle', () =
       );
     });
 
-    // Verify router redirected to confirmation
-    expect(mockPush).toHaveBeenCalledWith('/demo-resort/restaurant/confirmation?type=order&id=tx-ord-999');
+    // Cash settlement confirms the order -> confirmation step renders the
+    // canonical confirmation link (router.push was replaced by the 5-step
+    // workflow's in-flow confirmation step).
+    await waitFor(() => {
+      const confirmationLink = screen
+        .getAllByRole('link')
+        .find((l) => l.getAttribute('href') === '/demo-resort/restaurant/confirmation?type=order&id=tx-ord-999');
+      expect(confirmationLink).toBeDefined();
+    });
 
     // Verify ONLY restaurant items and restaurant fulfillment state were cleared; retail item remains!
     const remainingItems = useCartStore.getState().items;

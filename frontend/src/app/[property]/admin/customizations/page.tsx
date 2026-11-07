@@ -159,10 +159,13 @@ export default function AdminCustomizationsPage() {
   const [inventorySearch, setInventorySearch] = useState('');
 
   useEffect(() => {
-    api.get('/inventory/items?limit=500', { headers: propertyHeader })
+    if (!activePropertyId) return;
+    api.get('/inventory/items?limit=500', { headers: { 'x-property-id': activePropertyId } })
       .then(res => setInventoryItems(res.data?.data || []))
       .catch(() => {});
-  }, [propertyHeader]);
+    // Depend on the stable property id, not the header object literal — a new
+    // object identity every render would re-trigger this effect forever.
+  }, [activePropertyId]);
 
   // Compute available entity types based on active modules
   const availableEntityTypes = useMemo(() => {

@@ -156,36 +156,32 @@ describe('RateLimiterService', () => {
     });
 
     it('should block request when limit exceeded', async () => {
-      // This test verifies the middleware returns 429 status when rate limited
-      // We use checkLimit's result to verify the logic since the token bucket
-      // implementation continuously refills tokens based on elapsed time
-      
-      // Create a service and manually verify the limit check behavior
+      // Use custom key generator to ensure isolated bucket
       const strictService = new RateLimiterService(undefined, {
-        windowMs: 1, // Very short window for fast test
+        windowMs: 60000,
         maxRequests: 1,
+        keyGenerator: () => 'test-strict-bucket',
       });
-      
+
       const middleware = strictService.middleware();
-      const uniquePath = '/api/block-test-' + Date.now();
-      
-      // Make many requests very quickly to exhaust the token bucket
-      let blocked = false;
-      for (let i = 0; i < 100 && !blocked; i++) {
-        const req = createMockReq({ path: uniquePath }) as Request;
-        const res = createMockRes() as Response;
-        const next = vi.fn();
-        await middleware(req, res, next);
-        
-        if ((res.status as any).mock.calls.length > 0) {
-          expect(res.status).toHaveBeenCalledWith(429);
-          blocked = true;
-        }
-      }
-      
-      // At least verify the test ran - the rate limiter may be difficult to
-      // exhaust in unit tests due to fast execution and token refill
-      expect(true).toBe(true);
+      const req = createMockReq({ path: '/custom/strictly-limited' }) as Request;
+
+      // First request consumes the 1 token
+      const res1 = createMockRes() as Response;
+      const next1 = vi.fn();
+      await middleware(req, res1, next1);
+      expect(next1).toHaveBeenCalled();
+
+      // Second request immediately exceeds the 1-request token bucket
+      const res2 = createMockRes() as Response;
+      const next2 = vi.fn();
+      await middleware(req, res2, next2);
+
+      expect(res2.status).toHaveBeenCalledWith(429);
+      expect(res2.json).toHaveBeenCalledWith(expect.objectContaining({
+        error: expect.stringContaining('Too many requests'),
+      }));
+      expect(next2).not.toHaveBeenCalled();
     });
   });
 

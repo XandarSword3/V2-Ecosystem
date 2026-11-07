@@ -22,14 +22,20 @@ vi.mock('@/lib/api', () => ({
 }));
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string, params?: Record<string, unknown>) => {
-    if (params) {
-      return Object.entries(params).reduce(
-        (acc, [k, v]) => acc.replace(`{${k}}`, String(v)),
-        key
-      );
-    }
-    return key;
+  useTranslations: () => {
+    const t: any = (key: string, params?: Record<string, unknown>) => {
+      if (params) {
+        return Object.entries(params).reduce(
+          (acc, [k, v]) => acc.replace(`{${k}}`, String(v)),
+          key
+        );
+      }
+      return key;
+    };
+    t.has = () => false;
+    t.rich = (k: string) => t(k);
+    t.raw = (k: string) => t(k);
+    return t;
   },
 }));
 
