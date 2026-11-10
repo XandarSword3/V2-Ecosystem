@@ -70,17 +70,19 @@ export default defineConfig({
         '*.config.ts',
         '*.config.js',
       ],
-      // Ratchet-only coverage gate, re-baselined 2026-11-04 (Phase 0.5 of
-      // Engine A Roadmap §7). Measured unit coverage (V8, Node 22):
-      // 37.25% statements / 31.21% branches / 39.83% functions / 38.33% lines.
+      // Ratchet-only coverage gate. Re-baselined 2026-11-09 after the
+      // coverage-gap remediation (provisioning.service, discount-reversal,
+      // inventory-side-effects, inventory.service, stay-pricing previously
+      // 0% → now 94–100). Measured unit coverage (V8, Node 22):
+      // 48.13% statements / 40.05% branches / 52.40% functions / 49.64% lines.
       // Thresholds sit ~1-2pp below measured to absorb Node 20 (CI) variance.
       // NEVER lower these; raise only after a verified measurement, backed
-      // by tests asserting real behavior (docs/TEST_COVERAGE_PLAN.md).
+      // by tests asserting real behavior (docs/_archive/audit-reports/TEST_COVERAGE_PLAN.md).
       thresholds: {
-        statements: 36,
-        branches: 29,
-        functions: 38,
-        lines: 36,
+        statements: 47,
+        branches: 38,
+        functions: 51,
+        lines: 48,
       },
     },
   },
