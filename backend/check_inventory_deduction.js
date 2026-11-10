@@ -1,7 +1,19 @@
 const { Pool } = require('pg');
 
+// SECURITY: credentials are no longer hardcoded in source — resolved from
+// the DATABASE_URL in backend/.env (same policy as the migration scripts).
+const dotenv = require('dotenv');
+dotenv.config({ path: require('path').join(__dirname, '.env') });
+
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  console.error('DATABASE_URL is not defined in backend/.env');
+  process.exit(1);
+}
+
 const pool = new Pool({
-  connectionString: 'postgresql://postgres.qxtmesddgwmwspejnbvc:KItFysca3NolmhQG@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres',
+  connectionString: dbUrl,
+  ssl: { rejectUnauthorized: false },
 });
 
 async function checkInventoryDeduction() {

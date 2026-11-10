@@ -1,5 +1,18 @@
 import pg from 'pg';
-const password = process.env.SUPABASE_DB_PASSWORD || 'KItFysca3NolmhQG';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// SECURITY: credentials are no longer hardcoded in source — resolved from
+// SUPABASE_DB_PASSWORD (or the password embedded in DATABASE_URL) instead.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, '../.env') });
+const dbUrl = process.env.DATABASE_URL;
+const password = process.env.SUPABASE_DB_PASSWORD || (dbUrl ? decodeURIComponent(new URL(dbUrl).password) : null);
+if (!password) {
+  console.error('No database password available: set SUPABASE_DB_PASSWORD or DATABASE_URL in backend/.env');
+  process.exit(1);
+}
 const encoded = encodeURIComponent(password);
 const conn = `postgresql://postgres.qxtmesddgwmwspejnbvc:${encoded}@aws-1-ap-northeast-1.pooler.supabase.com:6543/postgres`;
 
