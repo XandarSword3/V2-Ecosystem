@@ -3,6 +3,7 @@ import path from 'path';
 import pg from 'pg';
 import dotenv from 'dotenv';
 import dns from 'dns';
+import { scriptSsl } from './db-ssl.js';
 
 // Force IPv4 for DNS resolution
 dns.setDefaultResultOrder('ipv4first');
@@ -24,7 +25,7 @@ async function run() {
   // Parse URL and force IPv4 resolution
   const pool = new Pool({
     connectionString: dbUrl,
-    ssl: { rejectUnauthorized: false },
+    ssl: scriptSsl(dbUrl),
     // Add connection timeout
     connectionTimeoutMillis: 30000,
   });
@@ -65,7 +66,7 @@ async function run() {
     
     const poolerPool = new Pool({
       connectionString: poolerUrl,
-      ssl: { rejectUnauthorized: false },
+      ssl: scriptSsl(poolerUrl),
       connectionTimeoutMillis: 30000,
     });
     

@@ -2,20 +2,29 @@ import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
 import dotenv from 'dotenv';
+import { scriptSsl } from './db-ssl.js';
 
 // Load env vars
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const { Pool } = pg;
 
+
 async function run() {
-  // Use pooler URL which resolves correctly
-  const dbUrl = 'postgresql://postgres.dfneswicpdprhneeqlsn:k8yhxQ8ktbKU8b@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
+  // SECURITY: credentials are no longer hardcoded in source — read from .env
+  // (DATABASE_URL) like the sibling migration scripts. The historical value
+  // was a Supabase transaction-pooler URL.
+  const dbUrl = process.env.DATABASE_URL;
+
+  if (!dbUrl) {
+    console.error('❌ DATABASE_URL is not defined in .env');
+    process.exit(1);
+  }
 
   console.log('🔌 Connecting to database via pooler...');
   const pool = new Pool({
     connectionString: dbUrl,
-    ssl: { rejectUnauthorized: false }
+    ssl: scriptSsl(dbUrl)
   });
 
   try {

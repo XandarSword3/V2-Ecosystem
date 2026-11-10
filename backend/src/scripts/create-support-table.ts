@@ -1,3 +1,4 @@
+import { scriptSsl } from './db-ssl.js';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -70,7 +71,7 @@ async function createSupportTable() {
     const { Pool } = await import('pg');
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
+      ssl: scriptSsl(process.env.DATABASE_URL),
       connectionTimeoutMillis: 15000,
     });
 
@@ -97,7 +98,7 @@ async function createSupportTable() {
     console.log('Trying pooler connection...');
     const pool = new Pool({
       connectionString: poolerUrl,
-      ssl: { rejectUnauthorized: false },
+      ssl: scriptSsl(poolerUrl),
       connectionTimeoutMillis: 15000,
     });
 

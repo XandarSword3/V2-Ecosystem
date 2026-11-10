@@ -2,12 +2,13 @@ import 'dotenv/config';
 import { Pool } from 'pg';
 import { config } from '../config/index.js';
 import { getSupabaseAdmin } from '../database/supabase.js';
+import { scriptSsl } from './db-ssl.js';
 
 async function main() {
   const supabase = getSupabaseAdmin();
 
   // 0. Direct SQL for column nullability (bypasses PostgREST schema cache)
-  const pool = new Pool({ connectionString: config.database.url, ssl: config.database.url.includes('localhost') ? false : { rejectUnauthorized: false } });
+  const pool = new Pool({ connectionString: config.database.url, ssl: scriptSsl(config.database.url) });
   try {
     const { rows } = await pool.query(`
       SELECT table_name, column_name, is_nullable, column_default

@@ -90,7 +90,7 @@ async function run() {
     console.log('Available tables:', tables);
   }
 
-  // 3. Check catalog items (order_items and kiosk_items based on hints)
+  // 3. Check catalog items (order_items; kiosk_items legacy data migrated here)
   console.log('\n3. CATALOG ITEMS:');
   
   // Try order_items (hint from error message)
@@ -111,23 +111,8 @@ async function run() {
     }
   }
 
-  // Try kiosk_items (hint from error message)
-  const { data: kioskItems, error: kioskError } = await supabase
-    .from('kiosk_items')
-    .select('*')
-    .limit(20);
-  
-  if (kioskError) {
-    console.error('Error fetching kiosk items:', kioskError);
-  } else {
-    console.log(`\nKiosk Items: ${kioskItems?.length || 0}`);
-    if (kioskItems && kioskItems.length > 0) {
-      console.log('Columns:', Object.keys(kioskItems[0]));
-      kioskItems?.forEach(item => {
-        console.log(`  - Item ID: ${item.id}, Name: ${item.name || 'N/A'}, Created: ${item.created_at || 'N/A'}`);
-      });
-    }
-  }
+  // kiosk_items was dropped (2026-11-10, Engine A Admin Plan Phase 3 residue):
+  // old data lives in catalog_items, audited below.
 
   // Try catalog_items table
   const { data: catalogItems, error: catalogError } = await supabase

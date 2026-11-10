@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { scriptSsl } from './db-ssl.js';
 
 dotenv.config();
 
@@ -13,7 +14,7 @@ async function runMigration() {
         return;
     }
 
-    const pool = new Pool({ connectionString, ssl: false });
+    const pool = new Pool({ connectionString, ssl: scriptSsl(connectionString) });
     const client = await pool.connect();
 
     try {

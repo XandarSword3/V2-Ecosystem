@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import pg from "pg";
 import dotenv from "dotenv";
+import { scriptSsl } from "./db-ssl.js";
 
 dotenv.config({ path: path.join(__dirname, "../../.env") });
 
@@ -16,7 +17,7 @@ async function run() {
 
   const pool = new Pool({
     connectionString: dbUrl,
-    ssl: { rejectUnauthorized: false }
+    ssl: scriptSsl(dbUrl)
   });
 
   try {
