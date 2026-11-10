@@ -304,6 +304,10 @@ import financeRoutes from './modules/finance/finance.routes.js';
 import customizationRoutes from './modules/customization/routes/customization.routes.js';
 import paymentPlatformRoutes from './modules/payments/payment.v1.routes.js';
 import pricingRoutes from './modules/admin/pricing.controller.js';
+// Fiscal REST surface — service layer already live via engines/payments
+// (document issue on payment events); these routes add the staff-managed
+// lifecycle (profiles, issue/cancel/submit) that previously had no caller.
+import fiscalRoutes from './modules/fiscal/fiscal.routes.js';
 
 apiRouter.use('/pricing', pricingRoutes);
 
@@ -338,6 +342,7 @@ import messagingRoutes from './modules/messaging/messaging.routes.js';
 import i18nRoutes from './modules/i18n/i18n.routes.js';
 
 apiRouter.use('/finance', financeRoutes);
+apiRouter.use('/fiscal', fiscalRoutes);
 
 // Unified Customization System - engine-neutral, serves all modules via dynamic routing
 apiRouter.use('/customizations', customizationRoutes);

@@ -388,19 +388,11 @@ Headers: \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, \`X-RateLimit-Reset\`
     },
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // PROMOTIONS (Unified)
+    // PROMOTIONS (Unified) — REMOVED 2026-11-10: the dormant `promotions`
+    // module (never imported by app.ts) was deleted. Coupon flows live at
+    // `/coupons` (admin CRUD) and via the engine pricing pipeline resolver;
+    // gift cards at `/giftcards`, loyalty at `/loyalty`.
     // ═══════════════════════════════════════════════════════════════════════════
-    '/promotions/coupons/apply': { post: { tags: ['Promotions'], operationId: 'promoApplyCoupon', summary: 'Apply coupon (unified)', security: secured, responses: { '200': jsonResponse('Applied') } } },
-    '/promotions/coupons': { post: { tags: ['Promotions'], operationId: 'promoCreateCoupon', summary: 'Create coupon (admin)', security: secured, responses: { '201': jsonResponse('Created') } } },
-    '/promotions/coupons/abuse-report': { get: { tags: ['Promotions'], operationId: 'promoAbuseReport', summary: 'Coupon abuse report (admin)', security: secured, responses: { '200': jsonResponse('Report') } } },
-    '/promotions/gift-cards': { post: { tags: ['Promotions'], operationId: 'promoIssueGiftCard', summary: 'Issue gift card', security: secured, responses: { '201': jsonResponse('Issued') } } },
-    '/promotions/gift-cards/{code}/balance': { get: { tags: ['Promotions'], operationId: 'promoGiftCardBalance', summary: 'Check gift card balance', security: secured, parameters: [{ name: 'code', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': jsonResponse('Balance') } } },
-    '/promotions/gift-cards/redeem': { post: { tags: ['Promotions'], operationId: 'promoRedeemGiftCard', summary: 'Redeem gift card', security: secured, responses: { '200': jsonResponse('Redeemed') } } },
-    '/promotions/gift-cards/liability-report': { get: { tags: ['Promotions'], operationId: 'promoLiabilityReport', summary: 'Gift card liability report (admin)', security: secured, responses: { '200': jsonResponse('Report') } } },
-    '/promotions/loyalty/award': { post: { tags: ['Promotions'], operationId: 'promoAwardPoints', summary: 'Award loyalty points (staff)', security: secured, responses: { '200': jsonResponse('Awarded') } } },
-    '/promotions/loyalty/redeem': { post: { tags: ['Promotions'], operationId: 'promoRedeemPoints', summary: 'Redeem loyalty points', security: secured, responses: { '200': jsonResponse('Redeemed') } } },
-    '/promotions/loyalty/users/{userId}/status': { get: { tags: ['Promotions'], operationId: 'promoUserLoyaltyStatus', summary: 'Get user loyalty status', security: secured, parameters: [{ name: 'userId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }], responses: { '200': jsonResponse('Status') } } },
-    '/promotions/loyalty/expire-points': { post: { tags: ['Promotions'], operationId: 'promoExpirePoints', summary: 'Expire loyalty points (admin)', security: secured, responses: { '200': jsonResponse('Expired') } } },
 
     // ═══════════════════════════════════════════════════════════════════════════
     // HOUSEKEEPING
