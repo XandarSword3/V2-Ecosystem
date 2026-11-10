@@ -9,6 +9,7 @@ import {
   Eye, EyeOff, Loader2, CheckCircle2, AlertCircle,
   ShieldCheck, Cpu,
 } from 'lucide-react';
+import { memoryTokenStore } from '@/lib/api';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3005/api/v1';
 const BASE = API.replace('/api/v1', '');
@@ -144,10 +145,14 @@ export default function InstallPage() {
         throw new Error(data.error ?? 'Installation failed. Check server logs.');
       }
 
-      // Persist JWT so the wizard's API calls are authenticated
-      const { accessToken, refreshToken } = data.data.tokens;
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
+      // SECURITY (C-1): the access token lives only in the in-memory store —
+      // never in localStorage, where any XSS payload could exfiltrate it.
+      // The refresh token is set by the backend as an httpOnly cookie, so
+      // page reloads refresh silently without any readable token material.
+      // The user profile is the one localStorage entry shared with the rest
+      // of the auth flow (auth-context.tsx) — it is preferences, not secrets.
+      const { accessToken } = data.data.tokens;
+      memoryTokenStore.set(accessToken);
       localStorage.setItem('user', JSON.stringify(data.data.user));
 
       setStep('done');

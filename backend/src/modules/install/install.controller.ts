@@ -23,6 +23,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { getSupabase } from '../../database/connection.js';
 import { generateTokens } from '../../modules/auth/auth.utils.js';
+import { setAuthCookies } from '../auth/auth.controller.js';
 import { logger } from '../../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -360,6 +361,18 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       machineId: currentId,
     });
 
+    // SECURITY (C-1): the refresh token is delivered exclusively through the
+    // same httpOnly; Secure cookie pair used by the login flow — never in the
+    // JSON body, never readable by JS. Only the access token is returned so
+    // the wizard can authenticate immediately.
+    setAuthCookies(res, tokens.refreshToken);
+
+    logger.info('Install completed successfully', {
+      business: businessName,
+      adminEmail,
+      machineId: currentId,
+    });
+
     return res.status(201).json({
       success: true,
       data: {
@@ -371,8 +384,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
           roles:    ['super_admin'],
         },
         tokens: {
-          accessToken:  tokens.accessToken,
-          refreshToken: tokens.refreshToken,
+          accessToken: tokens.accessToken,
         },
       },
     });
