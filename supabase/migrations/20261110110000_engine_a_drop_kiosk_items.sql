@@ -1,0 +1,28 @@
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Engine A — Admin Plan Phase 3 residue: kiosk_items drop
+--
+-- `Engine A Roadmap.md` Admin Plan 3 ("waitlist removal + kiosk_items drop",
+-- 2026-11-02) landed the waitlist drop the same day but explicitly carried
+-- the kiosk_items drop into the next DB session. This is that drop.
+--
+-- Legacy context: kiosk_items was Engine A's pre-generic item table. Old
+-- data has been served from catalog_items since the customization snapshot
+-- repairs (2026-08-10 → 2026-08-14), which copied kiosk-item customizations
+-- onto the canonical entity. The frontend, admin pages, and staff surfaces
+-- no longer render kiosk items; the backend emitted its last kiosk_item
+-- reference through the customization entity-type union, removed in this
+-- change alongside the table.
+--
+-- Residual DB references (safe): the customization repair functions from
+-- 20260810170000/171000/20260812100000/20260814120000 keep a 'kiosk_item'
+-- CASE branch that now selects from a nonexistent table. That branch is
+-- unreachable through the API (backend no longer passes entity_type
+-- 'kiosk_item'). Do NOT regenerate those functions without a data-bearing
+-- reason — they exist to backfill historical snapshots only. If a future
+-- migration rewrites them, drop the dead branch there.
+--
+-- RLS: the kiosk_items_isolation policy and all grants are attached to the
+-- table and are dropped implicitly by DROP TABLE.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+DROP TABLE IF EXISTS "public"."kiosk_items";
