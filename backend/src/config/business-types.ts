@@ -1,6 +1,10 @@
 // File: backend/src/config/business-types.ts
 // White-label engine type defaults.
-// Keyed by canonical ModuleTemplateType — the four commerce engines the platform supports.
+// Keyed by canonical ModuleTemplateType — the four customer-facing commerce
+// engines plus platform_entitlement: the platform operator's own control
+// plane (plans/tenants/billing), which lives in the registry for type
+// exhaustiveness but is never customer-facing (see
+// security/template-permission-presets.ts where its `order` preset is false).
 // No hardcoded business-type names (resort, hotel, etc.) — those are operator-defined.
 // Operators configure their own module names and terminology through the UI.
 
@@ -49,6 +53,16 @@ export const ENGINE_TYPE_DEFAULTS: Record<ModuleTemplateType, EngineTypeConfig> 
         terminologyOverrides: {
             unit_singular:   'Membership',
             unit_plural:     'Memberships',
+            action_singular: 'Subscription',
+            action_plural:   'Subscriptions',
+        },
+    },
+    platform_entitlement: {
+        id: 'platform_entitlement',
+        description: 'Platform operator control plane — subscription plans, tenant lifecycle and SaaS billing. Operator-only; never customer-facing.',
+        terminologyOverrides: {
+            unit_singular:   'Plan',
+            unit_plural:     'Plans',
             action_singular: 'Subscription',
             action_plural:   'Subscriptions',
         },
