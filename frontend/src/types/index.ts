@@ -87,7 +87,9 @@ export interface Order {
   customer_name?: string;
   customerPhone?: string;
   customer_phone?: string;
-  orderType: OrderType;
+  // Backend no longer fabricates a default order type — orders created
+  // engine-agnostically without one report null here (socket `order:new`).
+  orderType: OrderType | null;
   order_type?: string;
   status: OrderStatus;
   /** Stage 6 canonical fulfillment state (queued/in_progress/ready/handed_off). */

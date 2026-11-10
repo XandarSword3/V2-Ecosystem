@@ -891,7 +891,7 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                                           : order.orderType === 'delivery' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
                                           : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
                                         }`}>
-                                          {order.orderType?.replace('_', ' ') || 'dine in'}
+                                          {order.orderType?.replace('_', ' ') || 'order'}
                                         </span>
                                         <span className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
                                           <Clock className="h-3 w-3" />
@@ -981,7 +981,7 @@ export function KitchenView({ slug, moduleName, moduleId, requireReservation }: 
                 <h2 className="text-xl font-bold flex items-center gap-2">
                   Order #{selectedOrder.orderNumber}
                   <span className="text-sm font-normal text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
-                    {selectedOrder.orderType}
+                    {selectedOrder.orderType ?? 'order'}
                   </span>
                   <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded">
                     {selMode}{selLegacy ? ' (legacy)' : ''}

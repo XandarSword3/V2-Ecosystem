@@ -2736,7 +2736,8 @@ export async function addModuleOrderItem(req: Request, res: Response) {
       customerId: order.customer_id ?? undefined,
       staffId: userId ?? undefined,
       conditions: {
-        orderType: orderMeta.order_type ?? 'dine_in',
+        // Same policy as dynamic-module.router: no fabricated order type.
+        orderType: orderMeta.order_type ?? null,
         paymentMethod: orderMeta.payment_method ?? 'cash',
       },
     });

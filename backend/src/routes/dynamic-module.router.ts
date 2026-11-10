@@ -1935,7 +1935,10 @@ function buildInstantTransactionRouter(router: Router): void {
           id: created.id,
           orderNumber: getOrderNumber(created.id, meta),
           customerName: meta.customer_name ?? 'Guest',
-          orderType: meta.order_type ?? 'dine_in',
+          // No hardcoded order-type fallback here: an order without a stored
+          // type (engine-agnostic modules) reports null instead of an
+          // invented hospitality default.
+          orderType: meta.order_type ?? null,
           status: created.status,
           totalAmount: created.amount,
           tableNumber: meta.table_number ?? null,
@@ -2126,7 +2129,11 @@ function buildInstantTransactionRouter(router: Router): void {
         taxCategory: item.taxCategory,
       }));
       const resolvedPaymentMethod = (order.metadata as any)?.payment_method ?? 'cash';
-      const resolvedOrderType = (order.metadata as any)?.order_type ?? 'dine_in';
+      // conditions.orderType is not consumed by the pricing pipeline (tax
+      // and fee scoping key on paymentMethod only), so an absent stored
+      // order type is passed through as undefined rather than defaulted
+      // to a hospitality value.
+      const resolvedOrderType = (order.metadata as any)?.order_type as string | undefined;
       // No couponCode / giftCardCodes / loyaltyPointsToRedeem passed —
       // see comment above the route: this keeps the call side-effect-free.
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
@@ -2526,7 +2533,7 @@ function buildInstantTransactionRouter(router: Router): void {
           tax_amount: data.tax_amount,
           discount_amount: data.discount_amount,
           fulfillment_status: fulfillmentStatus ?? legacyFulfillmentToCanonical(data.status as string | null),
-          order_type: meta.order_type ?? 'dine_in',
+          order_type: meta.order_type ?? null,
           customer_name: meta.customer_name ?? null,
           customer_phone: meta.customer_phone ?? null,
           staff_id: resolvedStaffId,
