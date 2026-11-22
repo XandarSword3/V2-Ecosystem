@@ -58,6 +58,56 @@ async function resolveUserFromToken(token: string): Promise<JwtPayload> {
   return payload;
 }
 
+const PLATFORM_OPERATOR_SCOPES = new Set(['super_admin', 'platform_admin']);
+
+/** Platform operators legitimately span tenants; everyone else is pinned to one. */
+function isPlatformOperator(user: NonNullable<Request['user']>): boolean {
+  return Boolean(user.isPlatformAdmin)
+    || PLATFORM_OPERATOR_SCOPES.has(user.scope)
+    || (user.roles || []).includes('super_admin');
+}
+
+/**
+ * P0-1 containment: a tenant resolved from a client-supplied header
+ * (X-Tenant-ID / X-Tenant-Slug) or subdomain must never disagree with the
+ * tenant baked into the verified JWT.
+ *
+ * `resolveTenant` runs before authentication, so without this comparison the
+ * header silently wins: a manager authenticated in tenant A could send
+ * `X-Tenant-ID: <tenant B>` and read tenant B's reports. The JWT is the only
+ * trusted source of tenant identity; the header is a selector, not a grant.
+ *
+ * Returns null when there is nothing to compare (public/legacy request, or a
+ * platform operator), otherwise the two conflicting ids for logging.
+ */
+function tenantBindingViolation(
+  req: Request,
+): { tokenTenantId: string; resolvedTenantId: string } | null {
+  const tokenTenantId = req.user?.tenantId;
+  const resolvedTenantId = req.tenant?.id;
+  if (!tokenTenantId || !resolvedTenantId) return null;
+  if (req.user && isPlatformOperator(req.user)) return null;
+  if (tokenTenantId === resolvedTenantId) return null;
+  return { tokenTenantId, resolvedTenantId };
+}
+
+function rejectTenantMismatch(
+  req: Request,
+  res: Response,
+  violation: { tokenTenantId: string; resolvedTenantId: string },
+): void {
+  logger.warn('[AUTH] Blocked cross-tenant request', {
+    userId: req.user?.userId,
+    tokenTenantId: violation.tokenTenantId,
+    headerTenantId: violation.resolvedTenantId,
+    path: req.originalUrl || req.path,
+  });
+  res.status(403).json({
+    success: false,
+    error: 'Tenant context does not match authenticated user',
+  });
+}
+
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const authHeader = req.headers.authorization;
@@ -93,6 +143,12 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       isPlatformAdmin: payload.isPlatformAdmin ?? false,
     };
 
+    const violation = tenantBindingViolation(req);
+    if (violation) {
+      rejectTenantMismatch(req, res, violation);
+      return;
+    }
+
     next();
   } catch (err) {
     logger.error('Authentication error:', err);
@@ -121,8 +177,17 @@ export async function optionalAuthenticate(req: Request, res: Response, next: Ne
       tenantId:        payload.tenantId,
       isPlatformAdmin: payload.isPlatformAdmin ?? false,
     };
+
+    // Optional auth does not block anonymous requests, but a *valid* token
+    // whose tenant contradicts the header is an active cross-tenant attempt,
+    // not an anonymous visitor. Reject it the same way authenticate does.
+    const violation = tenantBindingViolation(req);
+    if (violation) {
+      rejectTenantMismatch(req, res, violation);
+      return;
+    }
   } catch {
-    // Optional auth should never block the request
+    // Invalid/expired token: fall through as anonymous, as before.
   }
 
   next();

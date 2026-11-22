@@ -35,7 +35,7 @@ function createReq(overrides: any = {}): any {
     params: {},
     body: {},
     query: {},
-    user: { userId: 'user-123', id: 'user-123', email: 'test@test.com', roles: ['admin'] },
+    user: { userId: 'user-123', id: 'user-123', email: 'test@test.com', roles: ['admin'], tenantId: 'tenant-1' },
     ...overrides,
   };
 }

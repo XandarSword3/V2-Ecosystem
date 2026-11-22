@@ -3,6 +3,11 @@ import express from 'express';
 import request from 'supertest';
 import terminologyRoutes from '../../../src/routes/terminology.routes.js';
 
+vi.mock('../../../src/middleware/auth.middleware.js', () => ({
+  authenticate: (req: any, _res: any, next: any) => { req.user = { id: 'admin-1', roles: ['admin'] }; next(); },
+  authorize: () => (_req: any, _res: any, next: any) => next(),
+}));
+
 vi.mock('../../../src/services/terminology.service.js', () => ({
   terminologyService: {
     getTerminology: vi.fn(),

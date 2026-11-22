@@ -16,6 +16,12 @@ import { test, expect } from '@playwright/test';
 
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 const TEST_MODULE_SLUG = process.env.E2E_ENGINE_A_SLUG || 'poolside-grill';
+const E2E_TENANT_SLUG = process.env.E2E_TENANT_SLUG || 'walid';
+// Module is mounted at /api/v1/<slug> by routes/dynamic-modules.loader.ts —
+// NOT /api/v1/modules/<slug> (that prefix only serves the admin modules list).
+const CATALOG_URL = `${API_URL}/api/v1/${TEST_MODULE_SLUG}/items`;
+const ORDERS_URL = `${API_URL}/api/v1/${TEST_MODULE_SLUG}/orders`;
+const MODULE_HEADERS = { 'X-Tenant-Slug': E2E_TENANT_SLUG };
 const TEST_EMAIL = process.env.E2E_CUSTOMER_EMAIL || 'e2e.customer@test.com';
 const TEST_PASSWORD = process.env.E2E_CUSTOMER_PASSWORD || 'TestPass123!';
 
@@ -38,7 +44,7 @@ test.describe('Engine A: Customer Cart & Checkout Flow', () => {
   test('rejects order creation with empty items payload', async ({ request }) => {
     expect(authToken).toBeTruthy();
 
-    const res = await request.post(`${API_URL}/api/v1/modules/${TEST_MODULE_SLUG}/orders`, {
+    const res = await request.post(ORDERS_URL, {
       data: {
         customerName: 'Test Customer',
         customerPhone: '+1234567890',
@@ -49,6 +55,7 @@ test.describe('Engine A: Customer Cart & Checkout Flow', () => {
       },
       headers: {
         'Authorization': `Bearer ${authToken}`,
+        'X-Tenant-Slug': E2E_TENANT_SLUG,
       },
     });
 
@@ -62,8 +69,8 @@ test.describe('Engine A: Customer Cart & Checkout Flow', () => {
     expect(authToken).toBeTruthy();
 
     // First, get available catalog items for the module if available
-    const catalogRes = await request.get(`${API_URL}/api/v1/modules/${TEST_MODULE_SLUG}/catalog`, {
-      headers: { 'Authorization': `Bearer ${authToken}` },
+    const catalogRes = await request.get(CATALOG_URL, {
+      headers: { 'Authorization': `Bearer ${authToken}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
     });
 
     let catalogItemId = '00000000-0000-0000-0000-000000000001';
@@ -75,7 +82,7 @@ test.describe('Engine A: Customer Cart & Checkout Flow', () => {
       }
     }
 
-    const res = await request.post(`${API_URL}/api/v1/modules/${TEST_MODULE_SLUG}/orders`, {
+    const res = await request.post(ORDERS_URL, {
       data: {
         customerName: 'Alex Customer',
         customerPhone: '+15551234567',
@@ -93,6 +100,7 @@ test.describe('Engine A: Customer Cart & Checkout Flow', () => {
       },
       headers: {
         'Authorization': `Bearer ${authToken}`,
+        'X-Tenant-Slug': E2E_TENANT_SLUG,
       },
     });
 

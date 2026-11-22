@@ -298,8 +298,10 @@ router.get(
     const ruleUsage: Record<string, number> = {};
     analytics?.forEach((a: Record<string, any>) => {
       const rules = a.applied_rules || [];
-      rules.forEach((rule: any) => {
-        ruleUsage[rule.name] = (ruleUsage[rule.name] || 0) + 1;
+      rules.forEach((rule: { name?: string }) => {
+        if (rule.name) {
+          ruleUsage[rule.name] = (ruleUsage[rule.name] || 0) + 1;
+        }
       });
     });
 
@@ -361,7 +363,7 @@ router.post(
     const moduleTaxCategory = await getModuleTaxCategory(moduleId);
     const { data: moduleRow } = await supabase
       .from('modules')
-      .select('template_type, property_id')
+      .select('template_type, property_id, tenant_id')
       .eq('id', moduleId)
       .maybeSingle();
     const templateType = moduleRow?.template_type;
@@ -427,6 +429,9 @@ router.post(
 
     const pricingContext: PricingContext = {
       moduleId,
+      // Tenant-scoped discounts: without this the coupon/gift-card/loyalty
+      // resolvers fail closed (they can no longer look codes up globally).
+      tenantId: moduleRow?.tenant_id || (req as any).tenant?.id,
       currency: await resolveModuleCurrency(moduleId, resolvedPropertyId),
       conditions: pricingConditions,
       customerId,
@@ -434,7 +439,12 @@ router.post(
       giftCardCodes,
       loyaltyPointsToRedeem,
       propertyId: resolvedPropertyId,
-      staffId: (req.user as any)?.userId
+      staffId: (req.user as any)?.userId,
+      // P0: this endpoint is a READ-ONLY quote. Without dryRun the pipeline
+      // invoked apply_coupon_atomic / redeem_giftcard_atomic /
+      // redeem_loyalty_points_atomic, permanently consuming coupons, gift
+      // cards and points on every page refresh before an order existed.
+      dryRun: true,
     };
 
     // Route through the same engine pipeline confirmation uses (engineService.calculatePricing),

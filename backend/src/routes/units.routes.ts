@@ -277,7 +277,7 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
         ...lineItem,
         taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
       }],
-      { moduleId: unit.module_id ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(unit.module_id, resolvedPropertyId) },
+      { moduleId: unit.module_id ?? undefined, tenantId: resolvedTenantId ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(unit.module_id, resolvedPropertyId) },
     );
 
     const { data: created, error } = await supabase
@@ -306,6 +306,9 @@ router.post('/bookings', authenticate, asyncHandler(async (req: Request, res: Re
     if (error) throw error;
     res.status(201).json({ success: true, data: created });
   } catch (error: any) {
+    if (error?.code === '23P01' || error?.message?.includes('already booked')) {
+      return res.status(409).json({ success: false, error: 'DOUBLE_BOOKING_CONFLICT', message: error?.message ?? 'Unit is already booked for these dates' });
+    }
     logger.error('Failed to create booking:', error);
     res.status(500).json({ success: false, error: error?.message ?? 'Failed to create booking' });
   }

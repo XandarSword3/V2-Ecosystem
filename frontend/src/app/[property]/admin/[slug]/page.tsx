@@ -8,14 +8,17 @@ import { useSiteSettings } from '@/lib/settings-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
-import { 
-  UtensilsCrossed, 
-  List, 
-  ShoppingCart, 
+import {
+  UtensilsCrossed,
+  List,
+  ShoppingCart,
   LayoutGrid,
   Calendar,
   Tags,
   Settings,
+  SlidersHorizontal,
+  MapPin,
+  Upload,
   Ticket,
   Users,
   CreditCard,
@@ -74,6 +77,53 @@ export default function DynamicModuleDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{tc('orders.title')}</div>
             <p className="text-xs text-muted-foreground">{tc('orders.viewAndManage')}</p>
+          </CardContent>
+        </Card>
+      </Link>
+
+      {/* Customizations (modifiers / variants) — these pages existed but were
+          orphaned: no dashboard card, reachable only by typing the URL. */}
+      <Link href={`/${propertySlug}/admin/${moduleSlug}/modifiers`}>
+        <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Customizations</CardTitle>
+            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Modifiers</div>
+            <p className="text-xs text-muted-foreground">
+              Options, add-ons & product variants
+            </p>
+          </CardContent>
+        </Card>
+      </Link>
+
+      <Link href={`/${propertySlug}/admin/${moduleSlug}/tables`}>
+        <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Service Locations</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Locations</div>
+            <p className="text-xs text-muted-foreground">
+              Tables, counters & pickup bays
+            </p>
+          </CardContent>
+        </Card>
+      </Link>
+
+      <Link href={`/${propertySlug}/admin/${moduleSlug}/menu/import`}>
+        <Card className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer h-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Import</CardTitle>
+            <Upload className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Bulk Import</div>
+            <p className="text-xs text-muted-foreground">
+              Upload spreadsheet / bulk catalog data
+            </p>
           </CardContent>
         </Card>
       </Link>

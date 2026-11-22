@@ -1,8 +1,13 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { defineConfig } from 'vitest/config';
+import { assertLocalTestEnvironment } from './tests/env-guard';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.test') });
+// Task 0b: `.env.test` is authoritative. `override: true` makes it win over
+// both a pre-existing shell variable and the later `backend/.env` load, so a
+// test run cannot be steered at a remote database or shared Redis by ambient
+// env. The guard below is the second line of defence.
+dotenv.config({ path: path.resolve(process.cwd(), '.env.test'), override: true });
 
 const REQUIRED_INTEGRATION_ENV_VARS = [
   'DATABASE_URL',
@@ -22,6 +27,8 @@ if (missingIntegrationEnvVars.length > 0) {
     `Missing required integration test env vars: ${missingIntegrationEnvVars.join(', ')}. Define them in backend/.env.test or export them before running integration tests.`
   );
 }
+
+assertLocalTestEnvironment(process.env, 'integration');
 
 /**
  * Vitest Configuration for Integration Tests

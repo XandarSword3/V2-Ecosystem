@@ -94,8 +94,13 @@ app.post(
 // Per-property Stripe webhook — same raw-body requirement.
 // Must be mounted BEFORE express.json() or req.rawBody will be undefined
 // and the controller will immediately return 400.
+// skipTenantGate: the handler resolves its own tenant from the signed event.
+// Without it, a suspended/cancelled tenant (or a missing platform-root
+// resolution) makes Stripe receive 402/404 and give up, so payment state and
+// the ledger diverge permanently.
 app.post(
   '/api/v1/payments/webhook/stripe',
+  skipTenantGate,
   express.raw({ type: 'application/json' }),
   (req, _res, next) => {
     // Expose raw buffer so payment.controller.ts can use it for Stripe signature verification

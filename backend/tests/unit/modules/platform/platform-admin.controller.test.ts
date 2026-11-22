@@ -33,6 +33,8 @@ vi.mock('../../../../src/middleware/tenantAccess.middleware.js', () => ({
 vi.mock('../../../../src/services/saas-billing.service.js', () => {
   const mockBilling = {
     cancelSubscription: vi.fn().mockResolvedValue(undefined),
+    suspendSubscription: vi.fn().mockResolvedValue(undefined),
+    resumeSubscription: vi.fn().mockResolvedValue(undefined),
     changeTier: vi.fn().mockResolvedValue({ status: 'active', tier: 'enterprise' }),
     createCustomerPortalSession: vi.fn().mockResolvedValue('https://billing.stripe.com/p/session_123'),
   };
@@ -280,7 +282,12 @@ describe('Platform Admin Controller (Genuine Stateful Database Verification)', (
       });
       await changeTier(req, res);
 
-      expect(billing.changeTier).toHaveBeenCalledWith('sub_123', 'growth', 'enterprise');
+      expect(billing.changeTier).toHaveBeenCalledWith(
+        'sub_123',
+        'growth',
+        'enterprise',
+        expect.objectContaining({ tenantId: 'tenant-1', actor: 'platform_admin' }),
+      );
       expect(res.json).toHaveBeenCalledWith({
         success: true,
         data: { status: 'active', tier: 'enterprise' },

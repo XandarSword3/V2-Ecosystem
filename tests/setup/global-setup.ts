@@ -9,7 +9,24 @@
  */
 
 import { FullConfig } from '@playwright/test';
+import dotenv from 'dotenv';
+import path from 'path';
 import { createClient } from '@supabase/supabase-js';
+import {
+  loadE2EAdminTwoFactor,
+  saveE2EAdminTwoFactor,
+  computeTotp,
+} from './two-factor';
+
+// Same env loading as tests/fixtures/base.ts — global-setup runs before any
+// spec, so it must resolve .env.test / backend/.env itself.
+dotenv.config({ path: path.resolve(__dirname, '../.env.test') });
+dotenv.config({ path: path.resolve(__dirname, '../../backend/.env') });
+
+// bcryptjs lives in backend/node_modules (the test root doesn't hoist it).
+// Needed to reset password hashes for pre-existing test users whose
+// credentials drifted from earlier sessions.
+const bcrypt = require(path.resolve(__dirname, '../../backend/node_modules/bcryptjs'));
 
 const BACKEND_URL = 'http://localhost:3005';
 
@@ -18,8 +35,58 @@ export default async function globalSetup(_config: FullConfig) {
 
   await verifyServers();
   await seedTestEnvironment();
+  await warmFrontendRoutes();
 
   console.log('\n✅ Global Setup complete — running tests\n');
+}
+
+// ---------------------------------------------------------------------------
+// Dev-compile warm-up
+// ---------------------------------------------------------------------------
+
+/**
+ * Pre-compiles the routes the suites hit first. In `next dev` the very first
+ * request to a route triggers an on-demand compile; during that window chunk
+ * requests abort and the page re-navigates, which used to make the first test
+ * on each route flaky (form fills firing before hydration, query params lost
+ * on the re-navigation). Hitting the routes once here shifts the compile cost
+ * into setup where a slow response is harmless.
+ */
+async function warmFrontendRoutes() {
+  const routes = ['/login', '/'];
+  for (const route of routes) {
+    try {
+      const res = await fetch(`http://localhost:3000${route}`, { signal: AbortSignal.timeout(60_000) });
+      console.log(`  ✓ Warmed ${route} (HTTP ${res.status})`);
+    } catch (err) {
+      // Non-fatal: compilation will just happen lazily during tests.
+      console.warn(`  ⚠ Warm-up for ${route} failed: ${(err as Error).message}`);
+    }
+  }
+
+  // Tenant-tier routes resolve only on walid.localhost (Chromium/curl can;
+  // Node fetch cannot). Warm them via curl.exe --resolve so the heavy
+  // on-demand compiles land here, not in the first test of each suite.
+  const tenantRoutes = [
+    '/walid-s-property/admin',
+    '/walid-s-property/admin/poolside-grill/menu',
+    '/walid-s-property/staff',
+    '/walid-s-property/staff/modules/poolside-grill',
+  ];
+  for (const route of tenantRoutes) {
+    try {
+      const { execFileSync } = require('child_process');
+      execFileSync(
+        'curl.exe',
+        ['-s', '-o', 'NUL', '--max-time', '120', '--resolve', 'walid.localhost:3000:127.0.0.1', `http://walid.localhost:3000${route}`],
+        { timeout: 130_000, windowsHide: true },
+      );
+      console.log(`  ✓ Warmed (tenant-tier) ${route}`);
+    } catch (err) {
+      // Non-fatal: compilation will just happen lazily during tests.
+      console.warn(`  ⚠ Tenant-tier warm-up for ${route} failed: ${(err as Error).message}`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +186,313 @@ async function seedTestEnvironment() {
   await ensureTestAdminUser(supabase, testcorpId, 'testcorp');
   await ensureTestAdminUser(supabase, othercorpId, 'othercorp');
 
+  // 6. Seed one property per test tenant so post-login admin redirects have a
+  //    target: the login page redirects admins to /{propertySlug}/admin, where
+  //    propertySlug comes from the backend property resolver (property_code).
+  await ensureTestProperty(supabase, testcorpId, 'testcorp');
+  await ensureTestProperty(supabase, othercorpId, 'othercorp');
+  await ensureTestProperty(supabase, (await getTenantId(supabase, 'suspended'))!, 'suspended');
+
+  // 7. Re-sync the by-name v2ecosystem E2E users. These are pre-existing rows
+  //    used by the Engine A suites; their password hashes drift from earlier
+  //    dev sessions, and every drifted login also poisons the backend's
+  //    lockout cache (CAPTCHA_REQUIRED / ACCOUNT_LOCKED for the whole session).
+  await ensureV2EcosystemPasswords(supabase);
+  await ensureEngineAFixtureAccess(supabase);
+  await ensureEngineAE2EAdmin(supabase, BACKEND_URL);
+  await ensureEngineAShiftHygiene(supabase);
+
   console.log('  ✓ Test tenants ready');
+}
+
+/**
+ * Force-resets password hashes for the Engine A fixture users so their
+ * credentials always match what the specs send. Values mirror the spec
+ * defaults (grep for EV2E_STAFF_/E2E_ADMIN_ in tests/e2e/engine-a-*).
+ */
+async function ensureV2EcosystemPasswords(supabase: ReturnType<typeof createClient>) {
+  const targets: Array<{ email: string; password: string }> = [
+    { email: 'e2e.staff@v2ecosystem.com', password: 'staff123' },
+    { email: 'e2e.admin@v2ecosystem.com', password: 'admin123' },
+    { email: 'test.admin@v2ecosystem.com', password: 'admin123' },
+    { email: 'admin@v2ecosystem.com', password: 'admin123' },
+    { email: 'menu.service.staff@v2ecosystem.com', password: 'staff123' },
+    { email: 'e2e.customer@test.com', password: 'TestPass123!' },
+  ];
+
+  for (const { email, password } of targets) {
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email);
+    if (error) {
+      console.warn(`  ⚠ User lookup failed for '${email}': ${error.message}`);
+      continue;
+    }
+    if (!users || users.length === 0) {
+      console.warn(`  ⚠ Engine A user '${email}' not found in DB — spec will need to register it`);
+      continue;
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({ password_hash: passwordHash, email_verified: true, two_factor_enabled: false })
+      .eq('email', email);
+    console.log(updateErr ? `  ⚠ Password resync for '${email}' failed: ${updateErr.message}` : `  ✓ '${email}' password re-synced`);
+  }
+}
+
+/**
+ * Engine A fixture: the customer user buys from the mounted `walid` module
+ * (poolside-grill). The dynamic module router runs requirePropertyAccess for
+ * every authenticated route outside NODE_ENV=test, and customer accounts are
+ * default-deny without a user_property_access row. Grant the fixture customer
+ * read access to the walid property (idempotent).
+ */
+async function ensureEngineAFixtureAccess(supabase: ReturnType<typeof createClient>) {
+  const { data: walidTenant } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('subdomain', 'walid')
+    .maybeSingle();
+  if (!walidTenant) {
+    console.warn('  ⚠ Engine A fixture tenant (walid) not found — skipping customer property access grant');
+    return;
+  }
+
+  const { data: property } = await supabase
+    .from('properties')
+    .select('id')
+    .eq('tenant_id', walidTenant.id)
+    .limit(1)
+    .maybeSingle();
+  if (!property) {
+    console.warn('  ⚠ No property found for walid tenant — skipping customer property access grant');
+    return;
+  }
+
+  const { data: customer } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', 'e2e.customer@test.com')
+    .maybeSingle();
+  if (!customer) {
+    console.warn('  ⚠ e2e.customer@test.com not found — skipping property access grant');
+    return;
+  }
+
+  const { data: existing } = await supabase
+    .from('user_property_access')
+    .select('id')
+    .eq('user_id', customer.id)
+    .eq('property_id', property.id)
+    .limit(1);
+  if (existing && existing.length > 0) return;
+
+  const { error } = await supabase.from('user_property_access').insert({
+    user_id: customer.id,
+    property_id: property.id,
+    access_level: 'read',
+    granted_by: customer.id,
+    tenant_id: walidTenant.id,
+  });
+  console.log(error ? `  ⚠ Property access grant for e2e.customer@test.com failed: ${error.message}` : `  ✓ e2e.customer@test.com granted access to walid fixture property`);
+}
+
+/**
+ * Engine A fixture: `e2e.admin@v2ecosystem.com` is the walid-tenant E2E admin.
+ * /auth/me derives roles[] from user.scope (permissions.ts scopeToRoles), so
+ * role promotion is cosmetic — the user's scope (tenant_admin) already maps to
+ * ['admin'], which the admin layout accepts. The REAL gate is the backend's
+ * mandatory-2FA rule: every privileged scope needs two_factor_enabled=true or
+ * login 403s (TWO_FACTOR_SETUP_REQUIRED). Enroll the fixture user via the real
+ * flow and persist the TOTP secret so test login helpers can answer the
+ * /auth/2fa/verify challenge (see tests/setup/two-factor.ts).
+ */
+async function ensureEngineAE2EAdmin(supabase: ReturnType<typeof createClient>, backendUrl: string) {
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, roles, two_factor_enabled')
+    .eq('email', 'e2e.admin@v2ecosystem.com');
+  if (!users || users.length === 0) {
+    console.warn('  ⚠ e2e.admin@v2ecosystem.com not found — skipping admin fixture setup');
+    return;
+  }
+
+  for (const u of users) {
+    // Role promotion is cosmetic (scope is the source of truth for /auth/me)
+    // but keeps the DB rows sane for anything that still reads roles.
+    const roles: string[] = Array.isArray(u.roles) ? u.roles : [];
+    if (!roles.includes('admin')) {
+      const promoted = [...new Set([...roles, 'admin'])];
+      const { error } = await supabase.from('users').update({ roles: promoted }).eq('id', u.id);
+      console.log(
+        error
+          ? `  ⚠ Admin role promotion for e2e.admin@v2ecosystem.com failed: ${error.message}`
+          : `  ✓ e2e.admin@v2ecosystem.com promoted to roles=${JSON.stringify(promoted)}`,
+      );
+    }
+
+    // ---- Mandatory-2FA enrollment --------------------------------------
+    const stored = loadE2EAdminTwoFactor();
+    if (stored) {
+      // The two_factor_auth row (if present) holds OUR cached secret,
+      // encrypted server-side. ensureV2EcosystemPasswords resets
+      // two_factor_enabled=false on every run, so just restore the flag
+      // instead of re-enrolling.
+      const { data: tfa } = await supabase
+        .from('two_factor_auth')
+        .select('user_id')
+        .eq('user_id', u.id)
+        .maybeSingle();
+      if (tfa) {
+        await supabase.from('users').update({ two_factor_enabled: true }).eq('id', u.id);
+        console.log('  ✓ e2e.admin@v2ecosystem.com 2FA flag restored (secret already in DB + cached)');
+        continue;
+      }
+    }
+    if (u.two_factor_enabled && !stored) {
+      // Enabled but we lost the secret file: the DB secret is encrypted, so
+      // re-seed instead — disable and re-enroll below. E2E-only account.
+      console.log('  ⚠ e2e.admin 2FA enabled but TOTP secret file missing — re-enrolling');
+      await supabase.from('users').update({ two_factor_enabled: false }).eq('id', u.id);
+    }
+    // Clean slate for enrollment: a live two_factor_auth row makes
+    // /2fa/setup 400 ("already enabled") and a stale pending row confuses
+    // verifyAndEnable.
+    await supabase.from('two_factor_auth').delete().eq('user_id', u.id);
+    await supabase.from('two_factor_pending').delete().eq('user_id', u.id);
+
+    const email = 'e2e.admin@v2ecosystem.com';
+    const password = 'admin123';
+    // Login is tenant-scoped: walid user + walid slug header.
+    const loginRes = await fetch(`${backendUrl}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': 'walid' },
+      body: JSON.stringify({ email, password }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const loginBody = await loginRes.json().catch(() => null);
+    const setupToken =
+      loginBody?.data?.twoFactorSetupToken ?? loginBody?.twoFactorSetupToken ?? null;
+    if (loginRes.status !== 403 || !setupToken) {
+      console.warn(
+        `  ⚠ Expected 403 TWO_FACTOR_SETUP_REQUIRED with a setup token for e2e.admin, got HTTP ${loginRes.status}: ${JSON.stringify(loginBody).slice(0, 200)}`,
+      );
+      continue;
+    }
+
+    // Generate the secret (server stores it encrypted + pending)
+    const setupRes = await fetch(`${backendUrl}/api/v1/auth/2fa/setup`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${setupToken}` },
+      signal: AbortSignal.timeout(30_000),
+    });
+    const setupBody = await setupRes.json().catch(() => null);
+    const secret = setupBody?.data?.secret;
+    if (setupRes.status !== 200 || !secret) {
+      console.warn(`  ⚠ 2FA setup failed for e2e.admin: HTTP ${setupRes.status} ${JSON.stringify(setupBody).slice(0, 200)}`);
+      continue;
+    }
+
+    // Verify the current TOTP code and activate 2FA (this response already
+    // completes the login server-side — completeLoginAfter2FA)
+    const enableRes = await fetch(`${backendUrl}/api/v1/auth/2fa/enable`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${setupToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: computeTotp(secret) }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (enableRes.status !== 200) {
+      const errBody = await enableRes.json().catch(() => null);
+      console.warn(`  ⚠ 2FA enable failed for e2e.admin: HTTP ${enableRes.status} ${JSON.stringify(errBody).slice(0, 200)}`);
+      continue;
+    }
+
+    saveE2EAdminTwoFactor({ email, userId: u.id, secret });
+    console.log('  ✓ e2e.admin@v2ecosystem.com enrolled in 2FA (TOTP secret cached for login helpers)');
+  }
+}
+
+/**
+ * Engine A fixture hygiene: the staff KDS specs click "Start Shift", which
+ * inserts an ACTIVE staff_shifts row (actual_end = NULL). The backend blocks
+ * a new ad-hoc start while an open shift from a PREVIOUS day exists (409
+ * "Still clocked in to a shift …"), and same-day shifts are reused instead —
+ * so stale overnight shifts brick the gate until clocked out. Close any
+ * still-open shifts belonging to the fixture staff user (shift_date < today,
+ * or any open shift already in the past) to keep reruns self-healing.
+ */
+async function ensureEngineAShiftHygiene(supabase: ReturnType<typeof createClient>) {
+  const { data: staff } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', 'e2e.staff@v2ecosystem.com')
+    .maybeSingle();
+  if (!staff) {
+    console.warn('  ⚠ e2e.staff@v2ecosystem.com not found — skipping shift hygiene');
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const { data: staleShifts, error: staleErr } = await supabase
+    .from('staff_shifts')
+    .select('id, shift_date')
+    .eq('staff_id', staff.id)
+    .in('status', ['active', 'scheduled'])
+    .is('actual_end', null)
+    .lt('shift_date', today);
+
+  if (staleErr) {
+    console.warn(`  ⚠ Shift hygiene query failed: ${staleErr.message}`);
+    return;
+  }
+  if (!staleShifts || staleShifts.length === 0) return;
+
+  const nowIso = new Date().toISOString();
+  const { error: updateErr } = await supabase
+    .from('staff_shifts')
+    .update({ actual_end: nowIso, status: 'completed' })
+    .in('id', staleShifts.map((s) => s.id));
+  console.log(
+    updateErr
+      ? `  ⚠ Shift hygiene update failed: ${updateErr.message}`
+      : `  ✓ Closed ${staleShifts.length} stale open staff shift(s) (dates: ${staleShifts.map((s) => s.shift_date).join(', ')})`,
+  );
+}
+
+async function getTenantId(supabase: ReturnType<typeof createClient>, subdomain: string): Promise<string | null> {
+  const { data } = await supabase.from('tenants').select('id').eq('subdomain', subdomain).maybeSingle();
+  return data?.id ?? null;
+}
+
+/**
+ * Seeds the tenant's default property used for post-login admin redirects.
+ * property_code = `${subdomain}-property` — the slug the login page's
+ * `/{propertySlug}/admin` redirect resolves against. Idempotent.
+ */
+async function ensureTestProperty(supabase: ReturnType<typeof createClient>, tenantId: string, subdomain: string) {
+  const propertyCode = `${subdomain}-property`;
+  const { data: existing } = await supabase
+    .from('properties')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    console.log(`  ✓ Property for '${subdomain}' already exists`);
+    return;
+  }
+
+  const { error } = await supabase.from('properties').insert({
+    name: `${subdomain} Test Property`,
+    tenant_id: tenantId,
+    property_code: propertyCode,
+    public_slug: propertyCode,
+    is_active: true,
+  });
+  if (error) throw new Error(`[Seed] Failed to create property for '${subdomain}': ${error.message}`);
+  console.log(`  ✓ Property '${propertyCode}' seeded for '${subdomain}'`);
 }
 
 async function ensureTestTenant(
@@ -187,15 +560,25 @@ async function ensureTestAdminUser(
 
   const { data: existing } = await supabase
     .from('users')
-    .select('id')
+    .select('id, password_hash')
     .eq('email', email)
     .eq('tenant_id', tenantId)
     .maybeSingle();
 
   if (existing) {
-    // User exists — still check and patch role in case it drifted back to 'customer'
+    // User exists — force back to a known-good credential + role in case
+    // password or role drifted from earlier sessions (register would 409).
+    const passwordHash = await bcrypt.hash(password, 12);
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({ password_hash: passwordHash, email_verified: true, two_factor_enabled: false })
+      .eq('id', existing.id);
+    if (updateErr) {
+      console.warn(`  ⚠ Password reset for '${email}' failed: ${updateErr.message}`);
+    } else {
+      console.log(`  ✓ Test admin '${email}' password re-synced`);
+    }
     await patchUserRole(supabase, email, tenantId);
-    console.log(`  ✓ Test admin '${email}' already exists`);
     return;
   }
 

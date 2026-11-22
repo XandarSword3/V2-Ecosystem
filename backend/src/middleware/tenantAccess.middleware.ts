@@ -19,11 +19,17 @@
  *                               own tenant (login, settings, modules) works on its
  *                               bare domain without needing a header or subdomain.
  *
- * Billing gate rules:
+ * Billing gate rules (two-tier — see validateTenantBilling below):
  *   active / trialing          → allow through, no header added
- *   past_due                   → allow reads (GET/HEAD/OPTIONS) with X-Billing-Warning header;
- *                                 block writes with 402 Payment Required
- *   suspended / cancelled      → 402 Payment Required, request blocked
+ *   past_due                   → reads (GET/HEAD/OPTIONS) pass with
+ *                                 X-Billing-Warning on operator paths; writes
+ *                                 are blocked. Operator surfaces get an
+ *                                 actionable 402; public storefront surfaces
+ *                                 get a sanitized 503 (no billing leakage).
+ *   suspended / cancelled      → blocked. Operator surfaces get an actionable
+ *                                 402 (suspended tenants can still GET the
+ *                                 Stripe portal for self-service); public
+ *                                 surfaces get a sanitized 503.
  *   tenant not found           → pass through (legacy single-tenant mode)
  *
  * This middleware must run BEFORE validatePropertyAccess so that suspended
@@ -368,10 +374,34 @@ export async function resolveTenant(req: Request, res: Response, next: NextFunct
  * Gate access based on tenant billing status.
  * Must run after resolveTenant.
  *
- * Returns 402 for suspended/cancelled tenants.
- * For past_due tenants: GET/HEAD/OPTIONS pass through with an
- * X-Billing-Warning header; all write methods (POST/PUT/PATCH/DELETE/etc.)
- * are blocked with 402 — this is the doc's "PASS reads / BLOCK writes" rule.
+ * TWO-TIER RESPONSE ARCHITECTURE:
+ *
+ * The 402 payload is a SaaS-billing internal — the caller being blocked may be
+ * an anonymous end-customer browsing a storefront (public Engine A catalog,
+ * Engine B availability, etc.), who has no V2 subscription and should never
+ * see "update your payment method". That text exposes the tenant's private
+ * billing dispute to the tenant's own customers and reads as nonsense to them.
+ *
+ *   Tier 1 — Operator surfaces (paths under /api/v1/{admin,staff,platform}):
+ *     These requests come from authenticated operator UIs. They get the raw
+ *     402 + actionable billing message + billing_status payload so the admin
+ *     frontend can render an actionable "update payment method" state.
+ *
+ *   Tier 2 — Public storefront surfaces (everything else):
+ *     Sanitized 503 Service Unavailable with a neutral maintenance message.
+ *     The real cause goes to server logs only. X-Billing-Warning is likewise
+ *     suppressed — no billing signals leak to guests.
+ *
+ * Self-service exception: an operator whose subscription is suspended must
+ * still be able to open the Stripe Customer Portal to fix payment, otherwise
+ * the suspension is a dead end. GET /api/v1/platform/billing/portal is
+ * exempted from the block while suspended (still never served to public
+ * paths). The Flutterwave/Stripe webhook exemption is upstream via skipTenantGate.
+ *
+ * GET / HEAD / OPTIONS pass through for past_due tenants with an
+ * X-Billing-Warning header on operator paths; all write methods
+ * (POST/PUT/PATCH/DELETE/etc.) are blocked — the doc's "PASS reads / BLOCK
+ * writes" rule.
  *
  * Fails closed if no tenant is resolved. There is no more "single-tenant
  * legacy mode" — the product is fully multi-tenant, and the old passthrough
@@ -397,16 +427,57 @@ export async function validateTenantBilling(req: Request, res: Response, next: N
     return;
   }
 
+  // Operator surfaces run behind authenticate() downstream (admin.routes,
+  // staff.routes, platform.routes all call it first thing inside their
+  // routers) — this gate runs before that, so identity is unknown here and
+  // the path topology is the caller-class signal. resolveTenant guarantees
+  // any /{admin,staff,platform}/... request was issued by an operator UI.
+  // Fail-safe default: a request with NO path context (only possible in
+  // unit-test mocks — real Express requests always carry both originalUrl
+  // and path) is treated as a public surface, so billing payload details
+  // fail CLOSED rather than leak.
+  const callerPath = req.originalUrl || req.path || '';
+  const isOperatorSurface = /^\/api\/v1\/(?:admin|staff|platform)(?:\/|$)/.test(callerPath);
+
+  /** Neutral guest-facing shutdown payload — no SaaS billing vocabulary. */
+  const publicUnavailable = (res: Response): void => {
+    res.status(503).json({
+      success: false,
+      error: 'This service is temporarily unavailable while updates are underway. Please check back shortly.',
+      // Opaque maintenance prefix so the operator can correlate server logs.
+      code: 'SERVICE_UNAVAILABLE',
+    });
+    return;
+  };
+
   const { billing_status, id, subdomain } = tenant;
 
   if (billing_status === 'suspended' || billing_status === 'cancelled') {
+    // Self-service lifeline: let a suspended operator reach the Stripe portal
+    // so they can fix payment. GET only, operator paths only. ('cancelled' is
+    // deliberately NOT included — reactivation goes through support.)
+    if (
+      billing_status === 'suspended' &&
+      req.method === 'GET' &&
+      /^\/api\/v1\/platform\/billing\/portal(?:\/|$)/.test(callerPath)
+    ) {
+      logger.info('[TENANT] Suspended tenant accessing billing portal self-service', { tenantId: id, subdomain });
+      return next();
+    }
+
     logger.warn('[TENANT] Blocked request — billing status gate', {
       tenantId: id,
       subdomain,
       billing_status,
       path: req.path,
       method: req.method,
+      callerSurface: isOperatorSurface ? 'operator' : 'public',
     });
+
+    if (!isOperatorSurface) {
+      publicUnavailable(res);
+      return;
+    }
 
     res.status(402).json({
       success: false,
@@ -415,32 +486,50 @@ export async function validateTenantBilling(req: Request, res: Response, next: N
         : 'This account has been cancelled. Please contact support to reactivate.',
       billing_status,
       tenantId: id,
+      // Actionable for the admin UI: exact path to self-service payment fix.
+      billing_portal_available: billing_status === 'suspended',
     });
     return;
   }
 
   if (billing_status === 'past_due') {
-    res.setHeader('X-Billing-Warning', 'payment_overdue');
-
     const isWriteMethod = req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS';
+    const isPortalPath = /^\/api\/v1\/platform\/billing\/portal(?:\/|$)/.test(callerPath);
+
+    // Warn header is an operator channel — never sent to public storefronts.
+    if (isOperatorSurface) {
+      res.setHeader('X-Billing-Warning', 'payment_overdue');
+    }
+
     if (isWriteMethod) {
       logger.warn('[TENANT] Blocked write — past_due grace period is read-only', {
         tenantId: id,
         subdomain,
         path: req.path,
         method: req.method,
+        callerSurface: isOperatorSurface ? 'operator' : 'public',
       });
+
+      if (!isOperatorSurface) {
+        publicUnavailable(res);
+        return;
+      }
 
       res.status(402).json({
         success: false,
         error: 'Your subscription payment is overdue. Read access remains available, but changes are blocked until payment is updated.',
         billing_status,
         tenantId: id,
+        billing_portal_available: true,
       });
       return;
     }
 
-    logger.info('[TENANT] Past-due tenant allowed read access with warning', { tenantId: id, subdomain });
+    // portal GET while suspended is handled above; past_due portal GET reads
+    // (Stripe portal works with failed cards) fall through normally.
+    if (!isPortalPath) {
+      logger.info('[TENANT] Past-due tenant allowed read access with warning', { tenantId: id, subdomain });
+    }
   }
 
   next();

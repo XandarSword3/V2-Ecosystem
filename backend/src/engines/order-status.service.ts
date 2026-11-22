@@ -364,6 +364,7 @@ export async function changeInstantTransactionOrderStatus(
       await reverseDiscounts(supabase, discounts, {
         userId: (current as { customer_id?: string }).customer_id ?? undefined,
         orderId: current.id,
+        tenantId: (current as { tenant_id?: string }).tenant_id ?? undefined,
       });
     }
   }

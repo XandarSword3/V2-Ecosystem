@@ -48,7 +48,7 @@ test.describe('Layer 2 — Tenant isolation: modules cross-tenant (Phase 0 / 0.1
     // This is a pure fixture, not the thing under test.
     const { data: property, error: propError } = await supabase
       .from('properties')
-      .insert({ name: `Isolation test property ${Date.now()}` })
+      .insert({ name: `Isolation test property ${Date.now()}`, tenant_id: othercorp.id })
       .select('id')
       .single();
     if (propError || !property) {

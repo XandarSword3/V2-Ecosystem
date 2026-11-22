@@ -13,9 +13,11 @@ const SESSION_SECRET = process.env.SESSION_SECRET;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 if (!SESSION_SECRET && NODE_ENV === 'production') {
-  console.warn(
-    'WARN: SESSION_SECRET is not set in production. Using a generated secret. ' +
-    'Sessions will be invalidated on restart.'
+  // Fail fast. A generated per-process secret silently invalidates sessions on
+  // every restart and makes multi-instance deployments unusable; deriving it
+  // from JWT_SECRET would cascade a JWT compromise into session forgery.
+  throw new Error(
+    'FATAL: SESSION_SECRET must be explicitly configured in production (independent from JWT_SECRET).'
   );
 }
 

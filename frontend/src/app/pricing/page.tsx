@@ -115,6 +115,10 @@ export default function PricingPage() {
         email: checkoutForm.email,
         name: checkoutForm.name,
         subdomain: checkoutForm.subdomain.toLowerCase().trim(),
+        // Must match the cycle the operator toggled above — previously this was
+        // omitted, so an operator selecting the Annual discount was still billed
+        // on the default monthly Stripe Price.
+        billingCycle,
       });
 
       if (res.data?.data?.url) {

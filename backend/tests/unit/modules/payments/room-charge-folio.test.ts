@@ -70,60 +70,80 @@ describe('Room Charge Folio Controller', () => {
 
   describe('postRoomCharge', () => {
     it('should charge a POS order to a checked-in booking folio', async () => {
+      // Mirror the real schema: transactions has `amount`/`currency` (no
+      // `total_amount`) and the paid flag lives in `metadata.payment_status`.
+      const ledgerInserts: any[] = [];
+      const paymentInserts: any[] = [];
+      const txUpdates: any[] = [];
+      const tenantId = 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44';
+      const propertyId = 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55';
+
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'transactions') {
           return {
             select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockImplementation((_col: string, val: string) => ({
-                single: vi.fn().mockResolvedValue(
-                  val === VALID_ORDER_ID
-                    ? {
-                        data: {
-                          id: VALID_ORDER_ID,
-                          total_amount: '45.00',
-                          status: 'pending',
-                          tenant_id: 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44',
-                          property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
-                        },
-                        error: null,
-                      }
-                    : {
-                        data: {
-                          id: VALID_BOOKING_ID,
-                          status: 'checked_in',
-                          engine_type: 'time_exclusive_reservation',
-                          tenant_id: 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44',
-                          property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
-                        },
-                        error: null,
-                      }
-                ),
-                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-              })),
+              eq: vi.fn().mockImplementation((_col: string, val: string) => {
+                const isOrder = val === VALID_ORDER_ID;
+                const row = isOrder
+                  ? {
+                      id: VALID_ORDER_ID,
+                      reference_table: 'transactions',
+                      reference_id: VALID_ORDER_ID,
+                      amount: '45.00',
+                      currency: 'EUR',
+                      status: 'pending',
+                      metadata: {},
+                      tenant_id: tenantId,
+                      property_id: propertyId,
+                    }
+                  : {
+                      id: VALID_BOOKING_ID,
+                      status: 'checked_in',
+                      engine_type: 'time_exclusive_reservation',
+                      metadata: {},
+                      tenant_id: tenantId,
+                      property_id: propertyId,
+                    };
+                return {
+                  single: vi.fn().mockResolvedValue({ data: row, error: null }),
+                  // updateReferencePaymentStatus resolves the transaction by id
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: isOrder ? row : null,
+                    error: null,
+                  }),
+                };
+              }),
             }),
-            update: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ error: null }),
+            update: vi.fn().mockImplementation((patch: any) => {
+              txUpdates.push(patch);
+              return { eq: vi.fn().mockResolvedValue({ error: null }) };
             }),
           };
         }
         if (table === 'payment_ledger') {
           return {
-            insert: vi.fn().mockReturnValue({
-              select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({
-                  data: { id: 'ledger-row-1', reference_id: VALID_BOOKING_ID, amount: '45.00', event_type: 'charge' },
-                  error: null,
+            insert: vi.fn().mockImplementation((row: any) => {
+              ledgerInserts.push(row);
+              return {
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({
+                    data: { id: 'ledger-row-1', ...row },
+                    error: null,
+                  }),
                 }),
-              }),
+              };
             }),
           };
         }
         if (table === 'payments') {
           return {
-            insert: vi.fn().mockReturnValue({
-              select: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({ data: { id: 'pay-1' }, error: null }),
-              }),
+            insert: vi.fn().mockImplementation((row: any) => {
+              paymentInserts.push(row);
+              return {
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: { id: 'pay-1' }, error: null }),
+                }),
+              };
             }),
           };
         }
@@ -138,6 +158,18 @@ describe('Room Charge Folio Controller', () => {
       expect(res._status).toBe(201);
       expect(res._json.success).toBe(true);
       expect(res._json.data.amount).toBe(45);
+
+      // Charge is written in the order's currency, not a hard-coded USD.
+      expect(ledgerInserts).toHaveLength(1);
+      expect(ledgerInserts[0].amount).toBe('45.00');
+      expect(ledgerInserts[0].currency).toBe('EUR');
+      expect(paymentInserts).toHaveLength(1);
+      expect(paymentInserts[0].amount).toBe('45.00');
+      expect(paymentInserts[0].currency).toBe('EUR');
+
+      // Paid status is recorded inside metadata — transactions has no
+      // payment_status column.
+      expect(txUpdates.some(u => u.metadata?.payment_status === 'paid')).toBe(true);
     });
 
     it('should reject charging if booking is not checked_in', async () => {
@@ -151,7 +183,7 @@ describe('Room Charge Folio Controller', () => {
                     ? {
                         data: {
                           id: VALID_ORDER_ID,
-                          total_amount: '45.00',
+                          amount: '45.00',
                           status: 'pending',
                           tenant_id: 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44',
                           property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
@@ -208,13 +240,15 @@ describe('Room Charge Folio Controller', () => {
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
                   eq: vi.fn().mockReturnValue({
-                    order: vi.fn().mockResolvedValue({
-                      data: [
-                        { event_type: 'charge', amount: '50.00' },
-                        { event_type: 'charge', amount: '25.00' },
-                        { event_type: 'settlement', amount: '30.00' },
-                      ],
-                      error: null,
+                    in: vi.fn().mockReturnValue({
+                      order: vi.fn().mockResolvedValue({
+                        data: [
+                          { event_type: 'charge', amount: '50.00' },
+                          { event_type: 'charge', amount: '25.00' },
+                          { event_type: 'settlement', amount: '30.00' },
+                        ],
+                        error: null,
+                      }),
                     }),
                   }),
                 }),
@@ -265,12 +299,16 @@ describe('Room Charge Folio Controller', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockResolvedValue({
-                    data: [
-                      { event_type: 'charge', amount: '45.00' },
-                      { event_type: 'settlement', amount: '45.00' },
-                    ],
-                    error: null,
+                  eq: vi.fn().mockReturnValue({
+                    eq: vi.fn().mockReturnValue({
+                      in: vi.fn().mockResolvedValue({
+                        data: [
+                          { event_type: 'charge', amount: '45.00' },
+                          { event_type: 'settlement', amount: '45.00' },
+                        ],
+                        error: null,
+                      }),
+                    }),
                   }),
                 }),
               }),
@@ -329,7 +367,7 @@ describe('Room Charge Folio Controller', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 eq: vi.fn().mockReturnValue({
-                  eq: vi.fn().mockResolvedValue({
+                  in: vi.fn().mockResolvedValue({
                     data: [
                       { event_type: 'charge', amount: '120.00' },
                     ],

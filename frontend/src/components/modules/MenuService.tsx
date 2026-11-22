@@ -2,7 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Loader2, AlertCircle, Sparkles, Star, ShoppingCart, Plus, Minus, Search, X, Flame, Leaf, Wheat } from 'lucide-react';
+import { Loader2, AlertCircle, Sparkles, Star, ShoppingCart, Plus, Minus, Search, X, Flame, Leaf, Wheat, Tag, Palette, Ruler } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useCartStore } from '@/stores/cartStore';
@@ -43,10 +44,50 @@ interface MenuItemData {
   is_vegetarian?: boolean;
   is_vegan?: boolean;
   is_gluten_free?: boolean;
+  /** Raw backend item — facet filters resolve attributes through metadata. */
+  metadata?: Record<string, unknown> | null;
   // Stock availability — populated by API when track_inventory is enabled
   is_available?: boolean;
   available_stock?: number | null;
   track_inventory?: boolean;
+}
+
+/**
+ * A CMS-configurable filter facet. Defined per-module in module settings
+ * (`filter_facets`), so a retail boutique gets Size/Brand/Format filters and
+ * a restaurant gets dietary filters — the customer UI renders whatever the
+ * tenant's catalog actually uses instead of hardcoded food buttons.
+ */
+interface FilterFacet {
+  key: string;
+  label: string;
+  icon?: string;
+}
+
+/** Icon-name → component map for facets (settings store a friendly name). */
+const FACET_ICONS: Record<string, LucideIcon> = {
+  leaf: Leaf,
+  sparkle: Sparkles,
+  sparkles: Sparkles,
+  wheat: Wheat,
+  flame: Flame,
+  star: Star,
+  tag: Tag,
+  palette: Palette,
+  ruler: Ruler,
+};
+
+const FACET_BTNS = ['bg-emerald-500 text-white shadow-md', 'bg-sky-500 text-white shadow-md', 'bg-amber-500 text-white shadow-md', 'bg-purple-500 text-white shadow-md'];
+
+/**
+ * Does an item satisfy a facet? Truthy top-level attribute or truthy
+ * `metadata[key]` (boolean true, or any non-empty string such as "S,M,L").
+ */
+function itemHasFacet(item: MenuItemData, key: string): boolean {
+  if ((item as unknown as Record<string, unknown>)[key]) return true;
+  const meta = item.metadata as Record<string, unknown> | null | undefined;
+  if (meta && meta[key]) return true;
+  return false;
 }
 
 export function CatalogShell({ module }: MenuServiceProps) {
@@ -60,6 +101,9 @@ export function CatalogShell({ module }: MenuServiceProps) {
     vegan: boolean;
     glutenFree: boolean;
   }>({ vegetarian: false, vegan: false, glutenFree: false });
+  // Facet filters keyed by facet key — only used when the module defines
+  // `filter_facets` in its settings (CMS-driven filtering).
+  const [activeFacets, setActiveFacets] = useState<Record<string, boolean>>({});
   const currency = useSettingsStore((s) => s.currency);
   const router = useRouter();
 
@@ -224,6 +268,32 @@ export function CatalogShell({ module }: MenuServiceProps) {
   const categories: MenuCategoryItem[] = data?.data?.data?.categories || [];
   const items: MenuItemData[] = data?.data?.data?.items || [];
 
+  // CMS facet configuration — set per-module in module settings. When present
+  // it fully replaces the hardcoded dietary buttons (a retail module gets
+  // Size/Brand facets; a restaurant can still re-declare the dietary ones).
+  // ModuleSettings' index signature only covers string|number|boolean, so the
+  // array is read through a local cast — settings values are untyped at the
+  // boundary anyway and stored verbatim backend-side.
+  const filterFacets = useMemo<FilterFacet[] | null>(() => {
+    const configured = (module.settings as unknown as { filter_facets?: FilterFacet[] } | undefined)?.filter_facets;
+    if (Array.isArray(configured) && configured.length > 0) {
+      return configured
+        .filter((f) => !!f && typeof f === 'object')
+        .map((f) => ({
+          key: String(f.key ?? ''),
+          label: String(f.label ?? f.key ?? 'Filter'),
+          icon: typeof f.icon === 'string' ? f.icon : undefined,
+        }))
+        .filter((f) => f.key.length > 0);
+    }
+    return null;
+  }, [module.settings]);
+
+  // Legacy fallback: dietary buttons only when this module is actually food
+  // service (or pre-dates the flag). Non-food modules with no facets defined
+  // get no dietary buttons instead of restaurant vocabulary.
+  const showLegacyDietary = !filterFacets && module.settings?.is_food_service !== false;
+
   const filteredItems = useMemo(() => {
     let result = items;
     if (selectedCategory) {
@@ -236,22 +306,31 @@ export function CatalogShell({ module }: MenuServiceProps) {
         item.description?.toLowerCase().includes(q)
       );
     }
-    // Dietary filters
-    if (dietaryFilters.vegetarian) {
-      result = result.filter((item: MenuItemData) => item.is_vegetarian);
+    // CMS facet filters (AND across the selected facets)
+    const selectedFacetKeys = Object.keys(activeFacets).filter((k) => activeFacets[k]);
+    if (selectedFacetKeys.length > 0) {
+      result = result.filter((item: MenuItemData) =>
+        selectedFacetKeys.every((k) => itemHasFacet(item, k))
+      );
     }
-    if (dietaryFilters.vegan) {
-      result = result.filter((item: MenuItemData) => item.is_vegan);
-    }
-    if (dietaryFilters.glutenFree) {
-      result = result.filter((item: MenuItemData) => item.is_gluten_free);
+    // Legacy dietary filters (only when no facets are configured)
+    if (showLegacyDietary) {
+      if (dietaryFilters.vegetarian) {
+        result = result.filter((item: MenuItemData) => item.is_vegetarian);
+      }
+      if (dietaryFilters.vegan) {
+        result = result.filter((item: MenuItemData) => item.is_vegan);
+      }
+      if (dietaryFilters.glutenFree) {
+        result = result.filter((item: MenuItemData) => item.is_gluten_free);
+      }
     }
     // Featured filter
     if (showFeaturedOnly) {
       result = result.filter((item: MenuItemData) => item.is_featured);
     }
     return result;
-  }, [items, selectedCategory, searchQuery, dietaryFilters, showFeaturedOnly]);
+  }, [items, selectedCategory, searchQuery, dietaryFilters, activeFacets, showFeaturedOnly, showLegacyDietary]);
 
   const featuredItems = useMemo(() => 
     items.filter((item: MenuItemData) => item.is_featured).slice(0, 3),
@@ -382,8 +461,34 @@ export function CatalogShell({ module }: MenuServiceProps) {
           </motion.section>
         )}
 
-        {/* Dietary Filters */}
-        {hasDietaryItems && (
+        {/* Filter Facets — CMS-driven (module settings `filter_facets`).
+            Non-food modules (retail, rental, digital) get their own facets;
+            food service falls back to the dietary trio. */}
+        {filterFacets && filterFacets.length > 0 && (
+          <div className="flex flex-wrap gap-2 justify-center mb-6">
+            {filterFacets.map((facet, idx) => {
+              const Icon = (facet.icon && FACET_ICONS[facet.icon.toLowerCase()]) || Tag;
+              const active = !!activeFacets[facet.key];
+              const activeClass = FACET_BTNS[idx % FACET_BTNS.length];
+              return (
+                <button
+                  key={facet.key}
+                  onClick={() => setActiveFacets((prev) => ({ ...prev, [facet.key]: !prev[facet.key] }))}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    active
+                      ? activeClass
+                      : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" /> {facet.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Dietary Filters — legacy food-service fallback */}
+        {showLegacyDietary && hasDietaryItems && !filterFacets && (
           <div className="flex flex-wrap gap-2 justify-center mb-6">
             <button
               onClick={() => setDietaryFilters(prev => ({ ...prev, vegetarian: !prev.vegetarian }))}

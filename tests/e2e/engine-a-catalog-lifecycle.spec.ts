@@ -34,11 +34,16 @@ import { test, expect } from '@playwright/test';
 
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 const TEST_MODULE_SLUG = process.env.E2E_ENGINE_A_SLUG || 'poolside-grill';
-const STAFF_EMAIL = process.env.E2E_STAFF_EMAIL || 'menu.service.staff@v2ecosystem.com';
+const E2E_TENANT_SLUG = process.env.E2E_TENANT_SLUG || 'walid';
+const STAFF_EMAIL = process.env.E2E_STAFF_EMAIL || 'e2e.staff@v2ecosystem.com';
 const STAFF_PASSWORD = process.env.E2E_STAFF_PASSWORD || 'staff123';
 
 async function getAuthToken(request: any, email: string, pass: string): Promise<string | null> {
+  // Login is tenant-scoped: the backend resolves the login scope from
+  // X-Tenant-Slug/X-Tenant-ID, defaulting to the platform root when absent.
+  // The module fixture tenant is walid, so the staff lookup must be scoped to it.
   const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
+    headers: { 'X-Tenant-Slug': E2E_TENANT_SLUG },
     data: { email, password: pass },
   });
   if (!loginRes.ok()) return null;
@@ -47,6 +52,11 @@ async function getAuthToken(request: any, email: string, pass: string): Promise<
 }
 
 test.describe('Engine A: Catalog Lifecycle (Phase 8)', () => {
+  // The lifecycle tests form a strict chain (create → pause → restore → …),
+  // so they must run in order. Under the config's fullyParallel mode each test
+  // runs in its own worker and never sees `testItemId` set by the create test.
+  test.describe.configure({ mode: 'serial' });
+
   let staffToken: string | null = null;
   let testItemId: string | null = null;
 
@@ -58,7 +68,7 @@ test.describe('Engine A: Catalog Lifecycle (Phase 8)', () => {
     // Cleanup: delete the test item
     if (staffToken && testItemId) {
       await request.delete(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items/${testItemId}`, {
-        headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-ID': 'default' },
+        headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
       });
     }
   });
@@ -67,7 +77,7 @@ test.describe('Engine A: Catalog Lifecycle (Phase 8)', () => {
     expect(staffToken).toBeTruthy();
 
     const res = await request.post(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items`, {
-      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-ID': 'default' },
+      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
       data: { name: 'E2E Lifecycle Burger', price: 15.00 },
     });
     expect(res.ok()).toBe(true);
@@ -85,7 +95,7 @@ test.describe('Engine A: Catalog Lifecycle (Phase 8)', () => {
     // The frontend sends lifecycle_status: 'temporarily_unavailable'
     // This must match the backend's state name, not the action verb 'pause'
     const res = await request.put(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items/${testItemId}`, {
-      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-ID': 'default' },
+      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
       data: { lifecycle_status: 'temporarily_unavailable' },
     });
     expect(res.ok()).toBe(true);
@@ -100,7 +110,7 @@ test.describe('Engine A: Catalog Lifecycle (Phase 8)', () => {
     // The frontend sends lifecycle_status: 'active'
     // NOT 'restore' (the action verb)
     const res = await request.put(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items/${testItemId}`, {
-      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-ID': 'default' },
+      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
       data: { lifecycle_status: 'active' },
     });
     expect(res.ok()).toBe(true);
@@ -115,7 +125,7 @@ test.describe('Engine A: Catalog Lifecycle (Phase 8)', () => {
     // The frontend sends lifecycle_status: 'sold_out'
     // NOT 'sell_out' (the action verb)
     const res = await request.put(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items/${testItemId}`, {
-      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-ID': 'default' },
+      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
       data: { lifecycle_status: 'sold_out' },
     });
     expect(res.ok()).toBe(true);
@@ -129,7 +139,7 @@ test.describe('Engine A: Catalog Lifecycle (Phase 8)', () => {
 
     // Attempting sold_out → active must fail with 400
     const res = await request.put(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items/${testItemId}`, {
-      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-ID': 'default' },
+      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
       data: { lifecycle_status: 'active' },
     });
     expect(res.status()).toBe(400);
@@ -142,7 +152,7 @@ test.describe('Engine A: Catalog Lifecycle (Phase 8)', () => {
     expect(testItemId).toBeTruthy();
 
     const res = await request.get(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/items`, {
-      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-ID': 'default' },
+      headers: { Authorization: `Bearer ${staffToken}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
     });
     expect(res.ok()).toBe(true);
     const body = await res.json();

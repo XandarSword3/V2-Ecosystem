@@ -101,9 +101,10 @@ describe('Stripe Webhook Idempotency & Signature Guard (Phase F8 / Production Re
       {
         id: TRANSACTION_ID,
         tenant_id: TENANT_ID,
-        total_amount: 45.0,
-        payment_status: 'pending',
+        property_id: 'c1111111-1111-4111-8111-111111111111',
+        amount: 45.0,
         currency: 'USD',
+        metadata: { payment_status: 'pending' },
       },
     ]);
   });
@@ -170,9 +171,10 @@ describe('Stripe Webhook Idempotency & Signature Guard (Phase F8 / Production Re
     expect(payments[0].status).toBe('completed');
     expect(payments[0].amount).toBe('45.00');
 
-    // State verification 2: Transaction payment_status moved to 'paid'
+    // State verification 2: Transaction payment flag moved to 'paid'
+    // (`transactions` has no payment_status column; metadata is canonical)
     const transactions = harness.getTable('transactions');
-    expect(transactions[0].payment_status).toBe('paid');
+    expect(transactions[0].metadata.payment_status).toBe('paid');
 
     // State verification 3: Payment ledger records immutable success entry with webhook_id
     const ledger = harness.getTable('payment_ledger');

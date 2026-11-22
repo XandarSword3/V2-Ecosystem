@@ -92,6 +92,9 @@ export interface CouponResolver {
     subtotal: number,
     customerId?: string,
     moduleId?: string,
+    dryRun?: boolean,
+    /** Owning tenant. Redemption RPCs are tenant-scoped; without it they fail closed. */
+    tenantId?: string,
   ): Promise<{ discountAmount: number; taxSavings: number; couponId: string } | null>;
 }
 
@@ -104,6 +107,9 @@ export interface GiftCardResolver {
   redeem(
     giftCardCode: string,
     maxAmount: number,
+    dryRun?: boolean,
+    /** Owning tenant. Redemption RPCs are tenant-scoped; without it they fail closed. */
+    tenantId?: string,
   ): Promise<{ amountDeducted: number; giftCardId: string } | null>;
 }
 
@@ -117,6 +123,9 @@ export interface LoyaltyResolver {
     customerId: string,
     pointsToRedeem: number,
     maxAmount: number,
+    dryRun?: boolean,
+    /** Owning tenant. Redemption RPCs are tenant-scoped; without it they fail closed. */
+    tenantId?: string,
   ): Promise<{ amountDeducted: number; pointsUsed: number } | null>;
 
   /**
@@ -127,6 +136,7 @@ export interface LoyaltyResolver {
     customerId: string,
     totalAmount: number,
     moduleId: string,
+    tenantId?: string,
   ): Promise<number>;
 }
 
@@ -208,6 +218,8 @@ export class PricingPipeline {
         subtotal.amount(),
         context.customerId,
         context.moduleId,
+        context.dryRun === true,
+        context.tenantId,
       );
       if (couponResult) {
         // RPC amounts are boundary numbers — converted to exact Money here.
@@ -284,7 +296,12 @@ export class PricingPipeline {
     if (config.supportsGiftCards && context.giftCardCodes?.length && this.deps.giftCardResolver) {
       for (const code of context.giftCardCodes) {
         if (remainingTotal.isNegative() || remainingTotal.isZero()) break;
-        const result = await this.deps.giftCardResolver.redeem(code, remainingTotal.amount());
+        const result = await this.deps.giftCardResolver.redeem(
+          code,
+          remainingTotal.amount(),
+          context.dryRun === true,
+          context.tenantId,
+        );
         if (result) {
           const deducted = Money.fromDecimal(result.amountDeducted, currency);
           remainingTotal = remainingTotal.subtract(deducted);
@@ -311,6 +328,8 @@ export class PricingPipeline {
           context.customerId,
           context.loyaltyPointsToRedeem,
           remainingTotal.amount(),
+          context.dryRun === true,
+          context.tenantId,
         );
         if (result) {
           const deducted = Money.fromDecimal(result.amountDeducted, currency);

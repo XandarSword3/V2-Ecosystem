@@ -28,7 +28,16 @@ import {
   Package,
   Timer,
   User,
+  MapPin,
+  Phone,
+  StickyNote,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/Dialog';
 
 interface SocketOrderEvent {
   id?: string;
@@ -68,9 +77,18 @@ interface Order {
   fulfillmentMode?: string | null;
   total_amount: number;
   totalAmount?: number;
+  /** Destination context — where/how this order reaches the customer. */
   table_number?: number;
   tableNumber?: number;
+  unit_number?: string;
+  unitNumber?: string;
+  delivery_address?: string;
+  deliveryAddress?: string;
+  pickup_location?: string;
+  pickupLocation?: string;
   notes?: string;
+  special_instructions?: string;
+  specialInstructions?: string;
   created_at: string;
   createdAt?: string;
   order_items?: OrderItem[];
@@ -80,8 +98,11 @@ interface Order {
   };
   customer?: {
     full_name: string;
+    phone?: string;
   };
   customerName?: string;
+  customerPhone?: string;
+  customer_phone?: string;
 }
 
 // Canonical state presentation — neutral labels, no vertical vocabulary.
@@ -104,6 +125,35 @@ function effectiveState(order: Order): string {
   const c = canonicalFulfillmentState(order, mode);
   const cfg = getModeStateConfig(mode);
   return resolveColumnKey(c, cfg);
+}
+
+/** Terminal states: no forward move, no cancel — nothing left to abort. */
+function isTerminalState(st: string): boolean {
+  return st === 'completed' || st === 'cancelled';
+}
+
+/** Destination summary for an order — mode-agnostic ("Table 12", "Unit 402",
+ * delivery address, pickup point). Blank when the order carries none. */
+function destinationLabel(order: Order): string | null {
+  const table = order.table_number ?? order.tableNumber;
+  const unit = order.unit_number ?? order.unitNumber;
+  const address = order.delivery_address ?? order.deliveryAddress;
+  const pickup = order.pickup_location ?? order.pickupLocation;
+  if (table != null && table !== 0) return `Table ${table}`;
+  if (unit) return `Unit ${unit}`;
+  if (address) return address;
+  if (pickup) return pickup;
+  return null;
+}
+
+/** First-class customer phone — staff need it for "your order is ready" calls. */
+function customerPhone(order: Order): string | null {
+  return order.customer?.phone || order.customerPhone || order.customer_phone || null;
+}
+
+/** Customer-level special instructions / notes entered at checkout. */
+function orderNotes(order: Order): string | null {
+  return order.notes || order.special_instructions || order.specialInstructions || null;
 }
 
 /** Canonical filter list — transaction states + fulfillment states. */
@@ -284,6 +334,8 @@ export default function DynamicOrdersPage() {
               const st = effectiveState(order);
               const StatusIcon = statusConfig[st]?.icon || Clock;
               const items = order.items || order.order_items || [];
+              const destination = destinationLabel(order);
+              const phone = customerPhone(order);
 
               return (
                 <motion.div
@@ -294,7 +346,11 @@ export default function DynamicOrdersPage() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Card className="h-full hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: st === 'pending' ? '#eab308' : st === 'ready' ? '#22c55e' : 'transparent' }}>
+                  <Card
+                    className={`h-full hover:shadow-md transition-shadow border-l-4 ${!isTerminalState(st) ? 'cursor-pointer' : ''}`}
+                    style={{ borderLeftColor: st === 'pending' ? '#eab308' : st === 'ready' ? '#22c55e' : 'transparent' }}
+                    onClick={() => { if (!isTerminalState(st)) setSelectedOrder(order); }}
+                  >
                     <CardContent className="p-5 space-y-4">
                       {/* Header */}
                       <div className="flex justify-between items-start">
@@ -312,6 +368,22 @@ export default function DynamicOrdersPage() {
                             <User className="w-3 h-3" />
                             {order.customer?.full_name || order.customerName || 'Guest'}
                           </div>
+                          {destination && (
+                            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                              <MapPin className="w-3 h-3" />
+                              {destination}
+                            </div>
+                          )}
+                          {phone && (
+                            <a
+                              href={`tel:${phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              <Phone className="w-3 h-3" />
+                              {phone}
+                            </a>
+                          )}
                         </div>
                         <div className="text-right">
                           <div className="font-bold text-lg text-slate-900 dark:text-white">
@@ -343,7 +415,7 @@ export default function DynamicOrdersPage() {
                         ))}
                         {items.length > 3 && (
                           <p className="text-xs text-center text-slate-500 italic">
-                            + {items.length - 3} more items
+                            + {items.length - 3} more items — tap card to view all
                           </p>
                         )}
                       </div>
@@ -351,15 +423,16 @@ export default function DynamicOrdersPage() {
                       {/* Actions — canonical transitions, one step at a time.
                           pending→confirmed is a transaction-layer move;
                           queued→in_progress→ready→handed_off→completed are
-                          fulfillment-layer moves. */}
-                      {/* Actions — mode-derived transitions from getModeStateConfig.
-                          pending/confirmed → transaction-layer confirm.
-                          fulfillment states → derive next target from mode config.
-                          No hardcoded hospitality action arrays. */}
+                          fulfillment-layer moves. Cancel is available for every
+                          non-terminal state (the backend state machines enforce
+                          per-state actor rules — staff can cancel
+                          confirmed/queued, later-stage aborts are admin-only
+                          comp/void — and the 400 error surfaces if unpermitted). */}
                       <div className="grid grid-cols-2 gap-2 pt-2">
                         {(() => {
                           // F2: only show order actions if user has order:update permission
                           if (!auth.hasPermission(Perm.ORDER_UPDATE)) return null;
+                          if (isTerminalState(st)) return null;
                           const mode = (order.fulfillmentMode as FulfillmentMode | null) ?? null;
                           const cs = canonicalFulfillmentState(order, mode);
                           // Transaction-layer: pending → confirmed
@@ -369,13 +442,13 @@ export default function DynamicOrdersPage() {
                                 <Button
                                   variant="outline"
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  onClick={() => updateStatus(order.id, 'cancelled')}
+                                  onClick={(e) => { e.stopPropagation(); updateStatus(order.id, 'cancelled'); }}
                                 >
                                   Reject
                                 </Button>
                                 <Button
                                   className="bg-blue-600 hover:bg-blue-700 text-white"
-                                  onClick={() => updateStatus(order.id, 'confirmed')}
+                                  onClick={(e) => { e.stopPropagation(); updateStatus(order.id, 'confirmed'); }}
                                 >
                                   Accept
                                 </Button>
@@ -384,21 +457,37 @@ export default function DynamicOrdersPage() {
                           }
                           // Fulfillment-layer: derive next target from mode config
                           const cfg = getModeStateConfig(mode);
-                          if (cfg && cs) {
-                            const nextState = cfg.nextTarget(cs as FulfillmentState);
-                            if (nextState) {
-                              const meta = cfg.metadata[cs as FulfillmentState];
-                              return (
+                          const nextState = cfg?.nextTarget(cs as FulfillmentState);
+                          const meta = cs ? cfg?.metadata[cs as FulfillmentState] : undefined;
+                          const cancelLabel = cs === 'confirmed' ? 'Cancel Order' : 'Cancel / Refund';
+                          return (
+                            <>
+                              <Button
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Cancel order #${order.order_number || order.orderNumber}? Any payment will need to be refunded.`)) {
+                                    updateStatus(order.id, 'cancelled');
+                                  }
+                                }}
+                              >
+                                {cancelLabel}
+                              </Button>
+                              {nextState ? (
                                 <Button
-                                  className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white"
-                                  onClick={() => updateStatus(order.id, nextState)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  onClick={(e) => { e.stopPropagation(); updateStatus(order.id, nextState); }}
                                 >
                                   {meta?.actionLabel ?? nextState}
                                 </Button>
-                              );
-                            }
-                          }
-                          return null;
+                              ) : (
+                                <span className="text-xs text-slate-400 self-center text-center px-1">
+                                  No next step from {statusConfig[st]?.label ?? st}
+                                </span>
+                              )}
+                            </>
+                          );
                         })()}
                       </div>
                     </CardContent>
@@ -409,6 +498,114 @@ export default function DynamicOrdersPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Order Detail Modal — the full, untruncated order. Staff tap a card to
+          see every line item, per-line notes, destination and checkout
+          instructions. The board card intentionally truncates the item list to
+          3; this is where items 4..N live. */}
+      <Dialog open={!!selectedOrder} onOpenChange={(open) => { if (!open) setSelectedOrder(null); }}>
+        <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+          {selectedOrder && (() => {
+            const items = selectedOrder.items || selectedOrder.order_items || [];
+            const st = effectiveState(selectedOrder);
+            const StatusIcon = statusConfig[st]?.icon || Clock;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    #{selectedOrder.order_number || selectedOrder.orderNumber}
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${statusConfig[st]?.color}`}>
+                      <StatusIcon className="w-3 h-3" />
+                      {statusConfig[st]?.label}
+                    </span>
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4 text-sm">
+                  {/* Customer + destination context */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-slate-400" />
+                      <span className="text-slate-700 dark:text-slate-300">
+                        {selectedOrder.customer?.full_name || selectedOrder.customerName || 'Guest'}
+                      </span>
+                    </div>
+                    {customerPhone(selectedOrder) && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-slate-400" />
+                        <a
+                          href={`tel:${customerPhone(selectedOrder)}`}
+                          className="text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {customerPhone(selectedOrder)}
+                        </a>
+                      </div>
+                    )}
+                    {destinationLabel(selectedOrder) && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-700 dark:text-slate-300">{destinationLabel(selectedOrder)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Timer className="w-4 h-4 text-slate-400" />
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {formatDate(selectedOrder.created_at || selectedOrder.createdAt || '')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Full item list, untruncated, with per-line notes */}
+                  <div className="border border-slate-100 dark:border-slate-800 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
+                    {items.length === 0 && (
+                      <p className="p-4 text-slate-500">No line items recorded on this order.</p>
+                    )}
+                    {items.map((item, idx) => (
+                      <div key={item.id || idx} className="p-3">
+                        <div className="flex justify-between">
+                          <div className="flex gap-2">
+                            <span className="font-medium text-slate-900 dark:text-white">{item.quantity}x</span>
+                            <span className="text-slate-700 dark:text-slate-300">
+                              {item.catalog_items?.name || item.name || 'Item'}
+                            </span>
+                          </div>
+                          <span className="text-slate-500">
+                            {formatCurrency((item.unit_price || item.unitPrice || 0) * item.quantity)}
+                          </span>
+                        </div>
+                        {(item.notes || item.special_instructions || item.specialInstructions) && (
+                          <p className="ml-6 mt-1 text-xs text-amber-600 dark:text-amber-400 italic">
+                            "{item.notes || item.special_instructions || item.specialInstructions}"
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total */}
+                  <div className="flex justify-between font-semibold text-slate-900 dark:text-white pt-1">
+                    <span>Total</span>
+                    <span>{formatCurrency(selectedOrder.total_amount || selectedOrder.totalAmount || 0)}</span>
+                  </div>
+
+                  {/* Checkout-level special instructions */}
+                  {orderNotes(selectedOrder) && (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex gap-2">
+                      <StickyNote className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-0.5">
+                          Special Instructions
+                        </p>
+                        <p className="text-slate-700 dark:text-slate-300">{orderNotes(selectedOrder)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

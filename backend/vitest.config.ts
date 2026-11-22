@@ -1,4 +1,9 @@
 import { defineConfig } from 'vitest/config';
+import { assertLocalTestEnvironment } from './tests/env-guard';
+
+// Task 0b: unit runs are config-mocked, but a stray shell DATABASE_URL /
+// REDIS_URL must still abort rather than risk a real connection.
+assertLocalTestEnvironment(process.env, 'unit');
 
 export default defineConfig({
   test: {
@@ -17,6 +22,10 @@ export default defineConfig({
       'dist',
       'tests/_pending/**',
       'tests/integration/**',
+      // Audit proofs require a spawned backend on :3199 (vitest.audit.config.ts).
+      // They are red-by-design against the vulnerable code and must never run
+      // in the default unit suite.
+      'tests/audit/**',
       'tests/atomic-verification.integration.test.ts',
       'tests/criticalFlows.test.ts',
       'tests/ai-agent.integration.test.ts',

@@ -83,10 +83,10 @@ describe('PricingPipeline — coupon taxSavings double-count is fixed', () => {
     const result = await pipeline.calculate(
       [{ itemId: 'a', name: 'Item', unitPrice: 100, quantity: 1 }],
       BASE_CONFIG,
-      { currency: 'EUR', couponCode: 'TEST10', giftCardCodes: ['GC1'] },
+      { currency: 'EUR', tenantId: 'tenant-1', couponCode: 'TEST10', giftCardCodes: ['GC1'] },
     );
 
-    expect(giftCard.redeem).toHaveBeenCalledWith('GC1', 99);
+    expect(giftCard.redeem).toHaveBeenCalledWith('GC1', 99, false, 'tenant-1');
     expect(result.totalAmount).toBe(0);
     expect(result.totalDiscount).toBe(109);
   });

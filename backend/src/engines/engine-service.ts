@@ -36,6 +36,7 @@ import { StateMachine, StateMachineError } from './state-machine.js';
 import { LayeredStateMachine } from './layered-state.js';
 import { createDiscountResolvers } from './discount-resolvers.js';
 import { getFinancialLedgerService, LedgerWriteError, type LedgerTransactionType } from './financial-ledger.js';
+import { getFeatureFlagService, type FeatureFlagService } from './feature-flags.js';
 import { getTransactionManager, type TransactionStep, type EngineOperationContext } from './transaction-manager.js';
 import { TaxService } from '../services/tax.service.js';
 import { logger } from '../utils/logger.js';
@@ -126,6 +127,13 @@ export class EngineService {
       throw new Error(`Unknown template type: '${templateType}'`);
     }
     return engineType;
+  }
+
+  /**
+   * Get the engine feature flag service.
+   */
+  getFeatureFlags(): FeatureFlagService {
+    return getFeatureFlagService();
   }
 
   // ============================================

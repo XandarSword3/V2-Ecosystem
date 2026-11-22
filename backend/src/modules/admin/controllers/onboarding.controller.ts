@@ -6,7 +6,7 @@ import { logActivity } from '../../../utils/activityLogger.js';
 import Stripe from 'stripe';
 import nodemailer from 'nodemailer';
 import { secretsManager } from '../../../config/secrets.config.js';
-import { TEMPLATE_TO_ENGINE } from '../../../engines/types.js';
+import { TEMPLATE_TO_ENGINE, ENGINE_TO_LEGACY_TEMPLATE_TYPE } from '../../../engines/types.js';
 import { upsertTenantIntegration } from '../../platform/tenant-integrations.service.js';
 
 /**
@@ -360,6 +360,29 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
           { publicKey: gatewayData.publicKey || '' },
           stripeSecret,
         );
+
+        // P0-3: runtime payment code resolves gateway credentials from
+        // `tenant_payment_settings` (one row per tenant). Onboarding is the
+        // writer that creates that row. `tenant_integrations` remains the
+        // encrypted integration registry; the payment resolver does not read
+        // it, so writing only there left a freshly onboarded tenant charging
+        // with the platform default.
+        const { error: paymentSettingsError } = await supabase
+          .from('tenant_payment_settings')
+          .upsert(
+            {
+              tenant_id: tenantId,
+              stripe_secret_key: stripeSecret,
+              stripe_publishable_key: gatewayData.publicKey || null,
+              stripe_webhook_secret:
+                req.body.stripeWebhookSecret || gatewayData.webhookSecret || null,
+              currency: String(gatewayData.currency || req.body.currency || 'USD').toUpperCase(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'tenant_id' },
+          );
+
+        if (paymentSettingsError) throw paymentSettingsError;
       }
       if (smtpPass || smtpData.host) {
         await upsertTenantIntegration(
@@ -391,10 +414,23 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       }
     }
 
-    const finalGatewaySettings = {
-      publicKey: gatewayData.publicKey ? `${gatewayData.publicKey.substring(0, 8)}...` : '',
-      configured: !!stripeSecret,
-    };
+    // Tenant-scoped tables require tenant_id (NOT NULL). Single-tenant
+    // deployments may not carry req.tenant, so resolve the owner from the
+    // property instead of silently writing a row without a tenant.
+    let scopedTenantId = tenantId ?? null;
+    if (!scopedTenantId) {
+      const { data: propertyRow, error: propertyError } = await supabase
+        .from('properties')
+        .select('tenant_id')
+        .eq('id', propertyId)
+        .maybeSingle();
+      if (propertyError) throw propertyError;
+      scopedTenantId = (propertyRow as { tenant_id?: string | null } | null)?.tenant_id ?? null;
+    }
+    if (!scopedTenantId) {
+      throw new Error('Cannot finalize onboarding: property has no tenant_id');
+    }
+
     const finalSmtpSettings = {
       host: smtpData.host || '',
       port: smtpData.port || '',
@@ -455,14 +491,16 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
     const settingsToInsert = [
       { property_id: propertyId, setting_key: 'branding',          setting_value: brandingSettings,    category: 'appearance' },
       { property_id: propertyId, setting_key: 'operational_hours', setting_value: hoursData,           category: 'general' },
-      { property_id: propertyId, setting_key: 'payment_gateway',   setting_value: finalGatewaySettings, category: 'finance' },
+      // Gateway credentials are deliberately NOT written to
+      // property_settings anymore: the canonical, per-tenant store is
+      // tenant_payment_settings (PK tenant_id), written above.
       { property_id: propertyId, setting_key: 'smtp_config',       setting_value: finalSmtpSettings,   category: 'system' },
       { property_id: propertyId, setting_key: 'tax_configuration', setting_value: taxConfiguration,   category: 'finance' },
     ];
 
     const { error: settingsErr } = await supabase
       .from('property_settings')
-      .insert(settingsToInsert);
+      .insert(settingsToInsert.map((row) => ({ ...row, tenant_id: scopedTenantId })));
 
     if (settingsErr) throw settingsErr;
 
@@ -472,7 +510,13 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       property_id: propertyId,
       name: modSlug.charAt(0).toUpperCase() + modSlug.slice(1).replace(/_/g, ' '),
       slug: modSlug,
-      template_type: modSlug,
+      // template_type is the legacy compat column — must hold a legacy
+      // template enum value (like modules.controller.createModule writes),
+      // NOT the module slug. Readers of this column (translations,
+      // delete-preview, analytics, pricing preview) switch on these values.
+      template_type: ENGINE_TO_LEGACY_TEMPLATE_TYPE[
+        (TEMPLATE_TO_ENGINE[modSlug as keyof typeof TEMPLATE_TO_ENGINE] || 'instant_transaction') as keyof typeof ENGINE_TO_LEGACY_TEMPLATE_TYPE
+      ] ?? null,
       engine_type: TEMPLATE_TO_ENGINE[modSlug as keyof typeof TEMPLATE_TO_ENGINE] || 'instant_transaction',
       is_active: true,
     }));
@@ -480,7 +524,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
     if (modulesToInsert.length > 0) {
       const { error: modErr } = await supabase
         .from('modules')
-        .insert(modulesToInsert);
+        .insert(modulesToInsert.map((row) => ({ ...row, tenant_id: scopedTenantId })));
       if (modErr) throw modErr;
     }
 
@@ -547,6 +591,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
               .upsert({
                 user_id: userAuthId,
                 property_id: propertyId,
+                tenant_id: scopedTenantId,
                 access_level: staffScope === 'tenant_admin' ? 'admin' : 'write',
               });
           }
@@ -571,6 +616,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       .from('site_settings')
       .upsert({
         key: `operations_manual_${propertyId}`,
+        tenant_id: scopedTenantId,
         value: { html: manualHtml, generated_at: new Date().toISOString() },
         updated_by: userId,
         updated_at: new Date().toISOString(),
@@ -588,6 +634,7 @@ export const finalizeOnboarding = asyncHandler(async (req: Request, res: Respons
       .from('site_settings')
       .upsert({
         key: 'onboarding_state',
+        tenant_id: scopedTenantId,
         value: finalState,
         updated_by: userId,
         updated_at: new Date().toISOString(),

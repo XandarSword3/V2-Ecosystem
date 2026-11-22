@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import bcrypt from 'bcryptjs';
 import { createStatefulDbHarness } from '../../helpers/stateful-db-harness';
 
 const harness = createStatefulDbHarness();
@@ -289,6 +290,75 @@ describe('ModulesController (Genuine Stateful Database Verification)', () => {
         })
       );
       expect(harness.getTable('modules').length).toBe(1);
+    });
+
+    it('creates a new staff user with a random password and a forced password change', async () => {
+      harness.seed('users', []);
+      harness.seed('modules', []);
+      harness.seed('app_role_permissions', []);
+      harness.seed('site_settings', [{ id: 1, navbar: { links: [] } }]);
+
+      const { req, res, next } = createMockReqRes({
+        body: {
+          name: 'Beach Club Cabanas',
+          engine_type: 'time_exclusive_reservation',
+        },
+      });
+
+      await modulesController.createModule(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+
+      const users = harness.getTable('users');
+      expect(users.length).toBe(1);
+      const staff = users[0];
+      expect(staff.email).toBe('staff.beach-club-cabanas@v2ecosystem.com');
+      expect(staff.scope).toBe('property_staff');
+      expect(staff.tenant_id).toBe('tenant-1');
+      expect(staff.must_change_password).toBe(true);
+
+      // The plaintext handed to bcrypt must be a 32-byte random secret, not
+      // the old predictable `Staff<Slug>123!` string.
+      const hashMock = vi.mocked(bcrypt.hash);
+      expect(hashMock).toHaveBeenCalledTimes(1);
+      const [plain, rounds] = hashMock.mock.calls[0] as [string, number];
+      expect(rounds).toBe(12);
+      expect(plain.length).toBe(43); // base64url of 32 random bytes
+      expect(plain.toLowerCase()).not.toContain('beach');
+      expect(plain).not.toBe('StaffBeach-club-cabanas123!');
+    });
+
+    it('reuses an existing same-tenant staff user without resetting its password', async () => {
+      harness.seed('users', [
+        {
+          id: 'staff-existing',
+          email: 'staff.dining@v2ecosystem.com',
+          tenant_id: 'tenant-1',
+          password_hash: 'original_hash',
+          must_change_password: false,
+        },
+      ]);
+      harness.seed('modules', []);
+      harness.seed('app_role_permissions', []);
+      harness.seed('site_settings', [{ id: 1, navbar: { links: [] } }]);
+
+      const { req, res, next } = createMockReqRes({
+        body: {
+          name: 'Dining',
+          slug: 'dining',
+          engine_type: 'instant_transaction',
+        },
+      });
+
+      await modulesController.createModule(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      const users = harness.getTable('users');
+      expect(users.length).toBe(1);
+      expect(users[0].id).toBe('staff-existing');
+      expect(users[0].password_hash).toBe('original_hash');
+      expect(users[0].must_change_password).toBe(false);
+      expect(vi.mocked(bcrypt.hash)).not.toHaveBeenCalled();
     });
   });
 

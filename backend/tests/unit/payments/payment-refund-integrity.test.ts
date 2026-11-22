@@ -67,9 +67,8 @@ describe('Payment Refund Relational State Integrity (Zero-Mock Emulation)', () =
       {
         id: orderId,
         status: 'confirmed',
-        payment_status: 'paid',
         amount: 150.0,
-        metadata: { itemsCount: 2 },
+        metadata: { itemsCount: 2, payment_status: 'paid' },
       },
     ]);
 
@@ -113,7 +112,7 @@ describe('Payment Refund Relational State Integrity (Zero-Mock Emulation)', () =
     // Table: transactions (status must be cancelled, not left in confirmed/completed!)
     const transactions = harness.getTable('transactions');
     expect(transactions[0].status).toBe('cancelled');
-    expect(transactions[0].payment_status).toBe('refunded');
+    expect(transactions[0].metadata.payment_status).toBe('refunded');
     expect(transactions[0].metadata.cancellation_reason).toBe('Customer requested cancellation');
 
     // Table: fulfillments (active fulfillment must be cancelled so kitchen/dispatch does not fulfill)
@@ -162,8 +161,8 @@ describe('Payment Refund Relational State Integrity (Zero-Mock Emulation)', () =
       {
         id: orderId,
         status: 'confirmed',
-        payment_status: 'paid',
         amount: 200.0,
+        metadata: { payment_status: 'paid' },
       },
     ]);
 
@@ -191,7 +190,7 @@ describe('Payment Refund Relational State Integrity (Zero-Mock Emulation)', () =
     // Transactions and fulfillments should stay active
     const transactions = harness.getTable('transactions');
     expect(transactions[0].status).toBe('confirmed');
-    expect(transactions[0].payment_status).toBe('partial');
+    expect(transactions[0].metadata.payment_status).toBe('partial');
 
     const fulfillments = harness.getTable('fulfillments');
     expect(fulfillments[0].status).toBe('in_progress');

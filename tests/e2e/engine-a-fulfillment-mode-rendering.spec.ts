@@ -20,7 +20,11 @@
 import { test, expect } from '../fixtures/auth.fixture';
 
 // Tenant-tier subdomain URL — bare localhost is blocked by proxy middleware.
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://walid.localhost:3000';
+// NOTE: do NOT read process.env.FRONTEND_URL here: the repo-root .env sets
+// FRONTEND_URL=https://v2-ecosystem.vercel.app/ and Playwright injects it
+// into the test process, so it points at PRODUCTION. E2E_FRONTEND_URL is the
+// test-scoped override knob; default to the local walid tenant tier.
+const FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://walid.localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
 const TEST_MODULE_SLUG = process.env.E2E_ENGINE_A_SLUG || 'poolside-grill';
 const TEST_PROPERTY_SLUG = process.env.E2E_PROPERTY_SLUG || 'walid-s-property';
@@ -134,13 +138,26 @@ async function navigateTo(page: any, url: string) {
  * If the staff KDS page shows 'Start Your Shift', click the button to start
  * a shift with zero opening cash so the kitchen board renders.
  */
-async function startShiftIfNeeded(page: any) {
-  await page.waitForTimeout(2_000);
-  const bodyText = await page.textContent('body');
-  if (!bodyText?.includes('Start Your Shift')) return;
+/**
+ * Waits for the staff KDS page to finish hydrating, then starts a shift if
+ * the 'Start Your Shift' gate is showing. Next dev on-demand compile +
+ * hydration can take >15s (and pre-hydration bodies contain only inline
+ * scripts, so a single textContent snapshot misreads the page) — poll for
+ * EITHER the gate OR the already-rendered board instead.
+ */
+async function startShiftIfNeeded(page: any, settleTimeoutMs = 60_000) {
+  const gate = page.getByText('Start Your Shift').first();
+  const board = page.locator('[class*="grid"][class*="gap"]').first();
+  const seen = await Promise.race([
+    gate.waitFor({ state: 'visible', timeout: settleTimeoutMs }).then(() => 'gate' as const),
+    board.waitFor({ state: 'visible', timeout: settleTimeoutMs }).then(() => 'board' as const),
+  ]).catch(() => null);
+
+  if (seen !== 'gate') return;
   // Click Start Shift button (opens shift with zero opening cash)
-  await page.getByRole('button', { name: 'Start Shift' }).click();
-  await page.waitForTimeout(3_000);
+  await page.getByRole('button', { name: 'Start Shift' }).click({ timeout: 15_000 });
+  // Wait for the board to replace the gate
+  await board.waitFor({ state: 'visible', timeout: settleTimeoutMs }).catch(() => {});
 }
 
 /**
@@ -178,11 +195,10 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
     await startShiftIfNeeded(page);
     await page.waitForTimeout(2_000);
 
-    // The board should render (grid exists)
+    // The board should render (grid exists) — startShiftIfNeeded already
+    // waits for either the gate or the board, so this should be present.
     const grid = page.locator('[class*="grid"][class*="gap"]').first();
-    await expect(grid).toBeVisible({ timeout: 10_000 });
-
-    // Hospitality-specific column headers should be present
+    await expect(grid).toBeVisible({ timeout: 30_000 });
     // (Queued, In Progress, Ready, Served are the hospitality mode labels)
     const pageContent = await page.textContent('body');
     expect(pageContent).toBeTruthy();
@@ -343,9 +359,10 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
     }).filter({ hasNotText: /Console AxiosError|nextjs/ });
     await expect(errorBoundary).not.toBeVisible({ timeout: 5_000 });
 
-    // The grid should exist (board rendered)
+    // The grid should exist (board rendered) — the helper already ensured
+    // either the gate was cleared or the board is up.
     const grid = page.locator('[class*="grid"][class*="gap"]').first();
-    await expect(grid).toBeVisible({ timeout: 10_000 });
+    await expect(grid).toBeVisible({ timeout: 30_000 });
   });
 
   // -----------------------------------------------------------------------
@@ -371,11 +388,11 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
       await page.waitForTimeout(500);
 
       const grid = page.locator('[class*="grid"][class*="gap"]').first();
-      await expect(grid).toBeVisible({ timeout: 5_000 });
+      await expect(grid).toBeVisible({ timeout: 30_000 });
     } else {
       // Single mode or no orders — board should still render
       const grid = page.locator('[class*="grid"][class*="gap"]').first();
-      await expect(grid).toBeVisible({ timeout: 10_000 });
+      await expect(grid).toBeVisible({ timeout: 30_000 });
     }
   });
 
@@ -576,6 +593,7 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
       // Get catalog items from the staff-scoped menu endpoint
       const itemsRes = await request.get(`${API_URL}/api/v1/staff/modules/${TEST_MODULE_SLUG}/menu`, {
         headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Slug': 'walid', 'X-Property-Slug': 'walid-s-property' },
+        timeout: 120_000, // hosted Supabase + parallel workers can exceed the 30s default
       });
       const itemsBody = await itemsRes.json();
       const items = itemsBody?.data?.items ?? [];
@@ -592,6 +610,7 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
           'X-Tenant-Slug': 'walid',
           'X-Property-Slug': 'walid-s-property',
         },
+        timeout: 120_000, // hosted Supabase + parallel workers can exceed the 30s default
         data: {
           items: [{ catalogItemId: item.id, quantity: 1 }],
           fulfillment_mode: mode,
@@ -618,6 +637,12 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
       page,
       request,
     }) => {
+      // This test does 5 order creations, 3 API verification loops, a
+      // staff login, shift start and kitchen navigation — each one can
+      // trigger an on-demand dev compile. Give it its own generous budget;
+      // the global 120s default is not enough in Next dev.
+      test.setTimeout(360_000);
+
       // ---- Phase 1: Auth token for fixture creation ----
       const token = await getStaffToken(request);
       expect(token, 'Staff token must be obtained for fixture creation').toBeTruthy();
@@ -655,9 +680,12 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
               'X-Tenant-Slug': 'walid',
               'X-Property-Slug': 'walid-s-property',
             },
+            timeout: 120_000,
           },
         );
-        expect(orderRes.ok(), 'Orders API must succeed').toBeTruthy();
+        // Phase 3 verification (also used on retry runs)
+        const status3 = orderRes.status();
+        expect(orderRes.ok(), `Orders API must succeed (HTTP ${status3}${status3 !== 200 ? `: ${(await orderRes.text()).slice(0, 200)}` : ''})`).toBeTruthy();
         const body = await orderRes.json();
         const allOrders = body?.data ?? [];
         const match = allOrders.find((o: any) => o.id === created.id);
@@ -675,7 +703,8 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
 
       // The default tab is Stations. Click Kitchen to activate the kitchen view.
       const kitchenBtn = page.getByRole('button', { name: 'Kitchen' });
-      await kitchenBtn.click({ timeout: 5_000 });
+      await kitchenBtn.waitFor({ state: 'visible', timeout: 30_000 });
+      await kitchenBtn.click({ timeout: 20_000 });
       await page.waitForTimeout(3_000);
 
       // ---- Phase 5: Verify kitchen-active orders from multiple modes ----
@@ -691,6 +720,7 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
             'X-Tenant-Slug': 'walid',
             'X-Property-Slug': 'walid-s-property',
           },
+          timeout: 120_000,
         },
       );
       const kitchenBody = await kitchenOrdersRes.json();
@@ -713,14 +743,13 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
       const bodyContent = await page.textContent('body');
 
       // The kitchen view should show at least some of our created order numbers
-      // or the card elements. Use a more lenient check: verify that the kitchen
-      // tab has order card elements (Card components with order numbers).
+      // or the card elements. Poll for the cards to appear (kitchen data loads
+      // after hydration).
       const orderCardElements = page.locator('text=/^#ORD-/');
+      await expect
+        .poll(async () => orderCardElements.count(), { timeout: 30_000 })
+        .toBeGreaterThan(0);
       const cardCount = await orderCardElements.count();
-      expect(
-        cardCount,
-        'Kitchen tab must render order cards with #ORD- order numbers',
-      ).toBeGreaterThan(0);
 
       // ---- Phase 7: Verify mode-specific action labels ----
       // Each mode's orders should show the correct action based on their state:
@@ -752,6 +781,7 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
               'X-Tenant-Slug': 'walid',
               'X-Property-Slug': 'walid-s-property',
             },
+            timeout: 120_000,
           },
         );
         const body = await orderRes.json();
@@ -766,7 +796,9 @@ test.describe('Engine A: Fulfillment Mode Rendering — Browser E2E (F1)', () =>
           digital_delivery: ['provisioning'],
           shipment: ['allocated'],
           service_execution: ['received'],
-          none: [null, undefined],
+          // 'none' orders get a default fulfillmentStatus ('queued') from the
+          // backend; unmodeled orders may also carry null.
+          none: ['queued', null, undefined],
         };
         if (validInitial[created.mode]) {
           expect(

@@ -24,6 +24,15 @@ import { getProvisioningService } from './provisioning.service.js';
 import { invalidateTenantCache } from '../../middleware/tenantAccess.middleware.js';
 import { logger } from '../../utils/logger.js';
 import type { SubscriptionTier } from '../../middleware/tenantAccess.middleware.js';
+import { z } from 'zod';
+
+const createPlatformCheckoutSchema = z.object({
+  tier: z.enum(['starter', 'growth', 'enterprise']),
+  email: z.string().email(),
+  name: z.string().min(1).max(100),
+  subdomain: z.string().min(2).max(63).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Subdomain must be lowercase alphanumeric with hyphens'),
+  billingCycle: z.enum(['monthly', 'annual']).optional(),
+});
 
 // ============================================
 // List all tenants
@@ -318,10 +327,18 @@ export async function cancelTenant(req: Request, res: Response): Promise<void> {
       }
     }
 
-    await getProvisioningService().updateBillingStatus(
-      tenant.stripe_subscription_id ?? id,
-      'cancelled',
-    );
+    // Previously this passed `stripe_subscription_id ?? id` into a lookup
+    // keyed ONLY on stripe_subscription_id: a tenant without a subscription
+    // id was never updated, so "cancel" silently no-op'd. The id path is now
+    // explicit.
+    if (tenant.stripe_subscription_id) {
+      await getProvisioningService().updateBillingStatus(
+        tenant.stripe_subscription_id,
+        'cancelled',
+      );
+    } else {
+      await getProvisioningService().updateBillingStatusByTenantId(id, 'cancelled');
+    }
 
     res.json({ success: true, message: 'Tenant cancelled' });
   } catch (err) {
@@ -371,10 +388,15 @@ export async function changeTier(req: Request, res: Response): Promise<void> {
     }
 
     const billing = getSaasBillingService();
+    const actorUserId =
+      (req.user as { id?: string; userId?: string } | undefined)?.id ??
+      (req.user as { id?: string; userId?: string } | undefined)?.userId ??
+      null;
     const result = await billing.changeTier(
       tenant.stripe_subscription_id,
       tenant.subscription_tier as SubscriptionTier,
       tier,
+      { tenantId: id, actorUserId, actor: 'platform_admin' },
     );
 
     // Sync tier locally — also re-resolve plan_id so feature_limits switch
@@ -531,17 +553,17 @@ export async function getPlatformStats(_req: Request, res: Response): Promise<vo
 
 export async function createCheckoutSession(req: Request, res: Response): Promise<void> {
   try {
-    const { tier, email, name, subdomain } = req.body as {
-      tier: SubscriptionTier;
-      email: string;
-      name: string;
-      subdomain: string;
-    };
-
-    if (!tier || !email || !name || !subdomain) {
-      res.status(400).json({ success: false, error: 'tier, email, name, and subdomain are required' });
+    const parseResult = createPlatformCheckoutSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid request data',
+        details: parseResult.error.flatten().fieldErrors,
+      });
       return;
     }
+
+    const { tier, email, name, subdomain, billingCycle } = parseResult.data;
 
     const supabase = getSupabase();
 
@@ -583,6 +605,9 @@ export async function createCheckoutSession(req: Request, res: Response): Promis
       operatorEmail: email,
       operatorName: name,
       subdomain,
+      // Only 'annual' is accepted downstream (whitelisted in the service);
+      // anything else — including garbage — bills monthly.
+      billingCycle: billingCycle === 'annual' ? 'annual' : 'monthly',
     });
 
     res.json({ success: true, data: result });
@@ -707,6 +732,30 @@ async function updateTenantBillingStatus(
       return;
     }
 
+    // Keep Stripe in sync: suspending locally but leaving collection running
+    // (or reactivating a still-paused subscription) is a billing dispute.
+    if (tenant.stripe_subscription_id) {
+      try {
+        const billing = getSaasBillingService();
+        if (status === 'suspended') {
+          await billing.suspendSubscription(tenant.stripe_subscription_id);
+        } else {
+          await billing.resumeSubscription(tenant.stripe_subscription_id);
+        }
+      } catch (stripeErr) {
+        logger.error('[PLATFORM] Stripe subscription state sync failed; aborting local change', {
+          tenantId: id,
+          status,
+          stripeErr,
+        });
+        res.status(502).json({
+          success: false,
+          error: 'Stripe subscription could not be updated; tenant status unchanged',
+        });
+        return;
+      }
+    }
+
     await supabase
       .from('tenants')
       .update({ billing_status: status, updated_at: new Date().toISOString() })
@@ -725,6 +774,8 @@ async function updateTenantBillingStatus(
 // ============================================
 // Public: Validate tenant by slug (no auth)
 // ============================================
+
+import { getFeatureFlagService, type EngineFeatureFlag } from '../../engines/feature-flags.js';
 
 export async function getTenantBySlug(req: Request, res: Response): Promise<void> {
   try {
@@ -745,6 +796,39 @@ export async function getTenantBySlug(req: Request, res: Response): Promise<void
     res.json({ success: true, data });
   } catch (err) {
     logger.error('[TENANT] Error validating tenant by slug', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+export async function getTenantFeatureFlags(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const flagService = getFeatureFlagService();
+    const flags = await flagService.getStatus(id);
+    res.json({ success: true, data: flags });
+  } catch (err) {
+    logger.error('[TENANT] Error getting feature flags', err);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+export async function setTenantFeatureFlag(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { flag, enabled } = req.body;
+    if (!flag) {
+      res.status(400).json({ success: false, error: 'flag name is required' });
+      return;
+    }
+    const flagService = getFeatureFlagService();
+    if (enabled) {
+      await flagService.enable(id, flag as EngineFeatureFlag);
+    } else {
+      await flagService.disable(id, flag as EngineFeatureFlag);
+    }
+    res.json({ success: true, message: `Flag ${flag} ${enabled ? 'enabled' : 'disabled'}` });
+  } catch (err) {
+    logger.error('[TENANT] Error setting feature flag', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 }

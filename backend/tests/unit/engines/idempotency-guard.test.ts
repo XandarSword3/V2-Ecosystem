@@ -17,6 +17,7 @@ import { IdempotencyGuard, IdempotencyConflictError } from '../../../src/engines
 
 const mockSupabase = {
   from: vi.fn(),
+  rpc: vi.fn(),
 };
 
 const mockSelect = vi.fn();
@@ -28,6 +29,18 @@ const mockDelete = vi.fn();
 const mockLt = vi.fn();
 
 // Chain builders
+function chainableUpdate() {
+  // The guard's failure path is `.update({...}).eq('key', ...).eq('status', ...)`.
+  // Make `eq` return the same thenable chain so any number of filters work and
+  // awaiting the final link resolves the write result.
+  const chain: any = {
+    then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: null, error: null }).then(resolve, reject),
+  };
+  chain.eq = vi.fn(() => chain);
+  return chain;
+}
+
 function setupSelectChain(data: unknown, error: unknown = null) {
   mockSupabase.from.mockReturnValue({
     select: mockSelect.mockReturnValue({
@@ -36,9 +49,7 @@ function setupSelectChain(data: unknown, error: unknown = null) {
       }),
     }),
     upsert: mockUpsert.mockResolvedValue({ data: null, error: null }),
-    update: vi.fn().mockReturnValue({
-      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }),
+    update: vi.fn().mockReturnValue(chainableUpdate()),
     delete: mockDelete.mockReturnValue({
       lt: mockLt.mockReturnValue({
         select: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -100,33 +111,15 @@ describe('IdempotencyGuard', () => {
   // ============================================
 
   describe('executeOnce — first time', () => {
-    it('should execute the operation when key does not exist', async () => {
-      // No existing key
-      setupSelectChain(null);
+    it('should claim the key, execute the operation, and cache the result', async () => {
+      mockSupabase.rpc.mockResolvedValue({
+        data: { claimed: true, status: 'processing', claim_token: 'token-1' },
+        error: null,
+      });
 
-      // Override for test: make from() return different objects for different operations
-      const fromMock = vi.fn();
-      mockSupabase.from = fromMock;
-      
-      // First call: select (check existing key)
-      fromMock.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: null, error: null }),
-          }),
-        }),
-      });
-      
-      // Second call: upsert (claim key)
-      fromMock.mockReturnValueOnce({
-        upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
-      });
-      
-      // Third call: update (store result)
-      fromMock.mockReturnValueOnce({
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: null, error: null }),
-        }),
+      const update = vi.fn().mockReturnValue(chainableUpdate());
+      mockSupabase.from = vi.fn().mockReturnValue({
+        update,
       });
 
       let executed = false;
@@ -143,10 +136,51 @@ describe('IdempotencyGuard', () => {
       );
 
       expect(executed).toBe(true);
+      expect(mockSupabase.rpc).toHaveBeenCalledWith(
+        'claim_engine_idempotency_key',
+        expect.objectContaining({
+          p_key: 'test-key',
+          p_tenant_id: 'tenant-1',
+          p_engine_type: 'instant_transaction',
+          p_entity_id: 'order-1',
+          p_action: 'confirm',
+        }),
+      );
       expect(result.isNew).toBe(true);
       expect(result.isDuplicate).toBe(false);
       expect(result.result).toEqual({ orderId: 'order-1', total: 100 });
       expect(result.key).toBe('test-key');
+    });
+
+    it('fails closed when the claim RPC errors', async () => {
+      mockSupabase.rpc.mockResolvedValue({
+        data: null,
+        error: { message: 'db down' },
+      });
+
+      await expect(
+        guard.executeOnce('test-key', 't', 'e', 'id', 'a', async () => 'result'),
+      ).rejects.toThrow(/Idempotency claim failed/);
+    });
+
+    it('marks the key failed when the operation throws, so a retry can re-run', async () => {
+      mockSupabase.rpc.mockResolvedValue({
+        data: { claimed: true, status: 'processing', claim_token: 'token-1' },
+        error: null,
+      });
+
+      const update = vi.fn().mockReturnValue(chainableUpdate());
+      mockSupabase.from = vi.fn().mockReturnValue({ update });
+
+      await expect(
+        guard.executeOnce('test-key', 't', 'e', 'id', 'a', async () => {
+          throw new Error('boom');
+        }),
+      ).rejects.toThrow('boom');
+
+      expect(update).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'failed' }),
+      );
     });
   });
 
@@ -157,20 +191,10 @@ describe('IdempotencyGuard', () => {
   describe('executeOnce — duplicate', () => {
     it('should return cached result for completed key', async () => {
       const cachedData = { orderId: 'order-1', total: 100 };
-      
-      mockSupabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: {
-                key: 'test-key',
-                status: 'completed',
-                result_data: cachedData,
-              },
-              error: null,
-            }),
-          }),
-        }),
+
+      mockSupabase.rpc.mockResolvedValue({
+        data: { claimed: false, status: 'completed', result_data: cachedData },
+        error: null,
       });
 
       let executed = false;
@@ -199,15 +223,9 @@ describe('IdempotencyGuard', () => {
 
   describe('executeOnce — conflict', () => {
     it('should throw IdempotencyConflictError for processing key', async () => {
-      mockSupabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: { key: 'test-key', status: 'processing' },
-              error: null,
-            }),
-          }),
-        }),
+      mockSupabase.rpc.mockResolvedValue({
+        data: { claimed: false, status: 'processing' },
+        error: null,
       });
 
       await expect(
@@ -223,15 +241,9 @@ describe('IdempotencyGuard', () => {
     });
 
     it('should include key in conflict error', async () => {
-      mockSupabase.from = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: { key: 'my-key', status: 'processing' },
-              error: null,
-            }),
-          }),
-        }),
+      mockSupabase.rpc.mockResolvedValue({
+        data: { claimed: false, status: 'processing' },
+        error: null,
       });
 
       try {

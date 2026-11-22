@@ -15,6 +15,7 @@ import { CurrencySwitcher } from '@/components/CurrencySwitcher';
 import { PropertySwitcher } from '@/components/PropertySwitcher';
 import { PropertyProvider } from '@/context/PropertyContext';
 import { api } from '@/lib/api';
+import BillingAlertBanner from '@/components/admin/BillingAlertBanner';
 import {
   Menu,
   X,
@@ -633,6 +634,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Page Content */}
         <div className="p-6">
+          <BillingAlertBanner />
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}

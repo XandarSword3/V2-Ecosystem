@@ -35,7 +35,7 @@ import {
   reassignStaffHandler,
 } from '../modules/reservations/reservations.routes.js';
 import { getReservationsForDay } from '../modules/reservations/reservations.service.js';
-import { submitProductReview, submitStaffReview, getProductItemRating } from '../modules/reviews/reviews.service.js';
+import { submitProductReview, submitStaffReview, getProductItemRating, createReview } from '../modules/reviews/reviews.service.js';
 
 // Import parsers
 import * as instantTransactionParser from '../modules/shared/import/instant-transaction-import.parser.js';
@@ -127,7 +127,7 @@ function enforceMountedModulePropertyAccess(req: Request, res: Response, next: N
     res.status(500).json({ success: false, error: 'Mounted module context is missing' });
     return;
   }
-  if (process.env.NODE_ENV === 'test' || req.headers['x-integration-test'] === 'true') {
+  if (process.env.NODE_ENV === 'test') {
     next();
     return;
   }
@@ -422,6 +422,7 @@ async function rollbackFailedOrder(
   scopedIdempotencyKey: string | null,
   claimToken: string | null,
   userId?: string | null,
+  tenantId?: string | null,
 ) {
   // 1. Compensate base inventory if deducted (independent step)
   if (baseInventoryItems && baseInventoryItems.length > 0) {
@@ -451,7 +452,24 @@ async function rollbackFailedOrder(
   // 2. Reverse discounts if any were applied (independent step)
   if (discounts && discounts.length > 0) {
     try {
-      await reverseDiscounts(supabase, discounts, { userId: userId ?? undefined, orderId: transactionId ?? undefined });
+      // Loyalty reversal needs the owning tenant. Creation-failure callers
+      // pass it explicitly; when only a transaction id is available, read the
+      // tenant from the row so the fallback is still tenant-correct.
+      let resolvedTenantId = tenantId ?? null;
+      if (!resolvedTenantId && transactionId) {
+        const { data: tx } = await supabase
+          .from('transactions')
+          .select('tenant_id')
+          .eq('id', transactionId)
+          .maybeSingle();
+        resolvedTenantId = tx?.tenant_id ?? null;
+      }
+
+      await reverseDiscounts(supabase, discounts, {
+        userId: userId ?? undefined,
+        orderId: transactionId ?? undefined,
+        tenantId: resolvedTenantId ?? undefined,
+      });
     } catch (discErr: any) {
       logger.error('[Dynamic Router Rollback] Failed to reverse discounts:', discErr);
       try {
@@ -1139,6 +1157,9 @@ function buildInstantTransactionRouter(router: Router): void {
     let appliedDiscounts: any[] | undefined = undefined;
     let insertedOrderItems: any[] = [];
     let heartbeatTimer: NodeJS.Timeout | null = null;
+    // Hoisted so the outer catch's rollback can pass the owning tenant to
+    // discount reversal (loyalty points are tenant-scoped).
+    let tenantId: string | null = null;
     const supabase = getSupabase();
     try {
       const mounted = getMountedModule(req);
@@ -1245,7 +1266,7 @@ function buildInstantTransactionRouter(router: Router): void {
         return res.status(500).json({ success: false, error: 'property_id is required but could not be resolved for this module' });
       }
       // Resolve tenant_id: mounted module → request context — NO fallbacks
-      const tenantId = mounted.tenant_id
+      tenantId = mounted.tenant_id
         || (req as any).tenant?.id
         || req.user?.tenantId
         || (req.headers?.['x-tenant-id'] as string)
@@ -1340,6 +1361,7 @@ function buildInstantTransactionRouter(router: Router): void {
 
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
+        tenantId: tenantId ?? undefined,
         propertyId: propertyId,
         currency,
         customerId: req.user?.userId ?? undefined,
@@ -1370,7 +1392,7 @@ function buildInstantTransactionRouter(router: Router): void {
             currency,
             moduleId: mounted.id,
           });
-          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
           return res.status(400).json({
             success: false,
             error: 'Pricing mismatch detected',
@@ -1406,7 +1428,7 @@ function buildInstantTransactionRouter(router: Router): void {
           .maybeSingle();
         if (locationError) throw locationError;
         if (!locationRow) {
-          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
           return res.status(400).json({ success: false, error: 'service_location_id does not belong to this module' });
         }
         
@@ -1420,7 +1442,7 @@ function buildInstantTransactionRouter(router: Router): void {
           .limit(1);
         if (occupancyError) throw occupancyError;
         if (existingOrders && existingOrders.length > 0) {
-          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
           return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
         }
         serviceLocationId = locationRow.id;
@@ -1489,7 +1511,7 @@ function buildInstantTransactionRouter(router: Router): void {
 
         if (rpcErr || !atomicResult) {
           logger.error('[Dynamic Router] Infrastructure error during atomic order creation:', rpcErr);
-          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
           return res.status(500).json({ success: false, error: 'INFRASTRUCTURE_ERROR', message: 'Order checkout service unavailable.' });
         }
 
@@ -1499,11 +1521,11 @@ function buildInstantTransactionRouter(router: Router): void {
               key: scopedIdempotencyKey,
               claimToken,
             });
-            await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+            await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
             return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
           }
           if (atomicResult.error === 'LOCATION_OCCUPIED') {
-            await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+            await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
             return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
           }
           createError = new Error(atomicResult.message || atomicResult.error);
@@ -1524,7 +1546,7 @@ function buildInstantTransactionRouter(router: Router): void {
             serviceLocationId,
             error: createError.message,
           });
-          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          await rollbackFailedOrder(supabase, null, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
           return res.status(409).json({ success: false, error: 'This location/table already has an open order' });
         }
 
@@ -1579,7 +1601,7 @@ function buildInstantTransactionRouter(router: Router): void {
 
         if (deductErr || !deductResult) {
           logger.error('[Dynamic Router] Infrastructure error during inventory deduction RPC:', deductErr);
-          await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
           return res.status(500).json({ success: false, error: 'INFRASTRUCTURE_ERROR', message: 'Failed to process inventory reservation' });
         }
 
@@ -1589,11 +1611,11 @@ function buildInstantTransactionRouter(router: Router): void {
               key: scopedIdempotencyKey,
               claimToken,
             });
-            await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+            await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
             return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
           }
           logger.warn('[Dynamic Router] Inventory deduction failed, rolling back order:', deductResult.message);
-          await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+          await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
           return res.status(400).json({
             success: false,
             error: 'INSUFFICIENT_STOCK',
@@ -1603,7 +1625,7 @@ function buildInstantTransactionRouter(router: Router): void {
         baseInventoryDeducted = true;
       } catch (invErr: any) {
         logger.error('[Dynamic Router] Exception during inventory deduction:', invErr);
-        await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId);
+        await rollbackFailedOrder(supabase, created.id, [], appliedDiscounts, scopedIdempotencyKey, claimToken, req.user?.userId, tenantId);
         return res.status(400).json({
           success: false,
           error: 'INSUFFICIENT_STOCK',
@@ -1624,6 +1646,7 @@ function buildInstantTransactionRouter(router: Router): void {
           scopedIdempotencyKey,
           claimToken,
           req.user?.userId,
+          tenantId,
         );
         return res.status(500).json({ success: false, error: 'Failed to process discounts for order' });
       }
@@ -1679,6 +1702,7 @@ function buildInstantTransactionRouter(router: Router): void {
               scopedIdempotencyKey,
               claimToken,
               req.user?.userId,
+              tenantId,
             );
             return res.status(500).json({ success: false, error: 'INFRASTRUCTURE_ERROR', message: 'Order item recording failed' });
           }
@@ -1697,6 +1721,7 @@ function buildInstantTransactionRouter(router: Router): void {
                 scopedIdempotencyKey,
                 claimToken,
                 req.user?.userId,
+                tenantId,
               );
               return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
             }
@@ -1721,6 +1746,7 @@ function buildInstantTransactionRouter(router: Router): void {
             scopedIdempotencyKey,
             claimToken,
             req.user?.userId,
+            tenantId,
           );
           return res.status(500).json({ success: false, error: 'Failed to record order items' });
         }
@@ -1737,6 +1763,7 @@ function buildInstantTransactionRouter(router: Router): void {
           scopedIdempotencyKey,
           claimToken,
           req.user?.userId,
+          tenantId,
         );
         return res.status(500).json({ success: false, error: 'Failed to record order items' });
       }
@@ -1785,6 +1812,7 @@ function buildInstantTransactionRouter(router: Router): void {
                   scopedIdempotencyKey,
                   claimToken,
                   req.user?.userId,
+                  tenantId,
                 );
                 return res.status(409).json({ success: false, error: 'LEASE_LOST', message: 'Order checkout lease expired or taken over.' });
               }
@@ -1803,6 +1831,7 @@ function buildInstantTransactionRouter(router: Router): void {
                 scopedIdempotencyKey,
                 claimToken,
                 req.user?.userId,
+                tenantId,
               );
               
               return res.status(400).json({
@@ -1823,6 +1852,7 @@ function buildInstantTransactionRouter(router: Router): void {
             scopedIdempotencyKey,
             claimToken,
             req.user?.userId,
+            tenantId,
           );
           
           return res.status(400).json({
@@ -1872,6 +1902,7 @@ function buildInstantTransactionRouter(router: Router): void {
           scopedIdempotencyKey,
           claimToken,
           req.user?.userId,
+          tenantId,
         );
         return res.status(500).json({
           success: false,
@@ -1905,12 +1936,17 @@ function buildInstantTransactionRouter(router: Router): void {
               amount: pricing.totalAmount.toFixed(2),
               currency,
               method: String(resolvedPaymentMethod),
-              status: 'completed',
+              // Cash/transfer tenders have NOT been collected yet at order
+              // creation. Recording them as 'completed' made uncollected cash
+              // look settled in reporting and the refund path.
+              status: String(resolvedPaymentMethod).toLowerCase() === 'cash'
+                ? 'pending_collection'
+                : 'pending_verification',
               processed_by: req.user?.userId ?? null,
-              processed_at: new Date().toISOString(),
+              processed_at: null,
               tenant_id: tenantId,
               property_id: propertyId,
-              notes: 'Auto-recorded at order creation',
+              notes: 'Recorded at order creation; awaiting tender collection',
             });
             if (paymentInsertErr) {
               logger.warn('[Dynamic Router] Failed to auto-record order payment row (non-fatal)', {
@@ -2007,6 +2043,7 @@ function buildInstantTransactionRouter(router: Router): void {
             scopedIdempotencyKey,
             claimToken,
             req.user?.userId,
+            tenantId,
           );
         }
         return res.status(400).json({ success: false, error: 'INVALID_FULFILLMENT_SELECTION', message: error.message });
@@ -2021,6 +2058,7 @@ function buildInstantTransactionRouter(router: Router): void {
           scopedIdempotencyKey,
           claimToken,
           req.user?.userId,
+          tenantId,
         );
       }
       res.status(500).json({ success: false, error: 'Failed to create order' });
@@ -2138,6 +2176,7 @@ function buildInstantTransactionRouter(router: Router): void {
       // see comment above the route: this keeps the call side-effect-free.
       const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: mounted.id,
+        tenantId: (await getTenantIdForMountedModule(mounted)) ?? undefined,
         propertyId: order.property_id ?? undefined,
         currency: await resolveModuleCurrency(mounted.id, order.property_id),
         conditions: { orderType: resolvedOrderType, paymentMethod: resolvedPaymentMethod },
@@ -2748,7 +2787,7 @@ function buildInstantTransactionRouter(router: Router): void {
       const supabase = getSupabase();
       const { data: order } = await supabase
         .from('transactions')
-        .select('staff_id, service_location_id')
+        .select('staff_id, service_location_id, customer_id, metadata')
         .eq('id', req.params.id)
         .eq('module_id', mounted.id)
         .maybeSingle();
@@ -2771,8 +2810,20 @@ function buildInstantTransactionRouter(router: Router): void {
         if (location?.assigned_staff_id) staffId = location.assigned_staff_id;
       }
 
+      if (!staffId && (order.metadata as any)?.paid_by_staff_id) {
+        staffId = (order.metadata as any).paid_by_staff_id;
+      }
+
+      // If no direct staff is assigned (e.g. self-service / delivery orders),
+      // gracefully record as general service review for this module rather than failing with 400
       if (!staffId) {
-        return res.status(400).json({ success: false, error: 'Order has no assigned staff member to review' });
+        const serviceType = mounted.slug === 'menu-service' ? 'menu_service' : 'general';
+        const generalReview = await createReview(req.user?.userId || order.customer_id || 'guest', {
+          rating: Number(rating),
+          text: text ? String(text) : '',
+          service_type: serviceType,
+        });
+        return res.status(201).json({ success: true, data: generalReview, note: 'Recorded as service review' });
       }
 
       const review = await submitStaffReview({
@@ -2930,7 +2981,7 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
           ...lineItem,
           taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
         }],
-        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
+        { moduleId: mounted.id, tenantId: (await getTenantIdForMountedModule(mounted)) ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
       );
       // Atomic insert with double-booking protection via advisory lock
       const { data: rpcResult, error: rpcError } = await supabase.rpc('reserve_unit_exclusive_atomic', {
@@ -2967,7 +3018,10 @@ function buildTimeExclusiveReservationRouter(router: Router): void {
           unit_id:        meta.unit_id        ?? unit_id,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === '23P01' || error?.message?.includes('already booked')) {
+        return res.status(409).json({ success: false, error: 'DOUBLE_BOOKING_CONFLICT', message: error?.message ?? 'Unit is already booked for these dates' });
+      }
       logger.error('[Dynamic Router] POST /bookings failed', error);
       res.status(500).json({ success: false, error: 'Failed to create booking' });
     }
@@ -3165,7 +3219,7 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
         lineItems,
-        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
+        { moduleId: mounted.id, tenantId: (await getTenantIdForMountedModule(mounted)) ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
       );
       const ticketDateRaw =
         (bodyMetadata as Record<string, unknown> | undefined)?.ticket_date
@@ -3356,7 +3410,7 @@ function buildSharedCapacityAccessRouter(router: Router): void {
       const pricing = await engineService.calculatePricing(
         mounted.engine_type,
         lineItems,
-        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
+        { moduleId: mounted.id, tenantId: (await getTenantIdForMountedModule(mounted)) ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
       );
       const ticketDate = dayjs().format('YYYY-MM-DD');
       const purchase = await purchaseSharedCapacityAtomic(supabase, {
@@ -3578,9 +3632,11 @@ function buildSharedCapacityAccessRouter(router: Router): void {
         return res.status(400).json({ success: false, error: 'name, starts_at, and ends_at are required' });
       }
       const supabase = getSupabase();
+      const tenantId = mounted.tenant_id ?? (req as any).tenant?.id ?? (req as any).user?.tenant_id;
       const { data, error } = await supabase
         .from('capacity_windows')
         .insert({
+          tenant_id: tenantId,
           module_id: mounted.id,
           name,
           starts_at: sessionStartsAt,
@@ -3768,7 +3824,7 @@ function buildOngoingEntitlementRouter(router: Router): void {
           ...lineItem,
           taxCategory: resolveTaxCategory(lineItem, module?.tax_category ?? 'all'),
         }],
-        { moduleId: mounted.id, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
+        { moduleId: mounted.id, tenantId: (await getTenantIdForMountedModule(mounted)) ?? undefined, customerId: req.user?.userId ?? undefined, currency: await resolveModuleCurrency(mounted.id, mounted.property_id) },
       );
       const { data, error } = await supabase
         .from('memberships')
@@ -4244,7 +4300,7 @@ async function commitImportForEngine(
       if (pendingIngredientLinks.length > 0) {
         const { error: linkError, count } = await supabase
           .from('menu_item_ingredients')
-          .insert(pendingIngredientLinks, { count: 'exact' });
+          .insert(pendingIngredientLinks.map(link => ({ ...link, tenant_id })), { count: 'exact' });
         if (linkError) {
           results.errors.push(`Failed to link ${pendingIngredientLinks.length} ingredient(s): ${linkError.message}`);
         } else {

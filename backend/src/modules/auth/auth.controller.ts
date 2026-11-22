@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { z } from 'zod';
 import * as authService from "./auth.service";
+import { verifyCaptchaToken } from "./lockout.service.js";
 import { loginSchema, registerSchema, changePasswordSchema } from "./auth.validation";
 import { logger } from "../../utils/logger";
 import { emailService } from "../../services/email.service";
@@ -54,6 +55,20 @@ export function clearAuthCookies(res: Response) {
 export async function register(req: Request, res: Response, next: NextFunction) {
   const body = req.body;
   try {
+    // Verify bot protection in production if Turnstile is configured
+    if (config.turnstile?.secretKey && config.env === 'production') {
+      const captchaToken = req.body.captchaToken || req.headers['cf-turnstile-response'];
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
+      const isValid = await verifyCaptchaToken(typeof captchaToken === 'string' ? captchaToken : undefined, ip);
+      if (!isValid) {
+        return res.status(400).json({
+          success: false,
+          error: 'CAPTCHA_REQUIRED',
+          message: 'Security check failed. Please refresh and try again.',
+        });
+      }
+    }
+
     const data = registerSchema.parse(body) as authService.RegisterData;
     // Inject tenant_id from the request's resolved tenant context.
     // The tenantAccess middleware populates req.tenant from X-Tenant-ID / X-Tenant-Slug headers.

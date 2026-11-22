@@ -52,6 +52,7 @@ const getOutputFile = () => {
 };
 
 export default defineConfig({
+  globalSetup: './tests/setup/global-setup.ts',
   testDir: './tests',
   testIgnore: getTestIgnore(),
   timeout: 120000,

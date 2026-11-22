@@ -193,17 +193,36 @@ describe('FeatureLimitsService (Unit Tests)', () => {
       const req = {
         tenant: {
           subscription_tier: 'starter',
-          feature_limits: { apiAccess: false },
+          feature_limits: { apiAccess: false, customDomain: false, whiteLabel: false },
         },
       } as unknown as Request;
 
-      expect(() => assertFeatureEnabled(req, 'apiAccess')).toThrow(AppError);
-      expect(() => assertFeatureEnabled(req, 'apiAccess')).toThrow(
-        expect.objectContaining({
-          statusCode: 402,
-          code: 'FEATURE_NOT_AVAILABLE',
-        })
-      );
+      for (const feature of ['apiAccess', 'customDomain', 'whiteLabel']) {
+        expect(() => assertFeatureEnabled(req, feature)).toThrow(AppError);
+        expect(() => assertFeatureEnabled(req, feature)).toThrow(
+          expect.objectContaining({
+            statusCode: 402,
+            code: 'FEATURE_NOT_AVAILABLE',
+          })
+        );
+      }
+    });
+
+    it('should be a no-op when no tenant is resolved', () => {
+      const req = {} as unknown as Request;
+
+      expect(() => assertFeatureEnabled(req, 'apiAccess')).not.toThrow();
+    });
+
+    it('should allow a feature that is absent from feature_limits (undefined is not false)', () => {
+      const req = {
+        tenant: {
+          subscription_tier: 'starter',
+          feature_limits: {},
+        },
+      } as unknown as Request;
+
+      expect(() => assertFeatureEnabled(req, 'customDomain')).not.toThrow();
     });
   });
 });

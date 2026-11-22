@@ -136,9 +136,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
     tableData.transactions = [
       {
         id: 'tx-ord-100',
-        total_amount: 42.5,
+        amount: 42.5,
         currency: 'USD',
-        payment_status: 'pending',
+        status: 'pending',
         tenant_id: TEST_TENANT_ID,
         property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
         customer_id: TEST_CUSTOMER_ID,
@@ -162,7 +162,7 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
 
     await (createPaymentIntent as Function)(req, res, vi.fn());
 
-    // Verified: Stripe amount is derived from DB total_amount (42.50 * 100 = 4250 cents)
+    // Verified: Stripe amount is derived from DB amount (42.50 * 100 = 4250 cents)
     expect(mockStripePaymentIntentsCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 4250,
@@ -171,7 +171,8 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
           referenceType: 'instant_transaction',
           referenceId: 'tx-ord-100',
         }),
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) })
     );
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -187,9 +188,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
     tableData.transactions = [
       {
         id: 'tx-ord-200',
-        total_amount: 89.99,
+        amount: 89.99,
         currency: 'USD',
-        payment_status: 'pending',
+        status: 'pending',
         tenant_id: TEST_TENANT_ID,
         property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
         customer_id: TEST_CUSTOMER_ID,
@@ -220,7 +221,8 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
       expect.objectContaining({
         amount: 8999,
         currency: 'usd',
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) })
     );
   });
 
@@ -228,9 +230,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
     tableData.transactions = [
       {
         id: 'tx-ord-kwd',
-        total_amount: 15.25,
+        amount: 15.25,
         currency: 'KWD',
-        payment_status: 'pending',
+        status: 'pending',
         tenant_id: TEST_TENANT_ID,
         property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
         customer_id: TEST_CUSTOMER_ID,
@@ -258,7 +260,8 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
       expect.objectContaining({
         amount: 15250,
         currency: 'kwd',
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) })
     );
   });
 
@@ -266,9 +269,9 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
     tableData.transactions = [
       {
         id: 'tx-ord-jpy',
-        total_amount: 3500,
+        amount: 3500,
         currency: 'JPY',
-        payment_status: 'pending',
+        status: 'pending',
         tenant_id: TEST_TENANT_ID,
         property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
         customer_id: TEST_CUSTOMER_ID,
@@ -296,7 +299,8 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
       expect.objectContaining({
         amount: 3500,
         currency: 'jpy',
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) })
     );
   });
 
@@ -304,9 +308,11 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
     tableData.transactions = [
       {
         id: 'tx-already-paid',
-        total_amount: 50.0,
+        amount: 50.0,
         currency: 'USD',
-        payment_status: 'paid',
+        // transactions has no payment_status column; the controller maps the
+        // settled engine statuses (completed/used/checked_out) onto 'paid'.
+        status: 'completed',
         tenant_id: TEST_TENANT_ID,
         property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
         customer_id: TEST_CUSTOMER_ID,
@@ -334,13 +340,20 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
     expect(mockStripePaymentIntentsCreate).not.toHaveBeenCalled();
   });
 
-  it('resolves authoritative amount for time_exclusive_reservation from bookings table', async () => {
-    tableData.bookings = [
+  it('resolves authoritative amount for time_exclusive_reservation from the canonical transactions table', async () => {
+    // Architecture Law (payment.controller.ts resolveAuthoritativePayableAmount):
+    // ALL engine transactions live in the canonical transactions table. The
+    // legacy `bookings` table is dead and must never be queried — this test
+    // previously seeded bookings and asserted the controller read from it.
+    // It now seeds the canonical row a time_exclusive_reservation writes.
+    tableData.transactions = [
       {
-        id: 'bkg-luxury-suite',
-        total_amount: 450.0,
+        id: 'txn-bkg-luxury-suite',
+        reference_id: 'bkg-luxury-suite',
+        engine_type: 'time_exclusive_reservation',
+        amount: 450.0,
         currency: 'USD',
-        payment_status: 'pending',
+        status: 'pending',
         tenant_id: TEST_TENANT_ID,
         property_id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a55',
         customer_id: TEST_CUSTOMER_ID,
@@ -367,7 +380,8 @@ describe('Authoritative Payment Intent Resolution (F6 Invariants)', () => {
       expect.objectContaining({
         amount: 45000,
         currency: 'usd',
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) })
     );
   });
 

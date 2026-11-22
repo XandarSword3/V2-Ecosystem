@@ -1,12 +1,12 @@
-// Real engine type names — the canonical types used across the entire platform.
-// Legacy aliases (menu_service, session_access, multi_day_booking, etc.) must
-// never appear here; they are resolved to canonical types at the router layer.
-export type ModuleTemplateType =
-  | 'instant_transaction'
-  | 'shared_capacity_access'
-  | 'time_exclusive_reservation'
-  | 'ongoing_entitlement'
-  | 'platform_entitlement';
+// Real engine types — the canonical union, defined once in engines/types.ts.
+// NOTE ON NAMING: despite the historical name, `ModuleTemplateType` values are
+// the canonical engine_type strings; legacy aliases (menu_service,
+// session_access, multi_day_booking, etc.) must never appear here — they are
+// resolved at the router layer (see engines/types.ts LEGACY aliases and
+// LEGACY_ALIASES below).
+import type { EngineType } from '../engines/types.js';
+
+export type ModuleTemplateType = EngineType;
 
 export interface TemplatePermissionPreset {
   view: boolean;

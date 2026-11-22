@@ -59,9 +59,19 @@ test.describe('Layer 1 — Auth: successful login', () => {
 // 3. Failed login
 // ---------------------------------------------------------------------------
 
+/**
+ * In Next dev the first load of /login may not be hydrated when fill/click
+ * fire, silently swallowing the submit. Wait for a settled network + tick.
+ */
+async function gotoSettledLogin(page: import('@playwright/test').Page) {
+  await page.goto('http://testcorp.localhost:3000/login', { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+  await page.waitForTimeout(500);
+}
+
 test.describe('Layer 1 — Auth: failed login', () => {
   test('wrong password shows an error and stays on /login', async ({ page }) => {
-    await page.goto('http://testcorp.localhost:3000/login');
+    await gotoSettledLogin(page);
 
     await page.fill('#email', TESTCORP_ADMIN.email);
     await page.fill('#password', 'WrongPassword!999');
@@ -78,7 +88,7 @@ test.describe('Layer 1 — Auth: failed login', () => {
   });
 
   test('unknown email shows an error and stays on /login', async ({ page }) => {
-    await page.goto('http://testcorp.localhost:3000/login');
+    await gotoSettledLogin(page);
 
     await page.fill('#email', 'doesnotexist@testcorp.v2platform.com');
     await page.fill('#password', 'SomePassword!1');

@@ -59,7 +59,14 @@ function getStripe(): Stripe {
  * Falls back to the legacy env var only if the DB row has no price ID
  * set yet (e.g. during initial setup before Stripe products are created).
  */
-async function getPriceId(tier: SubscriptionTier): Promise<string> {
+/**
+ * Billing interval for a SaaS checkout session. Selected by the operator on
+ * the public pricing page ('annual' shows the discounted yearly price) and
+ * carried through the frontend body so Stripe bills the right Price.
+ */
+export type SaasBillingCycle = 'monthly' | 'annual';
+
+async function getPriceId(tier: SubscriptionTier, cycle: SaasBillingCycle = 'monthly'): Promise<string> {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('plans')
@@ -68,7 +75,12 @@ async function getPriceId(tier: SubscriptionTier): Promise<string> {
     .eq('is_active', true)
     .single();
 
-  if (!error && data?.stripe_monthly_price_id) {
+  if (cycle === 'annual') {
+    if (!error && data?.stripe_annual_price_id) {
+      return data.stripe_annual_price_id;
+    }
+    throw new Error(`Plan '${tier}' does not have an active annual price configured.`);
+  } else if (!error && data?.stripe_monthly_price_id) {
     return data.stripe_monthly_price_id;
   }
 
@@ -104,6 +116,8 @@ export interface CreateCheckoutSessionParams {
   subdomain: string;
   /** Override trial period in days (defaults to SAAS_TRIAL_DAYS env or 14) */
   trialDays?: number;
+  /** Billing interval chosen on the pricing page. Defaults to monthly. */
+  billingCycle?: SaasBillingCycle;
 }
 
 export interface CheckoutSessionResult {
@@ -119,7 +133,35 @@ export interface SubscriptionTierUpdateResult {
   subscriptionId: string;
   previousTier: SubscriptionTier;
   newTier: SubscriptionTier;
+  billingCycle: SaasBillingCycle;
   effectiveAt: Date;
+}
+
+export interface ChangeTierOptions {
+  /** Tenant the subscription belongs to, for the audit row. */
+  tenantId?: string;
+  /** Platform admin user id that initiated the change. */
+  actorUserId?: string | null;
+  /** Human/service label recorded in the audit row. */
+  actor?: string;
+}
+
+/**
+ * The billing cycle a subscription is actually on.
+ *
+ * The Stripe Price interval is authoritative: metadata can drift (it is only a
+ * copy) and a subscription created before `billing_cycle` metadata existed has
+ * none. Metadata is only the fallback for Prices whose `recurring` block is
+ * absent (metered/one-off), which a SaaS subscription should not have.
+ */
+export function resolveSubscriptionCycle(subscription: Stripe.Subscription): SaasBillingCycle {
+  const interval = subscription.items.data[0]?.price?.recurring?.interval;
+  if (interval === 'year') return 'annual';
+  if (interval === 'month' || interval === 'week' || interval === 'day') return 'monthly';
+
+  const metadataCycle = subscription.metadata?.billing_cycle;
+  if (metadataCycle === 'annual') return 'annual';
+  return 'monthly';
 }
 
 // ============================================
@@ -149,10 +191,15 @@ export class SaasBillingService {
    * metadata so the webhook can idempotently provision the tenant.
    */
   async createCheckoutSession(params: CreateCheckoutSessionParams): Promise<CheckoutSessionResult> {
-    const { tenantId, tier, operatorEmail, operatorName, subdomain, trialDays } = params;
+    const { tenantId, tier, operatorEmail, operatorName, subdomain, trialDays, billingCycle } = params;
     const effectiveTrialDays = trialDays ?? this.trialDays;
+    // Whitelist: anything other than 'annual' bills monthly. The pricing page
+    // advertises the annual discount, so an unvalidated 'annual' would silently
+    // bill the discounted customer monthly (or vice versa) — accept only the
+    // two exact strings the frontend can send.
+    const cycle: SaasBillingCycle = billingCycle === 'annual' ? 'annual' : 'monthly';
 
-    logger.info('[SAAS BILLING] Creating checkout session', { tenantId, tier, subdomain });
+    logger.info('[SAAS BILLING] Creating checkout session', { tenantId, tier, subdomain, billingCycle: cycle });
 
     // Reuse an existing Stripe customer for this email when one already exists.
     // A retried checkout (e.g. the first attempt's webhook provisioning failed
@@ -171,7 +218,7 @@ export class SaasBillingService {
       mode: 'subscription',
       line_items: [
         {
-          price: await getPriceId(tier),
+          price: await getPriceId(tier, cycle),
           quantity: 1,
         },
       ],
@@ -181,12 +228,14 @@ export class SaasBillingService {
           tenantId,
           subdomain,
           tier,
+          billing_cycle: cycle,
         },
       },
       metadata: {
         tenantId,
         subdomain,
         tier,
+        billing_cycle: cycle,
       },
       success_url: buildTenantUrl(subdomain, `/setup/success?session_id={CHECKOUT_SESSION_ID}`),
       cancel_url: buildTenantUrl(subdomain, '/pricing?cancelled=1'),
@@ -256,11 +305,18 @@ export class SaasBillingService {
   /**
    * Upgrade or downgrade a subscription to a different tier.
    * Uses proration: upgrade bills immediately, downgrade credits next cycle.
+   *
+   * The subscription's current billing interval is preserved: an annual
+   * subscription moves to the new tier's annual Price, a monthly one to the
+   * new tier's monthly Price. Before this, `getPriceId(newTier)` defaulted to
+   * monthly, so an annual Pro -> Business change silently switched the tenant
+   * to monthly Business.
    */
   async changeTier(
     stripeSubscriptionId: string,
     previousTier: SubscriptionTier,
     newTier: SubscriptionTier,
+    options: ChangeTierOptions = {},
   ): Promise<SubscriptionTierUpdateResult> {
     if (previousTier === newTier) {
       throw new Error(`Tenant is already on the '${newTier}' tier`);
@@ -273,7 +329,8 @@ export class SaasBillingService {
       throw new Error(`Subscription ${stripeSubscriptionId} has no line items`);
     }
 
-    const newPriceId = await getPriceId(newTier);
+    const billingCycle = resolveSubscriptionCycle(subscription);
+    const newPriceId = await getPriceId(newTier, billingCycle);
 
     const updated = await getStripe().subscriptions.update(stripeSubscriptionId, {
       items: [
@@ -283,19 +340,59 @@ export class SaasBillingService {
         },
       ],
       proration_behavior: 'create_prorations',
-      metadata: { tier: newTier },
+      metadata: {
+        ...subscription.metadata,
+        tier: newTier,
+        billing_cycle: billingCycle,
+      },
     });
 
     logger.info('[SAAS BILLING] Tier changed', {
       subscriptionId: stripeSubscriptionId,
       previousTier,
       newTier,
+      billingCycle,
     });
+
+    // Audit trail: who changed what, from which tier/cycle, and when. Best
+    // effort — a failed audit insert must not undo a completed Stripe change,
+    // but it must be visible in logs.
+    try {
+      const { error: auditError } = await getSupabase()
+        .from('audit_logs')
+        .insert({
+          tenant_id: options.tenantId ?? null,
+          user_id: options.actorUserId ?? null,
+          action: 'saas_subscription.tier_changed',
+          resource: 'subscriptions',
+          resource_id: stripeSubscriptionId,
+          old_value: { tier: previousTier, billing_cycle: billingCycle },
+          new_value: { tier: newTier, billing_cycle: billingCycle },
+          details: {
+            actor: options.actor ?? 'platform_admin',
+            previousPriceId: currentItem.price?.id ?? null,
+            newPriceId,
+            effectiveAt: new Date(updated.current_period_start * 1000).toISOString(),
+          },
+        });
+      if (auditError) {
+        logger.error('[SAAS BILLING] Tier change succeeded but audit insert failed', {
+          subscriptionId: stripeSubscriptionId,
+          error: auditError.message,
+        });
+      }
+    } catch (auditErr) {
+      logger.error('[SAAS BILLING] Tier change audit insert threw', {
+        subscriptionId: stripeSubscriptionId,
+        error: auditErr instanceof Error ? auditErr.message : String(auditErr),
+      });
+    }
 
     return {
       subscriptionId: stripeSubscriptionId,
       previousTier,
       newTier,
+      billingCycle,
       effectiveAt: new Date(updated.current_period_start * 1000),
     };
   }
@@ -341,6 +438,28 @@ export class SaasBillingService {
     });
   }
 
+  /**
+   * Pause collection on a subscription (operator suspension). Access is
+   * blocked locally as well; without this call Stripe would keep billing a
+   * suspended tenant.
+   */
+  async suspendSubscription(stripeSubscriptionId: string): Promise<void> {
+    await getStripe().subscriptions.update(stripeSubscriptionId, {
+      pause_collection: { behavior: 'void' },
+    });
+    logger.info('[SAAS BILLING] Subscription collection paused', { stripeSubscriptionId });
+  }
+
+  /**
+   * Resume collection after a suspension.
+   */
+  async resumeSubscription(stripeSubscriptionId: string): Promise<void> {
+    await getStripe().subscriptions.update(stripeSubscriptionId, {
+      pause_collection: '',
+    });
+    logger.info('[SAAS BILLING] Subscription collection resumed', { stripeSubscriptionId });
+  }
+
   // ------------------------------------------
   // Webhook signature verification
   // ------------------------------------------
@@ -372,7 +491,10 @@ export class SaasBillingService {
       past_due: 'past_due',
       unpaid: 'past_due',      // treat unpaid same as past_due (both need dunning)
       canceled: 'cancelled',
-      incomplete: 'trialing',  // payment not yet confirmed — stay in trial-like state
+      // Payment is not confirmed yet (SCA pending, first invoice failed, ...).
+      // Granting trial/active access here is a revenue leak: map it to the
+      // read-only past_due state until Stripe confirms the payment.
+      incomplete: 'past_due',
       incomplete_expired: 'cancelled',
       paused: 'suspended',     // Stripe pause = our suspended
     };

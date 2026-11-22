@@ -31,7 +31,7 @@ import {
 
 export interface Module {
   id: string;
-  engine_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement';
+  engine_type: 'instant_transaction' | 'time_exclusive_reservation' | 'shared_capacity_access' | 'ongoing_entitlement' | 'platform_entitlement';
   name: string;
   slug: string;
   description?: string;

@@ -9,7 +9,6 @@ import { AppError } from '../../../utils/AppError.js';
 export type CustomizationType = 'add' | 'remove' | 'swap' | 'upgrade' | 'replace';
 export type CustomizableEntityType =
   | 'catalog_item'
-  | 'kiosk_item'
   | 'accommodation_unit'
   | 'capacity_window'
   | 'spa_service'

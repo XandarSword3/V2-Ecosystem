@@ -339,6 +339,10 @@ describe('Account Lockout', () => {
     await markEmailVerified(lockedUserEmail);
   });
 
+  // This test intentionally walks the progressive-delay staircase
+  // ([0, 2s, 5s, 15s, 30s] = ~52s of deliberate sleep) and then verifies the
+  // lockout. The default 60s budget left no room once Redis moved to Upstash
+  // (network round trips on every lockout read/write), so give it headroom.
   it('should lock account after max failed attempts', async () => {
     for (let i = 0; i < 5; i++) {
       await request(app)
@@ -351,7 +355,7 @@ describe('Account Lockout', () => {
       .send({ email: lockedUserEmail, password: 'WrongPassword', captchaToken: 'dummy-valid-captcha-token' });
 
     expect([401, 423, 429]).toContain(response.status);
-  });
+  }, 120_000);
 
   it('should reject correct password during lockout', async () => {
     const response = await request(app)

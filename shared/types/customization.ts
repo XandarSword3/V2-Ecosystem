@@ -23,7 +23,6 @@ export type CustomizationType =
  */
 export type CustomizableEntityType =
   | 'catalog_item'       // Menu/kiosk-service catalog items
-  | 'kiosk_item'         // Kiosk items
   | 'accommodation_unit' // Accommodation units
   | 'capacity_window'    // Capacity windows (pool sessions, timed slots, etc.)
   | 'spa_service'    // Spa services (future)

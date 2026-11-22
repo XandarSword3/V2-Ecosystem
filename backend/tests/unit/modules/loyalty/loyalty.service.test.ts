@@ -77,7 +77,7 @@ function createMockRequest(overrides: Record<string, unknown> = {}): Record<stri
     params: {},
     query: {},
     body: {},
-    user: { id: 'admin-user-1', userId: 'admin-user-1' },
+    user: { id: 'admin-user-1', userId: 'admin-user-1', tenantId: 'tenant-1' },
     ...overrides,
   };
 }

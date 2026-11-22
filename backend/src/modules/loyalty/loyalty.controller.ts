@@ -219,10 +219,14 @@ export class LoyaltyController {
 
       const { userId, points, description, referenceType, referenceId } = validation.data;
       const propertyId = getPropertyId(req);
+      const tenantId = req.user?.tenantId || req.tenant?.id;
+      if (!tenantId) {
+        return res.status(403).json({ success: false, error: 'This action requires a tenant-scoped account' });
+      }
       const supabase = getSupabase();
 
       // Get settings scoped to property
-      let settingsQuery = supabase.from('loyalty_settings').select('*');
+      let settingsQuery = supabase.from('loyalty_settings').select('*').eq('tenant_id', tenantId);
       if (propertyId) settingsQuery = settingsQuery.eq('property_id', propertyId);
       const { data: settings } = await settingsQuery.limit(1).single();
 
@@ -245,6 +249,7 @@ export class LoyaltyController {
           p_points: points,
           p_order_id: referenceId || '00000000-0000-0000-0000-000000000000',
           p_dollar_value: dollarValue,
+          p_tenant_id: tenantId,
         }
       );
 

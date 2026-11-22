@@ -89,6 +89,28 @@ async function getTenantIdForPurchase(req: Request, propertyId?: string): Promis
   throw new Error('Unable to resolve tenant for this request — no tenant context and no property context');
 }
 
+/**
+ * `gift_card_transactions` requires a non-null property_id (the gift card
+ * itself allows null). A customer-facing purchase may not carry a property,
+ * so fall back to the tenant's first property rather than failing the audit
+ * row after the card was already issued.
+ */
+async function resolveTransactionPropertyId(tenantId: string, preferred?: string): Promise<string> {
+  if (preferred) return preferred;
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('properties')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data?.id) {
+    throw new Error(`Could not resolve a property for tenant ${tenantId}`);
+  }
+  return data.id as string;
+}
+
 // Validation schemas
 const createGiftCardSchema = z.object({
   amount: z.number().positive().min(10).max(1000).optional(),
@@ -134,7 +156,12 @@ function generateGiftCardCode(): string {
   return code;
 }
 
-// In-process mutex to prevent same-card concurrent redemption races.
+// In-process serialisation for the same card code. This is an optimisation
+// only — it keeps the pre-check and the RPC from interleaving inside one
+// process. Correctness does NOT depend on it:
+// redeem_giftcard_atomic() does SELECT ... FOR UPDATE on the gift_cards row,
+// so a second backend instance (or the pricing resolver, which does not take
+// this lock) cannot spend the same balance twice.
 const giftCardLocks = new Map<string, Promise<void>>();
 
 async function acquireGiftCardLock(code: string): Promise<() => void> {
@@ -215,14 +242,20 @@ export class GiftCardController {
 
       if (insertError) throw insertError;
 
-      await supabase.from('gift_card_transactions').insert({
+      // tenant_id/property_id are NOT NULL on gift_card_transactions; the old
+      // insert omitted both and its error was ignored, so the audit trail was
+      // silently empty for every purchase.
+      const { error: auditError } = await supabase.from('gift_card_transactions').insert({
         gift_card_id: giftCard.id,
         transaction_type: 'purchase',
         amount: finalAmount,
         balance_after: finalAmount,
         notes: 'Gift card purchased',
-        performed_by: userId,
+        performed_by: userId ?? null,
+        tenant_id,
+        property_id: await resolveTransactionPropertyId(tenant_id, propertyId),
       });
+      if (auditError) throw auditError;
 
       if (recipientEmail) {
         let purchaserName: string | undefined = senderName;
@@ -358,14 +391,16 @@ export class GiftCardController {
       const { code, amount, referenceType, referenceId } = validation.data;
       const upperCode = code.toUpperCase();
       const propertyId = getPropertyId(req);
+      const tenantId = await getTenantIdForPurchase(req, propertyId);
       const supabase = getSupabase();
 
-      const releaseLock = await acquireGiftCardLock(upperCode);
+      const releaseLock = await acquireGiftCardLock(`${tenantId}:${upperCode}`);
       try {
         let cardQuery = supabase
           .from('gift_cards')
           .select('id, current_balance, status, expires_at')
-          .eq('code', upperCode);
+          .eq('code', upperCode)
+          .eq('tenant_id', tenantId);
         if (propertyId) cardQuery = cardQuery.eq('property_id', propertyId);
 
         const { data: card, error: cardError } = await cardQuery.single();
@@ -389,6 +424,7 @@ export class GiftCardController {
           p_code: upperCode,
           p_amount: amount,
           p_order_id: referenceId || null,
+          p_tenant_id: tenantId,
         });
 
         if (rpcError) {
@@ -647,14 +683,17 @@ export class GiftCardController {
 
       if (insertError) throw insertError;
 
-      await supabase.from('gift_card_transactions').insert({
+      const { error: auditError } = await supabase.from('gift_card_transactions').insert({
         gift_card_id: giftCard.id,
         transaction_type: 'purchase',
         amount: finalAmount,
         balance_after: finalAmount,
         notes: 'Gift card created by admin',
-        performed_by: userId,
+        performed_by: userId ?? null,
+        tenant_id,
+        property_id: propertyId,
       });
+      if (auditError) throw auditError;
 
       if (recipientEmail) {
         let senderName: string | undefined;
@@ -717,14 +756,21 @@ export class GiftCardController {
         return res.status(404).json({ success: false, error: 'Gift card not found' });
       }
 
-      await supabase.from('gift_card_transactions').insert({
+      // Wrong column names (`type`/`created_by`) made this insert fail every
+      // time, and the error was ignored. Disabling is an adjustment, not a
+      // refund (no money moves), and the row needs tenant/property scope.
+      const tenant_id = await getTenantIdForProperty(propertyId);
+      const { error: auditError } = await supabase.from('gift_card_transactions').insert({
         gift_card_id: id,
-        type: 'refund',
+        transaction_type: 'adjustment',
         amount: 0,
         balance_after: result.current_balance,
         notes: reason || 'Gift card disabled by admin',
-        created_by: req.user?.id,
+        performed_by: req.user?.id ?? null,
+        tenant_id,
+        property_id: propertyId,
       });
+      if (auditError) throw auditError;
 
       res.json({
         success: true,

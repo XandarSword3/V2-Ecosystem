@@ -28,10 +28,9 @@ import {
 // ==========================================
 
 export type CustomizationType = 'add' | 'remove' | 'swap' | 'upgrade' | 'replace';
-export type CustomizableEntityType = 
+export type CustomizableEntityType =
   | 'catalog_item'
-  | 'kiosk_item' 
-  | 'accommodation_unit' 
+  | 'accommodation_unit'
   | 'capacity_window' 
   | 'spa_service' 
   | 'activity' 

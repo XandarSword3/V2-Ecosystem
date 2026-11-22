@@ -102,11 +102,11 @@ describe('module-utils', () => {
     const bookingModule = createModule({ name: 'AccommodationUnits', engine_type: 'time_exclusive_reservation' });
     const sessionModule = createModule({ name: 'Pool', engine_type: 'shared_capacity_access' });
 
-    expect(getModuleDefaultDescription(menuModule)).toContain('menu and place orders');
+    expect(getModuleDefaultDescription(menuModule)).toContain('offerings and place orders');
     expect(getModuleDefaultDescription(bookingModule)).toContain('Book your stay');
     expect(getModuleDefaultDescription(sessionModule)).toContain('Purchase tickets and passes');
 
-    expect(getModuleStatLabel(menuModule)).toBe('Menu Items');
+    expect(getModuleStatLabel(menuModule)).toBe('Catalog Items');
     expect(getModuleStatLabel(bookingModule)).toBe('Units Available');
     expect(getModuleStatLabel(sessionModule)).toBe('Daily Visitors');
 

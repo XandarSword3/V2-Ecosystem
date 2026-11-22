@@ -221,7 +221,9 @@ describe('Admin module menu route coverage', () => {
 
     render(<DynamicMenuPage />);
 
-    await screen.findByText('MenuService Menu');
+    // Header copy changed from 'MenuService Menu' to '<module name> Catalog'
+    // (module-name-driven title). Wait on a data row like the other tests do.
+    await screen.findByText('Burger Deluxe');
 
     await user.click(screen.getByRole('button', { name: /Add Item/i }));
     expect(await screen.findByText('Add New Menu Item')).toBeInTheDocument();

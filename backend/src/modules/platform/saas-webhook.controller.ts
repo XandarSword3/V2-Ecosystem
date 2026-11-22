@@ -47,33 +47,19 @@ export async function handleSaasStripeWebhook(req: Request, res: Response): Prom
   // checkout.session.completed is the one event where a downstream failure must
   // NOT be silently acked: it is the only path that turns a Stripe subscription
   // into a provisioned tenant, so if provisioning fails we must return non-2xx
-  // and let Stripe retry the delivery. Everything else is a best-effort
-  // billing-status sync and keeps the fast-ack + async behaviour.
-  if (event.type === 'checkout.session.completed') {
-    try {
-      await processWebhookEvent(event);
-      res.status(200).json({ received: true });
-    } catch (err) {
-      logger.error('[SAAS WEBHOOK] checkout.session.completed processing failed', {
-        eventId: event.id,
-        err: err instanceof Error ? { message: err.message, stack: err.stack } : err,
-      });
-      res.status(500).json({ error: 'Webhook processing failed' });
-    }
-    return;
+  // Process all webhook events synchronously so that any DB/network failure returns
+  // HTTP 500, prompting Stripe to automatically retry delivery with exponential backoff.
+  try {
+    await processWebhookEvent(event);
+    res.status(200).json({ received: true });
+  } catch (err) {
+    logger.error('[SAAS WEBHOOK] Webhook event processing failed', {
+      eventId: event.id,
+      eventType: event.type,
+      err: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+    });
+    res.status(500).json({ error: 'Webhook processing failed' });
   }
-
-  // Acknowledge immediately — Stripe expects 2xx within 30 s
-  res.status(200).json({ received: true });
-
-  // Process asynchronously so we never block the response
-  processWebhookEvent(event).catch((err) =>
-    logger.error('[SAAS WEBHOOK] Unhandled processing error', { 
-      eventId: event.id, 
-      eventType: event.type, 
-      err: err instanceof Error ? { message: err.message, stack: err.stack } : err 
-    }),
-  );
 }
 
 async function processWebhookEvent(event: Stripe.Event): Promise<void> {
@@ -105,7 +91,9 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
 
       if (!tenantId || !subdomain) {
         logger.error('[SAAS WEBHOOK] checkout.session.completed missing metadata', { sessionId: session.id });
-        break;
+        // Fail loud: a 200 here tells Stripe the event is handled, so the
+        // customer is charged and never provisioned, with no retry.
+        throw new Error(`checkout.session.completed missing tenantId/subdomain metadata (session ${session.id})`);
       }
 
       // No platform-root check needed here. provision_tenant_on_activate's only
@@ -121,7 +109,16 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       // tenant and therefore rejected every real signup, silently, always.
 
       const subscription = await resolveSubscription(session.subscription as string);
-      if (!subscription) break;
+      if (!subscription) {
+        logger.error('[SAAS WEBHOOK] Unable to resolve subscription for completed checkout', {
+          sessionId: session.id,
+          subscriptionId: session.subscription,
+        });
+        // Same reasoning as missing metadata: never ACK an event we could not
+        // act on. Stripe will retry; if it keeps failing it ends up in the
+        // Stripe dashboard's failed-events queue for an operator.
+        throw new Error(`Unable to resolve subscription ${String(session.subscription)} for session ${session.id}`);
+      }
 
       // If the subscription is already cancelled there is nothing left to
       // provision. This is the retry of a checkout whose provisioning failed on
@@ -137,14 +134,21 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
         break;
       }
 
+      const operatorEmail = session.customer_details?.email || session.customer_email || '';
+      const operatorName = session.customer_details?.name || '';
+      if (!operatorEmail) {
+        logger.error('[SAAS WEBHOOK] checkout.session.completed has no operator email', { sessionId: session.id });
+        throw new Error(`checkout.session.completed has no operator email (session ${session.id})`);
+      }
+
       try {
         const provisionResult = await provisioning.provision({
           stripeSubscriptionId: subscription.id,
           stripeCustomerId: subscription.customer as string,
           tier,
           billingStatus: SaasBillingService.mapStripeToBillingStatus(subscription.status),
-          operatorEmail: session.customer_details?.email ?? '',
-          operatorName: session.customer_details?.name ?? '',
+          operatorEmail,
+          operatorName,
           subdomain,
           trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
         });
@@ -234,6 +238,13 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
       if (!subscription) break;
 
       const newStatus = SaasBillingService.mapStripeToBillingStatus(subscription.status);
+      if (invoice.total > 0 && invoice.amount_paid < invoice.total) {
+        logger.warn('[SAAS WEBHOOK] invoice.paid received partial or zero payment', {
+          invoiceId: invoice.id,
+          total: invoice.total,
+          amountPaid: invoice.amount_paid,
+        });
+      }
       await provisioning.updateBillingStatus(subscriptionId, newStatus);
 
       // Record billing history for idempotency

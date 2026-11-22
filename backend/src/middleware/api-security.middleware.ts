@@ -375,6 +375,30 @@ export async function apiKeyValidator(
       return;
     }
 
+    // Verify tenant apiAccess entitlement
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', keyRecord.user_id)
+      .maybeSingle();
+
+    if (userRow?.tenant_id) {
+      const { data: tenantRow } = await supabase
+        .from('tenants')
+        .select('feature_limits, subscription_tier')
+        .eq('id', userRow.tenant_id)
+        .maybeSingle();
+
+      const limits = tenantRow?.feature_limits as Record<string, unknown> | null;
+      if (limits?.apiAccess === false) {
+        res.status(403).json({
+          error: 'Forbidden',
+          message: `API access is not available on your ${tenantRow?.subscription_tier || 'current'} plan. Please upgrade to access this feature.`,
+        });
+        return;
+      }
+    }
+
     // Attach key info for downstream use
     (req as any).apiKeyId = keyRecord.id;
     (req as any).apiKeyUserId = keyRecord.user_id;

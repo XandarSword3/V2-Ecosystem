@@ -9,9 +9,11 @@ import http from 'http';
 import { TEST_CONFIG, getTestApiBaseUrl, getTestDatabaseUrl, getTestRedisUrl } from './config';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { assertLocalTestEnvironment } from '../env-guard';
 
-// Load .env.test first for overrides
-dotenv.config({ path: path.resolve(__dirname, '../../.env.test') });
+// Load .env.test first and make it authoritative (Task 0b). Without
+// `override: true`, a shell DATABASE_URL / REDIS_URL silently wins.
+dotenv.config({ path: path.resolve(__dirname, '../../.env.test'), override: true });
 // Load backend .env but DO NOT override process env (CI passes live URLs/keys).
 // This keeps local runs convenient while respecting explicitly-provided variables.
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
@@ -45,6 +47,32 @@ process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 process.env.JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 process.env.CORS_ORIGINS = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000';
 process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || process.env.CORS_ORIGINS;
+
+// Containment: integration runs must never reach a third-party service.
+//
+// .env.test deliberately does not override these keys, so the `dotenv.config`
+// above has just pulled live values out of backend/.env. Blank them here --
+// before src/app (and therefore EmailService / Stripe / config.database.url)
+// is imported -- so the affected code paths fail closed instead of talking to
+// Gmail, Sentry, the remote Supabase pooler, or the live Stripe account.
+//
+// Symptom this prevents: auth-flow's forgot-password test took ~1.5s because
+// nodemailer actually delivered a password-reset token over smtp.gmail.com.
+process.env.SMTP_HOST = '';
+process.env.SMTP_PORT = '';
+process.env.SMTP_USER = '';
+process.env.SMTP_PASS = '';
+process.env.SMTP_FROM = '';
+process.env.SMTP_FROM_NAME = '';
+process.env.SENTRY_DSN = '';
+process.env.SUPABASE_DB_PASSWORD = '';
+process.env.STRIPE_SECRET_KEY = '';
+process.env.STRIPE_WEBHOOK_SECRET = '';
+process.env.STRIPE_SAAS_WEBHOOK_SECRET = '';
+
+// Task 0b: after both dotenv loads and the containment blanks, refuse to run
+// against anything but loopback (Redis on 6380).
+assertLocalTestEnvironment(process.env, 'integration');
 
 interface IntegrationLifecycleState {
   initialized: boolean;

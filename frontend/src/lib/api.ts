@@ -364,9 +364,50 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// ---------------------------------------------------------------------------
+// Two-tier billing gate (frontend tier).
+//
+// The backend tenantAccess middleware returns actionable 402 payloads (with
+// billing_status + billing_portal_available) ONLY on operator surfaces
+// (/admin, /staff, /platform), and a sanitized 503 on public storefronts.
+// There is no global billing UI mounted everywhere, so the admin chrome needs
+// a signal. We dispatch a window CustomEvent consumed by
+// <BillingAlertBanner /> mounted in the admin/staff layouts:
+//
+//   'v2:billing-alert' { billingStatus, message, portalAvailable }
+//      — 402 on an operator request (writes are failing until payment is
+//        fixed) OR an X-Billing-Warning on a response (past_due grace
+//        period). The banner derives its tier (warning vs. blocked) from
+//        billing_status.
+// ---------------------------------------------------------------------------
+const BILLING_ALERT_EVENT = 'v2:billing-alert';
+
+function dispatchBillingAlert(detail: {
+  billingStatus?: string;
+  message: string;
+  portalAvailable?: boolean;
+}): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(BILLING_ALERT_EVENT, { detail }));
+}
+
 // Response interceptor to handle token refresh with queue and retry logic
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Success responses can still carry a past_due warning header (read-only
+    // grace period on operator surfaces).
+    const billingWarning = response.headers?.['x-billing-warning'];
+    if (billingWarning) {
+      dispatchBillingAlert({
+        billingStatus: 'past_due',
+        message: String(billingWarning) === 'payment_overdue'
+          ? 'Your subscription payment is overdue. Writes will be blocked until payment is updated.'
+          : `Billing notice: ${billingWarning}`,
+        portalAvailable: true,
+      });
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -422,6 +463,19 @@ api.interceptors.response.use(
           localStorage.removeItem('refreshToken');
         }
       }
+    }
+
+    // Two-tier billing gate: an actionable 402 on an operator route means the
+    // tenant's subscription is past_due (writes blocked) or suspended. Notify
+    // the admin chrome so it can surface the banner/portal CTA. Don't retry —
+    // no amount of retrying fixes an unpaid invoice.
+    if (error.response?.status === 402 && error.response?.data?.billing_status) {
+      const d = error.response.data;
+      dispatchBillingAlert({
+        billingStatus: d.billing_status,
+        message: d.error ?? 'Subscription billing issue — actions are temporarily blocked.',
+        portalAvailable: d.billing_portal_available ?? d.billing_status === 'suspended',
+      });
     }
 
     return Promise.reject(error);

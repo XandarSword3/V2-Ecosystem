@@ -101,15 +101,32 @@ export class IdempotencyGuard {
   ): Promise<IdempotencyResult<T>> {
     const supabase = getSupabase();
 
-    // Step 1: Check for existing key
-    const { data: existing } = await supabase
-      .from('engine_idempotency_keys')
-      .select('*')
-      .eq('key', key)
-      .single();
+    // Step 1: Atomically claim the key. The RPC uses INSERT ... ON CONFLICT
+    // DO NOTHING under a row lock; it never downgrades a completed key and it
+    // reclaims only failed or expired claims.
+    const { data: claim, error: claimError } = await supabase.rpc(
+      'claim_engine_idempotency_key',
+      {
+        p_key: key,
+        p_tenant_id: tenantId,
+        p_engine_type: engineType,
+        p_entity_id: entityId,
+        p_action: action,
+        p_ttl_seconds: Math.max(1, Math.ceil(this.defaultTtlMs / 1000)),
+      },
+    );
 
-    if (existing) {
-      if (existing.status === 'completed') {
+    if (claimError) {
+      // Fail closed: running unprotected is worse than making the caller retry.
+      logger.error('[IDEMPOTENCY] Failed to claim idempotency key', {
+        key,
+        error: claimError.message,
+      });
+      throw new Error(`Idempotency claim failed for key '${key}': ${claimError.message}`);
+    }
+
+    if (!claim?.claimed) {
+      if (claim?.status === 'completed') {
         logger.info('[IDEMPOTENCY] Duplicate request — returning cached result', {
           key,
           engineType,
@@ -119,55 +136,30 @@ export class IdempotencyGuard {
         return {
           isNew: false,
           isDuplicate: true,
-          result: (existing.result_data as T) ?? ({} as T),
+          result: (claim.result_data as T) ?? ({} as T),
           key,
         };
       }
 
-      if (existing.status === 'processing') {
-        logger.warn('[IDEMPOTENCY] Request already being processed (conflict)', {
-          key,
-          engineType,
-          entityId,
-          action,
-        });
-        throw new IdempotencyConflictError(
-          `Operation with key '${key}' is already being processed`,
-          key,
-        );
-      }
-    }
-
-    // Step 2: Claim the key (insert with status='processing')
-    const expiresAt = new Date(Date.now() + this.defaultTtlMs).toISOString();
-    
-    const { error: claimError } = await supabase
-      .from('engine_idempotency_keys')
-      .upsert({
+      logger.warn('[IDEMPOTENCY] Request already being processed (conflict)', {
         key,
-        tenant_id: tenantId,
-        engine_type: engineType,
-        entity_id: entityId,
+        engineType,
+        entityId,
         action,
-        status: 'processing',
-        created_at: new Date().toISOString(),
-        expires_at: expiresAt,
-      }, { onConflict: 'key' });
-
-    if (claimError) {
-      logger.error('[IDEMPOTENCY] Failed to claim idempotency key', {
-        key,
-        error: claimError.message,
       });
-      // If claim fails, proceed without idempotency protection
-      // (better to process than to block entirely)
+      throw new IdempotencyConflictError(
+        `Operation with key '${key}' is already being processed`,
+        key,
+      );
     }
 
-    // Step 3: Execute the operation
+    // Step 2: Execute the operation
     try {
       const result = await operation();
 
-      // Step 4: Store the result
+      // Step 3: Store the result. Only update a row that is still processing,
+      // so an expired-then-reclaimed key cannot be overwritten by the old
+      // worker after it finishes.
       await supabase
         .from('engine_idempotency_keys')
         .update({
@@ -175,7 +167,8 @@ export class IdempotencyGuard {
           result_data: result as Record<string, unknown>,
           completed_at: new Date().toISOString(),
         })
-        .eq('key', key);
+        .eq('key', key)
+        .eq('status', 'processing');
 
       logger.info('[IDEMPOTENCY] Operation completed and result cached', {
         key,
@@ -191,7 +184,8 @@ export class IdempotencyGuard {
         key,
       };
     } catch (err) {
-      // Mark as failed so retries can re-attempt
+      // Mark as failed so retries can re-attempt. Guarded by status so a key
+      // reclaimed by another worker is not clobbered.
       await supabase
         .from('engine_idempotency_keys')
         .update({
@@ -199,7 +193,8 @@ export class IdempotencyGuard {
           result_data: { error: err instanceof Error ? err.message : String(err) },
           completed_at: new Date().toISOString(),
         })
-        .eq('key', key);
+        .eq('key', key)
+        .eq('status', 'processing');
 
       throw err;
     }

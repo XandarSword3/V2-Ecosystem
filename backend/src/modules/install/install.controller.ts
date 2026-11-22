@@ -7,8 +7,8 @@
  *   - A "machine ID" is derived from stable OS identifiers (hostname + primary
  *     MAC address), hashed to a fixed string, and stored in system_config on
  *     first install.
- *   - GET  /api/install/status  → { initialized: bool }   (public, no auth)
- *   - POST /api/install         → creates roles + super_admin + seeds site state
+ *   - GET  /api/install/status  Ã¢â€ â€™ { initialized: bool }   (public, no auth)
+ *   - POST /api/install         Ã¢â€ â€™ creates roles + super_admin + seeds site state
  *                                 only succeeds when NOT yet initialized.
  *
  * After a successful POST the caller receives a full JWT pair so the browser
@@ -17,7 +17,6 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import os from 'os';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -38,42 +37,6 @@ import { logger } from '../../utils/logger.js';
  */
 function isInstallEnabled(): boolean {
   return process.env.INSTALL_ENABLED === 'true';
-}
-
-// ---------------------------------------------------------------------------
-// Machine ID
-// ---------------------------------------------------------------------------
-
-/**
- * Derives a stable machine identifier from the host's OS and primary network
- * interface.  The result is a hex string that does not change across reboots
- * unless the host is re-imaged or its primary NIC is replaced.
- *
- * Derivation:
- *   SHA-256( hostname + ":" + firstNonLoopbackMAC )
- *
- * We deliberately avoid packages like `node-machine-id` so there are no
- * additional runtime dependencies.
- */
-function deriveMachineId(): string {
-  const hostname = os.hostname();
-
-  // Walk network interfaces to find the first real (non-loopback) MAC address.
-  let mac = 'no-mac';
-  const ifaces = os.networkInterfaces();
-  outer: for (const name of Object.keys(ifaces)) {
-    for (const iface of ifaces[name] ?? []) {
-      if (!iface.internal && iface.mac && iface.mac !== '00:00:00:00:00:00') {
-        mac = iface.mac;
-        break outer;
-      }
-    }
-  }
-
-  return crypto
-    .createHash('sha256')
-    .update(`${hostname}:${mac}`)
-    .digest('hex');
 }
 
 // ---------------------------------------------------------------------------
@@ -100,12 +63,26 @@ const installSchema = z.object({
 
 /**
  * Returns { initialized: boolean, storedMachineId: string | null }.
- * Never throws — treats any DB error as "not initialized" so a broken
+ * Never throws Ã¢â‚¬â€ treats any DB error as "not initialized" so a broken
  * install state never permanently locks the wizard.
  */
 async function getInstallState(): Promise<{ initialized: boolean; storedMachineId: string | null }> {
   const supabase = getSupabase();
 
+  // Immutable installation marker. The old machine-id check re-opened the
+  // public installer whenever a container was recreated (new MAC/hostname),
+  // allowing anyone to mint a fresh super_admin. The token never changes.
+  const { data: tokenRow } = await supabase
+    .from('system_config')
+    .select('value')
+    .eq('key', 'install.token')
+    .maybeSingle();
+  if (tokenRow) {
+    return { initialized: true, storedMachineId: null };
+  }
+
+  // Backward compatibility for installs completed before the token existed.
+  // Presence of *any* install marker means this system was already installed.
   const { data, error } = await supabase
     .from('system_config')
     .select('value')
@@ -120,6 +97,27 @@ async function getInstallState(): Promise<{ initialized: boolean; storedMachineI
   return { initialized: !!storedMachineId, storedMachineId };
 }
 
+/**
+ * A super_admin existing in `users` is the authoritative "already installed"
+ * signal. Checked before the public installer writes anything so an ephemeral
+ * host or a lost marker can never reopen root provisioning.
+ */
+async function superAdminExists(): Promise<boolean> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('scope', 'super_admin')
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    // Fail closed: if we cannot prove the system is fresh, do not install.
+    logger.error('Install: failed to check for existing super_admin', { error: error.message });
+    return true;
+  }
+  return !!data;
+}
+
 // ---------------------------------------------------------------------------
 // Controllers
 // ---------------------------------------------------------------------------
@@ -131,9 +129,9 @@ async function getInstallState(): Promise<{ initialized: boolean; storedMachineI
  * the install page or redirect to login.
  *
  * The comparison is:
- *   currentMachineId === storedMachineId  →  already initialized, skip wizard
- *   storedMachineId is null               →  first boot, show install page
- *   IDs differ                            →  server was migrated, re-run install
+ *   currentMachineId === storedMachineId  Ã¢â€ â€™  already initialized, skip wizard
+ *   storedMachineId is null               Ã¢â€ â€™  first boot, show install page
+ *   IDs differ                            Ã¢â€ â€™  server was migrated, re-run install
  *                                            (returns initialized: false so the
  *                                             wizard re-appears and the operator
  *                                             can confirm ownership)
@@ -149,22 +147,15 @@ export async function getInstallStatus(req: Request, res: Response, next: NextFu
       });
     }
 
-    const currentId = deriveMachineId();
-    const { initialized, storedMachineId } = await getInstallState();
-
-    const machineMatch = initialized && storedMachineId === currentId;
+    const { initialized } = await getInstallState();
+    const hasRoot = await superAdminExists();
+    const isInitialized = initialized || hasRoot;
 
     return res.json({
       success: true,
       data: {
-        initialized: machineMatch,
-        // Surface whether this looks like a server migration vs first boot.
-        // The frontend can show a different message for each case.
-        reason: !initialized
-          ? 'first_boot'
-          : !machineMatch
-          ? 'machine_mismatch'
-          : 'ok',
+        initialized: isInitialized,
+        reason: isInitialized ? 'ok' : 'first_boot',
       },
     });
   } catch (err) {
@@ -212,19 +203,20 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
     }
     const { businessName, adminEmail, adminPassword, adminFullName } = parsed.data;
 
-    // 2. Guard: already initialized?
-    const currentId = deriveMachineId();
-    const { initialized, storedMachineId } = await getInstallState();
-
-    if (initialized && storedMachineId === currentId) {
+    // 2. Guard: already initialized? Any existing super_admin or install
+    // marker hard-blocks the public installer. Machine identity is no longer
+    // part of this decision: container recreation must never reopen root
+    // provisioning.
+    const { initialized } = await getInstallState();
+    if (initialized || (await superAdminExists())) {
       return res.status(409).json({
         success: false,
-        error: 'System is already initialized on this machine.',
+        error: 'System is already initialized. Use the normal login flow.',
       });
     }
 
     // 3. Seed core roles (idempotent via ON CONFLICT DO NOTHING)
-    // White-label roles only — no venue-specific names
+    // White-label roles only Ã¢â‚¬â€ no venue-specific names
     const rolesToSeed = [
       { name: 'super_admin',  display_name: 'Super Administrator', description: 'Full system access',          business_unit: null },
       { name: 'admin',        display_name: 'Administrator',       description: 'Property-level admin',        business_unit: null },
@@ -262,7 +254,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
 
     // 0.7 re-verification finding: `scope` defaults to 'customer' at the DB level
     // (see provisioning.service.ts). login() treats users.scope as the sole source
-    // of truth — it derives both the JWT `roles` claim and the mandatory-2FA
+    // of truth Ã¢â‚¬â€ it derives both the JWT `roles` claim and the mandatory-2FA
     // requirement from this column alone, not from user_roles. Without this explicit
     // override, the installer's own account would authenticate as super_admin only
     // for the one-shot JWT this endpoint hands back directly; their very next real
@@ -288,22 +280,53 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
 
     createdUserId = newUser.id;
 
-    // 5. FIX BUG-03: Create a default property so all property-scoped module queries work
-    const { data: defaultProperty, error: propError } = await supabase
-      .from('properties')
-      .insert({
-        name: businessName,
-        slug: businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-        is_active: true,
-        owner_id: newUser.id,
-      })
+    // 5. FIX BUG-03 / M-9: Create a default property with valid schema (tenant_id required; slug/owner_id do not exist on properties)
+    const { data: existingTenant } = await supabase
+      .from('tenants')
       .select('id')
-      .single();
+      .limit(1)
+      .maybeSingle();
 
-    if (propError) {
-      logger.warn('Install: default property creation failed (non-fatal)', { error: propError.message });
-    } else {
-      logger.info('Install: default property created', { propertyId: defaultProperty.id });
+    let tenantId = existingTenant?.id;
+    if (!tenantId) {
+      const tenantSubdomain = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'default';
+      const { data: newTenant } = await supabase
+        .from('tenants')
+        .insert({
+          name: businessName,
+          subdomain: tenantSubdomain,
+          billing_status: 'active',
+          subscription_tier: 'enterprise',
+        })
+        .select('id')
+        .single();
+      tenantId = newTenant?.id;
+    }
+
+    if (tenantId) {
+      const { data: defaultProperty, error: propError } = await supabase
+        .from('properties')
+        .insert({
+          name: businessName,
+          is_active: true,
+          tenant_id: tenantId,
+        })
+        .select('id')
+        .single();
+
+      if (propError) {
+        logger.warn('Install: default property creation failed', { error: propError.message });
+      } else {
+        logger.info('Install: default property created', { propertyId: defaultProperty.id });
+        if (newUser.id) {
+          await supabase.from('user_property_access').insert({
+            user_id: newUser.id,
+            property_id: defaultProperty.id,
+            tenant_id: tenantId,
+            access_level: 'admin',
+          });
+        }
+      }
     }
 
     // 6. Seed site_settings
@@ -326,14 +349,17 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       },
     ], { onConflict: 'key' });
 
-    // 7. Persist machine_id — this is what future status checks compare against
+    // 7. Persist machine_id Ã¢â‚¬â€ this is what future status checks compare against
+    // Immutable installation marker; never derived from host hardware, so a
+    // rebuilt container cannot look like a fresh install.
+    const installToken = crypto.randomBytes(32).toString('hex');
     const { error: configError } = await supabase
       .from('system_config')
       .upsert(
         {
-          key:   'install.machine_id',
+          key:   'install.token',
           value: {
-            id:           currentId,
+            token:        installToken,
             installed_at: new Date().toISOString(),
             installed_by: newUser.email,
             business:     businessName,
@@ -343,7 +369,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
       );
 
     if (configError) {
-      throw new Error(`Failed to persist machine ID: ${configError.message}`);
+      throw new Error(`Failed to persist installation token: ${configError.message}`);
     }
 
     // 8. Issue JWT so the browser is immediately authenticated
@@ -358,11 +384,11 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
     logger.info('Install completed successfully', {
       business: businessName,
       adminEmail,
-      machineId: currentId,
+
     });
 
     // SECURITY (C-1): the refresh token is delivered exclusively through the
-    // same httpOnly; Secure cookie pair used by the login flow — never in the
+    // same httpOnly; Secure cookie pair used by the login flow Ã¢â‚¬â€ never in the
     // JSON body, never readable by JS. Only the access token is returned so
     // the wizard can authenticate immediately.
     setAuthCookies(res, tokens.refreshToken);
@@ -370,7 +396,7 @@ export async function runInstall(req: Request, res: Response, next: NextFunction
     logger.info('Install completed successfully', {
       business: businessName,
       adminEmail,
-      machineId: currentId,
+
     });
 
     return res.status(201).json({

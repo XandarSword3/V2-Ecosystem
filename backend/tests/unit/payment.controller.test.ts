@@ -74,9 +74,9 @@ describe('Payment Controller (Genuine Stateful Database Verification)', () => {
       harness.seed('transactions', [
         {
           id: orderId,
-          total_amount: 85.5,
+          amount: 85.5,
           currency: 'USD',
-          payment_status: 'pending',
+          status: 'pending',
           tenant_id: 'tenant-1',
           property_id: 'prop-1',
           customer_id: 'cust-1',
@@ -107,7 +107,8 @@ describe('Payment Controller (Genuine Stateful Database Verification)', () => {
         expect.objectContaining({
           amount: 8550, // 85.50 in cents
           currency: 'usd',
-        })
+        }),
+        expect.anything()
       );
     });
 
@@ -139,9 +140,9 @@ describe('Payment Controller (Genuine Stateful Database Verification)', () => {
       harness.seed('transactions', [
         {
           id: foreignOrderId,
-          total_amount: 50.0,
+          amount: 50.0,
           currency: 'USD',
-          payment_status: 'pending',
+          status: 'pending',
           tenant_id: 'tenant-alien', // Belongs to a different tenant!
           property_id: 'prop-alien',
         },
@@ -174,9 +175,9 @@ describe('Payment Controller (Genuine Stateful Database Verification)', () => {
       harness.seed('transactions', [
         {
           id: orderId,
-          total_amount: 45.0,
+          amount: 45.0,
           currency: 'USD',
-          payment_status: 'pending',
+          metadata: { payment_status: 'pending' },
           tenant_id: 'tenant-1',
           property_id: 'prop-1',
         },
@@ -216,7 +217,9 @@ describe('Payment Controller (Genuine Stateful Database Verification)', () => {
       expect(payments[0].status).toBe('completed');
 
       const transactions = harness.getTable('transactions');
-      expect(transactions[0].payment_status).toBe('paid');
+      // transactions has no payment_status column; the payment flag is the
+      // metadata field the staff order endpoints read.
+      expect(transactions[0].metadata?.payment_status).toBe('paid');
     });
 
     it('rejects duplicate cash payment for the same reference with 409 conflict', async () => {
@@ -225,9 +228,9 @@ describe('Payment Controller (Genuine Stateful Database Verification)', () => {
       harness.seed('transactions', [
         {
           id: orderId,
-          total_amount: 30.0,
+          amount: 30.0,
           currency: 'USD',
-          payment_status: 'paid',
+          metadata: { payment_status: 'paid' },
           tenant_id: 'tenant-1',
           property_id: 'prop-1',
         },

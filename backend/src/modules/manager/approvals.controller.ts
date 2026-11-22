@@ -383,6 +383,8 @@ export class ApprovalsController {
             approval.amount,
             `Manager approval #${approval.id}: ${approval.description}`,
             approval.reviewed_by,
+            undefined,
+            { idempotencyKey: `approval:${approval.id}` },
           );
           logger.info(`Approval ${approval.id}: refund executed for payment ${payment.id}`);
           break;

@@ -33,9 +33,14 @@ export class TestApiClient {
   public userRoles: string[] = [];
 
   private cookies: Map<string, string> = new Map();
+  private propertyId: string | null = '00000000-0000-0000-0000-000000000001';
 
   constructor(baseUrl = TEST_CONFIG.api.baseUrl) {
     this.baseUrl = baseUrl;
+  }
+
+  setPropertyId(propertyId: string | null): void {
+    this.propertyId = propertyId;
   }
 
   setToken(token: string | null): void {
@@ -71,7 +76,11 @@ export class TestApiClient {
       'X-Integration-Test': 'true',
     };
 
-    if (requiresAuth && this.accessToken) {
+    if (this.propertyId) {
+      headers['X-Property-Id'] = this.propertyId;
+    }
+
+    if (this.accessToken) {
       headers.Authorization = `Bearer ${this.accessToken}`;
     }
 
@@ -228,7 +237,11 @@ export class TestApiClient {
   // ============ RESTAURANT (menu_service → instant_transaction) ============
 
   async getRestaurantMenu(): Promise<ApiResponse> {
-    return this.request(`/${ModuleSlug.RESTAURANT}/items`, 'GET');
+    return this.request(`/${ModuleSlug.RESTAURANT}/items`, 'GET', undefined, { requiresAuth: false });
+  }
+
+  async getRestaurantCategories(): Promise<ApiResponse> {
+    return this.request(`/${ModuleSlug.RESTAURANT}/categories`, 'GET', undefined, { requiresAuth: false });
   }
 
   /** Creates an `instant_transaction` row via the menu service module API. */

@@ -133,6 +133,7 @@ describe('Gift Card Controller', () => {
       // Queue responses in order
       mockBuilder.queueResponse(null, null);          // Check code uniqueness
       mockBuilder.queueResponse(createdGiftCard, null); // Insert gift card
+      mockBuilder.queueResponse({ id: 'prop-1' }, null); // Property lookup for transaction property_id
       mockBuilder.queueResponse(null, null);          // Insert transaction
       mockBuilder.queueResponse({ full_name: 'Test Sender' }, null); // Purchaser lookup for email
 

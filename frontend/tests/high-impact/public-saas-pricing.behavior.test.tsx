@@ -111,8 +111,55 @@ describe('Public SaaS Pricing & Checkout Flow (Engine E)', () => {
         email: 'alice@resortgroup.com',
         name: 'Alice Founder',
         subdomain: 'aliceresort',
+        // Default cycle — the pricing page toggle's 'monthly' is always sent,
+        // not omitted (omission previously billed the annual-discount picker
+        // on the monthly Stripe Price).
+        billingCycle: 'monthly',
       });
       expect(window.location.href).toBe('https://checkout.stripe.com/pay/cs_test_saas_123');
+    });
+  });
+
+  it('sends the selected annual billing cycle through to checkout', async () => {
+    delete (window as any).location;
+    window.location = { href: '' } as any;
+
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        success: true,
+        data: { url: 'https://checkout.stripe.com/pay/cs_test_saas_annual' },
+      },
+    });
+
+    render(<PricingPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Starter Tier')).toBeInTheDocument();
+    });
+
+    // Operator selects the Annual discount BEFORE opening checkout —
+    // this is the regression: the UI displayed annual pricing but the
+    // checkout payload silently dropped the cycle.
+    fireEvent.click(screen.getByRole('button', { name: /Annual billing/i }));
+
+    const startButtons = screen.getAllByRole('button', { name: /Start 14-day trial/i });
+    fireEvent.click(startButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('Subscribe to V2 Starter Tier')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/Your Full Name/i), { target: { value: 'Alice Founder' } });
+    fireEvent.change(screen.getByLabelText(/Business Email/i), { target: { value: 'alice@resortgroup.com' } });
+    fireEvent.change(screen.getByLabelText(/Desired Subdomain/i), { target: { value: 'aliceresort' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /Proceed to Stripe Checkout/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/platform/checkout', expect.objectContaining({
+        tier: 'starter',
+        billingCycle: 'annual',
+      }));
     });
   });
 });

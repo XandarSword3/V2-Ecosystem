@@ -39,6 +39,8 @@ import {
   createCheckoutSession,
   getBillingPortal,
   getPublicPlans,
+  getTenantFeatureFlags,
+  setTenantFeatureFlag,
 } from './platform-admin.controller.js';
 
 const router = Router();
@@ -55,12 +57,52 @@ export async function requirePlatformAdmin(req: Request, res: Response, next: Ne
   next();
 }
 
+/**
+ * Tenant billing-portal guard.
+ *
+ * The billing portal is the tenant's own Stripe subscription screen, not a
+ * platform-operator tool: `BillingAlertBanner` calls it from both the tenant
+ * admin and tenant staff layouts, and the handler reads the tenant from
+ * `req.tenant`. Putting it behind `requirePlatformAdmin` would 403 the paying
+ * tenant.
+ *
+ * What was actually wrong (P0-2) is that *any* authenticated principal —
+ * including a plain customer — reached the handler, and the tenant came from
+ * the header. The header half is closed by `authenticate`'s tenant binding
+ * (see `tenantBindingViolation` in auth.middleware.ts). This guard closes the
+ * role half: a customer token must not mint a billing-portal session.
+ */
+export function requireTenantBillingAccess(req: Request, res: Response, next: NextFunction): void {
+  if ((req.user as any)?.isPlatformAdmin) {
+    next();
+    return;
+  }
+  const scope = req.user?.scope;
+  const roles = req.user?.roles || [];
+  const isCustomer = scope === 'customer'
+    || (roles.length > 0 && roles.every((role) => role === 'customer'));
+  if (isCustomer) {
+    res.status(403).json({ success: false, error: 'Billing portal is restricted to tenant staff' });
+    return;
+  }
+  next();
+}
+
+import { userRateLimit } from '../../middleware/userRateLimit.middleware.js';
+
+const platformCheckoutRateLimit = userRateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 10,
+  keyPrefix: 'rate:platform:checkout:',
+  message: 'Too many checkout attempts. Please try again later.',
+});
+
 // ============================================
 // Public routes
 // ============================================
 
 router.get('/plans', getPublicPlans);
-router.post('/checkout', createCheckoutSession);
+router.post('/checkout', platformCheckoutRateLimit, createCheckoutSession);
 
 // Public tenant validation (no auth) - for frontend 404 handling
 router.get('/tenants/by-slug/:slug', getTenantBySlug);
@@ -72,7 +114,7 @@ router.get('/tenants/by-slug/:slug', getTenantBySlug);
 router.use(authenticateToken);
 router.use(resolveTenant);
 
-router.get('/billing/portal', getBillingPortal);
+router.get('/billing/portal', requireTenantBillingAccess, getBillingPortal);
 
 // ============================================
 // Platform admin routes
@@ -88,6 +130,8 @@ router.post('/tenants/:id/reactivate', reactivateTenant);
 router.post('/tenants/:id/unsuspend', reactivateTenant); // alias used by frontend
 router.post('/tenants/:id/cancel', cancelTenant);
 router.patch('/tenants/:id/tier', changeTier);
+router.get('/tenants/:id/feature-flags', getTenantFeatureFlags);
+router.post('/tenants/:id/feature-flags', setTenantFeatureFlag);
 router.get('/revenue', getRevenueOverview);
 
 export default router;

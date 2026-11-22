@@ -5,6 +5,11 @@
  */
 
 import { vi, beforeAll, afterAll, beforeEach } from 'vitest';
+import { assertLocalTestEnvironment } from './env-guard';
+
+// Task 0b: unit tests mock the database, but ambient remote connection
+// variables must never be present during a test run.
+assertLocalTestEnvironment(process.env, 'unit');
 
 // Mock environment variables FIRST before any imports
 process.env.NODE_ENV = 'test';
@@ -28,7 +33,7 @@ vi.mock('../src/config/index', () => ({
     frontendUrl: 'http://localhost:3000',
     corsOrigins: ['http://localhost:3000'],
     database: { url: '' },
-    supabase: { url: '', anonKey: '', serviceKey: '' },
+    supabase: { url: 'https://mock.supabase.co', anonKey: 'mock-anon-key', serviceKey: 'mock-service-key' },
     jwt: { secret: 'test-secret-key-min-32-characters-long', refreshSecret: 'test-refresh-secret-key-min-32-chars', expiresIn: '15m', refreshExpiresIn: '7d' },
     stripe: { secretKey: '', webhookSecret: '' },
     email: { host: 'smtp.sendgrid.net', port: 587, user: '', pass: '', from: '' },

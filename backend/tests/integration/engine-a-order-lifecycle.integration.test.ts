@@ -656,6 +656,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
   it('9. staff New-Order path confirms directly but still allocates pre-flight + seeds the trigger row; cancel releases', async () => {
     const res = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({
@@ -717,6 +718,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
 
     const create = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({ items: [{ catalogItemId, quantity: ORDER_QTY }], tableNumber: 'T-10' });
@@ -872,6 +874,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
 
     const create = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({ items: [{ catalogItemId, quantity: ORDER_QTY }], tableNumber: 'T-11' });
@@ -921,6 +924,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     // Second pay must not double-complete or corrupt economic state.
     const create = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({ items: [{ catalogItemId, quantity: 1 }], tableNumber: 'T-12' });
@@ -981,6 +985,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
 
     const create = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({ items: [{ catalogItemId, quantity: ORDER_QTY }], tableNumber: 'T-13' });
@@ -1027,6 +1032,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     // principle. A full digital-mode test requires a separate module fixture.
     const create = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({ items: [{ catalogItemId, quantity: 1 }], tableNumber: 'T-14' });
@@ -1055,6 +1061,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
   it('15. unknown fulfillment mode is REJECTED with INVALID_FULFILLMENT_MODE', async () => {
     const res = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({
@@ -1069,6 +1076,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
   it('16. explicit valid fulfillment mode creates correct destination from engine definition', async () => {
     const res = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({
@@ -1107,6 +1115,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     // doesn't exist — the RPC create_order_customization_snapshot should fail.
     const res = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({
@@ -1156,6 +1165,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
     const stockBefore = await readStock();
     const res = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({
@@ -1201,6 +1211,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
   it('20. shipment mode creates order with correct destination from engine definition', async () => {
     const res = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({
@@ -1231,6 +1242,7 @@ describeIntegration('Engine A order lifecycle (Integration)', () => {
   it('21. service_execution mode creates order with correct destination', async () => {
     const res = await request(app)
       .post(`/api/v1/staff/modules/${moduleSlug}/orders`)
+      .set('Idempotency-Key', randomUUID())
       .set('Authorization', `Bearer ${staffToken}`)
       .set('X-Tenant-ID', tenantId)
       .send({

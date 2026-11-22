@@ -92,16 +92,12 @@ export async function loadDynamicModules(): Promise<void> {
       // Resolution order:
       //   1. Exact tenant match — this request's tenant owns one of these rows.
       //   2. An unscoped/global row (tenant_id IS NULL).
-      //   3. If this slug has exactly one row total, use it regardless of
-      //      tenant — preserves existing behavior for the common case
-      //      (~15 pre-existing modules) where no collision exists at all.
-      // If none of these match, this tenant has no business seeing any
-      // module at this slug — fall through rather than leak another
-      // tenant's module context.
+      // Never fall back to another tenant's row: if the caller's tenant does not
+      // own a module at this slug and there is no global module, access is denied (404).
       const selected =
         (requestTenantId ? rows.find((row) => row.tenant_id === requestTenantId) : undefined) ??
         rows.find((row) => !row.tenant_id) ??
-        (rows.length === 1 ? rows[0] : undefined);
+        (!requestTenantId && rows.length === 1 ? rows[0] : undefined);
 
       if (!selected) {
         next();

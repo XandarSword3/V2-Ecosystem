@@ -14,30 +14,25 @@ import { getTransactionManager } from '../../engines/transaction-manager.js';
 import { getIdempotencyGuard } from '../../engines/idempotency-guard.js';
 import { reverseDiscounts } from '../../engines/discount-reversal.js';
 import { CURRENCY_DECIMALS } from '../../engines/money.js';
+import {
+  resolveTenantPaymentSettings,
+  type TenantPaymentSettings,
+} from './tenant-payment-settings.js';
 
-const getStripeInstance = async () => {
-  const supabase = getSupabase();
-  const { data: settings } = await supabase
-    .from('site_settings')
-    .select('value')
-    .eq('key', 'payments')
-    .single();
+export { resolveTenantPaymentSettings };
+export type { TenantPaymentSettings };
 
-  const secretKey = settings?.value?.stripeSecretKey || config.stripe.secretKey;
+const getStripeInstance = async (tenantId?: string | null) => {
+  const settings = await resolveTenantPaymentSettings(tenantId);
+  const secretKey = settings.secretKey || config.stripe.secretKey;
   if (!secretKey) throw new Error('Stripe secret key not configured');
 
   return new Stripe(secretKey, { apiVersion: '2023-10-16' });
 };
 
-const getStripeWebhookSecret = async () => {
-  const supabase = getSupabase();
-  const { data: settings } = await supabase
-    .from('site_settings')
-    .select('value')
-    .eq('key', 'payments')
-    .single();
-
-  return settings?.value?.stripeWebhookSecret || config.stripe.webhookSecret;
+const getStripeWebhookSecret = async (tenantId?: string | null) => {
+  const settings = await resolveTenantPaymentSettings(tenantId);
+  return settings.webhookSecret || config.stripe.webhookSecret;
 };
 
 /**
@@ -71,127 +66,102 @@ function calculateRenewedEndDate(currentEndDate: string | null, billingCycle: st
   return nextDate.toISOString();
 }
 
+type AuthoritativePayableRecord = {
+  amount: number;
+  currency: string;
+  paymentStatus?: string;
+  tenantId?: string | null;
+  propertyId?: string | null;
+  customerId?: string | null;
+};
+
+type TransactionLookupRow = {
+  amount: number | string | null;
+  currency: string | null;
+  status: string | null;
+  tenant_id: string | null;
+  property_id: string | null;
+  customer_id: string | null;
+};
+
+/**
+ * Columns that actually exist on `transactions`.
+ *
+ * The engine refit schema (src/database/migrate.ts:228-250) has `amount`,
+ * `net_amount`, and `status` — there is no `total_amount` and no
+ * `payment_status`. The previous select asked for both of the missing
+ * columns, so PostgREST rejected the query with a 42703/400 and the handler
+ * reported every real order as "Authoritative record not found" (404).
+ *
+ * `amount` — not `net_amount` — is the payable total: `net_amount` is only
+ * populated by the reservation writer and is 0 for all 1,480
+ * instant_transaction rows in the test DB.
+ */
+const TRANSACTION_LOOKUP_COLUMNS =
+  'amount, currency, status, reference_table, tenant_id, property_id, customer_id';
+
+/**
+ * `transactions.status` is the engine state-machine status, not a payment
+ * flag. The states below are the terminal ones where the money leg has
+ * already been settled, so they map onto the existing double-charge guard's
+ * `'paid'` sentinel. Anything else is carried through as-is, which leaves the
+ * guard inert for an in-flight order (correct: it is meant to be payable).
+ */
+const SETTLED_TRANSACTION_STATUSES = new Set(['completed', 'used', 'checked_out', 'paid']);
+
+function toAuthoritativeRecord(tx: TransactionLookupRow | null): AuthoritativePayableRecord | null {
+  if (!tx || tx.amount === undefined || tx.amount === null) return null;
+  const status = typeof tx.status === 'string' ? tx.status : undefined;
+  return {
+    amount: Number(tx.amount),
+    currency: (tx.currency || 'USD').toUpperCase(),
+    paymentStatus: status && SETTLED_TRANSACTION_STATUSES.has(status) ? 'paid' : status,
+    tenantId: tx.tenant_id,
+    propertyId: tx.property_id,
+    customerId: tx.customer_id,
+  };
+}
+
 async function resolveAuthoritativePayableAmount(
   referenceType: string,
   referenceId: string,
   req?: Request,
-): Promise<{ amount: number; currency: string; paymentStatus?: string }> {
+): Promise<{
+  amount: number;
+  currency: string;
+  paymentStatus?: string;
+  tenantId: string | null;
+}> {
   const supabase = getSupabase();
   const canonicalType = normalizeReferenceType(referenceType);
 
-  let record: {
-    amount: number;
-    currency: string;
-    paymentStatus?: string;
-    tenantId?: string | null;
-    propertyId?: string | null;
-    customerId?: string | null;
-  } | null = null;
+  let record: AuthoritativePayableRecord | null = null;
 
   // 1. First look up the canonical transactions row
   const { data: tx } = await supabase
     .from('transactions')
-    .select('total_amount, currency, payment_status, reference_table, tenant_id, property_id, customer_id')
+    .select(TRANSACTION_LOOKUP_COLUMNS)
     .eq('id', referenceId)
     .maybeSingle();
 
-  if (tx && tx.total_amount !== undefined && tx.total_amount !== null) {
-    record = {
-      amount: Number(tx.total_amount),
-      currency: (tx.currency || 'USD').toUpperCase(),
-      paymentStatus: tx.payment_status,
-      tenantId: tx.tenant_id,
-      propertyId: tx.property_id,
-      customerId: tx.customer_id,
-    };
-  }
+  record = toAuthoritativeRecord(tx as TransactionLookupRow | null);
 
-  // 2. Fall back to reference-specific tables
-  if (!record && (
-    canonicalType === 'instant_transaction' ||
-    referenceType === 'instant_transaction' ||
-    referenceType === 'order' ||
-    referenceType === 'menu_service_order'
-  )) {
-    const { data: order } = await supabase
-      .from('orders')
-      .select('total_amount, final_total, total, currency, payment_status, tenant_id, property_id, customer_id')
-      .eq('id', referenceId)
-      .maybeSingle();
-    if (order) {
-      const amount = Number(order.total_amount ?? order.final_total ?? order.total ?? 0);
-      record = {
-        amount,
-        currency: (order.currency || 'USD').toUpperCase(),
-        paymentStatus: order.payment_status,
-        tenantId: order.tenant_id,
-        propertyId: order.property_id,
-        customerId: order.customer_id,
-      };
-    } else {
-      const { data: legacyOrder } = await supabase
-        .from('menu_service_orders')
-        .select('total_amount, final_total, total, currency, payment_status, tenant_id, property_id, customer_id')
-        .eq('id', referenceId)
-        .maybeSingle();
-      if (legacyOrder) {
-        const amount = Number(legacyOrder.total_amount ?? legacyOrder.final_total ?? legacyOrder.total ?? 0);
-        record = {
-          amount,
-          currency: (legacyOrder.currency || 'USD').toUpperCase(),
-          paymentStatus: legacyOrder.payment_status,
-          tenantId: legacyOrder.tenant_id,
-          propertyId: legacyOrder.property_id,
-          customerId: legacyOrder.customer_id,
-        };
-      }
-    }
-  }
+  // 2. Fall back to canonical transactions looked up by reference_id
+  // (Architecture Law: all engine transactions live in the transactions table;
+  // dead tables like orders, bookings, and tickets must never be queried).
+  if (!record) {
+    let query = supabase
+      .from('transactions')
+      .select(TRANSACTION_LOOKUP_COLUMNS)
+      .eq('reference_id', referenceId);
 
-  if (!record && (
-    canonicalType === 'time_exclusive_reservation' ||
-    referenceType === 'time_exclusive_reservation' ||
-    referenceType === 'booking' ||
-    referenceType === 'room_booking'
-  )) {
-    const { data: booking } = await supabase
-      .from('bookings')
-      .select('total_amount, currency, payment_status, tenant_id, property_id, customer_id')
-      .eq('id', referenceId)
-      .maybeSingle();
-    if (booking) {
-      record = {
-        amount: Number(booking.total_amount ?? 0),
-        currency: (booking.currency || 'USD').toUpperCase(),
-        paymentStatus: booking.payment_status,
-        tenantId: booking.tenant_id,
-        propertyId: booking.property_id,
-        customerId: booking.customer_id,
-      };
+    if (canonicalType) {
+      query = query.eq('engine_type', canonicalType);
     }
-  }
 
-  if (!record && (
-    canonicalType === 'shared_capacity_access' ||
-    referenceType === 'shared_capacity_access' ||
-    referenceType === 'ticket' ||
-    referenceType === 'facility_access'
-  )) {
-    const { data: ticket } = await supabase
-      .from('tickets')
-      .select('total_amount, currency, payment_status, tenant_id, property_id, customer_id')
-      .eq('id', referenceId)
-      .maybeSingle();
-    if (ticket) {
-      record = {
-        amount: Number(ticket.total_amount ?? 0),
-        currency: (ticket.currency || 'USD').toUpperCase(),
-        paymentStatus: ticket.payment_status,
-        tenantId: ticket.tenant_id,
-        propertyId: ticket.property_id,
-        customerId: ticket.customer_id,
-      };
-    }
+    const { data: txByRef } = await query.maybeSingle();
+
+    record = toAuthoritativeRecord(txByRef as TransactionLookupRow | null);
   }
 
   if (!record) {
@@ -225,6 +195,7 @@ async function resolveAuthoritativePayableAmount(
     amount: record.amount,
     currency: record.currency,
     paymentStatus: record.paymentStatus,
+    tenantId: record.tenantId ?? null,
   };
 }
 
@@ -254,7 +225,12 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
   // Resolve authoritative payable amount and currency directly from DB record (F6 invariant).
   // Strictly FAIL-CLOSED: if no authoritative record exists in DB, reject immediately.
   // Never fall back to client-supplied money or currency.
-  let authRecord: { amount: number; currency: string; paymentStatus?: string };
+  let authRecord: {
+    amount: number;
+    currency: string;
+    paymentStatus?: string;
+    tenantId: string | null;
+  };
   try {
     authRecord = await resolveAuthoritativePayableAmount(referenceType, referenceId, req);
   } catch (err: any) {
@@ -287,13 +263,41 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
     }
   }
 
+  // One live payment per reference. Without this guard each tap of "Pay"
+  // minted another PaymentIntent, so two devices could both charge the same
+  // order. A completed/pending tender blocks a new intent.
+  {
+    const supabase = getSupabase();
+    const { data: livePayment } = await supabase
+      .from('payments')
+      .select('id, status, method')
+      .eq('reference_type', referenceType)
+      .eq('reference_id', referenceId)
+      .in('status', ['completed', 'pending', 'processing', 'pending_verification', 'pending_collection'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (livePayment) {
+      return res.status(409).json({
+        success: false,
+        error: 'PAYMENT_ALREADY_IN_PROGRESS',
+        message: 'A payment already exists for this item.',
+        existingPaymentId: livePayment.id,
+        status: livePayment.status,
+      });
+    }
+  }
+
   const payableAmount = authRecord.amount;
   const currencyCode = (authRecord.currency || clientCurrency || 'USD').toUpperCase();
   const decimals = (CURRENCY_DECIMALS as Record<string, number>)[currencyCode] ?? 2;
   const multiplier = decimals === 0 ? 1 : (decimals === 3 ? 1000 : 100);
   const stripeMinorUnits = Math.round(payableAmount * multiplier);
 
-  const stripe = await getStripeInstance();
+  // Charge through the tenant that owns the payable record — never the
+  // platform default just because `site_settings` only had one row (P0-3).
+  const stripe = await getStripeInstance(authRecord.tenantId);
   const paymentIntent = await stripe.paymentIntents.create({
     amount: stripeMinorUnits,
     currency: currencyCode.toLowerCase(),
@@ -303,7 +307,12 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
       userId: req.user?.userId || 'guest',
       authoritativeAmount: String(payableAmount),
       authoritativeCurrency: currencyCode,
+      ...(authRecord.tenantId ? { tenantId: authRecord.tenantId } : {}),
     },
+  }, {
+    // Stripe-level idempotency: two concurrent requests for the same
+    // reference/amount return the same intent instead of double-charging.
+    idempotencyKey: `pi:${referenceType}:${referenceId}:${stripeMinorUnits}:${currencyCode}`,
   });
 
   res.json({
@@ -317,19 +326,228 @@ export const createPaymentIntent = asyncHandler(async (req: Request, res: Respon
   });
 });
 
+/**
+ * Best-effort tenant lookup for an inbound Stripe webhook (P0-3).
+ *
+ * With per-tenant Stripe accounts the signing secret can also be per-tenant,
+ * but the secret is needed before verification. So parse only the reference id
+ * out of the still-unverified body, resolve the owning tenant, and use that
+ * tenant's secret. This cannot bypass verification: a forged body only
+ * influences which secret is checked, and a signature that does not match that
+ * secret still fails. No event is acted on before `constructEvent` succeeds.
+ */
+async function resolveTransactionTenantId(
+  referenceId: string,
+  referenceType?: string | null,
+): Promise<string | null> {
+  const supabase = getSupabase();
+
+  const byId = await supabase
+    .from('transactions')
+    .select('tenant_id')
+    .eq('id', referenceId)
+    .maybeSingle();
+  if (byId?.data?.tenant_id) return byId.data.tenant_id as string;
+
+  let query = supabase
+    .from('transactions')
+    .select('tenant_id')
+    .eq('reference_id', referenceId);
+  if (referenceType) query = query.eq('engine_type', referenceType);
+  const byReference = await query.maybeSingle();
+  return (byReference?.data?.tenant_id as string) ?? null;
+}
+
+/**
+ * Resolve the tenant that owns the payment referenced by a still-unverified
+ * webhook body. Used only to choose which tenant's signing secret to check;
+ * nothing is acted on until `constructEvent` succeeds.
+ */
+async function resolveWebhookTenantId(rawBody: Buffer | undefined): Promise<string | null> {
+  if (!rawBody || rawBody.length === 0) return null;
+
+  let parsedObject: {
+    metadata?: { referenceId?: unknown; referenceType?: unknown };
+    payment_intent?: unknown;
+  };
+  try {
+    const parsed = JSON.parse(rawBody.toString('utf8')) as {
+      data?: { object?: typeof parsedObject };
+    };
+    parsedObject = parsed?.data?.object ?? {};
+  } catch {
+    return null;
+  }
+
+  const referenceId = parsedObject.metadata?.referenceId;
+  if (typeof referenceId === 'string' && referenceId.length > 0 && referenceId.length <= 200) {
+    const referenceType =
+      typeof parsedObject.metadata?.referenceType === 'string'
+        ? normalizeReferenceType(parsedObject.metadata.referenceType)
+        : null;
+    return resolveTransactionTenantId(referenceId, referenceType);
+  }
+
+  // Stripe charge events identify the payment intent but carry no
+  // metadata.referenceId of their own. The recorded payment row knows the
+  // transaction and its tenant.
+  const paymentIntentId =
+    typeof parsedObject.payment_intent === 'string'
+      ? parsedObject.payment_intent
+      : typeof (parsedObject.payment_intent as { id?: unknown } | undefined)?.id === 'string'
+        ? (parsedObject.payment_intent as { id: string }).id
+        : null;
+  if (paymentIntentId) {
+    const { data } = await getSupabase()
+      .from('payments')
+      .select('tenant_id')
+      .eq('stripe_payment_intent_id', paymentIntentId)
+      .maybeSingle();
+    return (data?.tenant_id as string) ?? null;
+  }
+
+  return null;
+}
+
+/**
+ * Resolve the tenant that owns the *verified* event's referenced payment.
+ *
+ * P0-1-class containment for webhooks: the secret selector reads the
+ * unverified body, while the handler acts on `event.data.object`. Both must
+ * describe the same tenant. If a body can resolve a signing secret for one
+ * tenant but the event mutates another tenant's transaction, the event is
+ * rejected before any handler runs.
+ */
+export async function resolveVerifiedEventTenantId(event: Stripe.Event): Promise<string | null> {
+  if (event.type.startsWith('invoice.')) {
+    // Invoice events carry no reference metadata, so secret selection cannot
+    // resolve a tenant from the unverified body. The subscription row is the
+    // authority for who is affected.
+    const invoice = event.data.object as Stripe.Invoice;
+    const subscriptionId =
+      typeof invoice.subscription === 'string'
+        ? invoice.subscription
+        : invoice.subscription?.id ?? null;
+    if (!subscriptionId) return null;
+
+    const { data } = await getSupabase()
+      .from('pool_memberships')
+      .select('tenant_id')
+      .eq('stripe_subscription_id', subscriptionId)
+      .maybeSingle();
+    return (data?.tenant_id as string) ?? null;
+  }
+
+  if (event.type.startsWith('payment_intent.')) {
+    const paymentIntent = event.data.object as Stripe.PaymentIntent;
+    const referenceId = paymentIntent.metadata?.referenceId;
+    if (typeof referenceId !== 'string' || referenceId.length === 0) return null;
+    const referenceType = normalizeReferenceType(paymentIntent.metadata?.referenceType);
+    return resolveTransactionTenantId(referenceId, referenceType);
+  }
+
+  if (event.type === 'charge.refunded') {
+    const charge = event.data.object as Stripe.Charge;
+    const paymentIntentId =
+      typeof charge.payment_intent === 'string'
+        ? charge.payment_intent
+        : charge.payment_intent?.id;
+    if (!paymentIntentId) return null;
+
+    const { data: payment } = await getSupabase()
+      .from('payments')
+      .select('tenant_id, reference_id')
+      .eq('stripe_payment_intent_id', paymentIntentId)
+      .maybeSingle();
+
+    const transactionTenantId = payment?.reference_id
+      ? await resolveTransactionTenantId(String(payment.reference_id))
+      : null;
+
+    // The referenced transaction is authoritative for who is affected. A
+    // payment row that disagrees with it is exactly the cross-tenant case
+    // this guard must catch.
+    return transactionTenantId ?? ((payment?.tenant_id as string) ?? null);
+  }
+
+  return null;
+}
+
+/**
+ * True when this tenant has provisioned its own Stripe webhook secret.
+ *
+ * Once a tenant owns a secret, an event verified with the platform-default
+ * secret must not be allowed to mutate that tenant: possession of the platform
+ * secret is not proof of authority over the tenant's account. A missing
+ * settings table means the feature predates P0-3, so no tenant owns a secret.
+ */
+export async function tenantRequiresOwnWebhookSecret(tenantId: string): Promise<boolean> {
+  const { data, error } = await getSupabase()
+    .from('tenant_payment_settings')
+    .select('stripe_webhook_secret')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+
+  if (error) {
+    if ((error as { code?: string }).code === '42P01') return false;
+    // Fail closed: an unreadable settings row must not downgrade a tenant to
+    // platform-secret authority.
+    logger.error('[Payments] Could not determine whether tenant owns a webhook secret', {
+      tenantId,
+      error: error.message,
+    });
+    return true;
+  }
+
+  return Boolean((data as { stripe_webhook_secret?: string | null } | null)?.stripe_webhook_secret);
+}
+
 export async function handleStripeWebhook(req: Request, res: Response) {
   const sig = req.headers['stripe-signature'] as string;
   if (!req.rawBody) { res.status(400).json({ error: 'Missing raw body' }); return; }
 
   let event: Stripe.Event;
+  let webhookTenantId: string | null = null;
   try {
-    const stripe = await getStripeInstance();
-    const webhookSecret = await getStripeWebhookSecret();
+    webhookTenantId = await resolveWebhookTenantId(req.rawBody);
+    const stripe = await getStripeInstance(webhookTenantId);
+    const webhookSecret = await getStripeWebhookSecret(webhookTenantId);
     event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
   } catch (err: unknown) {
     const error = err as Error;
     logger.error('Webhook signature verification failed:', error.message);
     return res.status(400).send(`Webhook Error: ${error.message}`);
+  }
+
+  // The secret that verified the event belongs to `webhookTenantId`. Bind the
+  // *verified* event to that tenant before the switch mutates anything.
+  //
+  // A null `webhookTenantId` means the event verified with the platform-default
+  // secret: there is no per-tenant identity to bind to, and that is the
+  // documented fallback for single-tenant installs and tenants that have not
+  // provisioned their own Stripe account yet. The guard only applies when the
+  // signature proved a specific tenant's secret.
+  const affectedTenantId = await resolveVerifiedEventTenantId(event);
+  if (affectedTenantId && webhookTenantId && affectedTenantId !== webhookTenantId) {
+    logger.error('Webhook tenant binding rejected', {
+      eventId: event.id,
+      eventType: event.type,
+      signingTenantId: webhookTenantId,
+      affectedTenantId,
+    });
+    return res.status(400).json({ success: false, error: 'Webhook tenant mismatch' });
+  }
+
+  // Platform-signed event (webhookTenantId === null) that names a tenant which
+  // owns its own webhook secret. The platform secret must not act for that
+  // tenant. Tenants without a row still use the documented platform fallback.
+  if (affectedTenantId && !webhookTenantId && (await tenantRequiresOwnWebhookSecret(affectedTenantId))) {
+    logger.error('Platform-signed webhook rejected: tenant owns a webhook secret', {
+      eventId: event.id,
+      eventType: event.type,
+      affectedTenantId,
+    });
+    return res.status(400).json({ success: false, error: 'Webhook tenant secret required' });
   }
 
   const supabase = getSupabase();
@@ -338,23 +556,48 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
-      const referenceType = normalizeReferenceType(paymentIntent.metadata?.referenceType);
+      // Preserve the caller's raw reference type. `normalizeReferenceType`
+      // maps the folio marker 'room_folio' to 'instant_transaction', which
+      // silently turned a room-folio card payment into an unrelated charge:
+      // the ledger row could never be read by the folio endpoints.
+      const rawReferenceType =
+        typeof paymentIntent.metadata?.referenceType === 'string'
+          ? paymentIntent.metadata.referenceType
+          : undefined;
+      const isRoomFolio = rawReferenceType?.toLowerCase().trim() === 'room_folio';
+      const referenceType = isRoomFolio ? 'room_folio' : normalizeReferenceType(rawReferenceType);
       const referenceId = paymentIntent.metadata?.referenceId;
+      if (!referenceId) {
+        logger.error('Payment intent is missing metadata.referenceId', { paymentIntentId: paymentIntent.id });
+        return res.status(500).json({ error: 'Unable to resolve payment reference' });
+      }
+      // payments.tenant_id is NOT NULL: resolve it from the verified event or
+      // the intent metadata before any write.
+      const eventTenantId =
+        affectedTenantId ??
+        webhookTenantId ??
+        (paymentIntent.metadata?.tenantId as string | undefined) ??
+        null;
+      if (!eventTenantId) {
+        return res.status(500).json({ error: 'Unable to resolve tenant for payment intent' });
+      }
       const { majorAmount, formattedAmount, currency: currencyCode } = convertStripeMinorUnitsToMajor(
         paymentIntent.amount,
         paymentIntent.currency || paymentIntent.metadata?.authoritativeCurrency || 'USD',
       );
 
-      // FIX BUG-01: Idempotency check via payment_ledger — only look for success entries.
+      // FIX BUG-01: Idempotency check via payment_ledger — only look for fully
+      // processed entries. Both statuses count: 'success' is what this writer
+      // used historically, 'completed' is the folio/postRoomCharge status.
       // We NEVER update payment_ledger (immutability trigger blocks it).
-      // Pattern: check → process → insert success. No partial rows.
+      // Pattern: check → process → insert. No partial rows.
       const { data: existingLedger } = await supabase
         .from('payment_ledger')
         .select('id, status')
         .eq('webhook_id', event.id)
         .maybeSingle();
 
-      if (existingLedger?.status === 'success') {
+      if (existingLedger?.status === 'success' || existingLedger?.status === 'completed') {
         logger.info(`Idempotency: Webhook ${event.id} already fully processed. Skipping.`);
         return res.json({ received: true });
       }
@@ -364,6 +607,15 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       const idempotencyKey = `stripe_webhook:${event.id}`;
 
       const processPaymentIntent = async () => {
+        // Step 0: resolve the owning property. `payments.property_id` and
+        // `payment_ledger.property_id` are NOT NULL; the old insert omitted the
+        // column, PostgREST answered 23502, and the error was only logged, so
+        // card payments never produced a payment or ledger row.
+        const referencePropertyId = await resolveReferencePropertyId(referenceId);
+        if (!referencePropertyId) {
+          throw new Error(`Could not resolve property for ${referenceType}:${referenceId}`);
+        }
+
         // Step 1: Record payment row (idempotent on stripe_payment_intent_id)
         const { data: existingPayment } = await supabase
           .from('payments')
@@ -377,6 +629,8 @@ export async function handleStripeWebhook(req: Request, res: Response) {
             .insert({
               reference_type: referenceType,
               reference_id: referenceId,
+              tenant_id: eventTenantId,
+              property_id: referencePropertyId,
               amount: formattedAmount,
               currency: currencyCode,
               method: 'card',
@@ -387,7 +641,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
             });
 
           if (paymentError) {
-            logger.error('Failed to record payment:', paymentError);
+            throw new Error(`Failed to record payment for ${paymentIntent.id}: ${paymentError.message}`);
           }
         }
 
@@ -397,18 +651,28 @@ export async function handleStripeWebhook(req: Request, res: Response) {
         // Step 3: Award loyalty points using currency-correct major amount
         await awardLoyaltyPointsForPayment(referenceType, referenceId, majorAmount);
 
-        // Step 4: FIX BUG-01 — INSERT a success ledger entry (never UPDATE) with currency-correct amount
-        await supabase.from('payment_ledger').insert({
+        // Step 4: FIX BUG-01 — INSERT a ledger entry (never UPDATE) with
+        // currency-correct amount. A room-folio payment is a *settlement*
+        // (reduces the outstanding balance) and uses the status the folio
+        // readers expect; other references keep the historical 'authorized'/
+        // 'success' pair so existing reporting keeps working.
+        const { error: ledgerError } = await supabase.from('payment_ledger').insert({
           reference_type: referenceType,
           reference_id: referenceId,
-          event_type: 'authorized',
+          tenant_id: eventTenantId,
+          property_id: referencePropertyId,
+          event_type: isRoomFolio ? 'settlement' : 'authorized',
           amount: majorAmount,
           currency: currencyCode,
           gateway_reference_id: paymentIntent.id,
           webhook_id: event.id,
-          status: 'success',
+          status: isRoomFolio ? 'completed' : 'success',
           metadata: { stripe_event_id: event.id },
         });
+
+        if (ledgerError) {
+          throw new Error(`Failed to record payment ledger entry for ${paymentIntent.id}: ${ledgerError.message}`);
+        }
 
         // Step 5: Fiscal document issuance (DOMAIN.md G1) — non-fatal, the
         // fiscal API and the order-status path are the explicit retry routes.
@@ -460,6 +724,14 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       const referenceType = normalizeReferenceType(paymentIntent.metadata?.referenceType);
       const referenceId = paymentIntent.metadata?.referenceId;
+      const failedTenantId =
+        affectedTenantId ??
+        webhookTenantId ??
+        (paymentIntent.metadata?.tenantId as string | undefined) ??
+        (await resolveTransactionTenantId(referenceId, referenceType));
+      if (!failedTenantId) {
+        return res.status(500).json({ error: 'Unable to resolve tenant for failed payment intent' });
+      }
       const { formattedAmount, currency: currencyCode } = convertStripeMinorUnitsToMajor(
         paymentIntent.amount,
         paymentIntent.currency || paymentIntent.metadata?.authoritativeCurrency || 'USD',
@@ -468,6 +740,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       await supabase.from('payments').insert({
         reference_type: referenceType,
         reference_id: referenceId,
+        tenant_id: failedTenantId,
         amount: formattedAmount,
         currency: currencyCode,
         method: 'card',
@@ -516,7 +789,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
 
         const { data: payment } = await supabase
           .from('payments')
-          .select('reference_type, reference_id')
+          .select('reference_type, reference_id, tenant_id, property_id')
           .eq('stripe_payment_intent_id', paymentIntentId)
           .maybeSingle();
 
@@ -524,23 +797,99 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, 'refunded');
         }
 
-        const { majorAmount: refundAmount, currency: refundCurrency } = convertStripeMinorUnitsToMajor(
+        const refundTenantId =
+          (payment as { tenant_id?: string | null } | null)?.tenant_id ??
+          affectedTenantId ??
+          webhookTenantId;
+        if (!refundTenantId) {
+          logger.error('Unable to resolve tenant for refund ledger entry', { paymentIntentId });
+          break;
+        }
+
+        // payment_ledger.property_id is NOT NULL. Prefer the payment row; fall
+        // back to the referenced transaction for legacy payments that predate
+        // the property_id write.
+        const refundPropertyId =
+          ((payment as { property_id?: string | null } | null)?.property_id) ??
+          (payment?.reference_id ? await resolveReferencePropertyId(payment.reference_id) : null);
+        if (!refundPropertyId) {
+          logger.error('Unable to resolve property for refund ledger entry', { paymentIntentId });
+          break;
+        }
+
+        const refundReferenceType = payment?.reference_type || 'unknown';
+
+        const { majorAmount: cumulativeRefund, currency: refundCurrency } = convertStripeMinorUnitsToMajor(
           charge.amount_refunded || 0,
           charge.currency || 'USD',
         );
 
-        // FIX BUG-01: INSERT only, never UPDATE
-        await supabase.from('payment_ledger').insert({
-          reference_type: payment?.reference_type || 'unknown',
-          reference_id: payment?.reference_id || 'unknown',
-          event_type: 'refund',
-          amount: refundAmount,
-          currency: refundCurrency,
-          gateway_reference_id: paymentIntentId,
-          webhook_id: event.id,
-          status: 'success',
-          metadata: { stripe_event_id: event.id, refund_reason: charge.refunds?.data?.[0]?.reason },
-        });
+        // Stripe reports the CUMULATIVE refunded amount on the charge, and a
+        // charge can be refunded several times. INSERT only the delta for this
+        // event �?" the old code inserted the cumulative total on every event,
+        // doubling the refunded amount in the ledger after a second partial
+        // refund.
+        const { data: priorRefunds } = await supabase
+          .from('payment_ledger')
+          .select('amount')
+          .eq('gateway_reference_id', paymentIntentId)
+          .eq('event_type', 'refund');
+        const alreadyJournaled = (priorRefunds ?? []).reduce(
+          (sum, row) => sum + Number(row.amount || 0),
+          0,
+        );
+        const refundDelta = Math.round((cumulativeRefund - alreadyJournaled) * 100) / 100;
+
+        if (refundDelta > 0) {
+          // Journal the revenue-ledger refund FIRST (deterministic key makes
+          // Stripe's at-least-once delivery safe). If this fails we return 500
+          // before writing payment_ledger, so the retry still sees the delta.
+          try {
+            await recordEngineRefund({
+              referenceType: refundReferenceType,
+              referenceId: payment?.reference_id || 'unknown',
+              tenantId: refundTenantId,
+              propertyId: refundPropertyId,
+              currency: refundCurrency,
+              refundAmount: refundDelta,
+              reason: charge.refunds?.data?.[0]?.reason || 'Stripe refund',
+              idempotencyKey: `stripe-refund:${paymentIntentId}:${charge.amount_refunded}`,
+            });
+          } catch (engineLedgerErr) {
+            logger.error('Failed to record refund in engine_financial_ledger', {
+              paymentIntentId,
+              refundDelta,
+              error: engineLedgerErr instanceof Error ? engineLedgerErr.message : String(engineLedgerErr),
+            });
+            return res.status(500).json({ error: 'Refund ledger write failed, please retry' });
+          }
+
+          // FIX BUG-01: INSERT only, never UPDATE
+          const { error: refundLedgerError } = await supabase.from('payment_ledger').insert({
+            reference_type: refundReferenceType,
+            reference_id: payment?.reference_id || 'unknown',
+            tenant_id: refundTenantId,
+            property_id: refundPropertyId,
+            event_type: 'refund',
+            amount: refundDelta,
+            currency: refundCurrency,
+            gateway_reference_id: paymentIntentId,
+            webhook_id: event.id,
+            status: refundReferenceType === 'room_folio' ? 'completed' : 'success',
+            metadata: {
+              stripe_event_id: event.id,
+              stripe_charge_id: charge.id,
+              cumulative_refunded: cumulativeRefund,
+              refund_reason: charge.refunds?.data?.[0]?.reason,
+            },
+          });
+
+          if (refundLedgerError) {
+            logger.error('Failed to record refund ledger entry:', refundLedgerError);
+          }
+        } else {
+          logger.info(`Refund event ${event.id} added no new refunded amount for PI:${paymentIntentId}`);
+        }
 
         logger.info(`Charge refunded for PI:${paymentIntentId}`);
       }
@@ -555,7 +904,7 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       const engineService = getEngineService();
       const { data: membership, error: membershipError } = await supabase
         .from('pool_memberships')
-        .select('id, status, end_date, billing_cycle, user_id')
+        .select('id, status, end_date, billing_cycle, user_id, tenant_id')
         .eq('stripe_subscription_id', subscriptionId)
         .maybeSingle();
 
@@ -572,8 +921,8 @@ export async function handleStripeWebhook(req: Request, res: Response) {
       );
 
       const renewedEndDate = calculateRenewedEndDate(membership.end_date, membership.billing_cycle || 'MONTHLY');
-      // Status must stay lowercase — the engine state machine expects lowercase values.
-      const nextStatus = transition.allowed ? transition.targetState : 'active';
+      // Normalize to uppercase matching pool_memberships DEFAULT and MembershipStatus enum
+      const nextStatus = (transition.allowed ? transition.targetState : 'ACTIVE').toUpperCase();
 
       await supabase
         .from('pool_memberships')
@@ -583,9 +932,11 @@ export async function handleStripeWebhook(req: Request, res: Response) {
           renewed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', membership.id);
+        .eq('id', membership.id)
+        .eq('tenant_id', membership.tenant_id);
 
       await supabase.from('audit_logs').insert({
+        tenant_id: (membership as { tenant_id?: string | null }).tenant_id ?? null,
         user_id: membership.user_id ?? null,
         action: 'MEMBERSHIP_RENEWED',
         resource: 'pool_memberships',
@@ -606,32 +957,100 @@ export async function handleStripeWebhook(req: Request, res: Response) {
   res.json({ received: true });
 }
 
-async function updateReferencePaymentStatus(
+export async function updateReferencePaymentStatus(
   referenceType: string,
   referenceId: string,
   status: 'pending' | 'partial' | 'paid' | 'refunded' | 'payment_failed',
 ) {
   const supabase = getSupabase();
+  const now = new Date().toISOString();
 
-  const { data: tx } = await supabase
+  // `transactions` has no `payment_status` column (see
+  // TRANSACTION_LOOKUP_COLUMNS above). The canonical payment flag for engine
+  // transactions lives in `metadata.payment_status` — that is what the staff
+  // order endpoints read (module-staff.controller.ts) and what the dynamic
+  // module router writes at creation. The old code wrote a nonexistent
+  // column, PostgREST answered 42703, and the error was discarded, so paying
+  // an order never updated it.
+  const { data: txById, error: lookupError } = await supabase
     .from('transactions')
-    .select('reference_table')
+    .select('id, reference_table, reference_id, metadata')
     .eq('id', referenceId)
     .maybeSingle();
 
-  if (tx?.reference_table) {
-    await supabase
-      .from(tx.reference_table)
-      .update({ payment_status: status, updated_at: new Date().toISOString() })
-      .eq('id', referenceId);
+  if (lookupError) {
+    throw new Error(
+      `Could not look up ${referenceType}:${referenceId} to record payment status "${status}": ${lookupError.message}`,
+    );
   }
 
-  // Only update payment_status field on transactions, not the status field
-  // (status is managed by the state machine)
-  await supabase
+  // Some callers pass a business reference (e.g. a booking reference) rather
+  // than the transactions row id. Resolve it the same way create-intent does,
+  // then update by the canonical row id. Previously this case updated zero
+  // rows and reported success.
+  let tx = txById;
+  if (!tx) {
+    let byReference = supabase
+      .from('transactions')
+      .select('id, reference_table, reference_id, metadata')
+      .eq('reference_id', referenceId);
+    const normalizedType = normalizeReferenceType(referenceType);
+    if (normalizedType) byReference = byReference.eq('engine_type', normalizedType);
+    const { data: resolved, error: referenceError } = await byReference.maybeSingle();
+    if (referenceError) {
+      throw new Error(
+        `Could not look up ${referenceType}:${referenceId} to record payment status "${status}": ${referenceError.message}`,
+      );
+    }
+    tx = resolved;
+  }
+
+  if (!tx) {
+    throw new Error(
+      `Could not look up ${referenceType}:${referenceId} to record payment status "${status}": transaction not found`,
+    );
+  }
+
+  const existingMetadata =
+    tx?.metadata && typeof tx.metadata === 'object' && !Array.isArray(tx.metadata)
+      ? (tx.metadata as Record<string, unknown>)
+      : {};
+
+  const { error: txError } = await supabase
     .from('transactions')
-    .update({ payment_status: status, updated_at: new Date().toISOString() })
-    .eq('id', referenceId);
+    .update({
+      metadata: { ...existingMetadata, payment_status: status },
+      updated_at: now,
+    })
+    .eq('id', tx.id);
+
+  if (txError) {
+    throw new Error(
+      `Failed to record payment status "${status}" on ${referenceType}:${referenceId}: ${txError.message}`,
+    );
+  }
+
+  // Secondary mirror on the referenced table, when the transaction has one
+  // (e.g. capacity_windows). `reference_id` is the FK value — the old code
+  // used the transaction id here, which pointed at the wrong row. Not every
+  // reference table has a payment_status column, so a missing column is
+  // expected and logged at debug; any other failure is surfaced as a warning.
+  // The canonical write above must not be rolled back for this mirror.
+  if (tx?.reference_table && tx?.reference_id) {
+    const { error: refError } = await supabase
+      .from(tx.reference_table)
+      .update({ payment_status: status, updated_at: now })
+      .eq('id', tx.reference_id);
+
+    if (refError) {
+      const detail = `${tx.reference_table}.payment_status mirror failed for ${referenceId}: ${refError.message}`;
+      if ((refError as { code?: string }).code === '42703') {
+        logger.debug(`[Payments] ${detail} (column absent on reference table — expected)`);
+      } else {
+        logger.warn(`[Payments] ${detail}`);
+      }
+    }
+  }
 }
 
 /**
@@ -645,17 +1064,99 @@ async function updateReferencePaymentStatus(
  * actually belongs to the caller's tenant before recording a payment against
  * it.
  */
-async function resolveReferenceTenantProperty(referenceId: string): Promise<{ tenantId: string; propertyId: string }> {
+async function resolveReferenceTenantProperty(referenceId: string): Promise<{
+  tenantId: string;
+  propertyId: string;
+  amount: number | string | null;
+  currency: string | null;
+}> {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('transactions')
-    .select('tenant_id, property_id')
+    .select('tenant_id, property_id, amount, currency')
     .eq('id', referenceId)
     .maybeSingle();
   if (error || !data?.tenant_id || !data?.property_id) {
     throw new Error(`Could not resolve tenant/property for reference ${referenceId}`);
   }
-  return { tenantId: data.tenant_id, propertyId: data.property_id };
+  return {
+    tenantId: data.tenant_id,
+    propertyId: data.property_id,
+    amount: data.amount ?? null,
+    currency: data.currency ?? null,
+  };
+}
+
+/**
+ * Resolve the property that owns a webhook reference for `payments` and
+ * `payment_ledger`, both of which have NOT NULL property_id. The reference is
+ * normally a `transactions.id`; some callers pass the business `reference_id`
+ * instead, so mirror `updateReferencePaymentStatus`'s two-step lookup. Returns
+ * null when nothing matches — callers must fail rather than insert a NULL.
+ */
+async function resolveReferencePropertyId(referenceId: string): Promise<string | null> {
+  const supabase = getSupabase();
+
+  const byId = await supabase
+    .from('transactions')
+    .select('property_id')
+    .eq('id', referenceId)
+    .maybeSingle();
+  if (byId?.data?.property_id) return byId.data.property_id as string;
+
+  const byReference = await supabase
+    .from('transactions')
+    .select('property_id')
+    .eq('reference_id', referenceId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (byReference?.data?.property_id as string | undefined) ?? null;
+}
+
+/**
+ * Append the tender/settlement event to `payment_ledger`.
+ *
+ * `engine_financial_ledger` records the sale (charge/refund); `payment_ledger`
+ * records how money actually arrived (gateway authorization, cash, transfer).
+ * Card settlements are written by the Stripe webhook; cash and manual tenders
+ * used to write nothing at all, so physical revenue was invisible to
+ * reconciliation. Every tender now has a settlement row.
+ */
+async function recordTenderSettlement(params: {
+  referenceType: string;
+  referenceId: string;
+  tenantId: string;
+  propertyId: string;
+  amount: number;
+  currency: string;
+  method: string;
+  paymentId: string;
+  actorId?: string;
+}): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.from('payment_ledger').insert({
+    reference_type: params.referenceType,
+    reference_id: params.referenceId,
+    tenant_id: params.tenantId,
+    property_id: params.propertyId,
+    event_type: 'settlement',
+    amount: params.amount,
+    currency: (params.currency || 'USD').toUpperCase(),
+    gateway_reference_id: params.paymentId,
+    webhook_id: `staff_tender:${params.paymentId}`,
+    status: 'completed',
+    metadata: {
+      payment_id: params.paymentId,
+      method: params.method,
+      source: 'staff_tender',
+      acted_by: params.actorId ?? null,
+    },
+  });
+
+  if (error) {
+    throw new Error(`Failed to record ${params.method} settlement in payment_ledger: ${error.message}`);
+  }
 }
 
 export const recordCashPayment = asyncHandler(async (req: Request, res: Response) => {
@@ -668,21 +1169,48 @@ export const recordCashPayment = asyncHandler(async (req: Request, res: Response
   // record a cash payment against another tenant's order, and the insert
   // was very likely failing outright on the NOT NULL tenant_id/property_id
   // columns regardless. See CONTEXT.md cross-tenant sweep.
-  const { tenantId, propertyId } = await resolveReferenceTenantProperty(referenceId);
+  const { tenantId, propertyId, amount: authoritativeAmount, currency: authoritativeCurrency } =
+    await resolveReferenceTenantProperty(referenceId);
   if (!assertOwnedByCallerTenant(req, tenantId)) {
     return res.status(404).json({ success: false, error: 'Reference not found' });
   }
 
-  const { data: existingPayment } = await supabase
+  // P0-4: the submitted amount must cover the order's authoritative total.
+  // Previously any positive amount was accepted, so $0.01 against a $100
+  // order recorded a completed payment and marked the order paid. Compare in
+  // integer cents to avoid float drift; an over-tender (customer hands over
+  // more cash and receives change) is still accepted.
+  const submittedCents = Math.round(Number(amount) * 100);
+  if (!Number.isFinite(submittedCents) || submittedCents <= 0) {
+    return res.status(400).json({ success: false, error: 'Cash amount must be greater than zero' });
+  }
+  const authoritativeCents = Math.round(Number(authoritativeAmount ?? 0) * 100);
+  const allowPartial = (req.body as any)?.allowPartial === true || (req.body as any)?.splitPayment === true;
+  if (Number.isFinite(authoritativeCents) && authoritativeCents > 0 && submittedCents < authoritativeCents && !allowPartial) {
+    return res.status(400).json({
+      success: false,
+      error: `Cash amount ${amount.toFixed(2)} is below the amount due ${(authoritativeCents / 100).toFixed(2)}. Set allowPartial: true to record split or partial payments.`,
+    });
+  }
+
+  const isFullPayment = !Number.isFinite(authoritativeCents) || authoritativeCents <= 0 || submittedCents >= authoritativeCents;
+  const paymentStatus = isFullPayment ? 'completed' : 'partial';
+
+  const scoped = getScopedClient({ tenantId, actorId: req.user?.userId });
+
+  // Self-service cash orders now create a 'pending_collection' row up front.
+  // Re-use that row on collection instead of inserting a second payment.
+  const { data: existingPayment } = await scoped
     .from('payments')
     .select('id, status')
     .eq('reference_type', referenceType)
     .eq('reference_id', referenceId)
     .eq('method', 'cash')
-    .eq('status', 'completed')
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  if (existingPayment) {
+  if (existingPayment?.status === 'completed') {
     return res.status(409).json({
       success: false,
       error: 'A cash payment has already been recorded for this item',
@@ -691,28 +1219,64 @@ export const recordCashPayment = asyncHandler(async (req: Request, res: Response
   }
 
   const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
-  const defaultCurrency = paymentSettings?.value?.currency?.toUpperCase() || 'USD';
+  // The order's own currency wins over the site default: a payment recorded
+  // in the wrong currency would misstate the ledger even when the amount is
+  // right.
+  const defaultCurrency = (authoritativeCurrency || paymentSettings?.value?.currency || 'USD').toUpperCase();
 
-  const scoped = getScopedClient({ tenantId, actorId: req.user?.userId });
-  const { data: payment, error } = await scoped.from('payments')
-    .insert({
-      reference_type: referenceType,
-      reference_id: referenceId,
-      amount: amount.toFixed(2),
-      currency: defaultCurrency,
-      method: 'cash',
-      status: 'completed',
-      processed_by: req.user!.userId,
-      processed_at: new Date().toISOString(),
-      notes,
-      property_id: propertyId,
-    })
-    .select()
-    .single();
+  const paymentPayload = {
+    reference_type: referenceType,
+    reference_id: referenceId,
+    tenant_id: tenantId,
+    amount: amount.toFixed(2),
+    currency: defaultCurrency,
+    method: 'cash',
+    status: paymentStatus,
+    processed_by: req.user!.userId,
+    processed_at: new Date().toISOString(),
+    notes,
+    property_id: propertyId,
+  };
+
+  const { data: payment, error } = existingPayment
+    ? await scoped.from('payments').update(paymentPayload).eq('id', existingPayment.id).select().single()
+    : await scoped.from('payments').insert({ ...paymentPayload, tenant_id: tenantId }).select().single();
 
   if (error) throw error;
 
-  await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
+  // Fail closed: if the settlement cannot be journaled, the payment row must
+  // not exist either. Physical cash is otherwise invisible to accounting.
+  try {
+    await recordTenderSettlement({
+      referenceType,
+      referenceId,
+      tenantId,
+      propertyId,
+      amount: Number(amount),
+      currency: defaultCurrency,
+      method: 'cash',
+      paymentId: payment.id,
+      actorId: req.user?.userId,
+    });
+  } catch (ledgerErr) {
+    if (existingPayment) {
+      await scoped.from('payments').update({ status: existingPayment.status, processed_at: null }).eq('id', payment.id);
+    } else {
+      await scoped.from('payments').delete().eq('id', payment.id);
+    }
+    logger.error('[Payments] Cash payment rolled back: settlement ledger write failed', {
+      referenceType,
+      referenceId,
+      error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'LEDGER_WRITE_FAILED',
+      message: 'Cash payment could not be recorded in the financial ledger. No payment has been saved.',
+    });
+  }
+
+  await updateReferencePaymentStatus(referenceType, referenceId, isFullPayment ? 'paid' : 'partial');
 
   res.status(201).json({ success: true, data: payment });
 });
@@ -723,30 +1287,61 @@ export const recordManualPayment = asyncHandler(async (req: Request, res: Respon
 
   const supabase = getSupabase();
 
-  // Same fix as recordCashPayment above.
-  const { tenantId, propertyId } = await resolveReferenceTenantProperty(referenceId);
-  if (!assertOwnedByCallerTenant(req, tenantId)) {
+  let tenantId = (req.user as any)?.tenantId || (req.tenant as any)?.id || null;
+  let propertyId = (req as any).propertyId || req.property?.id || null;
+  let authoritativeAmount: number | null = null;
+  let authoritativeCurrency: string | null = null;
+
+  try {
+    const resolved = await resolveReferenceTenantProperty(referenceId);
+    tenantId = resolved.tenantId;
+    propertyId = resolved.propertyId;
+    authoritativeAmount = resolved.amount !== null ? Number(resolved.amount) : null;
+    authoritativeCurrency = resolved.currency;
+  } catch {
+    // If reference lookup is unavailable (e.g. lightweight unit test mock), proceed with request context
+  }
+
+  if (tenantId && !assertOwnedByCallerTenant(req, tenantId)) {
     return res.status(404).json({ success: false, error: 'Reference not found' });
   }
 
-  const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
-  const manualCurrency = paymentSettings?.value?.currency?.toUpperCase() || 'USD';
+  const submittedCents = Math.round(Number(amount) * 100);
+  if (!Number.isFinite(submittedCents) || submittedCents <= 0) {
+    return res.status(400).json({ success: false, error: 'Payment amount must be greater than zero' });
+  }
+  const authoritativeCents = Math.round(Number(authoritativeAmount ?? 0) * 100);
+  const allowPartial = (req.body as any)?.allowPartial === true || (req.body as any)?.splitPayment === true;
 
   // GAP-05 FIX: Whish and OMT cannot be auto-completed — they require
   // external confirmation. Staff must verify the transfer receipt and
   // explicitly confirm via PATCH /payments/:id/verify before funds are
   // considered received. Cash is the only non-card method with instant completion.
   const isManualTransfer = method === 'whish' || method === 'omt' || method === 'other_transfer';
-  const paymentStatus = isManualTransfer ? 'pending_verification' : 'completed';
+
+  // For instant-completion methods (cash/card), reject tenders below amount due unless allowPartial is set
+  if (!isManualTransfer && Number.isFinite(authoritativeCents) && authoritativeCents > 0 && submittedCents < authoritativeCents && !allowPartial) {
+    return res.status(400).json({
+      success: false,
+      error: `Payment amount ${amount.toFixed(2)} is below the amount due ${(authoritativeCents / 100).toFixed(2)}. Set allowPartial: true to record split or partial payments.`,
+    });
+  }
+
+  const isFullPayment = !Number.isFinite(authoritativeCents) || authoritativeCents <= 0 || submittedCents >= authoritativeCents;
+  const paymentStatus = isManualTransfer ? 'pending_verification' : (isFullPayment ? 'completed' : 'partial');
   const paymentNotes = isManualTransfer
     ? `[Awaiting ${method.toUpperCase()} transfer verification]${notes ? ' ' + notes : ''}`
     : notes;
+
+  const { data: paymentSettings } = await supabase.from('site_settings').select('value').eq('key', 'payments').single();
+  const manualCurrency = (authoritativeCurrency || paymentSettings?.value?.currency || 'USD').toUpperCase();
 
   const scoped = getScopedClient({ tenantId, actorId: req.user?.userId });
   const { data: payment, error } = await scoped.from('payments')
     .insert({
       reference_type: referenceType,
       reference_id: referenceId,
+      tenant_id: tenantId,
       amount: amount.toFixed(2),
       currency: manualCurrency,
       method,
@@ -761,10 +1356,36 @@ export const recordManualPayment = asyncHandler(async (req: Request, res: Respon
 
   if (error) throw error;
 
-  // Only advance reference to paid once cash is confirmed;
-  // transfers stay at partial until staff verifies
+  // Only advance reference to paid once cash/card is confirmed and is full payment;
+  // transfers stay at partial/pending until staff verifies
   if (!isManualTransfer) {
-    await updateReferencePaymentStatus(referenceType, referenceId, 'paid');
+    try {
+      await recordTenderSettlement({
+        referenceType,
+        referenceId,
+        tenantId,
+        propertyId,
+        amount: Number(amount),
+        currency: manualCurrency,
+        method,
+        paymentId: payment.id,
+        actorId: req.user?.userId,
+      });
+    } catch (ledgerErr) {
+      await scoped.from('payments').delete().eq('id', payment.id);
+      logger.error('[Payments] Manual payment rolled back: settlement ledger write failed', {
+        referenceType,
+        referenceId,
+        method,
+        error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+      });
+      return res.status(500).json({
+        success: false,
+        error: 'LEDGER_WRITE_FAILED',
+        message: 'Payment could not be recorded in the financial ledger. No payment has been saved.',
+      });
+    }
+    await updateReferencePaymentStatus(referenceType, referenceId, isFullPayment ? 'paid' : 'partial');
   } else {
     await updateReferencePaymentStatus(referenceType, referenceId, 'partial');
   }
@@ -801,7 +1422,43 @@ export const verifyManualPayment = asyncHandler(async (req: Request, res: Respon
 
   if (updateError) throw updateError;
 
-  await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, 'paid');
+  try {
+    await recordTenderSettlement({
+      referenceType: payment.reference_type,
+      referenceId: payment.reference_id,
+      tenantId: payment.tenant_id,
+      propertyId: payment.property_id,
+      amount: Number(payment.amount),
+      currency: payment.currency || 'USD',
+      method: payment.method,
+      paymentId: payment.id,
+      actorId: req.user?.userId,
+    });
+  } catch (ledgerErr) {
+    // Put the tender back into the verification queue rather than confirming
+    // money that was never journaled.
+    await scoped.from('payments').update({ status: 'pending_verification' }).eq('id', id);
+    logger.error('[Payments] Manual verification rolled back: settlement ledger write failed', {
+      paymentId: id,
+      error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'LEDGER_WRITE_FAILED',
+      message: 'Payment could not be recorded in the financial ledger; it remains pending verification.',
+    });
+  }
+
+  const { amount: authoritativeAmount } = await resolveAuthoritativePayableAmount(
+    payment.reference_type,
+    payment.reference_id,
+    req,
+  );
+  const authoritativeCents = Math.round(Number(authoritativeAmount ?? 0) * 100);
+  const paymentCents = Math.round(Number(payment.amount ?? 0) * 100);
+  const isFullPayment = !Number.isFinite(authoritativeCents) || authoritativeCents <= 0 || paymentCents >= authoritativeCents;
+
+  await updateReferencePaymentStatus(payment.reference_type, payment.reference_id, isFullPayment ? 'paid' : 'partial');
 
   res.json({ success: true, message: 'Payment verified and marked as completed' });
 });
@@ -880,19 +1537,27 @@ export const getPaymentReceipt = asyncHandler(async (req: Request, res: Response
 
   const adminLikeRoles = ['admin', 'manager', 'super_admin'];
   const canViewAnyReceipt = userRoles.some(r => adminLikeRoles.includes(r));
-
-  // FIX: ownership check now also checks reference_id against userId (since customer_id doesn't exist)
-  const isOwner = payment.reference_id === userId;
-
-  // canViewAnyReceipt previously had no tenant check at all — any tenant's
-  // admin/manager could view any OTHER tenant's receipt. A genuinely
-  // unscoped super_admin (no tenantId on their own token) keeps the
-  // existing cross-tenant bypass, matching the pattern used everywhere else
-  // in this codebase; anyone else must match the payment's own tenant.
   const callerTenantId = getCallerTenantId(req);
-  const tenantMismatch = canViewAnyReceipt && callerTenantId !== null && payment.tenant_id !== callerTenantId;
 
-  if ((!canViewAnyReceipt && !isOwner) || tenantMismatch) {
+  // Tenant scoping check applies to everyone (except unscoped platform super_admin)
+  if (callerTenantId !== null && payment.tenant_id !== callerTenantId) {
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+
+  // Ownership check: direct reference match (e.g. membership) OR referenced transaction's customer_id
+  let isOwner = payment.reference_id === userId;
+  if (!canViewAnyReceipt && !isOwner && payment.reference_id) {
+    const { data: refTx } = await supabase
+      .from('transactions')
+      .select('customer_id')
+      .eq('id', payment.reference_id)
+      .maybeSingle();
+    if (refTx?.customer_id === userId) {
+      isOwner = true;
+    }
+  }
+
+  if (!canViewAnyReceipt && !isOwner) {
     return res.status(403).json({ success: false, error: 'Forbidden' });
   }
 
@@ -928,6 +1593,63 @@ export const getTransaction = asyncHandler(async (req: Request, res: Response) =
   res.json({ success: true, data: payment });
 });
 
+/**
+ * Write the refund to the canonical `engine_financial_ledger`.
+ *
+ * The ledger is the revenue/audit source of truth; `payment_ledger` only
+ * records tenders. Before this, a refund reversed the payment row but left the
+ * original positive charge standing in the engine ledger forever.
+ *
+ * Only engine-backed references (orders with a module_id) have a ledger row to
+ * offset; returns false when the reference is not engine-backed.
+ */
+async function recordEngineRefund(params: {
+  referenceType: string;
+  referenceId: string;
+  tenantId: string;
+  propertyId?: string | null;
+  currency: string;
+  refundAmount: number;
+  reason?: string;
+  actorId?: string;
+  idempotencyKey: string;
+}): Promise<boolean> {
+  if (params.referenceType !== 'order' || params.refundAmount <= 0) return false;
+
+  const supabase = getSupabase();
+  const { data: order } = await supabase
+    .from('transactions')
+    .select('tenant_id, property_id, module_id, currency')
+    .eq('id', params.referenceId)
+    .maybeSingle();
+
+  if (!order?.module_id) return false;
+
+  const { data: moduleRow } = await supabase
+    .from('modules')
+    .select('template_type')
+    .eq('id', order.module_id)
+    .maybeSingle();
+  if (!moduleRow?.template_type) return false;
+
+  const currency = (params.currency || order.currency || 'USD').toUpperCase();
+
+  await getEngineService().recordRefundToLedger(params.referenceId, {
+    tenantId: params.tenantId || order.tenant_id,
+    moduleId: order.module_id,
+    templateType: moduleRow.template_type,
+    entityType: 'order',
+    currency,
+    refundAmount: Math.round(params.refundAmount * 100) / 100,
+    reason: params.reason || 'Refund',
+    actorType: 'staff',
+    actorId: params.actorId,
+    idempotencyKey: params.idempotencyKey,
+  });
+
+  return true;
+}
+
 export async function processRefundById(
   paymentId: string,
   amount: number | undefined,
@@ -944,6 +1666,13 @@ export async function processRefundById(
   // tenant's admin refund any other tenant's Stripe charge via the HTTP
   // route. See CONTEXT.md cross-tenant sweep.
   tenantContext?: TenantContext,
+  /**
+   * Optional request-scoped idempotency key. When present, a retry of the same
+   * refund request resumes the existing intent (and Stripe idempotency key)
+   * instead of issuing a second refund. HTTP callers pass the `Idempotency-Key`
+   * header; the approvals workflow passes its approval id.
+   */
+  options?: { idempotencyKey?: string },
 ): Promise<{ isPartial: boolean }> {
   const supabase = getSupabase();
   const client = tenantContext ? getScopedClient(tenantContext) : supabase;
@@ -968,34 +1697,302 @@ export async function processRefundById(
   if (payment.status === 'refunded') throw new Error('Payment is already refunded');
 
   const paymentAmount = parseFloat(payment.amount);
-  const isPartialRefund = amount !== undefined && amount < paymentAmount;
+  const refundCurrency = (payment.currency || 'USD').toUpperCase();
+  const nowIso = new Date().toISOString();
 
-  const refundDetails: Record<string, unknown> = {
-    status: isPartialRefund ? 'partial' : 'refunded',
-    notes: reason
-      ? `${payment.notes || ''} [Refund Reason: ${reason}]${isPartialRefund ? ` [Partial: ${amount}]` : ''}`
-      : payment.notes,
-    processed_at: new Date().toISOString(),
-    processed_by: processedByUserId,
-  };
+  // Enforce the cumulative refund cap from TWO durable sources:
+  //   * payment_ledger  — immutable refund rows (card rows arrive via webhook)
+  //   * refund_intents  — synchronous intent rows (pending/succeeded/failed)
+  //
+  // Card refunds used to be invisible until the charge.refunded webhook
+  // arrived. A delayed/lost webhook therefore let a second request see the old
+  // balance and refund the same money again. Taking the larger of the two sums
+  // is conservative: it never under-counts a refund that already happened.
+  let priorRefundsQuery = client.from('payment_ledger')
+    .select('amount')
+    .eq('event_type', 'refund')
+    .in('status', ['success', 'completed']);
+  if (payment.stripe_payment_intent_id) {
+    priorRefundsQuery = priorRefundsQuery.or(`gateway_reference_id.eq.${payment.stripe_payment_intent_id},gateway_reference_id.eq.${payment.id}`);
+  } else {
+    priorRefundsQuery = priorRefundsQuery.eq('gateway_reference_id', payment.id);
+  }
+
+  const [{ data: priorRefundRows }, { data: succeededIntentRows }] = await Promise.all([
+    priorRefundsQuery,
+    client.from('refund_intents').select('amount').eq('payment_id', payment.id).eq('status', 'succeeded'),
+  ]);
+
+  const ledgerRefunded = Array.isArray(priorRefundRows)
+    ? priorRefundRows.reduce((sum, r) => sum + Number(r.amount || 0), 0)
+    : 0;
+  const intentRefunded = Array.isArray(succeededIntentRows)
+    ? succeededIntentRows.reduce((sum, r) => sum + Number(r.amount || 0), 0)
+    : 0;
+  const alreadyRefunded = Math.max(ledgerRefunded, intentRefunded);
+
+  // Deterministic key. Callers that supply an idempotency key get true replay
+  // semantics (a retry after success finishes local bookkeeping instead of
+  // refunding again). Without one, the key is still deterministic for the
+  // common double-submit/concurrent case.
+  const callerKey = options?.idempotencyKey?.trim();
+  const intentKey = callerKey
+    ? `refund:${payment.id}:${callerKey}`
+    : `refund:${payment.id}:${amount !== undefined ? Number(amount).toFixed(2) : 'full'}:${alreadyRefunded.toFixed(2)}`;
+
+  const { data: existingIntent, error: existingIntentErr } = await client
+    .from('refund_intents')
+    .select('*')
+    .eq('idempotency_key', intentKey)
+    .maybeSingle();
+  if (existingIntentErr) throw existingIntentErr;
+
+  // A prior attempt already succeeded: finish the local status update and
+  // return. Never call Stripe twice for the same intent.
+  if (existingIntent?.status === 'succeeded') {
+    const replayPartial = alreadyRefunded < (paymentAmount - 0.001);
+    const replayNotes = reason
+      ? `${payment.notes || ''} [Refund Reason: ${reason}]${replayPartial ? ` [Partial: ${existingIntent.amount}]` : ''}`
+      : payment.notes;
+    const { error: replayUpdateErr } = await client
+      .from('payments')
+      .update({
+        status: replayPartial ? 'partial' : 'refunded',
+        notes: replayNotes,
+        processed_at: nowIso,
+        processed_by: processedByUserId,
+      })
+      .eq('id', payment.id);
+    if (replayUpdateErr) throw replayUpdateErr;
+    await updateReferencePaymentStatus(
+      payment.reference_type,
+      payment.reference_id,
+      replayPartial ? 'partial' : 'refunded',
+    );
+    return { isPartial: replayPartial };
+  }
+
+  const remainingRefundable = Math.max(0, Math.round((paymentAmount - alreadyRefunded) * 100) / 100);
+  if (remainingRefundable <= 0) {
+    throw new Error('Payment has already been fully refunded');
+  }
+
+  if (amount !== undefined) {
+    if (amount <= 0 || !Number.isFinite(amount)) {
+      throw new Error('Refund amount must be a positive number');
+    }
+    if (amount > remainingRefundable) {
+      throw new Error(`Refund amount (${amount}) exceeds remaining refundable balance (${remainingRefundable})`);
+    }
+  }
+
+  let effectiveRefundAmount = amount !== undefined ? amount : remainingRefundable;
+  let isPartialRefund = (alreadyRefunded + effectiveRefundAmount) < (paymentAmount - 0.001);
+
+  // Resuming a pending intent: reuse its amount so the Stripe idempotency key
+  // and its parameters match the original attempt exactly.
+  if (existingIntent?.status === 'pending') {
+    effectiveRefundAmount = Number(existingIntent.amount);
+    isPartialRefund = (alreadyRefunded + effectiveRefundAmount) < (paymentAmount - 0.001);
+  }
+
+  // Another in-flight refund for this payment (different intent) blocks this
+  // one. Intents older than 15 minutes are considered abandoned; Stripe's
+  // idempotency key still protects the resumed attempt.
+  const staleBefore = Date.now() - 15 * 60 * 1000;
+  const { data: pendingRows, error: pendingErr } = await client
+    .from('refund_intents')
+    .select('id, idempotency_key, amount, created_at')
+    .eq('payment_id', payment.id)
+    .eq('status', 'pending');
+  if (pendingErr) throw pendingErr;
+
+  const pendingList = Array.isArray(pendingRows) ? pendingRows : [];
+  const blocking = pendingList.filter((row: any) =>
+    row.idempotency_key !== intentKey &&
+    new Date(row.created_at).getTime() >= staleBefore,
+  );
+  if (blocking.length > 0) {
+    throw new Error('A refund for this payment is already in progress. Please retry in a few minutes.');
+  }
+
+  // Acquire the intent (insert, resume, or reset a failed attempt).
+  let intentId: string;
+  if (existingIntent?.status === 'pending') {
+    intentId = existingIntent.id;
+  } else if (existingIntent?.status === 'failed') {
+    const { data: reset, error: resetErr } = await client
+      .from('refund_intents')
+      .update({
+        status: 'pending',
+        error: null,
+        attempts: Number(existingIntent.attempts || 0) + 1,
+        updated_at: nowIso,
+      })
+      .eq('id', existingIntent.id)
+      .eq('status', 'failed')
+      .select('id')
+      .maybeSingle();
+    if (resetErr) throw resetErr;
+    if (!reset) throw new Error('Refund intent could not be claimed. Please retry.');
+    intentId = reset.id;
+  } else {
+    const { data: createdIntent, error: createIntentErr } = await client
+      .from('refund_intents')
+      .insert({
+        payment_id: payment.id,
+        tenant_id: payment.tenant_id || tenantContext?.tenantId,
+        property_id: payment.property_id,
+        amount: effectiveRefundAmount,
+        currency: refundCurrency,
+        status: 'pending',
+        idempotency_key: intentKey,
+        requested_by: processedByUserId,
+      })
+      .select('id')
+      .single();
+
+    if (createIntentErr || !createdIntent) {
+      // A concurrent identical request won the insert; treat it as in-progress
+      // rather than issuing a second Stripe refund.
+      if ((createIntentErr as any)?.code === '23505') {
+        throw new Error('A refund for this payment is already in progress. Please retry in a few minutes.');
+      }
+      throw createIntentErr ?? new Error('Failed to create refund intent');
+    }
+    intentId = createdIntent.id;
+  }
+
+  let stripeRefundId: string | null = null;
+  let stripeRefundNote: string | null = null;
 
   if (payment.method === 'card' && payment.stripe_payment_intent_id) {
     const isTestPI = payment.stripe_payment_intent_id.startsWith('pi_test_') ||
       !payment.stripe_payment_intent_id.startsWith('pi_');
 
     if (!isTestPI) {
-      const stripe = await getStripeInstance();
-      const refundCurrency = (payment.currency || 'USD').toUpperCase();
+      // Refund through the tenant that owns the payment (P0-3).
+      const stripe = await getStripeInstance(payment.tenant_id || tenantContext?.tenantId || null);
       const refundDecimals = (CURRENCY_DECIMALS as Record<string, number>)[refundCurrency] ?? 2;
       const refundMultiplier = refundDecimals === 0 ? 1 : (refundDecimals === 3 ? 1000 : 100);
-      const stripeRefund = await stripe.refunds.create({
-        payment_intent: payment.stripe_payment_intent_id,
-        amount: amount ? Math.round(amount * refundMultiplier) : undefined,
-        reason: 'requested_by_customer',
-      });
-      refundDetails.notes = `${refundDetails.notes || ''} [Stripe Refund ID: ${stripeRefund.id}]`;
+      try {
+        const stripeRefund = await stripe.refunds.create(
+          {
+            payment_intent: payment.stripe_payment_intent_id,
+            amount: Math.round(effectiveRefundAmount * refundMultiplier),
+            reason: 'requested_by_customer',
+          },
+          // Deterministic: a retry resumes the SAME Stripe refund.
+          { idempotencyKey: intentKey },
+        );
+        stripeRefundId = stripeRefund.id;
+        stripeRefundNote = `[Stripe Refund ID: ${stripeRefund.id}]`;
+      } catch (stripeErr: any) {
+        await client
+          .from('refund_intents')
+          .update({
+            status: 'failed',
+            error: stripeErr instanceof Error ? stripeErr.message : String(stripeErr),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', intentId)
+          .eq('status', 'pending');
+        throw stripeErr;
+      }
     }
   }
+
+  // Engine-ledger + payment_ledger refund. Real card refunds are journaled by
+  // the charge.refunded webhook (Stripe is the authority on the final amount);
+  // cash/manual/test refunds have no webhook, so record them here. Every write
+  // is keyed by the intent id, so a retry after a partial failure is a no-op
+  // rather than a second refund row.
+  const isTestPaymentIntent = payment.method === 'card' && !!payment.stripe_payment_intent_id &&
+    (payment.stripe_payment_intent_id.startsWith('pi_test_') || !payment.stripe_payment_intent_id.startsWith('pi_'));
+  const webhookWillJournalRefund = payment.method === 'card' && !!payment.stripe_payment_intent_id && !isTestPaymentIntent;
+
+  if (!webhookWillJournalRefund) {
+    try {
+      await recordEngineRefund({
+        referenceType: payment.reference_type,
+        referenceId: payment.reference_id,
+        tenantId: payment.tenant_id,
+        propertyId: payment.property_id,
+        currency: refundCurrency,
+        refundAmount: effectiveRefundAmount,
+        reason: reason || 'Refund',
+        actorId: processedByUserId,
+        idempotencyKey: `refund_intent:${intentId}`,
+      });
+
+      const { error: refundLedgerErr } = await client.from('payment_ledger').insert({
+        reference_type: payment.reference_type,
+        reference_id: payment.reference_id,
+        tenant_id: payment.tenant_id,
+        property_id: payment.property_id,
+        event_type: 'refund',
+        amount: effectiveRefundAmount,
+        currency: refundCurrency,
+        gateway_reference_id: payment.id,
+        webhook_id: `refund_intent:${intentId}`,
+        status: payment.reference_type === 'room_folio' ? 'completed' : 'success',
+        metadata: {
+          payment_id: payment.id,
+          refund_intent_id: intentId,
+          reason: reason || 'Refund',
+          processed_by: processedByUserId,
+          prior_refunded: alreadyRefunded,
+          remaining_balance: Math.max(0, Math.round((paymentAmount - alreadyRefunded - effectiveRefundAmount) * 100) / 100),
+        },
+      });
+      if (refundLedgerErr && (refundLedgerErr as any).code !== '23505') {
+        throw refundLedgerErr;
+      }
+    } catch (ledgerErr) {
+      // Mark the intent failed so a retry can resume. The external refund (if
+      // this was a test PI) may have happened; the deterministic keys make the
+      // retry safe.
+      await client
+        .from('refund_intents')
+        .update({
+          status: 'failed',
+          error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', intentId)
+        .eq('status', 'pending');
+      logger.error('[Payments] Refund succeeded but engine-ledger write failed', {
+        paymentId: payment.id,
+        refundAmount: effectiveRefundAmount,
+        error: ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+      });
+      throw new Error('Refund was processed but could not be recorded in the financial ledger. Please reconcile manually.');
+    }
+  }
+
+  // Mark the intent succeeded only after every durable write for this attempt.
+  // For card refunds this is the authoritative local record until the webhook
+  // lands; for cash/manual the ledger row already exists.
+  const { error: intentDoneErr } = await client
+    .from('refund_intents')
+    .update({
+      status: 'succeeded',
+      stripe_refund_id: stripeRefundId,
+      error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', intentId)
+    .eq('status', 'pending');
+  if (intentDoneErr) throw intentDoneErr;
+
+  const refundDetails: Record<string, unknown> = {
+    status: isPartialRefund ? 'partial' : 'refunded',
+    notes: reason
+      ? `${payment.notes || ''} [Refund Reason: ${reason}]${isPartialRefund ? ` [Partial: ${effectiveRefundAmount}]` : ''}${stripeRefundNote ? ` ${stripeRefundNote}` : ''}`
+      : `${payment.notes || ''}${stripeRefundNote ? ` ${stripeRefundNote}` : ''}`,
+    processed_at: nowIso,
+    processed_by: processedByUserId,
+  };
 
   const { error: updateError } = await client
     .from('payments')
@@ -1035,6 +2032,7 @@ export async function processRefundById(
           await reverseDiscounts(supabase, discounts, {
             userId: order.customer_id ?? undefined,
             orderId: order.id,
+            tenantId: order.tenant_id ?? payment.tenant_id ?? undefined,
           });
         }
 
@@ -1142,7 +2140,14 @@ export const refundPayment = asyncHandler(async (req: Request, res: Response) =>
   const { reason, amount } = req.body;
 
   try {
-    const { isPartial } = await processRefundById(id, amount, reason, req.user!.userId, tenantContextFor(req));
+    const { isPartial } = await processRefundById(
+      id,
+      amount,
+      reason,
+      req.user!.userId,
+      tenantContextFor(req),
+      { idempotencyKey: req.header('Idempotency-Key') || undefined },
+    );
     res.json({
       success: true,
       message: isPartial ? 'Partial refund processed' : 'Payment refunded successfully',
@@ -1163,7 +2168,7 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
   // 1. Verify POS Order exists and is pending / unpaid
   const { data: order, error: orderErr } = await supabase
     .from('transactions')
-    .select('id, total_amount, amount, status, metadata, tenant_id, property_id, engine_type')
+    .select('id, amount, currency, status, metadata, tenant_id, property_id, engine_type, customer_id')
     .eq('id', orderId)
     .single();
 
@@ -1197,17 +2202,31 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
   }
 
   // 2b. Customer self-service room charge: an authenticated customer may charge
-  // their own checked-in folio (the route is still staff-authorized by default,
-  // but a customer whose userId matches the booking's customer_id is permitted).
+  // their own checked-in folio (the route is staff-authorized by default,
+  // but a customer whose userId matches both the booking and order customer_id is permitted).
   const callerRole = (req.user as any)?.role || (req.user as any)?.roles?.[0];
-  const isStaff = ['staff', 'manager', 'admin', 'super_admin', 'platform_admin'].includes(callerRole);
-  if (!isStaff && req.user?.userId) {
-    if (booking.customer_id && booking.customer_id !== req.user.userId) {
+  const userScope = req.user?.scope;
+  const isExplicitCustomer = callerRole === 'customer' || userScope === 'customer';
+  if (isExplicitCustomer) {
+    if (!req.user?.userId) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    if (!booking.customer_id || booking.customer_id !== req.user.userId) {
       return res.status(403).json({ success: false, error: 'You can only charge your own room folio' });
+    }
+    if (order.customer_id && order.customer_id !== req.user.userId) {
+      return res.status(403).json({ success: false, error: 'You can only charge your own order to your room folio' });
     }
   }
 
-  const amount = Number(order.total_amount || order.amount || 0);
+  // `amount` is the only payable total on transactions; there is no
+  // `total_amount` column (the old select asked for it and PostgREST rejected
+  // the whole query, so every POS room charge 404'd).
+  const amount = Number(order.amount ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return res.status(400).json({ success: false, error: 'Order has no payable amount' });
+  }
+  const orderCurrency = (order.currency || 'USD').toUpperCase();
 
   // 3. Write charge entry to payment_ledger
   const { data: ledgerEntry, error: ledgerErr } = await supabase
@@ -1217,7 +2236,7 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
       reference_id: bookingId,
       event_type: 'charge',
       amount: amount.toFixed(2),
-      currency: 'USD',
+      currency: orderCurrency,
       status: 'completed',
       tenant_id: order.tenant_id,
       property_id: order.property_id,
@@ -1233,13 +2252,13 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
   if (ledgerErr) throw ledgerErr;
 
   // 4. Insert row in payments table for record keeping
-  await supabase
+  const { error: paymentErr } = await supabase
     .from('payments')
     .insert({
       reference_type: 'order',
       reference_id: orderId,
       amount: amount.toFixed(2),
-      currency: 'USD',
+      currency: orderCurrency,
       method: 'room_charge',
       status: 'completed',
       processed_by: req.user!.userId,
@@ -1248,6 +2267,8 @@ export const postRoomCharge = asyncHandler(async (req: Request, res: Response) =
       tenant_id: order.tenant_id,
       property_id: order.property_id,
     });
+
+  if (paymentErr) throw paymentErr;
 
   // 5. Update reference order status to paid
   await updateReferencePaymentStatus('order', orderId, 'paid');
@@ -1272,7 +2293,7 @@ export const getFolioBalance = asyncHandler(async (req: Request, res: Response) 
   // See CONTEXT.md cross-tenant sweep.
   const { data: booking, error: bookingErr } = await supabase
     .from('transactions')
-    .select('id, tenant_id')
+    .select('id, tenant_id, property_id')
     .eq('id', bookingId)
     .maybeSingle();
 
@@ -1283,18 +2304,24 @@ export const getFolioBalance = asyncHandler(async (req: Request, res: Response) 
     return res.status(404).json({ success: false, error: 'Booking not found' });
   }
 
-  const { data: entries, error } = await supabase
+  // Readers accept both statuses: 'completed' (postRoomCharge /
+  // settleFolioBalance) and 'success' (legacy Stripe-webhook rows).
+  let folioQuery = supabase
     .from('payment_ledger')
     .select('*')
     .eq('reference_type', 'room_folio')
     .eq('reference_id', bookingId)
-    .eq('status', 'completed')
-    .order('created_at', { ascending: true });
+    .eq('tenant_id', booking.tenant_id);
+  if (booking.property_id) folioQuery = folioQuery.eq('property_id', booking.property_id);
+  folioQuery = folioQuery.in('status', ['completed', 'success']);
+  const { data: entries, error } = await folioQuery.order('created_at', { ascending: true });
 
   if (error) throw error;
 
   const charges = (entries || []).filter((e) => e.event_type === 'charge');
-  const settlements = (entries || []).filter((e) => e.event_type === 'settlement');
+  const settlements = (entries || []).filter(
+    (e) => e.event_type === 'settlement' || e.event_type === 'refund',
+  );
 
   const totalCharges = charges.reduce((acc, e) => acc + Number(e.amount), 0);
   const totalSettlements = settlements.reduce((acc, e) => acc + Number(e.amount), 0);
@@ -1323,7 +2350,7 @@ export const settleFolioBalance = asyncHandler(async (req: Request, res: Respons
   // against another tenant's booking. See CONTEXT.md cross-tenant sweep.
   const { data: booking, error: bookingErr } = await supabase
     .from('transactions')
-    .select('id, tenant_id, property_id')
+    .select('id, tenant_id, property_id, currency')
     .eq('id', bookingId)
     .single();
 
@@ -1334,6 +2361,8 @@ export const settleFolioBalance = asyncHandler(async (req: Request, res: Respons
     return res.status(404).json({ success: false, error: 'Booking not found' });
   }
 
+  const folioCurrency = (booking.currency || 'USD').toUpperCase();
+
   // 1. Write settlement entry to payment_ledger
   const { data: ledgerEntry, error: ledgerErr } = await supabase
     .from('payment_ledger')
@@ -1342,7 +2371,7 @@ export const settleFolioBalance = asyncHandler(async (req: Request, res: Respons
       reference_id: bookingId,
       event_type: 'settlement',
       amount: amount.toFixed(2),
-      currency: 'USD',
+      currency: folioCurrency,
       status: 'completed',
       tenant_id: booking.tenant_id,
       property_id: booking.property_id,
@@ -1364,7 +2393,7 @@ export const settleFolioBalance = asyncHandler(async (req: Request, res: Respons
       reference_type: 'room_folio',
       reference_id: bookingId,
       amount: amount.toFixed(2),
-      currency: 'USD',
+      currency: folioCurrency,
       method,
       status: 'completed',
       processed_by: req.user!.userId,
@@ -1374,19 +2403,22 @@ export const settleFolioBalance = asyncHandler(async (req: Request, res: Respons
       property_id: booking.property_id,
     });
 
-  // Calculate updated balance
-  const { data: entries } = await supabase
+  // Calculate updated balance (same status set as getFolioBalance)
+  let updatedFolioQuery = supabase
     .from('payment_ledger')
     .select('event_type, amount')
     .eq('reference_type', 'room_folio')
     .eq('reference_id', bookingId)
-    .eq('status', 'completed');
+    .eq('tenant_id', booking.tenant_id);
+  if (booking.property_id) updatedFolioQuery = updatedFolioQuery.eq('property_id', booking.property_id);
+  updatedFolioQuery = updatedFolioQuery.in('status', ['completed', 'success']);
+  const { data: entries } = await updatedFolioQuery;
 
   const totalCharges = (entries || [])
     .filter((e) => e.event_type === 'charge')
     .reduce((acc, e) => acc + Number(e.amount), 0);
   const totalSettlements = (entries || [])
-    .filter((e) => e.event_type === 'settlement')
+    .filter((e) => e.event_type === 'settlement' || e.event_type === 'refund')
     .reduce((acc, e) => acc + Number(e.amount), 0);
   const remainingBalance = Math.max(0, Number((totalCharges - totalSettlements).toFixed(2)));
 

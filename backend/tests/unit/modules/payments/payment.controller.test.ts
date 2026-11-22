@@ -155,6 +155,7 @@ function mockReq(overrides: Record<string, unknown> = {}): Record<string, unknow
     user: { userId: 'admin-1', id: 'admin-1', roles: ['super_admin'], scope: 'super_admin', tenantId: 'tenant-1' },
     ip: '127.0.0.1',
     get: vi.fn(),
+    header: vi.fn(),
     ...overrides,
   };
 }
@@ -200,7 +201,7 @@ describe('PaymentController', () => {
         { id: 'order-1', total_amount: 50, currency: 'usd', payment_status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1' },
       ],
       transactions: [
-        { id: 'order-1', total_amount: 50, currency: 'USD', payment_status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1' },
+        { id: 'order-1', amount: 50, currency: 'USD', status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1' },
       ],
     };
   });
@@ -209,6 +210,7 @@ describe('PaymentController', () => {
 
   describe('createPaymentIntent', () => {
     it('should create a Stripe payment intent and return clientSecret', async () => {
+      tableData.payments = [];
       setupSupabase();
       mockStripePaymentIntentsCreate.mockResolvedValue({
         id: 'pi_test_1',
@@ -228,8 +230,9 @@ describe('PaymentController', () => {
     });
 
     it('should convert amount to cents', async () => {
+      tableData.payments = [];
       tableData.transactions = [
-        { id: 'order-1', total_amount: 99.99, currency: 'USD', payment_status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1', customer_id: 'admin-1' },
+        { id: 'order-1', amount: 99.99, currency: 'USD', status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1', customer_id: 'admin-1' },
       ];
       tableData.menu_service_orders = [
         { id: 'order-1', total_amount: 99.99, currency: 'usd', payment_status: 'pending', tenant_id: 'tenant-1', property_id: 'prop-1', customer_id: 'admin-1' },
@@ -245,6 +248,7 @@ describe('PaymentController', () => {
 
       expect(mockStripePaymentIntentsCreate).toHaveBeenCalledWith(
         expect.objectContaining({ amount: 9999 }),
+        expect.anything(),
       );
     });
   });
@@ -572,11 +576,16 @@ describe('PaymentController', () => {
         const res = mockRes();
         await (refundPayment as Function)(req, res, mockNext());
 
-        expect(mockStripeRefundsCreate).toHaveBeenCalledWith({
-          payment_intent: 'pi_live_123',
-          amount: tc.expectedStripeAmount,
-          reason: 'requested_by_customer',
-        });
+        expect(mockStripeRefundsCreate).toHaveBeenCalledWith(
+          {
+            payment_intent: 'pi_live_123',
+            amount: tc.expectedStripeAmount,
+            reason: 'requested_by_customer',
+          },
+          // P0-11: a deterministic idempotency key makes a retry resume the
+          // same Stripe refund instead of issuing a second one.
+          expect.objectContaining({ idempotencyKey: expect.any(String) }),
+        );
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
       }
     });
@@ -590,7 +599,7 @@ describe('PaymentController', () => {
       tableData.payments = [];
       setupSupabase();
       const req = mockReq({
-        body: { referenceType: 'menu_service_order', referenceId: 'order-1', amount: 30, notes: 'Exact change' },
+        body: { referenceType: 'menu_service_order', referenceId: 'order-1', amount: 50, notes: 'Exact change' },
       });
       const res = mockRes();
       await (recordCashPayment as Function)(req, res, mockNext());
@@ -604,7 +613,7 @@ describe('PaymentController', () => {
       tableData.payments = [{ ...PAYMENT, method: 'cash', status: 'completed' }];
       setupSupabase();
       const req = mockReq({
-        body: { referenceType: 'menu_service_order', referenceId: 'order-1', amount: 30 },
+        body: { referenceType: 'menu_service_order', referenceId: 'order-1', amount: 50 },
       });
       const res = mockRes();
       await (recordCashPayment as Function)(req, res, mockNext());

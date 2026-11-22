@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
+import { createChainableMock } from '../../utils.js';
 import { handleSaasStripeWebhook } from '../../../../src/modules/platform/saas-webhook.controller.js';
 import { getSaasBillingService } from '../../../../src/services/saas-billing.service.js';
 import { getProvisioningService } from '../../../../src/modules/platform/provisioning.service.js';
@@ -192,13 +193,9 @@ describe('SaaS Provisioning & Stripe Webhook Unit', () => {
         case 'user_roles': return mockUserRolesTable;
         case 'saas_billing_history': return mockBillingHistoryTable;
         default:
-          return {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-            insert: vi.fn().mockReturnThis(),
-            single: vi.fn().mockResolvedValue({ data: {}, error: null }),
-          };
+          // Includes provisioning_email_outbox: the resumable flow upserts the
+          // credential then reads pending rows to deliver it.
+          return createChainableMock({});
       }
     });
 

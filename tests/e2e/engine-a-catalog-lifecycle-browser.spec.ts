@@ -19,10 +19,15 @@
  */
 
 import { test, expect } from '../fixtures/auth.fixture';
-import { TEST_STAFF_EMAIL, TEST_STAFF_PASSWORD } from '../fixtures/test-credentials';
+import { loadE2EAdminTwoFactor, computeTotp } from '../setup/two-factor';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://walid.localhost:3000';
+// NOTE: do NOT read process.env.FRONTEND_URL here: the repo-root .env sets
+// FRONTEND_URL=https://v2-ecosystem.vercel.app/ and Playwright injects it
+// into the test process, so it points at PRODUCTION. E2E_FRONTEND_URL is the
+// test-scoped override knob; default to the local walid tenant tier.
+const FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://walid.localhost:3000';
 const API_URL = process.env.API_URL || 'http://localhost:3005';
+const E2E_TENANT_SLUG = process.env.E2E_TENANT_SLUG || 'walid';
 const TEST_MODULE_SLUG = process.env.E2E_ENGINE_A_SLUG || 'poolside-grill';
 
 // ---------------------------------------------------------------------------
@@ -33,54 +38,81 @@ const TEST_PROPERTY_SLUG = process.env.E2E_PROPERTY_SLUG || 'walid-s-property';
 
 async function dismissCookieConsent(page: any) {
   try {
-    const btn = page.getByRole('button', { name: /accept all/i });
+    // Scope to the banner dialog: the Customise modal ALSO has an
+    // "Accept All" button, and an unscoped getByRole match is a strict-mode
+    // violation — click throws, this catch swallows it, consent is never
+    // persisted and the banner keeps re-appearing after every re-render.
+    const btn = page
+      .locator('#cookie-consent-banner')
+      .getByRole('button', { name: /accept all/i });
     if (await btn.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await btn.click();
       await page.waitForTimeout(500);
     }
   } catch { /* not present */ }
+  // Belt and braces: drop the node so it can never hit-test over cards.
+  try {
+    await page.evaluate(() => document.getElementById('cookie-consent-banner')?.remove());
+  } catch { /* page context may be navigating */ }
 }
 
 async function loginAsAdmin(page: any) {
-  const email = process.env.E2E_ADMIN_EMAIL || 'test.admin@v2ecosystem.com';
+  // The walid tenant has no separate admin account: e2e.admin@v2ecosystem.com
+  // IS the walid-tenant E2E admin (scope=tenant_admin). Login is tenant-scoped,
+  // so the walid slug header is mandatory — without it the request resolves to
+  // the platform root tenant and 401s.
+  const email = process.env.E2E_ADMIN_EMAIL || 'e2e.admin@v2ecosystem.com';
   const password = process.env.E2E_ADMIN_PASSWORD || 'admin123';
   const response = await page.request.post(`${API_URL}/api/v1/auth/login`, {
+    headers: { 'X-Tenant-Slug': E2E_TENANT_SLUG },
     data: { email, password },
     timeout: 30_000,
   });
   if (!response.ok()) throw new Error(`API login failed: ${response.status()} ${await response.text()}`);
   const body = await response.json();
-  const accessToken = body?.data?.tokens?.accessToken || body?.data?.accessToken;
+  const data = body?.data ?? {};
+  let accessToken = data?.tokens?.accessToken || data?.accessToken;
+
+  // e2e.admin is enrolled in mandatory 2FA (global-setup); answer the
+  // challenge. Global-setup caches the TOTP secret in tests/.2fa-e2e-admin.json
+  // (tests/setup/two-factor.ts).
+  if (data?.requiresTwoFactor) {
+    const record = loadE2EAdminTwoFactor();
+    if (!record || record.email !== email) {
+      throw new Error('2FA challenge but no cached TOTP secret — global-setup must enroll e2e.admin first');
+    }
+    const verifyRes = await page.request.post(`${API_URL}/api/v1/auth/2fa/verify`, {
+      data: { userId: data.userId ?? record.userId, code: computeTotp(record.secret) },
+      timeout: 30_000,
+    });
+    if (!verifyRes.ok()) {
+      throw new Error(`2FA verify failed: ${verifyRes.status()} ${await verifyRes.text()}`);
+    }
+    const verifyBody = await verifyRes.json();
+    accessToken = verifyBody?.data?.tokens?.accessToken || verifyBody?.data?.accessToken;
+  }
+
   if (!accessToken) throw new Error('No accessToken in response');
   await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   await page.waitForTimeout(1_000);
   await dismissCookieConsent(page);
+  // Pre-seed consent so the fixed-bottom banner never mounts on later
+  // navigations (types mirror context/ConsentContext.tsx).
   await page.evaluate(({ token }) => {
     localStorage.setItem('accessToken', token);
+    localStorage.setItem(
+      'cookie-consent',
+      JSON.stringify({
+        categories: { necessary: true, functional: true, analytics: true, marketing: true },
+        timestamp: Date.now(),
+        version: '1.0',
+      }),
+    );
   }, { token: accessToken });
-  await page.reload({ waitUntil: 'networkidle', timeout: 30_000 });
+  // networkidle never settles on the Next dev server (HMR socket); wait for
+  // hydration via the fixed delay + explicit UI waits in each test instead.
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
   await dismissCookieConsent(page);
-}
-
-/** Find the lifecycle badge span for a given item name. */
-function lifecycleBadge(page: any, itemName: string) {
-  // The badge is a <span> with rounded-full text-xs inside the item card,
-  // rendered only when lifecycle_status !== 'active'.
-  return page
-    .locator(`text=${itemName}`)
-    .locator('xpath=ancestor::*[contains(@class,"Card") or contains(@class,"card") or @data-slot="card" or contains(@class,"rounded-2xl") or contains(@class,"bg-white")]')
-    .first()
-    .locator('span.rounded-full');
-}
-
-/** Find all lifecycle transition buttons for a given item name. */
-function lifecycleButtons(page: any, itemName: string) {
-  return page
-    .locator(`text=${itemName}`)
-    .locator('xpath=ancestor::*[contains(@class,"Card") or contains(@class,"card") or @data-slot="card" or contains(@class,"rounded-2xl") or contains(@class,"bg-white")]')
-    .first()
-    .locator('button')
-    .filter({ hasText: /Publish|Pause|Restore|Sell\s*Out|Archive/ });
 }
 
 /** Create a test catalog item via API. Returns its id. */
@@ -90,7 +122,7 @@ async function createTestItem(
   overrides: Record<string, any> = {},
 ): Promise<string> {
   const res = await request.post(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items`, {
-    headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': 'default' },
+    headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
     data: {
       name: `E2E Browser Lifecycle ${Date.now()}`,
       price: 12.5,
@@ -110,7 +142,7 @@ async function updateLifecycle(
   lifecycle_status: string,
 ) {
   const res = await request.put(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items/${itemId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': 'default' },
+    headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
     data: { lifecycle_status },
   });
   expect(res.ok()).toBe(true);
@@ -119,18 +151,66 @@ async function updateLifecycle(
 /** Delete an item via API. */
 async function deleteItem(request: any, token: string, itemId: string) {
   await request.delete(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/items/${itemId}`, {
-    headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': 'default' },
+    headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
   });
+}
+
+/**
+ * Navigate to the admin menu management page and stay there.
+ *
+ * Under parallel load the admin surface can redirect to the property root
+ * while auth/site-settings are still resolving; retry the goto until the
+ * browser actually sits on the menu URL (up to 4 attempts).
+ */
+async function gotoAdminMenu(page: any) {
+  const menuUrl = `${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    await page.goto(menuUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    await dismissCookieConsent(page);
+    const onMenu = await page
+      .waitForURL((u: URL) => u.pathname.endsWith(`/admin/${TEST_MODULE_SLUG}/menu`), { timeout: 8_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (onMenu) return;
+    console.log(`[gotoAdminMenu] attempt ${attempt} landed elsewhere (${page.url()}) — retrying`);
+  }
+  throw new Error(`Admin menu page never loaded as ${menuUrl}; last URL: ${page.url()}`);
 }
 
 /** Fetch items from the customer-facing menu API. */
 async function getCustomerMenuItems(request: any, token: string): Promise<any[]> {
   const res = await request.get(`${API_URL}/api/v1/${TEST_MODULE_SLUG}/items`, {
-    headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': 'default' },
+    headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
   });
   expect(res.ok()).toBe(true);
   const body = await res.json();
   return body.data || [];
+}
+
+/**
+ * Locator for a specific catalog item card on the admin menu page.
+ *
+ * The menu renders EVERY catalog item (including unrelated production
+ * fixtures in other lifecycle states), so lifecycle assertions and clicks
+ * MUST be scoped to the fixture item's own card — a page-wide `.first()`
+ * would grab arbitrary items and mutate rows we don't own. The menu page
+ * stamps each card with data-item-id.
+ */
+function itemCard(page: any, itemId: string | null) {
+  if (!itemId) throw new Error('itemCard called with null itemId');
+  return page.locator(`[data-item-id="${itemId}"]`);
+}
+
+/** Wait for the item card to appear (list fetch + render). */
+async function waitForItemCard(page: any, itemId: string | null) {
+  // The cookie banner can mount after hydration and sit over the cards.
+  await dismissCookieConsent(page);
+  const card = itemCard(page, itemId);
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  return card;
 }
 
 /** Fetch staff module orders via API. */
@@ -138,7 +218,7 @@ async function getStaffOrders(request: any, token: string): Promise<any[]> {
   const res = await request.get(
     `${API_URL}/api/v1/${TEST_MODULE_SLUG}/admin/orders?status=confirmed,queued,in_progress,ready,handed_off`,
     {
-      headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': 'default' },
+      headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Slug': E2E_TENANT_SLUG },
     },
   );
   if (!res.ok()) return [];
@@ -151,6 +231,10 @@ async function getStaffOrders(request: any, token: string): Promise<any[]> {
 // ---------------------------------------------------------------------------
 
 test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
+  // The tests mutate shared fixture items in a fixed order (pause → restore →
+  // sell out → …), so they must not run in parallel workers.
+  test.describe.configure({ mode: 'serial' });
+
   let staffToken: string | null = null;
   let activeItemId: string | null = null;
   let activeItemName: string | null = null;
@@ -158,9 +242,14 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
   let draftItemName: string | null = null;
 
   test.beforeAll(async ({ request }) => {
-    // Authenticate for API setup/teardown
+    // Authenticate for API setup/teardown. The mounted fixture module
+    // (poolside-grill) lives in the walid tenant, and login is tenant-scoped —
+    // so we log in as that tenant's staff with the slug header, then create
+    // items under the same tenant. (menu.service.staff@/menu_service_staff is
+    // platform-scoped and NOT authorize()'d on /admin/items.)
     const loginRes = await request.post(`${API_URL}/api/v1/auth/login`, {
-      data: { email: TEST_STAFF_EMAIL, password: TEST_STAFF_PASSWORD },
+      headers: { 'X-Tenant-Slug': E2E_TENANT_SLUG },
+      data: { email: process.env.E2E_STAFF_EMAIL || 'e2e.staff@v2ecosystem.com', password: process.env.E2E_STAFF_PASSWORD || 'staff123' },
     });
     if (loginRes.ok()) {
       const loginBody = await loginRes.json();
@@ -195,10 +284,11 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     activeItemName = `E2E Active ${Date.now()}`;
     activeItemId = await createTestItem(request, staffToken!, { name: activeItemName });
 
-    // Create a 'draft' item for Publish test
+    // Create a 'draft' item for Publish test. draft is the pre-publish state:
+    // the transition graph has no active → draft edge, so create the item
+    // directly in draft rather than transitioning.
     draftItemName = `E2E Draft ${Date.now() + 1}`;
-    draftItemId = await createTestItem(request, staffToken!, { name: draftItemName });
-    await updateLifecycle(request, staffToken!, draftItemId, 'draft');
+    draftItemId = await createTestItem(request, staffToken!, { name: draftItemName, lifecycle_status: 'draft' });
   });
 
   test.afterAll(async ({ request }) => {
@@ -215,10 +305,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     await loginAsAdmin(page);
 
     // Navigate to the admin menu management page for the test module
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
     // The page should show some indication of menu management
     await expect(
@@ -233,28 +320,20 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     page,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
-    // Wait for items to load
-    await page.waitForTimeout(2_000);
+    // An active item should have Pause, Sell Out, and Archive buttons —
+    // scoped to this item's card (other catalog rows can legitimately show
+    // Publish/Restore for their own lifecycle states).
+    const card = await waitForItemCard(page, activeItemId);
 
-    // An active item should have Pause, Sell Out, and Archive buttons
-    const pauseBtn = page.getByRole('button', { name: /Pause/i }).first();
-    const sellOutBtn = page.getByRole('button', { name: /Sell\s*Out/i }).first();
-    const archiveBtn = page.getByRole('button', { name: /Archive/i }).first();
+    await expect(card.getByRole('button', { name: /Pause/i })).toBeVisible({ timeout: 10_000 });
+    await expect(card.getByRole('button', { name: /Sell\s*Out/i })).toBeVisible({ timeout: 10_000 });
+    await expect(card.getByRole('button', { name: /Archive/i })).toBeVisible({ timeout: 10_000 });
 
-    await expect(pauseBtn).toBeVisible({ timeout: 10_000 });
-    await expect(sellOutBtn).toBeVisible({ timeout: 10_000 });
-    await expect(archiveBtn).toBeVisible({ timeout: 10_000 });
-
-    // Publish and Restore should NOT be visible for an active item
-    const publishBtn = page.getByRole('button', { name: /^Publish$/i }).first();
-    const restoreBtn = page.getByRole('button', { name: /^Restore$/i }).first();
-    await expect(publishBtn).not.toBeVisible();
-    await expect(restoreBtn).not.toBeVisible();
+    // Publish and Restore should NOT be offered for an active item
+    await expect(card.getByRole('button', { name: /^Publish$/i })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: /^Restore$/i })).toHaveCount(0);
   });
 
   // -----------------------------------------------------------------------
@@ -262,19 +341,13 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
   // -----------------------------------------------------------------------
   test('draft item shows Publish button', async ({ page }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
-    await page.waitForTimeout(2_000);
-
-    // The draft item should display a Draft badge and a Publish button
-    const draftBadge = page.locator('span', { hasText: 'Draft' }).first();
-    await expect(draftBadge).toBeVisible({ timeout: 10_000 });
-
-    const publishBtn = page.getByRole('button', { name: /Publish/i }).first();
-    await expect(publishBtn).toBeVisible({ timeout: 10_000 });
+    // The draft item should display a Draft badge and a Publish button —
+    // scoped to the draft fixture item's card.
+    const card = await waitForItemCard(page, draftItemId);
+    await expect(card.locator('span', { hasText: /^Draft$/ })).toBeVisible({ timeout: 10_000 });
+    await expect(card.getByRole('button', { name: /Publish/i })).toBeVisible({ timeout: 10_000 });
   });
 
   // -----------------------------------------------------------------------
@@ -285,15 +358,11 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     request,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
-    await page.waitForTimeout(2_000);
-
-    // Find the Publish button (associated with the draft item)
-    const publishBtn = page.getByRole('button', { name: /Publish/i }).first();
+    // Find the Publish button on the draft fixture item's card
+    const card = await waitForItemCard(page, draftItemId);
+    const publishBtn = card.getByRole('button', { name: /Publish/i });
     await expect(publishBtn).toBeVisible({ timeout: 10_000 });
 
     // Intercept the PUT request to verify the lifecycle_status payload
@@ -312,12 +381,13 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     expect(putBody.data?.lifecycle_status).toBe('active');
 
     // After Publish, the draft badge should disappear (active items show no badge)
-    await page.waitForTimeout(1_500);
-    const draftBadge = page.locator('span', { hasText: 'Draft' }).first();
-    await expect(draftBadge).not.toBeVisible({ timeout: 10_000 });
+    const updatedCard = itemCard(page, draftItemId);
+    await expect(updatedCard.locator('span', { hasText: /^Draft$/ })).toHaveCount(0, {
+      timeout: 10_000,
+    });
 
-    // Publish button should be gone; Pause, Sell Out, Archive should appear
-    await expect(page.getByRole('button', { name: /Pause/i }).first()).toBeVisible({
+    // Publish button should be gone; the active-item actions appear instead
+    await expect(updatedCard.getByRole('button', { name: /Pause/i })).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -330,14 +400,10 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     request,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
-    await page.waitForTimeout(2_000);
-
-    const pauseBtn = page.getByRole('button', { name: /Pause/i }).first();
+    const card = await waitForItemCard(page, activeItemId);
+    const pauseBtn = card.getByRole('button', { name: /Pause/i });
     await expect(pauseBtn).toBeVisible({ timeout: 10_000 });
 
     const putPromise = page.waitForResponse(
@@ -354,17 +420,14 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     // Must send the state name, not the action verb
     expect(putBody.data?.lifecycle_status).toBe('temporarily_unavailable');
 
-    // Badge should now say "Paused"
-    await page.waitForTimeout(1_500);
-    const pausedBadge = page.locator('span', { hasText: 'Paused' }).first();
-    await expect(pausedBadge).toBeVisible({ timeout: 10_000 });
+    // Badge should now say "Paused" and Restore should appear — on THIS card
+    const updatedCard = itemCard(page, activeItemId);
+    await expect(updatedCard.locator('span', { hasText: /^Paused$/ })).toBeVisible({ timeout: 10_000 });
 
-    // Restore button should appear
-    const restoreBtn = page.getByRole('button', { name: /Restore/i }).first();
-    await expect(restoreBtn).toBeVisible({ timeout: 10_000 });
+    await expect(updatedCard.getByRole('button', { name: /Restore/i })).toBeVisible({ timeout: 10_000 });
 
-    // Pause button should be gone
-    await expect(page.getByRole('button', { name: /^Pause$/i }).first()).not.toBeVisible();
+    // Pause button should be gone from this card
+    await expect(updatedCard.getByRole('button', { name: /^Pause$/i })).toHaveCount(0);
   });
 
   // -----------------------------------------------------------------------
@@ -374,14 +437,10 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     page,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
-    await page.waitForTimeout(2_000);
-
-    const restoreBtn = page.getByRole('button', { name: /Restore/i }).first();
+    const card = await waitForItemCard(page, activeItemId);
+    const restoreBtn = card.getByRole('button', { name: /Restore/i });
     await expect(restoreBtn).toBeVisible({ timeout: 10_000 });
 
     const putPromise = page.waitForResponse(
@@ -397,14 +456,14 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     const putBody = await putResponse.json();
     expect(putBody.data?.lifecycle_status).toBe('active');
 
-    // After restore, the Paused badge should disappear
-    await page.waitForTimeout(1_500);
-    await expect(page.locator('span', { hasText: 'Paused' }).first()).not.toBeVisible({
+    // After restore, the Paused badge should disappear from THIS card
+    const updatedCard = itemCard(page, activeItemId);
+    await expect(updatedCard.locator('span', { hasText: /^Paused$/ })).toHaveCount(0, {
       timeout: 10_000,
     });
 
     // Pause button should reappear
-    await expect(page.getByRole('button', { name: /^Pause$/i }).first()).toBeVisible({
+    await expect(updatedCard.getByRole('button', { name: /^Pause$/i })).toBeVisible({
       timeout: 10_000,
     });
   });
@@ -417,14 +476,10 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     request,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
-    await page.waitForTimeout(2_000);
-
-    const sellOutBtn = page.getByRole('button', { name: /Sell\s*Out/i }).first();
+    const card = await waitForItemCard(page, activeItemId);
+    const sellOutBtn = card.getByRole('button', { name: /Sell\s*Out/i });
     await expect(sellOutBtn).toBeVisible({ timeout: 10_000 });
 
     const putPromise = page.waitForResponse(
@@ -440,15 +495,16 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     const putBody = await putResponse.json();
     expect(putBody.data?.lifecycle_status).toBe('sold_out');
 
-    // Badge should now say "Sold Out"
-    await page.waitForTimeout(1_500);
-    const soldOutBadge = page.locator('span', { hasText: 'Sold Out' }).first();
-    await expect(soldOutBadge).toBeVisible({ timeout: 10_000 });
+    // Badge should now say "Sold Out" on THIS card
+    const updatedCard = itemCard(page, activeItemId);
+    await expect(updatedCard.locator('span', { hasText: /^Sold Out$/ })).toBeVisible({
+      timeout: 10_000,
+    });
 
-    // No more lifecycle buttons (sold_out is terminal)
-    await expect(page.getByRole('button', { name: /Restore/i }).first()).not.toBeVisible();
-    await expect(page.getByRole('button', { name: /Pause/i }).first()).not.toBeVisible();
-    await expect(page.getByRole('button', { name: /Archive/i }).first()).not.toBeVisible();
+    // No more lifecycle buttons on this card (sold_out is terminal)
+    await expect(updatedCard.getByRole('button', { name: /Restore/i })).toHaveCount(0);
+    await expect(updatedCard.getByRole('button', { name: /Pause/i })).toHaveCount(0);
+    await expect(updatedCard.getByRole('button', { name: /Archive/i })).toHaveCount(0);
 
     // Verify customer menu hides sold_out items
     expect(staffToken).toBeTruthy();
@@ -464,16 +520,11 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     page,
   }) => {
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
-    await page.waitForTimeout(2_000);
-
-    // The Sold Out badge should be visible in the admin view
-    const soldOutBadge = page.locator('span', { hasText: 'Sold Out' }).first();
-    await expect(soldOutBadge).toBeVisible({ timeout: 10_000 });
+    // The Sold Out badge should be visible on the fixture item's card
+    const card = await waitForItemCard(page, activeItemId);
+    await expect(card.locator('span', { hasText: /^Sold Out$/ })).toBeVisible({ timeout: 10_000 });
   });
 
   // -----------------------------------------------------------------------
@@ -491,17 +542,11 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     const freshItemId = await createTestItem(request, staffToken!, { name: freshItemName });
 
     await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
-    });
+    await gotoAdminMenu(page);
 
-    await page.waitForTimeout(3_000);
-
-    // Step 1: Active — no badge for this specific item
-    // Active items don't show a lifecycle badge, so we verify Pause button is present
-    const pauseBtn = page.getByRole('button', { name: /Pause/i }).first();
-    await expect(pauseBtn).toBeVisible({ timeout: 10_000 });
+    // Step 1: Active — Pause button is present on THIS card
+    let card = await waitForItemCard(page, freshItemId);
+    await expect(card.getByRole('button', { name: /Pause/i })).toBeVisible({ timeout: 10_000 });
 
     // Step 2: Pause
     let putPromise = page.waitForResponse(
@@ -510,18 +555,18 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
         resp.request().method() === 'PUT',
       { timeout: 15_000 },
     );
-    await pauseBtn.click();
+    await card.getByRole('button', { name: /Pause/i }).click();
     let resp = await putPromise;
     let body = await resp.json();
     expect(body.data?.lifecycle_status).toBe('temporarily_unavailable');
 
-    await page.waitForTimeout(1_500);
-    await expect(page.locator('span', { hasText: 'Paused' }).first()).toBeVisible({
+    card = itemCard(page, freshItemId);
+    await expect(card.locator('span', { hasText: /^Paused$/ })).toBeVisible({
       timeout: 10_000,
     });
 
     // Step 3: Restore
-    const restoreBtn = page.getByRole('button', { name: /Restore/i }).first();
+    const restoreBtn = card.getByRole('button', { name: /Restore/i });
     await expect(restoreBtn).toBeVisible({ timeout: 10_000 });
     putPromise = page.waitForResponse(
       (resp) =>
@@ -534,14 +579,13 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     body = await resp.json();
     expect(body.data?.lifecycle_status).toBe('active');
 
-    await page.waitForTimeout(1_500);
-    // Paused badge should be gone
-    await expect(page.locator('span', { hasText: 'Paused' }).first()).not.toBeVisible({
+    // Paused badge should be gone from THIS card
+    await expect(card.locator('span', { hasText: /^Paused$/ })).toHaveCount(0, {
       timeout: 10_000,
     });
 
     // Step 4: Sell Out
-    const sellOutBtn = page.getByRole('button', { name: /Sell\s*Out/i }).first();
+    const sellOutBtn = card.getByRole('button', { name: /Sell\s*Out/i });
     await expect(sellOutBtn).toBeVisible({ timeout: 10_000 });
     putPromise = page.waitForResponse(
       (resp) =>
@@ -554,8 +598,7 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
     body = await resp.json();
     expect(body.data?.lifecycle_status).toBe('sold_out');
 
-    await page.waitForTimeout(1_500);
-    await expect(page.locator('span', { hasText: 'Sold Out' }).first()).toBeVisible({
+    await expect(card.locator('span', { hasText: /^Sold Out$/ })).toBeVisible({
       timeout: 10_000,
     });
 
@@ -573,14 +616,17 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
   // -----------------------------------------------------------------------
   test('every lifecycle PUT sends lifecycle_status (state name), never an action verb', async ({
     page,
+    request,
   }) => {
-    await loginAsAdmin(page);
-    await page.goto(`${FRONTEND_URL}/${TEST_PROPERTY_SLUG}/admin/${TEST_MODULE_SLUG}/menu`, {
-      waitUntil: 'networkidle',
-      timeout: 30_000,
+    // Create a dedicated item so the click below cannot mutate unrelated
+    // catalog rows (scoped card locator — see itemCard()).
+    expect(staffToken).toBeTruthy();
+    const probeItemId = await createTestItem(request, staffToken!, {
+      name: `E2E Verb Probe ${Date.now()}`,
     });
 
-    await page.waitForTimeout(2_000);
+    await loginAsAdmin(page);
+    await gotoAdminMenu(page);
 
     // Collect all PUT payloads to admin items
     const payloads: any[] = [];
@@ -597,10 +643,9 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
       }
     });
 
-    // Click the first available lifecycle transition button
-    const transitionBtn = page
-      .getByRole('button', { name: /Pause|Sell\s*Out|Archive|Publish|Restore/i })
-      .first();
+    // Click the transition button on THIS item's card (Pause — active state)
+    const card = await waitForItemCard(page, probeItemId);
+    const transitionBtn = card.getByRole('button', { name: /Pause|Sell\s*Out|Archive|Publish|Restore/i }).first();
 
     if (await transitionBtn.isVisible().catch(() => false)) {
       await transitionBtn.click();
@@ -629,5 +674,8 @@ test.describe('Engine A: Catalog Lifecycle — Browser E2E (Phase 8)', () => {
         }
       }
     }
+
+    // Cleanup
+    await deleteItem(request, staffToken!, probeItemId);
   });
 });

@@ -2,8 +2,9 @@
  * ProvisioningService
  *
  * Creates a fully-formed tenant from a Stripe checkout or subscription event.
- * Idempotent: calling provision() twice with the same stripe_subscription_id
- * returns the existing tenant without duplicating any rows.
+ * Idempotent AND resumable: calling provision() again with the same
+ * stripe_subscription_id converges a half-built tenant by creating any missing
+ * child rows, then retries any undelivered welcome email.
  *
  * Provisioning sequence:
  *   1. Upsert tenants row (idempotency key: stripe_subscription_id)
@@ -12,11 +13,14 @@
  *   4. Create owner user account with hashed temporary password and
  *      scope = 'tenant_owner' (scope is the single source of truth for
  *      authorization — no roles/user_roles rows are seeded per tenant)
- *   5. Grant property access for the owner
- *   6. Queue welcome / credential email (fire-and-forget)
+ *   5. Grant property access for the owner (fatal — an owner with no property
+ *      is a broken tenant)
+ *   6. Persist the welcome email + encrypted temporary password to
+ *      provisioning_email_outbox, then attempt delivery
  *
  * On partial failure the service logs the error and re-throws so the webhook
- * handler can return a non-200 response — Stripe will retry the webhook.
+ * handler can return a non-200 response — Stripe will retry, and the retry
+ * resumes at the first missing row rather than no-opping.
  */
 
 import crypto from 'crypto';
@@ -28,6 +32,7 @@ import { generateSecurePassword } from '../../services/password-policy.service.j
 import type { SubscriptionTier, BillingStatus } from '../../middleware/tenantAccess.middleware.js';
 import { invalidateTenantCache } from '../../middleware/tenantAccess.middleware.js';
 import { buildTenantUrl } from '../../utils/tenant-url.js';
+import { encrypt, decrypt } from '../../utils/encryption.js';
 
 // ============================================
 // Types
@@ -139,54 +144,48 @@ export class ProvisioningService {
       tier,
     });
 
-    // ---- Step 1: Idempotency check ----
+    // ---- Step 1: Resume an existing (possibly half-built) tenant ----
+    // This is NOT a pure no-op. Provisioning spans several tables and has no
+    // cross-table transaction, so a previous attempt may have created the
+    // tenants row and then died. Stripe retries the webhook; every retry must
+    // converge by creating whatever child rows are missing.
     const { data: existing } = await supabase
       .from('tenants')
-      .select('id, property_group_id')
+      .select('id, property_group_id, subdomain')
       .eq('stripe_subscription_id', stripeSubscriptionId)
       .maybeSingle();
 
     if (existing) {
-      logger.info('[PROVISIONING] Tenant already provisioned — idempotent no-op', {
+      logger.info('[PROVISIONING] Tenant already exists — verifying child rows', {
         tenantId: existing.id,
         stripeSubscriptionId,
       });
 
-      // Still look up property and owner for the return value
-      const { data: group } = await supabase
-        .from('property_groups')
-        .select('id')
-        .eq('id', existing.property_group_id)
-        .maybeSingle();
+      const repaired = await this.ensureTenantChildren({
+        tenantId: existing.id,
+        subdomain: existing.subdomain || subdomain,
+        operatorEmail,
+        operatorName,
+        propertyGroupId: existing.property_group_id,
+      });
 
-      const { data: property } = await supabase
-        .from('properties')
-        .select('id')
-        .eq('group_id', existing.property_group_id)
-        .limit(1)
-        .maybeSingle();
-
-      // Scoped by tenant_id: email is now only unique per-tenant (see
-      // 20260704010000_scope_users_email_uniqueness_per_tenant.sql), so an
-      // unscoped lookup here could match a different tenant's user row
-      // sharing the same email and return the wrong owner id.
-      const { data: owner } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', operatorEmail)
-        .eq('tenant_id', existing.id)
-        .maybeSingle();
+      // Only invalidate when a row was actually created/linked: a fully
+      // provisioned tenant should not churn the cache on every Stripe retry.
+      if (repaired.repaired) {
+        await invalidateTenantCache(existing.id, existing.subdomain || subdomain);
+      }
+      await this.flushPendingWelcomeEmails(existing.id);
 
       return {
         tenantId: existing.id,
-        propertyGroupId: group?.id ?? existing.property_group_id,
-        propertyId: property?.id ?? '',
-        ownerUserId: owner?.id ?? '',
+        propertyGroupId: repaired.propertyGroupId,
+        propertyId: repaired.propertyId,
+        ownerUserId: repaired.ownerUserId,
         created: false,
       };
     }
 
-    // ---- Step 2: Create tenant row first (property_groups foreign key references tenants.id) ----
+    // ---- Step 2: Create tenant row first (property_groups FK references tenants.id) ----
     const tenantId = crypto.randomUUID();
     const { plan_id: resolvedPlanId, feature_limits: resolvedFeatureLimits, code: resolvedTierCode } = await resolvePlanForTier(tier);
 
@@ -205,120 +204,302 @@ export class ProvisioningService {
       });
 
     if (tenantErr) {
+      // Two webhook deliveries can race. If another worker won the insert,
+      // resume against its row instead of failing the event (which would make
+      // Stripe retry forever against a tenant that already exists).
+      if ((tenantErr as { code?: string }).code === '23505') {
+        const { data: raced } = await supabase
+          .from('tenants')
+          .select('id, property_group_id, subdomain')
+          .eq('stripe_subscription_id', stripeSubscriptionId)
+          .maybeSingle();
+
+        if (raced) {
+          const repaired = await this.ensureTenantChildren({
+            tenantId: raced.id,
+            subdomain: raced.subdomain || subdomain,
+            operatorEmail,
+            operatorName,
+            propertyGroupId: raced.property_group_id,
+          });
+          if (repaired.repaired) {
+            await invalidateTenantCache(raced.id, raced.subdomain || subdomain);
+          }
+          await this.flushPendingWelcomeEmails(raced.id);
+          return {
+            tenantId: raced.id,
+            propertyGroupId: repaired.propertyGroupId,
+            propertyId: repaired.propertyId,
+            ownerUserId: repaired.ownerUserId,
+            created: false,
+          };
+        }
+      }
       throw new Error(`[PROVISIONING] Failed to create tenant: ${tenantErr.message}`);
     }
 
-    // ---- Step 3: Create property group ----
-    const groupName = `${operatorName}'s Group`;
-    const { data: group, error: groupErr } = await supabase
-      .from('property_groups')
-      .insert({
-        name: groupName,
-        description: `Default property group for ${subdomain}`,
-        tenant_id: tenantId,
-      })
-      .select('id')
-      .single();
+    // ---- Steps 3-6: group, property, owner, property access ----
+    // Shared with the resume path above so a retry after a partial failure
+    // creates exactly the missing rows.
+    const children = await this.ensureTenantChildren({
+      tenantId,
+      subdomain,
+      operatorEmail,
+      operatorName,
+      propertyGroupId: null,
+    });
 
-    if (groupErr || !group) {
-      throw new Error(`[PROVISIONING] Failed to create property_group: ${groupErr?.message}`);
-    }
-
-    // Link tenant to property group
-    await supabase
-      .from('tenants')
-      .update({ property_group_id: group.id })
-      .eq('id', tenantId);
-
-    // ---- Step 4: Create default property ----
-    const propertyName = `${operatorName}'s Property`;
-    const publicSlug = await this.generateUniquePublicSlug(propertyName, group.id);
-
-    const { data: property, error: propErr } = await supabase
-      .from('properties')
-      .insert({
-        name: propertyName,
-        group_id: group.id,
-        tenant_id: tenantId,
-        public_slug: publicSlug,
-        is_active: true,
-      })
-      .select('id')
-      .single();
-
-    if (propErr || !property) {
-      throw new Error(`[PROVISIONING] Failed to create property: ${propErr?.message}`);
-    }
-
-    // ---- Step 5: Create owner user ----
-    // FIX: crypto.randomBytes(...).toString('base64url') only ever produces
-    // [A-Za-z0-9-_] — it can never contain a special character, so a temp
-    // password generated that way can fail this very platform's own
-    // requireSpecialChars policy (password-policy.service.ts) despite being
-    // the credential we email to a brand-new paying customer. generateSecurePassword()
-    // already guarantees one of each required character class.
-    const tempPassword = generateSecurePassword(16);
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
-
-    const { data: user, error: userErr } = await supabase
-      .from('users')
-      .insert({
-        email: operatorEmail,
-        full_name: operatorName,
-        password_hash: passwordHash,
-        is_active: true,
-        email_verified: true, // Auto-verify email for new tenant provisioning
-        tenant_id: tenantId,
-        must_change_password: true,
-        // scope defaults to 'customer' at the DB level — without this explicit
-        // override, every newly provisioned tenant owner silently became a
-        // 'customer' in the one column the rest of the app (auth.service.ts)
-        // treats as the actual source of truth for authorization.
-        scope: 'tenant_owner',
-      })
-      .select('id')
-      .single();
-
-    if (userErr || !user) {
-      throw new Error(`[PROVISIONING] Failed to create owner user: ${userErr?.message}`);
-    }
-
-    // ---- Step 6: Property access for owner ----
-    const { error: accessErr } = await supabase
-      .from('user_property_access')
-      .insert({
-        user_id: user.id,
-        property_id: property.id,
-        tenant_id: tenantId,
-        access_level: 'admin',
-      });
-
-    if (accessErr) {
-      logger.error('[PROVISIONING] Failed to create user_property_access for owner', { error: accessErr.message });
-    }
-
-    // ---- Step 7: Invalidate tenant cache ----
-    invalidateTenantCache(tenantId, subdomain);
+    // ---- Step 7: Invalidate tenant cache (awaited: a stale negative cache
+    // entry makes the new tenant unreachable until TTL expiry) ----
+    await invalidateTenantCache(tenantId, subdomain);
 
     logger.info('[PROVISIONING] Tenant provisioned successfully', {
       tenantId,
-      propertyGroupId: group.id,
-      propertyId: property.id,
-      ownerUserId: user.id,
+      propertyGroupId: children.propertyGroupId,
+      propertyId: children.propertyId,
+      ownerUserId: children.ownerUserId,
       subdomain,
     });
 
-    // ---- Step 8: Queue welcome email (fire-and-forget) ----
-    this.sendWelcomeEmail(operatorEmail, operatorName, subdomain, tempPassword).catch((err) =>
-      logger.error('[PROVISIONING] Welcome email failed (non-fatal)', { err }),
-    );
+    // ---- Step 8: Deliver the welcome email from the durable outbox ----
+    // The credential is already persisted (encrypted). A delivery failure is
+    // retried by the next webhook event for this subscription and never rolls
+    // back the tenant.
+    await this.flushPendingWelcomeEmails(tenantId);
 
     return {
       tenantId,
-      propertyGroupId: group.id,
-      propertyId: property.id,
-      ownerUserId: user.id,
+      propertyGroupId: children.propertyGroupId,
+      propertyId: children.propertyId,
+      ownerUserId: children.ownerUserId,
       created: true,
+    };
+  }
+
+  /**
+   * Create any child rows missing for a tenant.
+   *
+   * Provisioning spans tenants -> property_groups -> properties -> users ->
+   * user_property_access with no cross-table transaction, so an interrupted
+   * attempt leaves a partially built tenant. This method is the convergence
+   * point: it creates only what is absent, is safe to call repeatedly, and is
+   * a pure read on a fully provisioned tenant.
+   *
+   * Throws on every failure that would leave the tenant unusable, so the
+   * webhook returns non-200 and Stripe retries. The previous code logged and
+   * swallowed the user_property_access failure, producing an owner who could
+   * sign in but had no property.
+   */
+  private async ensureTenantChildren(params: {
+    tenantId: string;
+    subdomain: string;
+    operatorEmail: string;
+    operatorName: string;
+    propertyGroupId?: string | null;
+  }): Promise<{ propertyGroupId: string; propertyId: string; ownerUserId: string; repaired: boolean }> {
+    const { tenantId, subdomain, operatorEmail, operatorName } = params;
+    const supabase = getSupabase();
+    let repaired = false;
+
+    // ---- Property group ----
+    let groupId: string | null = params.propertyGroupId ?? null;
+
+    if (groupId) {
+      const { data: group } = await supabase
+        .from('property_groups')
+        .select('id')
+        .eq('id', groupId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (!group) groupId = null;
+    }
+
+    if (!groupId) {
+      const { data: existingGroup } = await supabase
+        .from('property_groups')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      groupId = existingGroup?.id ?? null;
+    }
+
+    if (!groupId) {
+      const { data: group, error: groupErr } = await supabase
+        .from('property_groups')
+        .insert({
+          name: `${operatorName}'s Group`,
+          description: `Default property group for ${subdomain}`,
+          tenant_id: tenantId,
+        })
+        .select('id')
+        .single();
+
+      if (groupErr || !group) {
+        throw new Error(`[PROVISIONING] Failed to create property_group: ${groupErr?.message}`);
+      }
+      groupId = group.id;
+      repaired = true;
+    }
+
+    if (!groupId) {
+      throw new Error('[PROVISIONING] Property group could not be resolved');
+    }
+
+    // Keep tenants.property_group_id authoritative even if an earlier attempt
+    // created the group but died before linking it. Skip the write when the
+    // tenant is already linked so a retry of a complete tenant stays a pure
+    // read (no cache churn / no needless row versioning).
+    if (params.propertyGroupId !== groupId) {
+      const { error: linkErr } = await supabase
+        .from('tenants')
+        .update({ property_group_id: groupId })
+        .eq('id', tenantId);
+
+      if (linkErr) {
+        throw new Error(`[PROVISIONING] Failed to link tenant to property_group: ${linkErr.message}`);
+      }
+      repaired = true;
+    }
+
+    // ---- Default property ----
+    let { data: property } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!property) {
+      const propertyName = `${operatorName}'s Property`;
+      const publicSlug = await this.generateUniquePublicSlug(propertyName, groupId);
+
+      const { data: createdProperty, error: propErr } = await supabase
+        .from('properties')
+        .insert({
+          name: propertyName,
+          group_id: groupId,
+          tenant_id: tenantId,
+          public_slug: publicSlug,
+          is_active: true,
+        })
+        .select('id')
+        .single();
+
+      if (propErr || !createdProperty) {
+        throw new Error(`[PROVISIONING] Failed to create property: ${propErr?.message}`);
+      }
+      property = createdProperty;
+      repaired = true;
+    }
+
+    if (!property) {
+      throw new Error('[PROVISIONING] Property could not be resolved');
+    }
+
+    // ---- Owner user ----
+    // Scoped by tenant_id: email is only unique per-tenant (see
+    // 20260704010000_scope_users_email_uniqueness_per_tenant.sql), so an
+    // unscoped lookup could match another tenant's user row sharing the email.
+    let { data: owner } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', operatorEmail)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!owner) {
+      // generateSecurePassword() guarantees one of each required character
+      // class; a randomBytes(...).toString('base64url') password could fail the
+      // platform's own requireSpecialChars policy.
+      const tempPassword = generateSecurePassword(16);
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+      const { data: createdOwner, error: userErr } = await supabase
+        .from('users')
+        .insert({
+          email: operatorEmail,
+          full_name: operatorName,
+          password_hash: passwordHash,
+          is_active: true,
+          email_verified: true, // Auto-verify email for new tenant provisioning
+          tenant_id: tenantId,
+          must_change_password: true,
+          // scope defaults to 'customer' at the DB level — without this
+          // explicit override, every newly provisioned tenant owner silently
+          // became a 'customer' in the one column auth.service.ts treats as
+          // the source of truth for authorization.
+          scope: 'tenant_owner',
+        })
+        .select('id')
+        .single();
+
+      if (userErr || !createdOwner) {
+        // A concurrent retry may have won the insert. Re-read before failing.
+        const { data: racedOwner } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', operatorEmail)
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+        if (!racedOwner) {
+          throw new Error(`[PROVISIONING] Failed to create owner user: ${userErr?.message}`);
+        }
+        owner = racedOwner;
+      } else {
+        owner = createdOwner;
+        repaired = true;
+        // Persist the credential BEFORE attempting delivery: the hash is
+        // one-way, so this row is the only remaining copy of the temporary
+        // password if SMTP is down.
+        await this.enqueueWelcomeEmail({
+          tenantId,
+          userId: owner.id,
+          email: operatorEmail,
+          name: operatorName,
+          subdomain,
+          tempPassword,
+        });
+      }
+    }
+
+    // ---- Property access for owner ----
+    const { data: existingAccess, error: accessReadErr } = await supabase
+      .from('user_property_access')
+      .select('id')
+      .eq('user_id', owner.id)
+      .eq('property_id', property.id)
+      .maybeSingle();
+
+    if (accessReadErr) {
+      throw new Error(`[PROVISIONING] Failed to read user_property_access: ${accessReadErr.message}`);
+    }
+
+    if (!existingAccess) {
+      const { error: accessErr } = await supabase
+        .from('user_property_access')
+        .insert({
+          user_id: owner.id,
+          property_id: property.id,
+          tenant_id: tenantId,
+          access_level: 'admin',
+          is_primary: true,
+        });
+
+      // 23505 = a concurrent retry already granted it; anything else is fatal.
+      if (accessErr && (accessErr as { code?: string }).code !== '23505') {
+        throw new Error(`[PROVISIONING] Failed to create user_property_access for owner: ${accessErr.message}`);
+      }
+      repaired = true;
+    }
+
+    return {
+      propertyGroupId: groupId,
+      propertyId: property.id,
+      ownerUserId: owner.id,
+      repaired,
     };
   }
 
@@ -344,8 +525,12 @@ export class ProvisioningService {
     };
     if (tier) {
       update.subscription_tier = tier;
-      const { plan_id } = await resolvePlanForTier(tier);
+      const { plan_id, feature_limits } = await resolvePlanForTier(tier);
       update.plan_id = plan_id;
+      // tenants.feature_limits is a snapshot read by FeatureLimitsService.
+      // Re-resolving plan_id alone left an upgraded tenant enforcing the old
+      // plan's caps forever.
+      update.feature_limits = feature_limits;
     }
 
     const { data, error } = await supabase
@@ -361,6 +546,9 @@ export class ProvisioningService {
 
     if (data) {
       invalidateTenantCache(data.id, data.subdomain);
+      // A subscription event is a natural retry opportunity for a welcome
+      // email whose SMTP delivery previously failed. Never throws.
+      await this.flushPendingWelcomeEmails(data.id);
       logger.info('[PROVISIONING] Billing status updated', {
         tenantId: data.id,
         stripeSubscriptionId,
@@ -369,21 +557,170 @@ export class ProvisioningService {
     }
   }
 
+  /**
+   * Update billing_status by tenant id. Used for tenants provisioned outside
+   * Stripe (or before a subscription id existed) where matching on
+   * stripe_subscription_id silently no-ops.
+   */
+  async updateBillingStatusByTenantId(
+    tenantId: string,
+    newStatus: BillingStatus,
+  ): Promise<void> {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('tenants')
+      .update({ billing_status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', tenantId)
+      .select('id, subdomain')
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`[PROVISIONING] Failed to update billing status: ${error.message}`);
+    }
+    if (!data) {
+      throw new Error(`[PROVISIONING] Tenant ${tenantId} not found while updating billing status`);
+    }
+
+    invalidateTenantCache(data.id, data.subdomain);
+    logger.info('[PROVISIONING] Billing status updated by tenant id', {
+      tenantId,
+      newStatus,
+    });
+  }
+
   // ------------------------------------------
   // Private helpers
   // ------------------------------------------
 
-  private async sendWelcomeEmail(
-    email: string,
-    name: string,
-    subdomain: string,
-    tempPassword: string,
-  ): Promise<void> {
+  /**
+   * Persist a credential email before delivery.
+   *
+   * Fatal on failure: at this point the temporary password exists only in
+   * memory and its hash is one-way, so losing the row means the owner can
+   * never receive the generated credential.
+   */
+  private async enqueueWelcomeEmail(params: {
+    tenantId: string;
+    userId: string;
+    email: string;
+    name: string;
+    subdomain: string;
+    tempPassword: string;
+  }): Promise<void> {
+    const supabase = getSupabase();
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('provisioning_email_outbox')
+      .upsert(
+        {
+          tenant_id: params.tenantId,
+          user_id: params.userId,
+          purpose: 'welcome',
+          recipient_email: params.email,
+          recipient_name: params.name,
+          subdomain: params.subdomain,
+          temp_password_encrypted: encrypt(params.tempPassword),
+          status: 'pending',
+          attempts: 0,
+          last_error: null,
+          sent_at: null,
+          updated_at: now,
+        },
+        { onConflict: 'tenant_id,purpose' },
+      );
+
+    if (error) {
+      throw new Error(`[PROVISIONING] Failed to persist welcome-email outbox row: ${error.message}`);
+    }
+  }
+
+  /**
+   * Deliver every pending/failed welcome email for a tenant.
+   *
+   * This is the retry loop: called after provisioning and on subscription
+   * updates, so Stripe's webhook retries drive recovery from a temporarily
+   * unavailable SMTP server without a cron job. It never throws — a mail
+   * failure must not fail a webhook whose tenant writes already committed.
+   *
+   * Public so an operator/back-office action can force a retry.
+   */
+  async flushPendingWelcomeEmails(tenantId: string): Promise<void> {
+    const supabase = getSupabase();
+
+    const { data: pending, error } = await supabase
+      .from('provisioning_email_outbox')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .in('status', ['pending', 'failed'])
+      .limit(5);
+
+    if (error) {
+      logger.error('[PROVISIONING] Failed to read pending welcome emails', {
+        tenantId,
+        error: error.message,
+      });
+      return;
+    }
+
+    const rows = Array.isArray(pending) ? pending : [];
+    for (const row of rows) {
+      let tempPassword: string;
+      try {
+        tempPassword = decrypt(row.temp_password_encrypted as string);
+      } catch (err) {
+        logger.error('[PROVISIONING] Cannot decrypt pending welcome email — abandoning row', {
+          tenantId,
+          outboxId: row.id,
+          err,
+        });
+        await supabase
+          .from('provisioning_email_outbox')
+          .update({
+            status: 'abandoned',
+            last_error: 'decrypt failed (ENCRYPTION_KEY rotated?)',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', row.id);
+        continue;
+      }
+
+      const sent = await this.sendWelcomeEmail({
+        email: row.recipient_email as string,
+        name: row.recipient_name as string,
+        subdomain: row.subdomain as string,
+        tempPassword,
+        tenantId,
+      });
+
+      await supabase
+        .from('provisioning_email_outbox')
+        .update({
+          status: sent ? 'sent' : 'failed',
+          attempts: Number(row.attempts ?? 0) + 1,
+          last_attempt_at: new Date().toISOString(),
+          sent_at: sent ? new Date().toISOString() : null,
+          last_error: sent ? null : 'emailService.sendEmail returned false',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id);
+    }
+  }
+
+  private async sendWelcomeEmail(params: {
+    email: string;
+    name: string;
+    subdomain: string;
+    tempPassword: string;
+    tenantId: string;
+  }): Promise<boolean> {
+    const { email, name, subdomain, tempPassword, tenantId } = params;
     const loginUrl = buildTenantUrl(subdomain, '/login');
 
     const sent = await emailService.sendEmail({
       to: email,
       subject: 'Your V2 Ecosystem account is ready',
+      tenantId,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1>Welcome, ${name}!</h1>
@@ -398,20 +735,17 @@ export class ProvisioningService {
 
     if (sent) {
       logger.info('[PROVISIONING] Welcome email sent', { email, subdomain });
-      return;
+      return true;
     }
 
-    // Send failed (SMTP not configured, etc.) — log as a fallback so the
-    // credentials aren't lost outright. Same dev-only redaction as before;
-    // in production this means a failed send currently has no recovery path
-    // other than the password-reset flow — flagged in CONTEXT.md as a
-    // follow-up (e.g. an admin "resend welcome email" action).
-    logger.warn('[PROVISIONING] Welcome email failed to send — credentials logged for manual delivery', {
+    // Never log the password: the outbox row holds it encrypted and the next
+    // provision/subscription event retries delivery.
+    logger.error('[PROVISIONING] Welcome email delivery failed — kept in outbox for retry', {
       email,
       subdomain,
-      loginUrl,
-      tempPassword: process.env.NODE_ENV === 'production' ? '[REDACTED]' : tempPassword,
+      tenantId,
     });
+    return false;
   }
 }
 

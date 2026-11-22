@@ -10,7 +10,9 @@ import { test, expect, Page } from '../fixtures/auth.fixture';
 const RUN_EXPLORATORY_E2E = process.env.RUN_EXPLORATORY_E2E === 'true';
 test.skip(!RUN_EXPLORATORY_E2E, 'UI coverage inventory checks are exploratory outside dedicated runs.');
 
-const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+// NOTE: repo-root .env injects FRONTEND_URL=https://v2-ecosystem.vercel.app/
+// into the test process via Playwright's env loader — never read it here.
+const BASE_URL = process.env.E2E_FRONTEND_URL || 'http://localhost:3000';
 const API_BASE_URL = process.env.API_URL || 'http://localhost:3005';
 
 // Helper to check if an element exists

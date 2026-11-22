@@ -142,6 +142,13 @@ export default function DynamicMenuPage() {
   const propertySlug = (params?.property as string) || '';
   const currentModule = modules.find(m => m.slug === slug);
   const propertyHeader = activePropertyId ? { 'x-property-id': activePropertyId } : undefined;
+  /**
+   * Restaurant/F&B vocabulary gate. Engine A serves retail, rentals and
+   * digital goods too — the hardcoded food attributes (spicy/vegetarian/
+   * prep timers) must only appear for food service modules. Legacy modules
+   * that pre-date the flag keep the old behavior (undefined !== false).
+   */
+  const isFoodServiceModule = currentModule?.settings?.is_food_service !== false;
 
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -165,7 +172,14 @@ export default function DynamicMenuPage() {
     if (currentModule) {
       fetchData();
     }
-  }, [currentModule]);
+    // activePropertyId resolves asynchronously (PropertyContext fetches
+    // /multi-property/my-properties on mount). Without it in the deps, this
+    // effect once fired before the property context was ready and sent
+    // GET /inventory/items with NO x-property-id header — which the backend
+    // rejects with 400 ("X-Property-Id header is required"). Include it so
+    // the ingredient fetch (re)runs once the header becomes available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentModule, activePropertyId]);
 
   const fetchData = async () => {
     if (!currentModule) return;
@@ -174,10 +188,16 @@ export default function DynamicMenuPage() {
       const [menuRes, catRes, ingredientsRes, groupsRes] = await Promise.all([
         api.get(`/${slug}/admin/items`, { params: { moduleId: currentModule.id } }),
         api.get(`/${slug}/categories`, { params: { moduleId: currentModule.id } }),
-        api.get('/inventory/items', { headers: propertyHeader }).catch((e) => {
-          console.warn('[Menu Page] Inventory items fetch failed:', e.message);
-          return { data: [] };
-        }),
+        // Inventory requires an x-property-id header (staffAuth includes
+        // requirePropertyId which 400s without one). Skip the request
+        // entirely until the property context resolves — ingredients are an
+        // optional enhancement; an empty list must never block the page.
+        propertyHeader
+          ? api.get('/inventory/items', { headers: propertyHeader }).catch((e) => {
+              console.warn('[Menu Page] Inventory items fetch failed:', e.message);
+              return { data: [] };
+            })
+          : Promise.resolve({ data: [] }),
         api.get('/customizations/groups', { params: { includeOptions: true }, headers: propertyHeader }).catch((e) => {
           console.warn('[Menu Page] Modifiers fetch failed:', e.message);
           return { data: [] };
@@ -227,9 +247,12 @@ export default function DynamicMenuPage() {
       category_id: categories[0]?.id || '',
       is_available: true,
       is_featured: false,
-      is_vegetarian: false,
-      is_spicy: false,
-      preparation_time: 15,
+      // NOTE: no is_vegetarian / is_spicy defaults and — critically — no
+      // hardcoded `preparation_time: 15`. Engine A is engine- and vertical-
+      // agnostic: a "15 minute prep time" default on a pair of sunglasses is
+      // nonsense data. The hospitality modal section renders these fields only
+      // when module settings say this is a food service module.
+      ...(isFoodServiceModule ? { is_vegetarian: false, is_spicy: false, preparation_time: undefined } : {}),
     });
     setRecipeItems([]);
     setTrackingMode('none');
@@ -596,7 +619,11 @@ export default function DynamicMenuPage() {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ delay: index * 0.05 }}
                 >
-                  <Card className={`overflow-hidden ${!item.is_available ? 'opacity-60' : ''}`}>
+                  <Card
+                    data-item-id={item.id}
+                    data-testid={`catalog-item-${item.id}`}
+                    className={`overflow-hidden ${!item.is_available ? 'opacity-60' : ''}`}
+                  >
                     {/* Image */}
                     <div className="relative h-40 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800">
                       {item.image_url ? (
@@ -884,17 +911,19 @@ export default function DynamicMenuPage() {
                         <p className="mt-1 text-sm text-red-500">Please select a category</p>
                       )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                        Fulfillment / Prep Time (min)
-                      </label>
-                      <Input
-                        type="number"
-                        value={formData.preparation_time || ''}
-                        onChange={(e) => setFormData({ ...formData, preparation_time: parseInt(e.target.value) })}
-                        placeholder="e.g. 15"
-                      />
-                    </div>
+                  {isFoodServiceModule && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                      Prep / Fulfillment Time (min)
+                    </label>
+                    <Input
+                      type="number"
+                      value={formData.preparation_time || ''}
+                      onChange={(e) => setFormData({ ...formData, preparation_time: parseInt(e.target.value) })}
+                      placeholder="e.g. 15"
+                    />
+                  </div>
+                  )}
                   </div>
 
                   <div>
@@ -947,7 +976,10 @@ export default function DynamicMenuPage() {
                       />
                       <span className="text-sm text-slate-700 dark:text-slate-300">Featured</span>
                     </label>
-                    {/* Optional Hospitality & F&B Attributes */}
+                    {/* Optional Hospitality & F&B Attributes — only for food
+                        service modules; a retail/rental catalog shouldn't be
+                        forced past spicy/vegetarian toggles. */}
+                    {isFoodServiceModule && (
                     <div className="w-full mt-2 pt-4 border-t border-slate-100 dark:border-slate-800">
                       <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-1.5">
                         <ChefHat className="w-3.5 h-3.5" />
@@ -980,6 +1012,7 @@ export default function DynamicMenuPage() {
                         </label>
                       </div>
                     </div>
+                    )}
                   </div>
                 </TabsContent>
 

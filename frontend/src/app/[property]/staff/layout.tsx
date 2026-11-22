@@ -33,6 +33,7 @@ import {
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { PropertyProvider } from '@/context/PropertyContext';
+import BillingAlertBanner from '@/components/admin/BillingAlertBanner';
 
 interface StaffLayoutProps {
   children: ReactNode;
@@ -488,12 +489,15 @@ export default function StaffLayout({ children }: StaffLayoutProps) {
 
       {/* Main Content */}
       <main className={cn('pt-16 min-h-screen transition-all duration-300', sidebarOpen ? 'lg:pl-64' : 'lg:pl-20')}>
+        <div className="p-4 lg:p-6">
+          <BillingAlertBanner />
+        </div>
         <motion.div
           key={pathname}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="p-4 lg:p-6"
+          className="px-4 lg:px-6 pb-6"
         >
           {children}
         </motion.div>

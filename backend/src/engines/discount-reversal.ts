@@ -20,9 +20,9 @@
  * Both entry points are used across all five engine creation routes in
  * dynamic-module.router.ts, plus order cancellation and payment refund.
  *
- * NOTE: loyalty-point redemption has the identical unreversed-consumption gap
- * (see SupabaseLoyaltyResolver.redeem in discount-resolvers.ts) but is out of
- * scope here — flagged, not fixed, in reverseDiscounts() below.
+ * NOTE: loyalty-point redemption is reversed too, via
+ * reverse_loyalty_redemption (the points spent and tenant are carried on the
+ * DiscountBreakdown produced by the pricing pipeline).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -99,7 +99,7 @@ export async function linkDiscountsToOrder(
 export async function reverseDiscounts(
   supabase: SupabaseClient,
   discounts: DiscountBreakdown[],
-  opts: { userId?: string; orderId?: string } = {},
+  opts: { userId?: string; orderId?: string; tenantId?: string } = {},
 ): Promise<void> {
   for (const discount of discounts) {
     if (!discount.referenceId) continue;
@@ -122,11 +122,48 @@ export async function reverseDiscounts(
         if (error) throw error;
         logger.info('[DISCOUNT REVERSAL] Restored gift card balance', { giftCardId: discount.referenceId, amount: discount.amount, orderId: opts.orderId });
       } else if (discount.type === 'loyalty') {
-        // Same unreversed-consumption gap as coupons/gift cards
-        // (SupabaseLoyaltyResolver.redeem never gets compensated). Not fixed
-        // here — logged so it's visible rather than silently wrong.
-        logger.warn('[DISCOUNT REVERSAL] Loyalty point redemption was consumed but reversal is not implemented', {
+        // referenceId on a loyalty breakdown is the customer/user id; the
+        // points actually spent are carried in metadata.pointsUsed.
+        const pointsUsed = Number(
+          (discount.metadata as { pointsUsed?: number } | undefined)?.pointsUsed ?? 0,
+        );
+
+        if (!opts.tenantId) {
+          logger.error('[DISCOUNT REVERSAL] Cannot reverse loyalty redemption without a tenant — points NOT restored', {
+            customerId: discount.referenceId,
+            pointsUsed,
+            orderId: opts.orderId,
+          });
+          continue;
+        }
+
+        if (!Number.isFinite(pointsUsed) || pointsUsed <= 0) {
+          logger.warn('[DISCOUNT REVERSAL] Loyalty breakdown has no pointsUsed — nothing to reverse', {
+            customerId: discount.referenceId,
+            orderId: opts.orderId,
+          });
+          continue;
+        }
+
+        const { data, error } = await supabase.rpc('reverse_loyalty_redemption', {
+          p_user_id: discount.referenceId,
+          p_points: pointsUsed,
+          p_order_id: opts.orderId || null,
+          p_tenant_id: opts.tenantId,
+        });
+        if (error) throw error;
+        if (data !== true) {
+          logger.error('[DISCOUNT REVERSAL] Loyalty reversal returned false — member row not found for tenant', {
+            customerId: discount.referenceId,
+            tenantId: opts.tenantId,
+            pointsUsed,
+            orderId: opts.orderId,
+          });
+          continue;
+        }
+        logger.info('[DISCOUNT REVERSAL] Restored loyalty points', {
           customerId: discount.referenceId,
+          pointsUsed,
           orderId: opts.orderId,
         });
       }

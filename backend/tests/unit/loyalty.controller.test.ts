@@ -74,7 +74,7 @@ describe('Loyalty Controller', () => {
     };
     
     mockRequest = {
-      user: { id: 'user-123', role: 'customer' },
+      user: { id: 'user-123', role: 'customer', tenantId: 'tenant-1' },
       params: {},
       query: {},
       body: {},

@@ -124,3 +124,6 @@ refactor_economics.js
 scratch/
 schema_dump.sql
 .aider*
+
+# E2E-only: cached TOTP secret for the synthetic e2e.admin fixture account
+/tests/.2fa-e2e-admin.json

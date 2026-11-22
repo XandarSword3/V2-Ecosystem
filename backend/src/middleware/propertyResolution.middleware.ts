@@ -201,15 +201,25 @@ export async function resolveProperty(req: Request, _res: Response, next: NextFu
   }
 
   // Priority 2: explicit x-property-id header (fallback if no slug header provided or matched)
+  //
+  // SECURITY: this header is client-supplied and is only a *selector* within
+  // the tenant that was already resolved. Without the tenant_id predicate, a
+  // caller could resolve (and then act on) any property UUID in the platform
+  // by putting it in X-Property-ID. Scope the lookup to req.tenant whenever a
+  // tenant is in context; if the header names another tenant's property the
+  // lookup misses and the single-property fallback below applies instead.
   const propertyIdHeader = req.headers['x-property-id'] as string | undefined;
   if (propertyIdHeader) {
     try {
       const supabase = getSupabase();
-      const { data, error } = await supabase
+      let propertyQuery = supabase
         .from('properties')
         .select('id, name, group_id, property_code')
-        .eq('id', propertyIdHeader)
-        .maybeSingle();
+        .eq('id', propertyIdHeader);
+      if (tenantId) {
+        propertyQuery = propertyQuery.eq('tenant_id', tenantId);
+      }
+      const { data, error } = await propertyQuery.maybeSingle();
       if (!error && data) {
         req.property = data as PropertyRecord;
         logger.info(`[PropertyResolution] Resolved property "${data.name}" (${data.id}) via x-property-id header [${Date.now() - startTime}ms]`);

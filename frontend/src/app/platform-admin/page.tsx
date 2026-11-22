@@ -271,8 +271,7 @@ export default function PlatformAdminPage() {
       )}
 
       {/* Tenant table */}
-      <div style={{ background: '#0B0F14', border: '1px solid #1A222C' }}>
-        {/* Filters */}
+      <div style={{ background: '#0B0F14', border: '1px solid #1A222C' }}>        {/* Filters */}
         <div style={{ padding: '14px 18px', borderBottom: '1px solid #1A222C', display: 'flex', alignItems: 'center', gap: 12 }}>
           <p style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>Tenants ({filtered.length})</p>
           <div style={{ position: 'relative' }}>
@@ -289,7 +288,11 @@ export default function PlatformAdminPage() {
           </select>
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        {/* Horizontally scrollable on narrow viewports — without this the
+            8-column table clips off-screen and the Suspend/Restore actions
+            become unreachable on mobile (<768px). */}
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
           <thead>
             <tr style={{ background: '#111820' }}>
               {['Subdomain', 'Email', 'Tier', 'Status', 'MRR', 'Properties', 'Created', 'Actions'].map(h => (
@@ -393,6 +396,7 @@ export default function PlatformAdminPage() {
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

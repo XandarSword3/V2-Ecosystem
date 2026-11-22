@@ -22,8 +22,19 @@ export class SupabaseCouponResolver implements CouponResolver {
     subtotal: number,
     customerId?: string,
     moduleId?: string,
+    dryRun = false,
+    tenantId?: string,
   ): Promise<{ discountAmount: number; taxSavings: number; couponId: string } | null> {
     const supabase = getSupabase();
+
+    // Coupon codes are unique per tenant, and apply_coupon_atomic is
+    // tenant-scoped. Without a tenant a lookup could match another tenant's
+    // code, so fail closed rather than applying a discount that belongs to
+    // someone else.
+    if (!tenantId) {
+      logger.warn('[COUPON RESOLVER] Missing tenantId — refusing coupon application', { code: couponCode });
+      return null;
+    }
 
     try {
       // apply_coupon_atomic's p_module_type is matched against the coupon's
@@ -41,12 +52,59 @@ export class SupabaseCouponResolver implements CouponResolver {
           .from('modules')
           .select('slug')
           .eq('id', moduleId)
+          .eq('tenant_id', tenantId)
           .maybeSingle();
         if (moduleError) {
           logger.warn('[COUPON RESOLVER] Failed to resolve module slug for coupon scoping', { moduleId, error: moduleError.message });
         } else if (moduleRow?.slug) {
           moduleType = moduleRow.slug;
         }
+      }
+
+      // Dry-run (price preview): validate the coupon and quote the same
+      // discount the atomic RPC would apply, WITHOUT incrementing
+      // usage_count or inserting a coupon_usage row. Preview must never
+      // consume a limited-use coupon.
+      if (dryRun) {
+        const { data: c, error: readError } = await supabase
+          .from('coupons')
+          .select('*')
+          .eq('code', couponCode.toUpperCase())
+          .eq('tenant_id', tenantId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (readError || !c) return null;
+
+        const now = Date.now();
+        if (c.valid_from && new Date(c.valid_from).getTime() > now) return null;
+        if (c.valid_until && new Date(c.valid_until).getTime() <= now) return null;
+        if (c.applies_to && c.applies_to !== 'all' && c.applies_to !== moduleType) return null;
+        if (c.min_order_amount != null && subtotal < Number(c.min_order_amount)) return null;
+        if (c.usage_limit != null && Number(c.usage_count ?? 0) >= Number(c.usage_limit)) return null;
+
+        if (customerId && c.per_user_limit != null) {
+          const { count } = await supabase
+            .from('coupon_usage')
+            .select('*', { count: 'exact', head: true })
+            .eq('coupon_id', c.id)
+            .eq('user_id', customerId);
+          if ((count ?? 0) >= Number(c.per_user_limit)) return null;
+        }
+
+        let discountAmount = 0;
+        if (c.discount_type === 'percentage') {
+          discountAmount = subtotal * (Number(c.discount_value) / 100);
+          if (c.max_discount_amount != null) {
+            discountAmount = Math.min(discountAmount, Number(c.max_discount_amount));
+          }
+        } else if (c.discount_type === 'fixed_amount' || c.discount_type === 'fixed') {
+          discountAmount = Math.min(Number(c.discount_value), subtotal);
+        }
+        discountAmount = Math.round(discountAmount * 100) / 100;
+        if (discountAmount <= 0) return null;
+
+        return { discountAmount, taxSavings: 0, couponId: c.id };
       }
 
       const { data: couponResult, error: couponError } = await supabase.rpc(
@@ -57,6 +115,7 @@ export class SupabaseCouponResolver implements CouponResolver {
           p_order_total: subtotal,
           p_order_id: null, // Order ID not known yet at pricing time
           p_module_type: moduleType,
+          p_tenant_id: tenantId,
         },
       );
 
@@ -102,10 +161,40 @@ export class SupabaseGiftCardResolver implements GiftCardResolver {
   async redeem(
     giftCardCode: string,
     maxAmount: number,
+    dryRun = false,
+    tenantId?: string,
   ): Promise<{ amountDeducted: number; giftCardId: string } | null> {
     const supabase = getSupabase();
 
+    // Gift cards are tenant-scoped and redeem_giftcard_atomic requires the
+    // tenant. Without one a lookup could match another tenant's card.
+    if (!tenantId) {
+      logger.warn('[GIFT CARD RESOLVER] Missing tenantId — refusing gift card redemption', { code: giftCardCode });
+      return null;
+    }
+
     try {
+      // Dry-run (price preview): quote the redeemable amount from the current
+      // balance only. Never call the mutating RPC �?" a page refresh must not
+      // debit a real gift card.
+      if (dryRun) {
+        const { data: card, error: readError } = await supabase
+          .from('gift_cards')
+          .select('id, current_balance, status, expires_at')
+          .eq('code', giftCardCode.toUpperCase())
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+
+        if (readError || !card) return null;
+        if (card.status !== 'active') return null;
+        if (card.expires_at && new Date(card.expires_at).getTime() <= Date.now()) return null;
+
+        const balance = Number(card.current_balance) || 0;
+        const amountDeducted = Math.round(Math.min(maxAmount, balance) * 100) / 100;
+        if (amountDeducted <= 0) return null;
+
+        return { amountDeducted, giftCardId: card.id };
+      }
       // Previously this did a manual fetch -> update -> insert instead of
       // using the existing atomic RPC. Two real bugs from that:
       //   1. No row lock between the fetch and the update, so two concurrent
@@ -124,6 +213,7 @@ export class SupabaseGiftCardResolver implements GiftCardResolver {
         p_code: giftCardCode.toUpperCase(),
         p_amount: maxAmount,
         p_order_id: null, // Order ID not known yet at pricing time — see discount-reversal.ts
+        p_tenant_id: tenantId,
       });
 
       if (rpcError) {
@@ -157,20 +247,55 @@ export class SupabaseLoyaltyResolver implements LoyaltyResolver {
     customerId: string,
     pointsToRedeem: number,
     maxAmount: number,
+    dryRun = false,
+    tenantId?: string,
   ): Promise<{ amountDeducted: number; pointsUsed: number } | null> {
     const supabase = getSupabase();
 
+    // Loyalty balances are per-tenant. redeem_loyalty_points_atomic requires
+    // the tenant, and an unscoped loyalty_members read could pick another
+    // tenant's member row.
+    if (!tenantId) {
+      logger.warn('[LOYALTY RESOLVER] Missing tenantId — refusing loyalty redemption', { customerId });
+      return null;
+    }
+
     try {
-      const pointsDollarValue = pointsToRedeem / 100; // Default: 100 points = $1
-      const redeemAmount = Math.min(pointsDollarValue, maxAmount);
+      // Never burn more points than the discount they pay for. The previous
+      // code passed the full requested point count to the RPC even when the
+      // dollar value was capped by the remaining order total, so the customer
+      // lost points that bought nothing.
+      const maxPointsByAmount = Math.max(0, Math.floor(maxAmount * 100));
+      let pointsToUse = Math.min(pointsToRedeem, maxPointsByAmount);
+
+      if (dryRun) {
+        const { data: member, error: memberError } = await supabase
+          .from('loyalty_members')
+          .select('available_points')
+          .eq('user_id', customerId)
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+
+        if (memberError || !member) return null;
+        pointsToUse = Math.min(pointsToUse, Number(member.available_points) || 0);
+        if (pointsToUse <= 0) return null;
+        return {
+          amountDeducted: Math.round(pointsToUse) / 100,
+          pointsUsed: pointsToUse,
+        };
+      }
+
+      const redeemAmount = pointsToUse / 100; // Default: 100 points = $1
+      if (pointsToUse <= 0) return null;
 
       const { data: loyaltyResult, error: loyaltyError } = await supabase.rpc(
         'redeem_loyalty_points_atomic',
         {
           p_user_id: customerId,
-          p_points: pointsToRedeem,
+          p_points: pointsToUse,
           p_order_id: null, // Can be linked later
           p_dollar_value: redeemAmount,
+          p_tenant_id: tenantId,
         },
       );
 
@@ -197,16 +322,16 @@ export class SupabaseLoyaltyResolver implements LoyaltyResolver {
     customerId: string,
     totalAmount: number,
     moduleId: string,
+    tenantId?: string,
   ): Promise<number> {
     const supabase = getSupabase();
 
     try {
-      // Get loyalty settings
-      const { data: settings } = await supabase
-        .from('loyalty_settings')
-        .select('*')
-        .limit(1)
-        .single();
+      // Get loyalty settings (tenant-scoped: every tenant configures its own
+      // earn rate, and an unscoped .limit(1) could read another tenant's).
+      let settingsQuery = supabase.from('loyalty_settings').select('*');
+      if (tenantId) settingsQuery = settingsQuery.eq('tenant_id', tenantId);
+      const { data: settings } = await settingsQuery.limit(1).maybeSingle();
 
       if (!settings) {
         // N2 fix: the gate used to read `settings?.is_enabled`, but
@@ -227,6 +352,7 @@ export class SupabaseLoyaltyResolver implements LoyaltyResolver {
           p_order_total: totalAmount,
           p_order_id: moduleId, // Using moduleId as reference
           p_points_per_dollar: pointsPerDollar,
+          p_tenant_id: tenantId ?? null,
         },
       );
 

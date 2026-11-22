@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
 import { createChainableMock } from '../../utils.js';
+import { encrypt } from '../../../../src/utils/encryption.js';
 import { handleSaasStripeWebhook } from '../../../../src/modules/platform/saas-webhook.controller.js';
 import { getSaasBillingService } from '../../../../src/services/saas-billing.service.js';
 import { getProvisioningService } from '../../../../src/modules/platform/provisioning.service.js';
@@ -151,6 +152,22 @@ describe('SaaS Provisioning & Stripe Webhook Handler', () => {
     const mockUserRolesTable = createChainableMock([]);
     const mockBillingHistoryTable = createChainableMock([]);
 
+    // P0-6: the credential is persisted to the outbox first and delivered by
+    // flushPendingWelcomeEmails(). The mock must expose a pending row so the
+    // delivery assertion below still proves the email is sent.
+    const mockOutboxTable = createChainableMock([
+      {
+        id: 'outbox-1',
+        tenant_id: tenantId,
+        recipient_email: 'alicesmith@example.com',
+        recipient_name: 'Alice Smith',
+        subdomain: 'alicesresort',
+        temp_password_encrypted: encrypt('TempPass123!'),
+        status: 'pending',
+        attempts: 0,
+      },
+    ]);
+
     const fromMock = vi.fn().mockImplementation((table: string) => {
       switch (table) {
         case 'tenants': return mockTenantsTable;
@@ -160,6 +177,7 @@ describe('SaaS Provisioning & Stripe Webhook Handler', () => {
         case 'users': return mockUsersTable;
         case 'user_roles': return mockUserRolesTable;
         case 'saas_billing_history': return mockBillingHistoryTable;
+        case 'provisioning_email_outbox': return mockOutboxTable;
         default:
           return createChainableMock({});
       }

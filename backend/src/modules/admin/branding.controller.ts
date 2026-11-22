@@ -20,6 +20,7 @@ import multer from 'multer';
 import path from 'path';
 import xss from 'xss';
 import { authorize } from '../../middleware/auth.middleware.js';
+import { requireFeature } from '../../services/feature-limits.service.js';
 import { asyncHandler } from '../../middleware/async-handler.js';
 import { AppError } from '../../utils/AppError.js';
 import { logger } from '../../utils/logger.js';
@@ -191,6 +192,7 @@ const upload = multer({
 router.get(
   '/',
   authorize('admin'),
+  requireFeature('whiteLabel'),
   asyncHandler(async (req: Request, res: Response) => {
     const propertyId = requirePropertyId(req);
     const { resolveSettings } = await import(
@@ -216,6 +218,7 @@ router.get(
 router.patch(
   '/:section',
   authorize('admin'),
+  requireFeature('whiteLabel'),
   asyncHandler(async (req: Request, res: Response) => {
     const section = req.params.section as BrandingSection;
     if (!(BRANDING_SECTIONS as readonly string[]).includes(section)) {
@@ -280,6 +283,7 @@ router.patch(
 router.post(
   '/logo',
   authorize('admin'),
+  requireFeature('whiteLabel'),
   upload.single('logo'),
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) throw new AppError('No file uploaded', 400);
@@ -328,6 +332,7 @@ router.post(
 router.post(
   '/favicon',
   authorize('admin'),
+  requireFeature('whiteLabel'),
   upload.single('favicon'),
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) throw new AppError('No file uploaded', 400);

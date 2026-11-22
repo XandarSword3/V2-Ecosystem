@@ -11,6 +11,7 @@ import {
   TestApiClient,
   createStaffClient,
   createGuestClient,
+  createCustomerClient,
 } from '../api-client';
 import {
   assertSuccess,
@@ -24,8 +25,9 @@ import { waitForServices, resetTestContext, seedTestDatabase } from '../setup';
 const runIntegration = process.env.RUN_INTEGRATION_TESTS === 'true';
 const describeIf = runIntegration ? describe : describe.skip;
 
-describe.skip('Order Lifecycle Integration', () => {
+describeIf('Order Lifecycle Integration', () => {
   let guestClient: TestApiClient;
+  let customerClient: TestApiClient;
   let staffClient: TestApiClient;
   let menuItemId: string;
   let orderId: string;
@@ -34,6 +36,7 @@ describe.skip('Order Lifecycle Integration', () => {
   beforeAll(async () => {
     // Always create clients
     guestClient = createGuestClient();
+    customerClient = createGuestClient();
     staffClient = createGuestClient(); // Will be replaced if services available
     
     const services = await waitForServices(5, 1000);
@@ -47,6 +50,7 @@ describe.skip('Order Lifecycle Integration', () => {
 
     servicesAvailable = true;
     resetTestContext();
+    customerClient = await createCustomerClient();
     staffClient = await createStaffClient();
   });
 
@@ -56,7 +60,7 @@ describe.skip('Order Lifecycle Integration', () => {
 
   describe('Phase 1: Customer Browse & Order', () => {
     it('should fetch menu service menu', async () => {
-      const response = await guestClient.getRestaurantMenu();
+      const response = await customerClient.getRestaurantMenu();
       assertSuccess(response);
 
       const menu = assertHasData<any>(response);
@@ -70,11 +74,11 @@ describe.skip('Order Lifecycle Integration', () => {
     });
 
     it('should fetch menu service categories', async () => {
-      const response = await guestClient.getRestaurantCategories();
+      const response = await customerClient.getRestaurantCategories();
       assertSuccess(response);
     });
 
-    it('should create menu service order as guest', async () => {
+    it('should create menu service order as customer', async () => {
       // Skip if no menu items available
       if (!menuItemId) {
         console.warn('⚠️ No menu items available, using placeholder');
@@ -90,7 +94,7 @@ describe.skip('Order Lifecycle Integration', () => {
         notes: 'Created by integration test',
       };
 
-      const response = await guestClient.createRestaurantOrder(orderData);
+      const response = await customerClient.createRestaurantOrder(orderData);
       assertSuccess(response);
 
       const order = assertHasData<any>(response, (data: any) => {
@@ -107,7 +111,7 @@ describe.skip('Order Lifecycle Integration', () => {
         return; // Skip if order creation failed
       }
 
-      const response = await guestClient.getMenuServiceOrder(orderId);
+      const response = await customerClient.getMenuServiceOrder(orderId);
       assertSuccess(response);
 
       assertHasData<any>(response, (order: any) => {
@@ -118,6 +122,20 @@ describe.skip('Order Lifecycle Integration', () => {
   });
 
   describe('Phase 2: Staff Processing', () => {
+    it('should confirm order', async () => {
+      if (!orderId) {
+        return;
+      }
+
+      const response = await staffClient.updateOrderStatus(orderId, 'confirm');
+      assertSuccess(response);
+
+      const orderResponse = await customerClient.getMenuServiceOrder(orderId);
+      assertHasData<any>(orderResponse, (order: any) => {
+        expect(['confirmed', 'in_progress']).toContain(order.status);
+      });
+    });
+
     it('should update order status to preparing', async () => {
       if (!orderId) {
         return;
@@ -126,10 +144,10 @@ describe.skip('Order Lifecycle Integration', () => {
       const response = await staffClient.updateOrderStatus(orderId, 'preparing');
       assertSuccess(response);
 
-      // Verify status changed
-      const orderResponse = await guestClient.getMenuServiceOrder(orderId);
+      // Verify status changed (Stage-6 engine contract: fulfillment status advances)
+      const orderResponse = await customerClient.getMenuServiceOrder(orderId);
       assertHasData<any>(orderResponse, (order: any) => {
-        expect(order.status).toBe('preparing');
+        expect(['preparing', 'in_progress']).toContain(order.fulfillment_status || order.status);
       });
     });
 
@@ -142,9 +160,9 @@ describe.skip('Order Lifecycle Integration', () => {
       assertSuccess(response);
 
       // Verify status changed
-      const orderResponse = await guestClient.getMenuServiceOrder(orderId);
+      const orderResponse = await customerClient.getMenuServiceOrder(orderId);
       assertHasData<any>(orderResponse, (order: any) => {
-        expect(order.status).toBe('ready');
+        expect(['ready', 'prepared']).toContain(order.fulfillment_status || order.status);
       });
     });
 
@@ -157,9 +175,9 @@ describe.skip('Order Lifecycle Integration', () => {
       assertSuccess(response);
 
       // Verify final status
-      const orderResponse = await guestClient.getMenuServiceOrder(orderId);
+      const orderResponse = await customerClient.getMenuServiceOrder(orderId);
       assertHasData<any>(orderResponse, (order: any) => {
-        expect(['delivered', 'completed']).toContain(order.status);
+        expect(['delivered', 'handed_off', 'completed']).toContain(order.fulfillment_status || order.status);
       });
     });
   });
@@ -184,7 +202,7 @@ describe.skip('Order Lifecycle Integration', () => {
 
     it('should handle non-existent order gracefully', async () => {
       const fakeId = '00000000-0000-0000-0000-000000000000';
-      const response = await guestClient.getMenuServiceOrder(fakeId);
+      const response = await customerClient.getMenuServiceOrder(fakeId);
 
       expect(response.success).toBe(false);
       expect(response.status).toBe(404);

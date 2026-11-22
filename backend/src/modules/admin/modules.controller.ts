@@ -3,6 +3,7 @@ import { asyncHandler } from '../../middleware/async-handler.js';
 import { getSupabase } from "../../database/connection";
 import { emitToAll } from "../../socket";
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { clearModuleCache } from "../../middleware/moduleGuard.middleware";
 import { createModuleSchema, updateModuleSchema, validateBody } from "../../validation/schemas";
 import { logActivity } from "../../utils/activityLogger";
@@ -80,13 +81,22 @@ export const getModule = asyncHandler(async (req: Request, res: Response) => {
 
     const propertyId = req.property?.id ?? ((req as any).propertyId as string | undefined);
     const tenantId = req.user ? getCallerTenantId(req) : (req.tenant?.id ?? null);
+    const isAdmin = Boolean(req.user?.roles?.some((r: string) => ['admin', 'manager', 'super_admin'].includes(r)));
+    const requireActive = !isAdmin;
 
-    logger.info(`[ModulesController] getModule identifier="${identifier}" propertyId="${propertyId ?? 'none'}" tenantId="${tenantId ?? 'none'}"`);
+    logger.info(`[ModulesController] getModule identifier="${identifier}" propertyId="${propertyId ?? 'none'}" tenantId="${tenantId ?? 'none'}" requireActive=${requireActive}`);
 
     const applyScope = (q: any) => {
       let scoped = q;
+      if (requireActive) {
+        scoped = scoped.eq('is_active', true);
+      }
       if (propertyId) scoped = scoped.or(`property_id.eq.${propertyId},property_id.is.null`);
-      if (tenantId) scoped = scoped.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+      if (tenantId) {
+        scoped = scoped.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+      } else if (!isAdmin) {
+        scoped = scoped.is('tenant_id', null);
+      }
       return scoped;
     };
 
@@ -255,7 +265,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
           property_id: propertyId,
         }));
 
-        const { error: permUpsertError } = await supabase.from('app_permissions').upsert(permsToCreate, { onConflict: 'slug' });
+        const { error: permUpsertError } = await supabase.from('app_permissions').upsert(permsToCreate, { onConflict: 'tenant_id,property_id,slug' });
         if (permUpsertError) throw permUpsertError;
 
         // Assign based on template preset policy.
@@ -273,7 +283,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         });
 
         const stampedRolePerms = rolePerms.map((rp) => ({ ...rp, tenant_id: tenantId, property_id: propertyId }));
-        const { error: rolePermUpsertError } = await supabase.from('app_role_permissions').upsert(stampedRolePerms, { onConflict: 'role_name,permission_slug' });
+        const { error: rolePermUpsertError } = await supabase.from('app_role_permissions').upsert(stampedRolePerms, { onConflict: 'tenant_id,property_id,role_name,permission_slug' });
         if (rolePermUpsertError) throw rolePermUpsertError;
         await permissionCache.refreshCache();
 
@@ -324,15 +334,42 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
     // users.scope is the source of truth for authorization — no roles/
     // user_roles rows are seeded here. The staff record (staff_profiles)
     // carries the module as the member's department/sub-role.
+    //
+    // SECURITY: never seed a predictable password, and never overwrite an
+    // existing account's credentials. A module slug is public (`/api/modules`
+    // returns it), so the old `Staff<Slug>123!` password was guessable for any
+    // newly created module and the upsert reset it on every module creation.
+    // New accounts get 32 random bytes and must_change_password=true; the
+    // account is unusable until an operator issues a reset.
     try {
       const staffEmail = `staff.${finalSlug}@v2ecosystem.com`;
-      const staffPassword = await bcrypt.hash(`Staff${finalSlug.charAt(0).toUpperCase() + finalSlug.slice(1)}123!`, 12);
       const tenantId = requireTenantScope(req);
 
-      const { data: userData, error: userError } = await supabase
+      const { data: existingStaff } = await supabase
         .from('users')
-        .upsert(
-          {
+        .select('id, tenant_id')
+        .eq('email', staffEmail)
+        .maybeSingle();
+
+      let staffUserId: string | null = null;
+
+      if (existingStaff) {
+        if (existingStaff.tenant_id !== tenantId) {
+          logger.warn(
+            `[Modules] Not attaching staff profile: ${staffEmail} already belongs to another tenant`,
+            { existingTenantId: existingStaff.tenant_id, tenantId, module: finalSlug },
+          );
+        } else {
+          staffUserId = existingStaff.id as string;
+          logger.info(`[Modules] Reusing existing staff user ${staffEmail}; credentials left unchanged`);
+        }
+      } else {
+        const randomPassword = crypto.randomBytes(32).toString('base64url');
+        const staffPassword = await bcrypt.hash(randomPassword, 12);
+
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .insert({
             email: staffEmail,
             password_hash: staffPassword,
             full_name: `${name} Staff`,
@@ -341,16 +378,23 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
             email_verified: true,
             scope: 'property_staff',
             tenant_id: tenantId,
-          },
-          { onConflict: 'email', ignoreDuplicates: false }
-        )
-        .select()
-        .single();
+            must_change_password: true,
+          })
+          .select()
+          .single();
 
-      if (!userError && userData) {
+        if (userError) {
+          logger.error(`[Modules] Failed to create staff user ${staffEmail}`, userError);
+        } else {
+          staffUserId = userData?.id as string;
+          logger.info(`[Modules] Created staff user ${staffEmail} with a random password; password change required`);
+        }
+      }
+
+      if (staffUserId) {
         const { error: staffProfileError } = await supabase.from('staff_profiles').upsert(
           {
-            user_id: userData.id,
+            user_id: staffUserId,
             tenant_id: tenantId,
             department: finalSlug,
           },
@@ -359,7 +403,7 @@ export const createModule = asyncHandler(async (req: Request, res: Response) => 
         if (staffProfileError) {
           logger.warn(`[Modules] Staff profile upsert failed for ${staffEmail}`, staffProfileError.message);
         } else {
-          logger.info(`[Modules] Created/updated staff user ${staffEmail} (property_staff) with staff record for ${finalSlug}`);
+          logger.info(`[Modules] Staff record ready for ${staffEmail} (property_staff) for ${finalSlug}`);
         }
       }
     } catch (innerError) {
@@ -406,7 +450,7 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
     // 1. Fetch current module to check permissions, tenant ownership, and version
     const { data: currentModule, error: fetchError } = await supabase
       .from('modules')
-      .select('slug, engine_type, settings_version, tenant_id')
+      .select('slug, engine_type, settings_version, tenant_id, property_id')
       .eq('id', id)
       .single();
 
@@ -429,6 +473,7 @@ export const updateModule = asyncHandler(async (req: Request, res: Response) => 
             .from('app_role_permissions')
             .select('permission_slug')
             .eq('permission_slug', requiredPerm)
+            .eq('tenant_id', currentModule.tenant_id)
             .in('role_name', user.roles)
             .limit(1);
 
@@ -534,6 +579,7 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
         .from('app_role_permissions')
         .select('permission_slug')
         .eq('permission_slug', requiredPerm)
+        .eq('tenant_id', moduleData.tenant_id)
         .in('role_name', user.roles)
         .limit(1);
       hasPermission = Boolean(permData && permData.length > 0);
@@ -604,6 +650,7 @@ export const deleteModule = asyncHandler(async (req: Request, res: Response) => 
             .from('app_permissions')
             .delete()
             .eq('module_slug', moduleData.slug)
+            .eq('tenant_id', moduleData.tenant_id)
             .select('slug');
           
           if (perms && perms.length > 0) {

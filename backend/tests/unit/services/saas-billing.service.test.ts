@@ -82,7 +82,7 @@ describe('SaasBillingService', () => {
       expect(SaasBillingService.mapStripeToBillingStatus('past_due')).toBe('past_due');
       expect(SaasBillingService.mapStripeToBillingStatus('unpaid')).toBe('past_due');
       expect(SaasBillingService.mapStripeToBillingStatus('canceled')).toBe('cancelled');
-      expect(SaasBillingService.mapStripeToBillingStatus('incomplete')).toBe('trialing');
+      expect(SaasBillingService.mapStripeToBillingStatus('incomplete')).toBe('past_due');
       expect(SaasBillingService.mapStripeToBillingStatus('incomplete_expired')).toBe('cancelled');
       expect(SaasBillingService.mapStripeToBillingStatus('paused')).toBe('suspended');
       expect(SaasBillingService.mapStripeToBillingStatus('unknown_status' as any)).toBe('suspended');
@@ -246,7 +246,8 @@ describe('SaasBillingService', () => {
 
       mockSubscriptionsRetrieve.mockResolvedValueOnce({
         id: 'sub_active_1',
-        items: { data: [{ id: 'si_item_1' }] },
+        metadata: {},
+        items: { data: [{ id: 'si_item_1', price: { id: 'price_old', recurring: { interval: 'month' } } }] },
       });
 
       mockSubscriptionsUpdate.mockResolvedValueOnce({
@@ -265,10 +266,11 @@ describe('SaasBillingService', () => {
       const updateRes = await service.changeTier('sub_active_1', 'starter', 'growth');
       expect(updateRes.newTier).toBe('growth');
       expect(updateRes.previousTier).toBe('starter');
+      expect(updateRes.billingCycle).toBe('monthly');
       expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_active_1', {
         items: [{ id: 'si_item_1', price: 'price_growth_upgraded' }],
         proration_behavior: 'create_prorations',
-        metadata: { tier: 'growth' },
+        metadata: { tier: 'growth', billing_cycle: 'monthly' },
       });
     });
 

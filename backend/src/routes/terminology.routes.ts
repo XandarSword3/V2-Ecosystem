@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import { terminologyService } from "../services/terminology.service.js";
 import { authenticate, authorize } from "../middleware/auth.middleware.js";
+import { requireFeature } from '../services/feature-limits.service.js';
 import { asyncHandler } from '../middleware/async-handler.js';
 
 
@@ -19,13 +20,15 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     res.json({ success: true, data: terms });
 }));
 
-router.get('/admin', asyncHandler(async (req: Request, res: Response) => {
+router.get('/admin', authenticate, authorize('admin'), requireFeature('whiteLabel'), asyncHandler(async (req: Request, res: Response) => {
     const businessType = req.query.business_type as string;
     const overrides = await terminologyService.getAllOverrides(businessType);
     res.json({ success: true, data: overrides });
 }));
 
-router.post('/', asyncHandler(async (req: Request, res: Response) => {
+// Previously unauthenticated: any anonymous caller could rewrite a tenant's
+// white-label terminology.
+router.post('/', authenticate, authorize('admin'), requireFeature('whiteLabel'), asyncHandler(async (req: Request, res: Response) => {
     const { business_type, term_key, term_value, language } = req.body;
     if (!business_type || !term_key || !term_value) {
         return res.status(400).json({ success: false, error: 'Missing required fields' });
@@ -34,7 +37,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     res.json({ success: true, data: result });
 }));
 
-router.post('/bulk', asyncHandler(async (req: Request, res: Response) => {
+router.post('/bulk', authenticate, authorize('admin'), requireFeature('whiteLabel'), asyncHandler(async (req: Request, res: Response) => {
     const { business_type, language, updates } = req.body;
     if (!business_type || !updates) {
         return res.status(400).json({ success: false, error: 'Missing required fields' });

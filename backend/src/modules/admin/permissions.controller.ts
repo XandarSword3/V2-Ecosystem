@@ -8,10 +8,16 @@ import { getScopedClient, tenantContextFor } from '../../security/scoped-client.
 
 export const getAllPermissions = asyncHandler(async (req: Request, res: Response) => {
     const supabase = getSupabase();
-    // Fetch from new app_permissions table
-    const { data, error } = await supabase
+    // app_permissions is keyed by (tenant_id, property_id, slug): the same
+    // module slug can exist in two tenants with independent rows. Only a
+    // platform admin (no homed tenant) may read across tenants.
+    const tenantId = req.user?.tenantId;
+    let query = supabase
       .from('app_permissions')
-      .select('slug, description, module_slug, created_at')
+      .select('slug, description, module_slug, created_at, tenant_id, property_id');
+    if (tenantId) query = query.eq('tenant_id', tenantId);
+
+    const { data, error } = await query
       .order('module_slug', { ascending: true })
       .order('slug', { ascending: true });
 
@@ -36,19 +42,16 @@ export const getRolePermissions = asyncHandler(async (req: Request, res: Respons
         return res.status(404).json({ success: false, error: 'Role not found' });
     }
 
-    // NOTE: app_role_permissions is keyed by (role_name, tenant_id,
-    // property_id) but this query still filters by role_name only. If two
-    // tenants have a role with the same name, this can surface permission
-    // rows that don't belong to the caller's tenant. app_role_permissions is
-    // deliberately NOT registered in TENANT_SCOPED_TABLES — its NOT NULL
-    // property_id column has no equivalent on `roles`, so getScopedClient
-    // can't safely auto-stamp inserts for it. See the note on
-    // updateRolePermissions below for why this needs a real design decision
-    // rather than a guessed patch.
-    const { data, error } = await supabase
+    // app_role_permissions is keyed by (tenant_id, property_id, role_name,
+    // permission_slug). Filter by the caller's tenant, otherwise two tenants
+    // with a role of the same name share each other's grants.
+    let rolePermQuery = supabase
       .from('app_role_permissions')
       .select('permission_slug')
       .eq('role_name', roleData.name);
+    if (req.user?.tenantId) rolePermQuery = rolePermQuery.eq('tenant_id', req.user.tenantId);
+
+    const { data, error } = await rolePermQuery;
 
     if (error) throw error;
     

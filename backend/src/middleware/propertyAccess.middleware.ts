@@ -235,11 +235,20 @@ export function requireModulePropertyAccess(moduleSlug: string) {
       return;
     }
 
+    const userTenantId = req.user.tenantId;
     const supabase = getSupabase();
-    const { data: moduleRecord, error } = await supabase
+    let query = supabase
       .from('modules')
       .select('id, property_id, tenant_id')
-      .eq('slug', moduleSlug)
+      .eq('slug', moduleSlug);
+
+    if (userTenantId) {
+      query = query.or(`tenant_id.eq.${userTenantId},tenant_id.is.null`);
+    }
+
+    const { data: moduleRecord, error } = await query
+      .order('tenant_id', { nullsFirst: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) {
@@ -256,7 +265,6 @@ export function requireModulePropertyAccess(moduleSlug: string) {
     // ── Tenant ownership guard ──────────────────────────────────────────────
     // Verify that the module's tenant_id matches the authenticated user's tenantId.
     // Cross-tenant staff access is unconditionally rejected.
-    const userTenantId = req.user.tenantId;
     if (moduleRecord.tenant_id && userTenantId && moduleRecord.tenant_id !== userTenantId) {
       logger.warn('Cross-tenant module access denied', {
         userId: req.user.userId,

@@ -203,9 +203,9 @@ describe('I-04: AccommodationUnit Availability — No Overlapping Reservations',
       ? responseData
       : responseData?.bookings || responseData?.data || [];
 
-    // Filter to non-cancelled bookings
+    // Filter to active confirmed bookings (ignore cancelled, failed, rejected attempts)
     const active = bookings.filter(
-      (b: any) => !['cancelled', 'no_show'].includes(b.status)
+      (b: any) => ['confirmed', 'completed'].includes(b.status)
     );
 
     // Group by unit id (metadata.unit_id from engine-refit reservations)
@@ -222,8 +222,8 @@ describe('I-04: AccommodationUnit Availability — No Overlapping Reservations',
       // Sort by check-in date
       chaletBookings.sort(
         (a: any, b: any) =>
-          new Date(a.check_in_date || a.checkInDate).getTime() -
-          new Date(b.check_in_date || b.checkInDate).getTime()
+          new Date(a.metadata?.check_in_date || a.check_in_date || a.checkInDate).getTime() -
+          new Date(b.metadata?.check_in_date || b.check_in_date || b.checkInDate).getTime()
       );
 
       for (let i = 0; i < chaletBookings.length; i++) {

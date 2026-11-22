@@ -107,7 +107,6 @@ interface DualWriteStats {
 // Entity type labels - static list, but will be filtered by active modules
 const ALL_ENTITY_TYPE_LABELS: Record<string, string> = {
   catalog_item: 'Menu / Catalog Items',
-  kiosk_item: 'Kiosk Items',
   accommodation_unit: 'Accommodation Units',
   capacity_window: 'Capacity Windows',
   spa_service: 'Spa Services',

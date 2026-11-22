@@ -294,3 +294,40 @@ export const test = base.extend<AuthFixtures>({
 
 export type { APIRequestContext, Browser, BrowserContext, Page };
 export { expect };
+
+// ---------------------------------------------------------------------------
+// Standalone UI login helper — used by e2e/01-auth and other browser specs
+// that import `loginAsAdmin` by name rather than via the test fixture API.
+// ---------------------------------------------------------------------------
+
+/**
+ * Performs a real UI login on a tenant's admin login page and waits for the
+ * admin dashboard. Credentials come from test-credentials.ts, which global-setup
+ * seeds against the same tenant (`admin@<slug>.v2platform.com`).
+ */
+export async function loginAsAdmin(page: Page, subdomain: string = 'testcorp'): Promise<void> {
+  const { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } = await import('./test-credentials');
+
+  // The login page honors a ?redirect= param — without it, tenant admins are
+  // sent to /{settings.propertySlug}/admin, which depends on the backend's
+  // ambient property resolution (the /login page resolves no property). The
+  // redirect param is deterministic: global-setup seeds property_code
+  // `testcorp-property` for the tenant, matching the [property] route.
+  const propertySlug = `${subdomain}-property`;
+  const loginUrl = `http://${subdomain}.localhost:3000/login?redirect=${encodeURIComponent(`/${propertySlug}/admin`)}`;
+
+  await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+
+  // In Next dev, the page re-navigates once when chunks finish loading and
+  // hydration isn't done at domcontentloaded — an immediate fill/click is
+  // silently swallowed. Wait for a settled network + a hydration tick.
+  await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => {});
+  await page.waitForTimeout(500);
+
+  await page.fill('#email', TEST_ADMIN_EMAIL(subdomain));
+  await page.fill('#password', TEST_ADMIN_PASSWORD);
+  await page.click('button[type="submit"]');
+
+  // loginAsAdmin contract: resolves only once the admin area is reached.
+  await page.waitForURL(/\/admin/, { timeout: 30_000 });
+}

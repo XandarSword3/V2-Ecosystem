@@ -238,6 +238,24 @@ export class FinancialLedgerService {
 
     this.validateInvariant(entry);
 
+    // Idempotency: a retried settlement/refund must not double the books.
+    // The partial unique index idx_efl_idem (migration) is the concurrency
+    // backstop; this read makes the common retry path cheap and quiet.
+    if (entry.idempotencyKey) {
+      const { data: existing } = await supabase
+        .from('engine_financial_ledger')
+        .select('id')
+        .eq('idempotency_key', entry.idempotencyKey)
+        .maybeSingle();
+      if (existing?.id) {
+        logger.info('[LEDGER] Idempotent replay skipped', {
+          ledgerId: existing.id,
+          idempotencyKey: entry.idempotencyKey,
+        });
+        return existing.id;
+      }
+    }
+
 
 
     const row = {

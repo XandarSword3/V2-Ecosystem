@@ -58,7 +58,14 @@ function baseReqRes(orderStatus: string) {
       roles: ['staff'],
     },
   });
-  const mockOrder = { id: orderId, amount: 40, status: orderStatus, metadata: { tableNumber: 'T5' } };
+  const mockOrder = {
+    id: orderId,
+    amount: 40,
+    status: orderStatus,
+    tenant_id: 'tenant-123',
+    property_id: 'prop-123',
+    metadata: { tableNumber: 'T5' },
+  };
   const mockUpdatedOrder = {
     id: orderId,
     amount: 40,
@@ -84,6 +91,16 @@ function baseReqRes(orderStatus: string) {
       chain.update = vi.fn().mockReturnValue(createChainableMock(mockUpdatedOrder));
       txChainRef = chain;
       return chain;
+    }
+    if (table === 'payments') {
+      // P0-4/P0-5: every tender persists a payments row and a settlement
+      // ledger row. Return a concrete payment id so the settlement proceeds.
+      const chain = createChainableMock({ id: 'payment-1' });
+      chain.single = vi.fn().mockResolvedValue({ data: { id: 'payment-1' }, error: null });
+      return chain;
+    }
+    if (table === 'site_settings') {
+      return createChainableMock({ value: 'USD' });
     }
     return createChainableMock(null);
   });
@@ -159,11 +176,11 @@ describe('Staff Module Order Payment (payModuleOrder)', () => {
 
     expect(awardLoyaltyPointsForPayment).toHaveBeenCalledWith('order', orderId, 50);
 
-    expect(emitToUnit).toHaveBeenCalledWith('tenant-123', 'restaurant', 'order:updated', {
+    expect(emitToUnit).toHaveBeenCalledWith('tenant-123', 'restaurant', 'order:updated', expect.objectContaining({
       orderId,
       status: 'completed',
       paymentStatus: 'paid',
-    });
+    }));
   });
 
   it('settles payment but defers completion when the fulfillment gate refuses (still preparing)', async () => {
@@ -191,11 +208,11 @@ describe('Staff Module Order Payment (payModuleOrder)', () => {
     );
     // Settlement happened even though completion was refused.
     expect(awardLoyaltyPointsForPayment).toHaveBeenCalledWith('order', orderId, 50);
-    expect(emitToUnit).toHaveBeenCalledWith('tenant-123', 'restaurant', 'order:updated', {
+    expect(emitToUnit).toHaveBeenCalledWith('tenant-123', 'restaurant', 'order:updated', expect.objectContaining({
       orderId,
       status: 'in_progress',
       paymentStatus: 'paid',
-    });
+    }));
   });
 
   it('never fails an already-settled payment on a fail-closed completion error (500)', async () => {
@@ -276,7 +293,13 @@ describe('Staff Module Order Payment (payModuleOrder)', () => {
         return createChainableMock({ id: 'mod-1', engine_type: 'instant_transaction' });
       }
       if (table === 'transactions') {
-        return createChainableMock({ id: 'order-1', amount: 20, status: 'cancelled' });
+        return createChainableMock({
+          id: 'order-1',
+          amount: 20,
+          status: 'cancelled',
+          tenant_id: 'tenant-1',
+          property_id: 'prop-1',
+        });
       }
       return createChainableMock(null);
     });

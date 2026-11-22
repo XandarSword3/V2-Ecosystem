@@ -814,6 +814,10 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
     }
     try {
       const res = await api.post(`/staff/modules/${moduleSlug}/orders`, {
+        // P0-5: required by the API. A double-tap or network retry with the
+        // same key replays the original order instead of duplicating it and
+        // deducting stock twice.
+        idempotencyKey: globalThis.crypto?.randomUUID?.() ?? `ord_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         items: quickCart.map(c => ({
           catalogItemId: c.id,
           quantity: c.quantity,
@@ -1008,6 +1012,8 @@ export default function StaffPOSTemplate({ moduleId, moduleSlug, moduleName, req
   const createNewOrder = async (tableId: string) => {
     try {
       const res = await api.post(`/staff/modules/${moduleSlug}/orders`, {
+        // P0-5: required by the API (see checkoutQuickOrder).
+        idempotencyKey: globalThis.crypto?.randomUUID?.() ?? `ord_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         serviceLocationId: tableId,
         tableId,
         orderType: 'dine_in',

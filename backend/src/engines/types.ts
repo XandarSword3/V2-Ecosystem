@@ -108,6 +108,13 @@ export interface PricingConfig {
 export interface EconomicsReporting {
   staffId?: UUID;
   propertyId?: UUID;
+  /**
+   * Owning tenant. Required for any operation that touches a tenant-scoped
+   * customer asset (coupon / gift card / loyalty). Redemption RPCs are
+   * tenant-scoped, so omitting it makes discounts fail closed instead of
+   * matching another tenant's code.
+   */
+  tenantId?: UUID;
   cancellationReason?: string;
   refundReason?: string;
   promoCodeUsed?: string;
@@ -125,6 +132,13 @@ export interface PricingContext extends EconomicsReporting {
   couponCode?: string;
   giftCardCodes?: string[];
   loyaltyPointsToRedeem?: number;
+  /**
+   * When true the pipeline must NOT mutate any customer asset (coupon usage,
+   * gift-card balance, loyalty points). Resolvers validate and quote only.
+   * Used by the public price-preview endpoint; order creation is the only
+   * place where discounts are actually consumed.
+   */
+  dryRun?: boolean;
 }
 
 export interface DiscountBreakdown {

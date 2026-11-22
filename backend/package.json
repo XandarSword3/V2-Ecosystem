@@ -127,6 +127,7 @@
     "form-data": "^4.0.6",
     "vite": "^7.3.5",
     "tmp": "^0.2.6",
+    "proxy-addr": "^2.0.8",
     "qs": "^6.15.2",
     "@opentelemetry/core": "^2.8.0"
   }

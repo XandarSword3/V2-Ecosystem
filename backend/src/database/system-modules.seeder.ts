@@ -111,7 +111,7 @@ export async function seedSystemModules() {
 
           const { error: permsError } = await supabase
             .from('app_permissions')
-            .upsert(permsToCreate, { onConflict: 'slug' });
+            .upsert(permsToCreate, { onConflict: 'tenant_id,property_id,slug' });
           if (permsError) {
             throw permsError;
           }
@@ -131,7 +131,7 @@ export async function seedSystemModules() {
 
           const { error: rolePermsError } = await supabase
             .from('app_role_permissions')
-            .upsert(rolePerms, { onConflict: 'role_name,permission_slug' });
+            .upsert(rolePerms, { onConflict: 'tenant_id,property_id,role_name,permission_slug' });
           if (rolePermsError) {
             throw rolePermsError;
           }

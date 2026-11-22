@@ -17,7 +17,7 @@ import { resolveFulfillmentSelection } from '../fulfillment/fulfillment-selectio
 // Resource lifecycle driver for item-derived fulfillment moves (plan Phase
 // 5): KDS item bumps advance the fulfillment row through a DIFFERENT path
 // than the order-status choke point, so consumption must be driven here
-// too — the generic service is wired with the hospitality BOM resolver at
+// too â€” the generic service is wired with the hospitality BOM resolver at
 // this operational call site, never in the generic core.
 const itemPathResourceConsumption = new ResourceConsumptionService(hospitalityResourceResolver);
 import { computeStayBaseAmount } from '../../utils/stay-pricing.js';
@@ -46,15 +46,78 @@ function legacyFulfillmentToCanonical(status: string | null): string | null {
   }
 }
 
+async function resolveStaffModule(supabase: any, slug: string, callerTenantId?: string | null) {
+  let moduleQuery: any = supabase
+    .from('modules')
+    .select('id, engine_type, tenant_id')
+    .eq('slug', slug);
+  if (callerTenantId && typeof moduleQuery.or === 'function') {
+    moduleQuery = moduleQuery.or(`tenant_id.eq.${callerTenantId},tenant_id.is.null`);
+  }
+  if (typeof moduleQuery.maybeSingle === 'function') {
+    if (typeof moduleQuery.order === 'function') {
+      moduleQuery = moduleQuery.order('tenant_id', { nullsFirst: false });
+    }
+    if (typeof moduleQuery.limit === 'function') {
+      moduleQuery = moduleQuery.limit(1);
+    }
+    return await moduleQuery.maybeSingle();
+  }
+  return await moduleQuery.single();
+}
+
+interface StaffIdempotencyClaim {
+  claimed: boolean;
+  status: 'in_progress' | 'completed' | 'failed';
+  claim_token?: string;
+  response?: any;
+  transaction_id?: string;
+}
+
+/**
+ * Claim a staff-order idempotency lease.
+ *
+ * Staff POS order creation used to be completely unprotected: a double tap or
+ * a network retry created a second order and deducted stock twice. The claim
+ * RPC is atomic and fails closed — if it cannot be reached we refuse the
+ * request rather than silently creating a duplicate.
+ */
+async function claimStaffIdempotencyKey(
+  supabase: any,
+  key: string,
+  leaseSeconds = 120,
+): Promise<StaffIdempotencyClaim> {
+  const { data, error } = await supabase.rpc('claim_idempotency_key', {
+    p_key: key,
+    p_lease_seconds: leaseSeconds,
+  });
+  if (error) {
+    throw new Error(`Idempotency claim failed: ${error.message}`);
+  }
+  if (!data || typeof data !== 'object') {
+    throw new Error('Idempotency claim returned no result');
+  }
+  return data as StaffIdempotencyClaim;
+}
+
+async function failStaffIdempotencyKey(supabase: any, key: string | null, claimToken: string | null): Promise<void> {
+  if (!key || !claimToken) return;
+  try {
+    await supabase.rpc('fail_idempotency_key', { p_key: key, p_claim_token: claimToken });
+  } catch (err: any) {
+    logger.warn('[Staff Order] Failed to release idempotency lease', { key, error: err?.message || err });
+  }
+}
+
 /**
  * Dynamic Module Staff Controller
  * Handles staff operations for any module type based on slug.
  * All operational data is stored in the unified `transactions` table.
  * 
  * ENGINE TYPE MAPPINGS:
- *  - menu_service orders → engine_type: 'instant_transaction'
- *  - multi_day_booking   → engine_type: 'time_exclusive_reservation'
- *  - session_access      → engine_type: 'shared_capacity_access'
+ *  - menu_service orders â†’ engine_type: 'instant_transaction'
+ *  - multi_day_booking   â†’ engine_type: 'time_exclusive_reservation'
+ *  - session_access      â†’ engine_type: 'shared_capacity_access'
  */
 
 // ============================================
@@ -137,7 +200,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Module is not a menu service' });
     }
 
-    // Build query for orders — use transactions table for instant_transaction
+    // Build query for orders â€” use transactions table for instant_transaction
     // engine. Stage 6: fulfillment meaning lives in the fulfillments table, so
     // the canonical fulfillment state is joined in and returned as
     // fulfillment_status. transactions.status carries only the transaction
@@ -207,13 +270,13 @@ export async function getModuleOrders(req: Request, res: Response) {
             fmStatuses.add(s);
             break;
           default:
-            // Unknown status — let the DB filter return nothing rather than
+            // Unknown status â€” let the DB filter return nothing rather than
             // silently broadening the result set.
             txStatuses.add('__none__');
         }
       }
       // Resolve fulfillment-layer statuses to transaction ids FIRST (a plain
-      // query on fulfillments — deliberately avoids PostgREST embedded-resource
+      // query on fulfillments â€” deliberately avoids PostgREST embedded-resource
       // filter syntax, which varies by server version), then combine with
       // transaction-layer statuses in a single OR over the transactions query.
       // The migration backfilled a fulfillment row for every existing
@@ -235,7 +298,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       } else if (fmTxIds.length > 0) {
         query = query.in('id', fmTxIds);
       } else if (fmStatuses.size > 0) {
-        // Only fulfillment states were requested and none matched — return
+        // Only fulfillment states were requested and none matched â€” return
         // nothing rather than silently broadening to all orders. The zero
         // uuid matches no real row.
         query = query.in('id', ['00000000-0000-0000-0000-000000000000']);
@@ -254,7 +317,7 @@ export async function getModuleOrders(req: Request, res: Response) {
     const orderIds = (orders || []).map((o) => o.id);
 
     // Fetch order_items for this page of orders. Previously this endpoint
-    // always returned items: [] — see the commit that added order_items
+    // always returned items: [] â€” see the commit that added order_items
     // insertion at creation time for the full story. Kept as two plain
     // queries (rather than a PostgREST embedded catalog_items(...) join)
     // since that requires a specific FK relationship name and this way
@@ -272,7 +335,7 @@ export async function getModuleOrders(req: Request, res: Response) {
         .in('transaction_id', orderIds);
 
       if (itemsError) {
-        logger.warn('Failed to fetch order_items for module orders list — items will show empty', itemsError.message);
+        logger.warn('Failed to fetch order_items for module orders list â€” items will show empty', itemsError.message);
       } else if (itemRows && itemRows.length > 0) {
         const catalogIds = [...new Set(itemRows.map((r) => r.catalog_item_id).filter(Boolean))];
         const { data: catalogRows } = catalogIds.length > 0
@@ -312,7 +375,7 @@ export async function getModuleOrders(req: Request, res: Response) {
         .in('id', locationIds);
 
       if (locationsError) {
-        logger.warn('Failed to fetch service_locations for module orders list — falling back to metadata', locationsError.message);
+        logger.warn('Failed to fetch service_locations for module orders list â€” falling back to metadata', locationsError.message);
       } else {
         for (const row of locationRows || []) {
           locationNameById.set(row.id, row.name);
@@ -355,7 +418,7 @@ export async function getModuleOrders(req: Request, res: Response) {
       const staffId = (order as { staff_id?: string | null }).staff_id ?? null;
       const staffName = staffId ? (staffNameById.get(staffId) ?? null) : null;
       // Stage 6: canonical fulfillment state from the fulfillments join.
-      // No transitional metadata mirror exists anymore — the only fallback
+      // No transitional metadata mirror exists anymore â€” the only fallback
       // is the legacy-composite map for pre-Stage-6 rows that have no
       // fulfillment row (historical data on live instances).
       const fulfillmentRel = (order as { fulfillments?: Array<{ status?: string | null; mode?: string | null }> | { status?: string | null; mode?: string | null } | null }).fulfillments ?? null;
@@ -375,11 +438,11 @@ export async function getModuleOrders(req: Request, res: Response) {
         staffName,
         orderType: (meta.order_type as string | undefined) ?? order.engine_type,
         status: order.status,
-        // Canonical fulfillment state — the KDS consumes THIS, not status.
+        // Canonical fulfillment state â€” the KDS consumes THIS, not status.
         fulfillmentStatus: canonicalFulfillmentState,
         // Phase F1: fulfillment mode tells the frontend which state machine
-        // governs this order (on_premise → hospitality states,
-        // digital_delivery → provisioning/provisioned/delivered, etc.).
+        // governs this order (on_premise â†’ hospitality states,
+        // digital_delivery â†’ provisioning/provisioned/delivered, etc.).
         fulfillmentMode: fulfillmentMode ?? meta.fulfillment_mode ?? null,
         paymentMethod: rawPaymentMethod,
         paymentStatus,
@@ -412,7 +475,7 @@ export async function getModuleOrders(req: Request, res: Response) {
  * List service_locations for a module, with occupancy derived from live
  * transactions (per the design note on the service_locations table itself:
  * occupancy is derived, not stored). "Occupied" = any non-terminal
- * instant_transaction transaction tied to that location — terminal states
+ * instant_transaction transaction tied to that location â€” terminal states
  * are 'completed' and 'cancelled' (see engines/definitions/instant-transaction.ts).
  *
  * NOTE: this reads occupancy off `service_location_id`, the real FK on
@@ -420,7 +483,7 @@ export async function getModuleOrders(req: Request, res: Response) {
  * same FK (migrated off the legacy `metadata.table_id` string in the same
  * change) so splits/merges are reflected here correctly. See
  * ENGINE_A_STAFF_WORKFLOW_PLAN.md Phase 1. Rows created before this
- * migration may still be missing service_location_id — run
+ * migration may still be missing service_location_id â€” run
  * `backfill-service-location-id.ts` to backfill them from their old
  * metadata.table_id value.
  */
@@ -468,7 +531,7 @@ export async function getModuleTables(req: Request, res: Response) {
 
       for (const tx of openTx || []) {
         const locId = (tx as { service_location_id?: string | null }).service_location_id;
-        // First open transaction wins if there's ever more than one — that
+        // First open transaction wins if there's ever more than one â€” that
         // itself would be a data issue worth surfacing later, not silently
         // picking the latest.
         if (locId && !occupiedByLocation.has(locId)) {
@@ -567,17 +630,14 @@ export async function splitModuleTable(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'newTableId is required' });
     }
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'instant_transaction')) {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
     }
 
-    // tableId / newTableId are service_locations.id (the real FK) — verify both
+    // tableId / newTableId are service_locations.id (the real FK) â€” verify both
     // belong to this module before touching any transactions. Previously "the
     // table" was identified via metadata->>table_id, a free-text field with no
     // referential integrity; service_location_id is now the single source of
@@ -672,17 +732,14 @@ export async function mergeModuleTables(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'targetTableId is required' });
     }
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'instant_transaction')) {
       return res.status(400).json({ success: false, error: 'Invalid module for table operations' });
     }
 
-    // Same service_location_id validation as splitModuleTable — see comment there.
+    // Same service_location_id validation as splitModuleTable â€” see comment there.
     const { data: locations, error: locationsError } = await supabase
       .from('service_locations')
       .select('id')
@@ -722,7 +779,7 @@ export async function mergeModuleTables(req: Request, res: Response) {
       return res.status(404).json({ success: false, error: 'Both source and target tables must have open tabs' });
     }
 
-    // Reassign all orders from source tab to target tab (via metadata) — this
+    // Reassign all orders from source tab to target tab (via metadata) â€” this
     // link (order -> tab via metadata.tab_id) is a separate concept from which
     // table the tab itself sits at, and is unaffected by this migration.
     const { data: ordersToMove } = await supabase
@@ -767,11 +824,8 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     const supabase = getSupabase();
 
     // Verify module exists and is correct type
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'instant_transaction')) {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
@@ -790,7 +844,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     // Transaction-layer states are always valid
     const transactionStatuses = ['pending', 'confirmed', 'completed', 'cancelled'];
     if (transactionStatuses.includes(status)) {
-      // Allow — these are transaction-layer moves
+      // Allow â€” these are transaction-layer moves
     } else {
       // Validate against the mode-specific state machine
       const { getEngine } = await import('../../engines/registry.js');
@@ -799,7 +853,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       const machine = resolveFulfillmentMachine(engine.capabilities.fulfillment, orderMode as any);
       
       if (!machine) {
-        // Mode with no machine (e.g. 'none') — reject fulfillment moves
+        // Mode with no machine (e.g. 'none') â€” reject fulfillment moves
         return res.status(400).json({ success: false, error: `Mode '${orderMode}' has no fulfillment state machine` });
       }
       
@@ -812,7 +866,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
     }
 
     // This used to be two separate implementations of the same responsibility
-    // — this one (hardcoded status→action switch, no module scoping, no
+    // â€” this one (hardcoded statusâ†’action switch, no module scoping, no
     // discount reversal on cancel) and dynamic-module.router.ts's
     // PATCH /orders/:id/status (engine-driven, properly module-scoped, does
     // discount reversal, but never emitted the socket event the KDS needs).
@@ -827,7 +881,7 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
       // engine only allow actor 'staff' (not 'admin'), but this route is
       // reachable by admins/managers too (staffRoles). Forcing 'staff'
       // regardless of real role is what makes "Mark Ready"/"Served" work
-      // for everyone this route is meant to serve — switching to
+      // for everyone this route is meant to serve â€” switching to
       // actorForUser would silently 400 those buttons for admins/managers.
       actor: 'staff',
       userId,
@@ -848,17 +902,17 @@ export async function updateModuleOrderStatus(req: Request, res: Response) {
 const ITEM_STATUS_FLOW = ['pending', 'preparing', 'ready', 'served'];
 
 /**
- * Update the status of a single order_items row — the item-level KDS.
+ * Update the status of a single order_items row â€” the item-level KDS.
  * Forward-only, one step at a time (mirrors the spirit of the order-level
  * state machine, but order_items isn't a registered engine entity so this
  * is enforced directly here rather than via transitionState).
  *
  * Once every item on an order reaches 'ready' or 'served', the parent
- * order is auto-advanced to match (ready→ready, served→the engine's real
+ * order is auto-advanced to match (readyâ†’ready, servedâ†’the engine's real
  * 'delivered') via the real engine transition, actor 'staff', so staff
  * don't have to separately bump the order after bumping its last item.
  * If the order-level transition isn't currently allowed for any reason,
- * the item status update still succeeds — the order just won't
+ * the item status update still succeeds â€” the order just won't
  * auto-advance that time.
  *
  * Known gap: no per-item cancel yet. An 86'd item mid-prep still has to
@@ -877,11 +931,8 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
       });
     }
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || module.engine_type !== 'instant_transaction') {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
@@ -917,7 +968,7 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
     if (targetIndex !== currentIndex + 1) {
       return res.status(400).json({
         success: false,
-        error: `Cannot move item from '${currentItem.status}' to '${status}' — items advance one step at a time (${ITEM_STATUS_FLOW.join(' → ')}).`,
+        error: `Cannot move item from '${currentItem.status}' to '${status}' â€” items advance one step at a time (${ITEM_STATUS_FLOW.join(' â†’ ')}).`,
       });
     }
 
@@ -939,22 +990,22 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
     }
 
     // Auto-derive the parent order's fulfillment state once every item hits
-    // the same milestone. Only for 'ready'/'served' — 'preparing' has no
+    // the same milestone. Only for 'ready'/'served' â€” 'preparing' has no
     // order-level action worth forcing, and a cancelled/completed order is
     // never touched by this regardless of item states.
     //
     // Stage 6: this derivation now writes the CANONICAL fulfillment state to
     // the fulfillments table via the fulfillment service. It NEVER touches
-    // transactions.status — that stays at its transaction-layer value
+    // transactions.status â€” that stays at its transaction-layer value
     // (confirmed) until the transaction itself completes/cancels. Pre-Stage-6
     // rows without a fulfillment row are self-healed by ensure.
     //
     // Two older bugs fixed here: this used to run as actor 'system', but
-    // mark_ready's allowedActors on the engine is ['staff'] only — so it
+    // mark_ready's allowedActors on the engine is ['staff'] only â€” so it
     // was rejected every single time. Runs as 'staff' now, which is accurate
     // anyway: a staff member did trigger this, just indirectly by bumping
     // the order's last item. It also used to ask for a 'mark_served' action
-    // that has never existed on the engine — the item milestone is still
+    // that has never existed on the engine â€” the item milestone is still
     // called 'served', but the order state it derives to is the engine's
     // canonical 'handed_off'.
     if (status === 'ready' || status === 'served') {
@@ -970,14 +1021,14 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
         const fulfillmentService = getFulfillmentService();
         // FAIL-CLOSED: the confirm trigger created the row atomically, so the
         // row must already exist. A read error or a missing row means the
-        // derivation cannot be trusted — skip it (the item update above
+        // derivation cannot be trusted â€” skip it (the item update above
         // already succeeded; the order just won't auto-advance this time)
         // rather than writing fulfillment state from an assumption.
         let fulfillment: Awaited<ReturnType<typeof fulfillmentService.getForTransaction>>;
         try {
           fulfillment = await fulfillmentService.getForTransaction(supabase, orderId);
         } catch (readErr) {
-          logger.error('Order auto-derivation skipped — fulfillment read failed', {
+          logger.error('Order auto-derivation skipped â€” fulfillment read failed', {
             orderId,
             error: readErr instanceof Error ? readErr.message : String(readErr),
           });
@@ -997,7 +1048,7 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
           : { ok: false as const, error: 'No fulfillment row for this transaction' };
 
         if (result.ok && result.canonicalState) {
-          // Same payload shape as order-status.service.ts — the KDS consumes
+          // Same payload shape as order-status.service.ts â€” the KDS consumes
           // fulfillmentStatus, not status.
           const derivedPayload = {
             id: orderId,
@@ -1009,7 +1060,7 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
           emitToUnit(req.user?.tenantId || 'default', module.id, 'order:status', derivedPayload);
 
           // Resource lifecycle (plan Phase 5): the item-derived move is a
-          // REAL fulfillment move — consumption at the mode's handoff must
+          // REAL fulfillment move â€” consumption at the mode's handoff must
           // fire here too, not only on the order-status choke-point path.
           // Non-fatal by design (same boundary as the choke point): the
           // move already persisted; the RPCs are idempotent.
@@ -1042,7 +1093,7 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
             );
           }
         }
-        // Not allowed just means the order won't auto-advance this time —
+        // Not allowed just means the order won't auto-advance this time â€”
         // the item update above already succeeded and is not rolled back.
       }
     }
@@ -1057,13 +1108,13 @@ export async function updateModuleOrderItemStatus(req: Request, res: Response) {
 /**
  * Split an order's bill into equal shares for staff to collect payment
  * against separately. Deliberately does NOT create new transactions or
- * touch `amount`/`status` — actual payment collection already goes through
+ * touch `amount`/`status` â€” actual payment collection already goes through
  * the existing cash-payment endpoint per share. This just persists the
  * split intent (method + per-share amounts) onto the order so staff
  * re-opening it see the same breakdown instead of re-deriving it.
  *
  * Frontend contract (KitchenView.splitBill): { method: 'equal', parts }.
- * Only 'equal' is implemented — itemized/by-seat splitting needs its own
+ * Only 'equal' is implemented â€” itemized/by-seat splitting needs its own
  * UI to assign items to a share and isn't wired on the frontend yet.
  */
 export async function splitModuleOrder(req: Request, res: Response) {
@@ -1073,7 +1124,7 @@ export async function splitModuleOrder(req: Request, res: Response) {
     const supabase = getSupabase();
 
     if (method !== 'equal') {
-      return res.status(400).json({ success: false, error: `Unsupported split method '${method}' — only 'equal' is implemented` });
+      return res.status(400).json({ success: false, error: `Unsupported split method '${method}' â€” only 'equal' is implemented` });
     }
 
     const partsCount = Number(parts);
@@ -1081,11 +1132,8 @@ export async function splitModuleOrder(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'parts must be an integer between 2 and 20' });
     }
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || module.engine_type !== 'instant_transaction') {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
@@ -1107,7 +1155,7 @@ export async function splitModuleOrder(req: Request, res: Response) {
     }
 
     // Whole cents per share, remainder distributed one cent at a time to
-    // the first N shares so they sum exactly to `amount` — no floating
+    // the first N shares so they sum exactly to `amount` â€” no floating
     // point drift, nobody's charged a rounded-away cent.
     const totalCents = Math.round((order.amount as number) * 100);
     const baseCents = Math.floor(totalCents / partsCount);
@@ -1172,7 +1220,7 @@ export async function getModuleBookings(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Module is not a booking service' });
     }
 
-    // Build query — actual table is transactions
+    // Build query â€” actual table is transactions
     let query = supabase
       .from('transactions')
       .select(`
@@ -1183,7 +1231,7 @@ export async function getModuleBookings(req: Request, res: Response) {
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('module_id', moduleId || module.id);
 
-    // Filter by date (check-in or check-out on this date — stored in metadata)
+    // Filter by date (check-in or check-out on this date â€” stored in metadata)
     if (date) {
       query = query.or(`metadata->>check_in_date.eq.${date},metadata->>check_out_date.eq.${date}`);
     }
@@ -1249,11 +1297,8 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
     const supabase = getSupabase();
 
     // Verify module
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'time_exclusive_reservation' && module.engine_type !== 'multi_day_booking')) {
       return res.status(400).json({ success: false, error: 'Invalid module for booking operations' });
@@ -1268,7 +1313,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
     // Get current booking from unified transactions
     const { data: currentBooking } = await supabase
       .from('transactions')
-      .select('status, reference_id, metadata')
+      .select('status, reference_id, metadata, tenant_id, property_id')
       .eq('id', bookingId)
       .single();
 
@@ -1285,20 +1330,29 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
       default: throw new Error(`Invalid status: ${status}`);
     }
 
-    // Enforce Folio balance settlement before check-out
+    // Enforce Folio balance settlement before check-out.
+    // Readers accept both statuses: 'completed' (postRoomCharge /
+    // settleFolioBalance) and 'success' (legacy Stripe-webhook rows).
     if (status === 'checked_out' || engineAction === 'check_out') {
-      const { data: ledgerEntries } = await supabase
+      let checkoutLedgerQuery = supabase
         .from('payment_ledger')
         .select('event_type, amount')
         .eq('reference_type', 'room_folio')
-        .eq('reference_id', bookingId)
-        .eq('status', 'completed');
+        .eq('reference_id', bookingId);
+      if (currentBooking?.tenant_id) {
+        checkoutLedgerQuery = checkoutLedgerQuery.eq('tenant_id', currentBooking.tenant_id);
+      }
+      if (currentBooking?.property_id) {
+        checkoutLedgerQuery = checkoutLedgerQuery.eq('property_id', currentBooking.property_id);
+      }
+      checkoutLedgerQuery = checkoutLedgerQuery.in('status', ['completed', 'success']);
+      const { data: ledgerEntries } = await checkoutLedgerQuery;
 
       const totalCharges = (ledgerEntries || [])
         .filter((e) => e.event_type === 'charge')
         .reduce((acc, e) => acc + Number(e.amount), 0);
       const totalSettlements = (ledgerEntries || [])
-        .filter((e) => e.event_type === 'settlement')
+        .filter((e) => e.event_type === 'settlement' || e.event_type === 'refund')
         .reduce((acc, e) => acc + Number(e.amount), 0);
       const balance = Math.max(0, Number((totalCharges - totalSettlements).toFixed(2)));
 
@@ -1387,7 +1441,7 @@ export async function updateModuleBookingStatus(req: Request, res: Response) {
 /**
  * Create a staff booking for a module (walk-in booking)
  * Works for: any multi_day_booking module
- * Server-side price calculation — never trust client-supplied totals
+ * Server-side price calculation â€” never trust client-supplied totals
  */
 export async function createStaffBooking(req: Request, res: Response) {
   try {
@@ -1399,7 +1453,7 @@ export async function createStaffBooking(req: Request, res: Response) {
     // Verify module exists and is correct type
     const { data: module, error: moduleError } = await supabase
       .from('modules')
-      .select('id, engine_type')
+      .select('id, engine_type, tenant_id, property_id')
       .eq('slug', slug)
       .single();
 
@@ -1474,10 +1528,15 @@ export async function createStaffBooking(req: Request, res: Response) {
         status: 'confirmed',
         customer_id: null, // Walk-in, no customer account
         module_id: module.id,
+        // tenant_id/property_id are NOT NULL. Their absence made every
+        // staff walk-in booking fail with 23502.
+        tenant_id: module.tenant_id,
+        property_id: module.property_id,
         reference_id: unit_id,
         reference_table: 'accommodation_units',
         amount: totalAmount,
         metadata: {
+          unit_id,
           booking_number: bookingNumber,
           customer_name: customer_name || 'Walk-in Guest',
           customer_phone: customer_phone || '',
@@ -1560,7 +1619,7 @@ export async function getModuleSessions(req: Request, res: Response) {
       return res.status(400).json({ success: false, error: 'Module is not a session access service' });
     }
 
-    // Actual table is capacity_windows — no per-date filter, sessions are time windows not calendar days
+    // Actual table is capacity_windows â€” no per-date filter, sessions are time windows not calendar days
     const { data: sessions, error } = await supabase
       .from('capacity_windows')
       .select(`
@@ -1590,17 +1649,14 @@ export async function validateModuleTicket(req: Request, res: Response) {
     const supabase = getSupabase();
 
     // Get the module
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for ticket validation' });
     }
 
-    // Find the ticket — ticket_number is stored in metadata
+    // Find the ticket â€” ticket_number is stored in metadata
     const { data: ticket, error } = await supabase
       .from('transactions')
       .select(`
@@ -1672,11 +1728,8 @@ export async function recordEntry(req: Request, res: Response) {
     const supabase = getSupabase();
 
     // Verify module
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for entry operations' });
@@ -1736,11 +1789,8 @@ export async function recordExit(req: Request, res: Response) {
     const supabase = getSupabase();
 
     // Verify module
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for exit operations' });
@@ -1799,11 +1849,8 @@ export async function getModuleCapacity(req: Request, res: Response) {
     const { date } = req.query;
     const supabase = getSupabase();
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for capacity operations' });
@@ -1855,11 +1902,8 @@ export async function getTodaysTickets(req: Request, res: Response) {
     const { date, status } = req.query;
     const supabase = getSupabase();
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for ticket operations' });
@@ -1926,11 +1970,8 @@ export async function getModuleMaintenanceLogs(req: Request, res: Response) {
     const { slug } = req.params;
     const supabase = getSupabase();
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for maintenance operations' });
@@ -1962,11 +2003,8 @@ export async function createModuleMaintenanceLog(req: Request, res: Response) {
     const userId = (req as any).user?.id;
     const supabase = getSupabase();
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || (module.engine_type !== 'shared_capacity_access' && module.engine_type !== 'session_access')) {
       return res.status(400).json({ success: false, error: 'Invalid module for maintenance operations' });
@@ -2130,6 +2168,9 @@ export async function createModuleOrder(req: Request, res: Response) {
   // read in the outer catch for compensation. Declared here so both try
   // and catch can see it.
   let deductionPayload: Array<{ catalog_item_id: string; quantity: number }> = [];
+  // Hoisted so the outer catch can release a claimed idempotency lease.
+  let scopedIdempotencyKey: string | null = null;
+  let idempotencyClaimToken: string | null = null;
   try {
     const { slug } = req.params;
     const { serviceLocationId: reqServiceLocId, tableId, tableNumber, customerName, customerId, items, notes, orderType, paymentMethod } = req.body;
@@ -2140,15 +2181,26 @@ export async function createModuleOrder(req: Request, res: Response) {
     // receipt, analytics) sees a real value rather than the raw engine_type.
     const resolvedOrderType = orderType ?? (serviceLocationId ? 'dine_in' : 'counter');
     const userId = req.user?.userId;
-    const tenantId = req.user?.tenantId;
-    const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
+    const tenantId = req.user?.tenantId || (req.user as any)?.tenant_id;
+    const propertyId = (req as any).propertyId
+      || (req.headers?.['x-property-id'] as string | undefined)
+      || (req.user as any)?.propertyId
+      || (req.user as any)?.property_id;
     const supabase = getSupabase();
 
-    const { data: module, error: moduleError } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    // Staff orders write NOT NULL tenant/property columns on both transactions
+    // and order_items. Failing loudly here is better than inserting a row that
+    // belongs to nobody (or another tenant).
+    if (!tenantId) {
+      return res.status(403).json({ success: false, error: 'This action requires a tenant-scoped account' });
+    }
+    if (!propertyId) {
+      return res.status(400).json({ success: false, error: 'property_id is required to create a staff order' });
+    }
+
+    // Tenant-scoped module resolution. The previous unscoped `.eq('slug').single()`
+    // could pick another tenant's module when two tenants share a slug.
+    const { data: module, error: moduleError } = await resolveStaffModule(supabase, slug, tenantId);
 
     if (moduleError || !module) {
       return res.status(404).json({ success: false, error: 'Module not found' });
@@ -2157,6 +2209,28 @@ export async function createModuleOrder(req: Request, res: Response) {
     if (module.engine_type !== 'instant_transaction') {
       return res.status(400).json({ success: false, error: 'Module is not an instant_transaction module' });
     }
+
+    // P0-5: require an idempotency key so a double-tap/retry cannot create two
+    // orders and deduct stock twice. Accept the standard header or a body field
+    // (older POS clients send it in the payload).
+    const rawIdempotencyKey = String(
+      req.header('Idempotency-Key') || (req.body?.idempotencyKey ?? ''),
+    ).trim();
+    if (!rawIdempotencyKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'IDEMPOTENCY_KEY_REQUIRED',
+        message: 'An Idempotency-Key header (or body.idempotencyKey) is required to create a staff order.',
+      });
+    }
+    if (rawIdempotencyKey.length > 200) {
+      return res.status(400).json({
+        success: false,
+        error: 'IDEMPOTENCY_KEY_INVALID',
+        message: 'Idempotency key must be 200 characters or fewer.',
+      });
+    }
+    scopedIdempotencyKey = `staff_order:${tenantId}:${propertyId}:${module.id}:${rawIdempotencyKey}`;
 
     // Verify service location if provided
     let locationName = tableNumber;
@@ -2188,15 +2262,15 @@ export async function createModuleOrder(req: Request, res: Response) {
       } else {
         // Phase F1 Fix: validate the explicit mode against the canonical
         // capability contract and derive destination from the engine
-        // definition — NEVER use a local modeDestMap with stale/wrong
+        // definition â€” NEVER use a local modeDestMap with stale/wrong
         // destination vocabulary. The engine definition is the single
-        // source of truth for mode → destination mappings.
+        // source of truth for mode â†’ destination mappings.
         const { getEngine } = await import('../../engines/registry.js');
         const { assertValidFulfillmentSelection, FulfillmentContractError } = await import('../../engines/fulfillment-contract.js');
         const engine = getEngine('instant_transaction');
         const engineFulfillment = engine.capabilities.fulfillment;
 
-        // Cast to the typed FulfillmentMode — reject arbitrary strings
+        // Cast to the typed FulfillmentMode â€” reject arbitrary strings
         // before they reach the capability validator.
         const typedMode = explicitMode as FulfillmentMode;
         const modeOption = engineFulfillment.options.find(o => o.mode === typedMode);
@@ -2208,7 +2282,7 @@ export async function createModuleOrder(req: Request, res: Response) {
           });
         }
 
-        // For 'none', destination is always 'none' — no fulfillment layer.
+        // For 'none', destination is always 'none' â€” no fulfillment layer.
         // For other modes, derive destination from the engine definition.
         const destinationType = typedMode === 'none' ? 'none' : modeOption.destinations[0];
 
@@ -2240,7 +2314,7 @@ export async function createModuleOrder(req: Request, res: Response) {
       }
     } else {
       // Stage 6 fix: staff-created orders are inserted directly as 'confirmed',
-      // so the fulfillment selection must be snapshotted HERE — the confirm
+      // so the fulfillment selection must be snapshotted HERE â€” the confirm
       // trigger copies it into the fulfillment row and refuses to confirm an
       // order without it. Resolved + capability-validated (typed domain values).
       fulfillmentSelection = resolveFulfillmentSelection('instant_transaction', {
@@ -2303,6 +2377,7 @@ export async function createModuleOrder(req: Request, res: Response) {
       const engineService = getEngineService();
       pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
         moduleId: module.id,
+        tenantId: tenantId ?? undefined,
         propertyId: propertyId ?? undefined,
         currency: await resolveModuleCurrency(module.id, propertyId),
         customerId: customerId ?? undefined,
@@ -2330,6 +2405,46 @@ export async function createModuleOrder(req: Request, res: Response) {
     const discountAmount = pricing ? pricing.totalDiscount : 0;
 
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase().slice(-5)}`;
+
+    // Claim the idempotency lease only after pricing/validation have passed, so
+    // a bad request does not leave a lease behind. The claim is atomic: two
+    // concurrent submissions of the same key cannot both reach the insert.
+    let claim: StaffIdempotencyClaim;
+    try {
+      claim = await claimStaffIdempotencyKey(supabase, scopedIdempotencyKey, 120);
+    } catch (claimErr: any) {
+      logger.error('[Staff Order] Idempotency claim failed — refusing to create order', {
+        key: scopedIdempotencyKey,
+        error: claimErr?.message || claimErr,
+      });
+      return res.status(503).json({
+        success: false,
+        error: 'IDEMPOTENCY_UNAVAILABLE',
+        message: 'Could not reserve this order request. Please retry.',
+      });
+    }
+
+    if (!claim.claimed) {
+      if (claim.status === 'completed' && claim.response) {
+        // Replay of an already-created order. Return the original response so a
+        // retry is indistinguishable from the first success.
+        return res.status(200).json(claim.response);
+      }
+      return res.status(409).json({
+        success: false,
+        error: 'IN_PROGRESS',
+        message: 'This order request is already being processed. Please check back in a moment.',
+      });
+    }
+    idempotencyClaimToken = claim.claim_token ?? null;
+    if (!idempotencyClaimToken) {
+      logger.error('[Staff Order] Idempotency claim returned no token', { key: scopedIdempotencyKey });
+      return res.status(503).json({
+        success: false,
+        error: 'IDEMPOTENCY_UNAVAILABLE',
+        message: 'Could not reserve this order request. Please retry.',
+      });
+    }
 
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
@@ -2388,6 +2503,7 @@ export async function createModuleOrder(req: Request, res: Response) {
       if (deductError) {
         logger.warn('Staff order creation rejected due to insufficient stock:', deductError.message);
         await supabase.from('transactions').delete().eq('id', transaction.id);
+        await failStaffIdempotencyKey(supabase, scopedIdempotencyKey, idempotencyClaimToken);
         return res.status(400).json({
           success: false,
           error: 'INSUFFICIENT_STOCK',
@@ -2399,7 +2515,7 @@ export async function createModuleOrder(req: Request, res: Response) {
     const createdItems: any[] = [];
     if (resolvedItems.length > 0) {
       // selectedModifiers isn't sent by any current staff UI (StaffPOSTemplate /
-      // AdminPOSTemplate have no customization selector today — only the
+      // AdminPOSTemplate have no customization selector today â€” only the
       // customer-facing MenuService/DynamicModuleRenderer flow does), so this
       // is defensive: if a caller ever does send it (future staff modifier UI,
       // a customer-cart handoff, direct API use), it's captured and actually
@@ -2415,7 +2531,7 @@ export async function createModuleOrder(req: Request, res: Response) {
           subtotal: Math.round(unitPrice * item.quantity * 100) / 100,
           special_instructions: source.notes || source.instructions || null,
           status: 'pending',
-          // order_items.tenant_id / property_id are NOT NULL — omitting them
+          // order_items.tenant_id / property_id are NOT NULL â€” omitting them
           // silently failed the insert for every staff order (the error was
           // swallowed as a warn), so staff orders never had order_items: the
           // kitchen never saw them and the BOM resolver found nothing to
@@ -2436,15 +2552,33 @@ export async function createModuleOrder(req: Request, res: Response) {
         .select('*');
 
       if (itemsError) {
-        logger.warn('Failed inserting order items for staff order:', itemsError.message);
+        logger.error('Failed inserting order items for staff order:', { error: itemsError.message, orderId: transaction.id });
+        if (deductionPayload.length > 0) {
+          try {
+            await supabase.rpc('restore_inventory_for_order_items', {
+              p_items: deductionPayload,
+              p_user_id: userId || null,
+              p_order_id: transaction.id,
+            });
+          } catch (restoreErr: any) {
+            logger.error('Failed to restore inventory after items insert failure:', restoreErr);
+          }
+        }
+        await supabase.from('transactions').delete().eq('id', transaction.id);
+        await failStaffIdempotencyKey(supabase, scopedIdempotencyKey, idempotencyClaimToken);
+        return res.status(500).json({
+          success: false,
+          error: 'ORDER_ITEMS_INSERT_FAILED',
+          message: 'Failed to record order items. The order has been rolled back.',
+        });
       } else {
         createdItems.push(...(insertedItems || []));
       }
 
       // Process customization inventory for items with selectedModifiers.
-      // Mirrors dynamic-module.router.ts's customer order path exactly —
+      // Mirrors dynamic-module.router.ts's customer order path exactly â€”
       // same RPC, same order_type, same compensating transaction on
-      // failure — so the two order-creation paths stay consistent instead
+      // failure â€” so the two order-creation paths stay consistent instead
       // of silently diverging in what they deduct. Order totals now come
       // from calculatePricing (see above), so modifier price adjustments
       // are included in the charged amount and in the snapshotted pricing.
@@ -2493,6 +2627,7 @@ export async function createModuleOrder(req: Request, res: Response) {
               }
               await supabase.from('order_items').delete().eq('transaction_id', transaction.id);
               await supabase.from('transactions').delete().eq('id', transaction.id);
+              await failStaffIdempotencyKey(supabase, scopedIdempotencyKey, idempotencyClaimToken);
               return res.status(400).json({
                 success: false,
                 error: 'INSUFFICIENT_STOCK_CUSTOMIZATION',
@@ -2517,6 +2652,7 @@ export async function createModuleOrder(req: Request, res: Response) {
           }
           await supabase.from('order_items').delete().eq('transaction_id', transaction.id);
           await supabase.from('transactions').delete().eq('id', transaction.id);
+          await failStaffIdempotencyKey(supabase, scopedIdempotencyKey, idempotencyClaimToken);
           return res.status(400).json({
             success: false,
             error: 'INSUFFICIENT_STOCK_CUSTOMIZATION',
@@ -2526,10 +2662,10 @@ export async function createModuleOrder(req: Request, res: Response) {
       }
     }
 
-    // Resource allocation (plan Phase 5 — no-window invariant). The staff
+    // Resource allocation (plan Phase 5 â€” no-window invariant). The staff
     // path creates orders DIRECTLY as 'confirmed' (no choke-point confirm
     // transition), so the pre-flight allocation runs here, right after the
-    // order_items exist — the same invariant the choke point enforces: an
+    // order_items exist â€” the same invariant the choke point enforces: an
     // order is never confirmed without its allocation. Physical stock was
     // already deducted at creation above (the ONE stock authority); this
     // records the generic reservation. On failure the order is rolled back.
@@ -2542,7 +2678,7 @@ export async function createModuleOrder(req: Request, res: Response) {
       context: { orderId: transaction.id, staffCreated: true },
     });
     if (!allocation.ok) {
-      logger.error('[Staff Order] Refusing staff order — resource allocation failed', {
+      logger.error('[Staff Order] Refusing staff order â€” resource allocation failed', {
         orderId: transaction.id,
         error: allocation.error,
       });
@@ -2566,6 +2702,7 @@ export async function createModuleOrder(req: Request, res: Response) {
       await supabase.from('fulfillments').delete().eq('transaction_id', transaction.id);
       await supabase.from('resource_allocations').delete().eq('transaction_id', transaction.id);
       await supabase.from('transactions').delete().eq('id', transaction.id);
+      await failStaffIdempotencyKey(supabase, scopedIdempotencyKey, idempotencyClaimToken);
       return res.status(409).json({
         success: false,
         error: 'RESOURCE_ALLOCATION_FAILED',
@@ -2585,6 +2722,32 @@ export async function createModuleOrder(req: Request, res: Response) {
       createdAt: transaction.created_at,
     };
 
+    // Persist the response against the idempotency key so a retry replays this
+    // exact order instead of creating a duplicate. A completion failure must
+    // not fail the request: the order already exists, and the lease will expire
+    // so a later retry can still be served from the row.
+    try {
+      const { data: completed, error: completeErr } = await supabase.rpc('complete_idempotency_key', {
+        p_key: scopedIdempotencyKey,
+        p_claim_token: idempotencyClaimToken,
+        p_transaction_id: transaction.id,
+        p_response: { success: true, data: resultPayload },
+      });
+      if (completeErr) throw completeErr;
+      if (completed === false) {
+        logger.warn('[Staff Order] Idempotency completion was rejected (lease no longer held)', {
+          key: scopedIdempotencyKey,
+          orderId: transaction.id,
+        });
+      }
+    } catch (idemErr: any) {
+      logger.error('[Staff Order] Failed to persist idempotent response — order still created', {
+        key: scopedIdempotencyKey,
+        orderId: transaction.id,
+        error: idemErr?.message || idemErr,
+      });
+    }
+
     try {
       emitToUnit(tenantId || 'default', slug, 'order:new', resultPayload);
       emitToUnit(tenantId || 'default', module.id, 'order:new', resultPayload);
@@ -2595,6 +2758,7 @@ export async function createModuleOrder(req: Request, res: Response) {
     res.status(201).json({ success: true, data: resultPayload });
   } catch (error: any) {
     logger.error('Error creating module order:', error);
+    await failStaffIdempotencyKey(getSupabase(), scopedIdempotencyKey, idempotencyClaimToken);
     // If inventory was deducted but an exception occurred before or during
     // resource allocation, the order row may or may not exist. Attempt
     // compensation: restore_inventory_for_order_items is safe to call even
@@ -2631,11 +2795,8 @@ export async function addModuleOrderItem(req: Request, res: Response) {
     const targetCatalogId = catalogItemId || itemId;
     const qty = Number(quantity || 1);
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || module.engine_type !== 'instant_transaction') {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
@@ -2659,7 +2820,7 @@ export async function addModuleOrderItem(req: Request, res: Response) {
     const orderMeta = (order.metadata ?? {}) as Record<string, any>;
 
     // Phase 5 invariant: an order whose fulfillment has already reached the
-    // handoff/consumption point can never accept new items — the new
+    // handoff/consumption point can never accept new items â€” the new
     // allocation rows could never be consumed (the completion move skips
     // consumption, by design). Fail-closed: a fulfillment read error refuses
     // the write rather than proceeding on a stale assumption.
@@ -2680,7 +2841,7 @@ export async function addModuleOrderItem(req: Request, res: Response) {
     const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined) || order.property_id || null;
 
     // Price the FULL item set (existing order_items + the new line) through
-    // the same server-side pipeline createModuleOrder uses — a staff caller
+    // the same server-side pipeline createModuleOrder uses â€” a staff caller
     // can't over/under-charge by sending their own unitPrice, and the
     // transaction amount + pricing snapshot stay consistent after the add.
     const { data: existingItems, error: existingErr } = await supabase
@@ -2731,6 +2892,7 @@ export async function addModuleOrderItem(req: Request, res: Response) {
     const engineService = getEngineService();
     const pricing = await engineService.calculatePricing('instant_transaction', lineItems, {
       moduleId: module.id,
+      tenantId: order.tenant_id ?? callerTenantId ?? undefined,
       propertyId: propertyId ?? undefined,
       currency: await resolveModuleCurrency(module.id, propertyId),
       customerId: order.customer_id ?? undefined,
@@ -2757,7 +2919,7 @@ export async function addModuleOrderItem(req: Request, res: Response) {
     });
 
     // Stock for the NEW line only, through the ONE inventory authority
-    // (creation-time deduction RPC — same as createModuleOrder; add-item is
+    // (creation-time deduction RPC â€” same as createModuleOrder; add-item is
     // a creation-time-equivalent stock event, never a second authority).
     // The RPC raises on shortfall, rolling back its own deductions.
     const deductionPayload = [{ catalog_item_id: targetCatalogId, quantity: newResolvedItem.quantity }];
@@ -2786,7 +2948,7 @@ export async function addModuleOrderItem(req: Request, res: Response) {
         subtotal: Math.round(newUnitPrice * newResolvedItem.quantity * 100) / 100,
         special_instructions: notes || null,
         status: 'pending',
-        // order_items.tenant_id / property_id are NOT NULL — omitting them
+        // order_items.tenant_id / property_id are NOT NULL â€” omitting them
         // silently failed this insert for every staff add-item (same bug as
         // createModuleOrder's item insert, fixed there).
         tenant_id: tenantId,
@@ -2825,7 +2987,7 @@ export async function addModuleOrderItem(req: Request, res: Response) {
     }
 
     // Incremental generic allocation (Phase 5). allocate_resources is
-    // idempotent per (transaction_id, kind, resource_ref) — re-running the
+    // idempotent per (transaction_id, kind, resource_ref) â€” re-running the
     // FULL requirement set after the item insert adds only the new rows and
     // leaves the existing allocation untouched. The served-order guard above
     // ensures any new 'allocated' rows are still consumed when this order
@@ -2839,7 +3001,7 @@ export async function addModuleOrderItem(req: Request, res: Response) {
       context: { orderId: order.id, staffCreated: true, addedItem: true },
     });
     if (!allocation.ok) {
-      logger.error('[Staff Order] Allocation failed after adding item — rolling back:', {
+      logger.error('[Staff Order] Allocation failed after adding item â€” rolling back:', {
         orderId: order.id,
         error: allocation.error,
       });
@@ -2884,11 +3046,8 @@ export async function payModuleOrder(req: Request, res: Response) {
     const userId = req.user?.userId;
     const supabase = getSupabase();
 
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    const callerTenantId = (req.user as any)?.tenantId || (req.user as any)?.tenant_id;
+    const { data: module } = await resolveStaffModule(supabase, slug, callerTenantId);
 
     if (!module || module.engine_type !== 'instant_transaction') {
       return res.status(400).json({ success: false, error: 'Invalid module for order operations' });
@@ -2896,13 +3055,31 @@ export async function payModuleOrder(req: Request, res: Response) {
 
     const { data: order, error: orderErr } = await supabase
       .from('transactions')
-      .select('id, amount, status, metadata')
+      .select('id, amount, status, metadata, tenant_id, property_id')
       .eq('id', orderId)
       .eq('module_id', module.id)
       .single();
 
     if (orderErr || !order) {
       return res.status(404).json({ success: false, error: 'Order not found for this module' });
+    }
+
+    // The order's own tenant/property are authoritative. `payment_ledger` and
+    // `payments` both require them (NOT NULL), and the engine ledger previously
+    // wrote the literal string 'unknown' when the JWT lacked a tenant — which
+    // silently corrupted reporting. Fail closed instead.
+    const orderTenantId = order.tenant_id || callerTenantId;
+    const orderPropertyId = order.property_id
+      || (req as any).propertyId
+      || (req.headers?.['x-property-id'] as string | undefined);
+    if (!orderTenantId) {
+      return res.status(403).json({ success: false, error: 'Order has no tenant and the caller has no tenant context' });
+    }
+    if (callerTenantId && order.tenant_id && order.tenant_id !== callerTenantId) {
+      return res.status(404).json({ success: false, error: 'Order not found for this module' });
+    }
+    if (!orderPropertyId) {
+      return res.status(400).json({ success: false, error: 'Order has no property; cannot record payment' });
     }
 
     if (order.status === 'cancelled') {
@@ -2912,27 +3089,220 @@ export async function payModuleOrder(req: Request, res: Response) {
     const orderMeta = (order.metadata ?? {}) as Record<string, any>;
     const paidAmount = Number(amountPaid ?? order.amount);
     const tip = Number(tipAmount || 0);
-    const changeAmount = Math.max(0, Math.round((paidAmount - (order.amount + tip)) * 100) / 100);
+    const orderTotal = Number(order.amount);
+    // A negative tip silently reduced the amount due, letting staff settle an
+    // order for less than its authoritative total.
+    if (!Number.isFinite(tip) || tip < 0) {
+      return res.status(400).json({ success: false, error: 'Tip amount cannot be negative' });
+    }
+    const amountDue = orderTotal + tip;
+
+    // P0-4 parity for the staff order route: never settle an order for less
+    // than the authoritative total unless partial/split payment is explicitly allowed.
+    // Compare integer cents so float drift cannot accept an under-tender.
+    const paidCents = Math.round(paidAmount * 100);
+    const dueCents = Math.round(amountDue * 100);
+    if (!Number.isFinite(paidCents) || paidCents <= 0) {
+      return res.status(400).json({ success: false, error: 'Payment amount must be greater than zero' });
+    }
+    if (!Number.isFinite(dueCents) || dueCents < 0) {
+      return res.status(400).json({ success: false, error: 'Order has no payable amount' });
+    }
+
+    const allowPartial = req.body.allowPartial === true || req.body.splitPayment === true;
+    const previouslyPaidCents = Math.round(Number(orderMeta.amount_paid ?? 0) * 100);
+    const cumulativePaidCents = previouslyPaidCents + paidCents;
+
+    if (cumulativePaidCents < dueCents && !allowPartial) {
+      return res.status(400).json({
+        success: false,
+        error: `Payment amount ${paidAmount.toFixed(2)} is below the amount due ${(dueCents / 100).toFixed(2)}. Enable allowPartial to record a split or partial payment.`,
+      });
+    }
+
+    const isFullyPaid = cumulativePaidCents >= dueCents;
+    const paymentStatus = isFullyPaid ? 'paid' : 'partial';
+    const changeAmount = isFullyPaid ? Math.max(0, Math.round((cumulativePaidCents - dueCents)) / 100) : 0;
+
+    // Journal BEFORE marking the order paid. If the ledger cannot be written
+    // the settlement must not commit: previously the catch block downgraded a
+    // lost ledger row to a warning while the order stayed paid.
+    const wasAlreadyPaid = orderMeta.payment_status === 'paid';
+    const pricingSnapshot = orderMeta.pricing as any;
+    const currency = String(
+      orderMeta.pricing?.currency || await resolveModuleCurrency(module.id, orderPropertyId) || 'USD',
+    ).toUpperCase();
+
+    // Journal the sale on the FIRST tender, not only on full payment. Partial
+    // tenders used to be invisible to the engine ledger entirely. The
+    // idempotency key makes retries and subsequent tenders no-ops.
+    if (!wasAlreadyPaid && pricingSnapshot) {
+      const engineService = getEngineService();
+      try {
+        await engineService.recordToLedger(pricingSnapshot, {
+          tenantId: orderTenantId,
+          propertyId: orderPropertyId,
+          moduleId: module.id,
+          templateType: 'instant_transaction',
+          entityId: order.id,
+          entityType: 'order',
+          transactionType: 'charge',
+          actorType: 'staff',
+          actorId: userId,
+          entityState: order.status,
+          paymentMethod,
+          idempotencyKey: `settle:${order.id}`,
+          metadata: {
+            lineItems: orderMeta.lineItems ?? [],
+            taxBreakdown: pricingSnapshot.taxBreakdown ?? [],
+            feeBreakdown: pricingSnapshot.feeBreakdown ?? [],
+            tip_amount: tip,
+          },
+        });
+      } catch (ledgerErr: any) {
+        logger.error('Staff payment NOT settled: financial-ledger write failed', {
+          orderId: order.id,
+          error: ledgerErr?.message || ledgerErr,
+        });
+        return res.status(500).json({
+          success: false,
+          error: 'LEDGER_WRITE_FAILED',
+          message: 'Payment could not be recorded in the financial ledger. The order has not been marked paid.',
+        });
+      }
+    }
+
+    // Every tender — cash, card, transfer, partial or full — now writes a
+    // `payments` row and a `payment_ledger` settlement row. Reporting and
+    // refund caps read those tables; metadata alone was invisible to them.
+    //
+    // The deterministic webhook_id makes the tender idempotent across a retry
+    // where the order metadata update failed: the same pre-tender cumulative
+    // amount produces the same key, so the retry reuses the original rows
+    // instead of double-booking the cash.
+    const tenderKey = `staff_tender:${order.id}:${previouslyPaidCents}:${paidCents}:${paymentMethod}`;
+    let tenderPaymentId: string | null = null;
+
+    const { data: existingTender, error: existingTenderErr } = await supabase
+      .from('payment_ledger')
+      .select('id, gateway_reference_id')
+      .eq('webhook_id', tenderKey)
+      .maybeSingle();
+    if (existingTenderErr) {
+      logger.error('[Staff Order] Could not check existing tender record', {
+        orderId: order.id,
+        error: existingTenderErr.message,
+      });
+      return res.status(500).json({ success: false, error: 'PAYMENT_RECORD_FAILED' });
+    }
+
+    if (existingTender?.gateway_reference_id) {
+      tenderPaymentId = existingTender.gateway_reference_id as string;
+    } else {
+      const { data: paymentRow, error: paymentErr } = await supabase
+        .from('payments')
+        .insert({
+          reference_type: 'order',
+          reference_id: order.id,
+          transaction_id: order.id,
+          tenant_id: orderTenantId,
+          property_id: orderPropertyId,
+          amount: (paidCents / 100).toFixed(2),
+          currency,
+          method: paymentMethod,
+          status: isFullyPaid ? 'completed' : 'partial',
+          processed_by: userId || null,
+          processed_at: new Date().toISOString(),
+          notes: `Staff POS tender${tip > 0 ? ` (tip ${tip.toFixed(2)})` : ''}`,
+        })
+        .select('id')
+        .single();
+
+      if (paymentErr || !paymentRow) {
+        logger.error('[Staff Order] Failed to record payment row', {
+          orderId: order.id,
+          error: paymentErr?.message,
+        });
+        return res.status(500).json({
+          success: false,
+          error: 'PAYMENT_RECORD_FAILED',
+          message: 'Payment could not be recorded. The order has not been marked paid.',
+        });
+      }
+      tenderPaymentId = paymentRow.id;
+
+      const { error: tenderLedgerErr } = await supabase.from('payment_ledger').insert({
+        reference_type: 'order',
+        reference_id: order.id,
+        tenant_id: orderTenantId,
+        property_id: orderPropertyId,
+        event_type: 'settlement',
+        amount: (paidCents / 100).toFixed(2),
+        currency,
+        gateway_reference_id: tenderPaymentId,
+        webhook_id: tenderKey,
+        status: isFullyPaid ? 'completed' : 'partial',
+        metadata: {
+          payment_id: tenderPaymentId,
+          method: paymentMethod,
+          source: 'staff_tender',
+          acted_by: userId ?? null,
+          order_id: order.id,
+          tip_amount: tip,
+          cumulative_paid: cumulativePaidCents / 100,
+          remaining_amount: isFullyPaid ? 0 : Math.round(dueCents - cumulativePaidCents) / 100,
+        },
+      });
+
+      if (tenderLedgerErr) {
+        // A concurrent retry may have won the unique webhook_id race. Reuse
+        // its payment id and drop the losing payments row.
+        if ((tenderLedgerErr as any).code === '23505') {
+          const { data: winner } = await supabase
+            .from('payment_ledger')
+            .select('gateway_reference_id')
+            .eq('webhook_id', tenderKey)
+            .maybeSingle();
+          await supabase.from('payments').delete().eq('id', tenderPaymentId);
+          tenderPaymentId = (winner?.gateway_reference_id as string | undefined) ?? tenderPaymentId;
+        } else {
+          await supabase.from('payments').delete().eq('id', tenderPaymentId);
+          logger.error('[Staff Order] Failed to record tender settlement', {
+            orderId: order.id,
+            error: tenderLedgerErr.message,
+          });
+          return res.status(500).json({
+            success: false,
+            error: 'LEDGER_WRITE_FAILED',
+            message: 'Payment could not be recorded in the payment ledger. The order has not been marked paid.',
+          });
+        }
+      }
+    }
 
     const updatedMetadata = {
       ...orderMeta,
-      payment_status: 'paid',
+      payment_status: paymentStatus,
       payment_method: paymentMethod,
-      paid_at: new Date().toISOString(),
-      amount_paid: paidAmount,
+      paid_at: isFullyPaid ? new Date().toISOString() : orderMeta.paid_at,
+      amount_paid: Math.round(cumulativePaidCents) / 100,
+      remaining_amount: isFullyPaid ? 0 : Math.round(dueCents - cumulativePaidCents) / 100,
       tip_amount: tip,
       change_amount: changeAmount,
       paid_by_staff_id: userId || null,
+      payment_history: [
+        ...(Array.isArray(orderMeta.payment_history) ? orderMeta.payment_history : []),
+        {
+          amount: paidAmount,
+          method: paymentMethod,
+          paid_at: new Date().toISOString(),
+          staff_id: userId || null,
+          payment_id: tenderPaymentId,
+        },
+      ],
     };
 
-    // Settlement write — payment records PAYMENT, never completion. A direct
-    // status write here would impersonate completion: it would bypass the
-    // fulfillment machine, the capability-gated completion condition
-    // (required fulfillment must reach its terminal handoff state first),
-    // resource consumption at handoff, and fiscal issuance. Payment and
-    // completion are separate facts; only the state machine may change
-    // status (plan Phase 5 mutation-path inventory — payModuleOrder was the
-    // one Engine A path writing transactions.status directly).
+    // Settlement write
     const { data: updatedOrder, error: updateErr } = await supabase
       .from('transactions')
       .update({
@@ -2945,17 +3315,14 @@ export async function payModuleOrder(req: Request, res: Response) {
 
     if (updateErr) throw updateErr;
 
-    // Completion through the capability-gated choke point. The gate refuses
-    // 'completed' until the fulfillment layer has reached its terminal
-    // handoff condition — paying mid-preparation settles the order without
-    // completing it (the KDS/frontend completes it at handoff). Settlement
-    // already persisted above; a 400 refusal here is expected for
-    // not-yet-handoff-eligible orders, and a fail-closed (500) error is
-    // logged loudly rather than failing an already-settled payment.
-    let completionStatus: 'completed' | 'pending_fulfillment_handoff';
+    // If order is only partially paid, do not advance to completed status
+    let completionStatus: 'completed' | 'pending_fulfillment_handoff' | 'partially_paid';
     let displayStatus: string;
-    if (order.status === 'completed') {
-      // Already terminal — nothing to gate, nothing to read.
+    if (!isFullyPaid) {
+      completionStatus = 'partially_paid';
+      displayStatus = order.status;
+    } else if (order.status === 'completed') {
+      // Already terminal â€” nothing to gate, nothing to read.
       completionStatus = 'completed';
       displayStatus = 'completed';
     } else {
@@ -2994,57 +3361,24 @@ export async function payModuleOrder(req: Request, res: Response) {
       }
     }
 
-    // Record the settled charge to the financial ledger — this is what makes a
-    // staff-originated sale visible to the books (receipts, reconciliation,
-    // reporting). The exact pricing snapshot was captured at creation
-    // (createModuleOrder stores metadata.pricing), so the ledger gets the same
-    // server-resolved numbers. Idempotent: a re-settle (already paid) skips
-    // the write so a double-tap can't double the books.
-    const wasAlreadyPaid = orderMeta.payment_status === 'paid';
-    const pricingSnapshot = orderMeta.pricing as any;
-    if (!wasAlreadyPaid && pricingSnapshot) {
+    // Award loyalty points only once the order is fully settled. Previously
+    // this ran on every tender (including partials) and awarded points on the
+    // full order amount.
+    if (isFullyPaid) {
       try {
-        const engineService = getEngineService();
-        const propertyId = (req as any).propertyId || (req.headers?.['x-property-id'] as string | undefined);
-        await engineService.recordToLedger(pricingSnapshot, {
-          tenantId: req.user?.tenantId || 'unknown',
-          propertyId,
-          moduleId: module.id,
-          templateType: 'instant_transaction',
-          entityId: order.id,
-          entityType: 'order',
-          transactionType: 'charge',
-          actorType: 'staff',
-          actorId: userId,
-          entityState: displayStatus,
-          paymentMethod,
-          idempotencyKey: `settle:${order.id}`,
-          metadata: {
-            lineItems: orderMeta.lineItems ?? [],
-            taxBreakdown: pricingSnapshot.taxBreakdown ?? [],
-            feeBreakdown: pricingSnapshot.feeBreakdown ?? [],
-          },
-        });
-      } catch (ledgerErr: any) {
-        logger.warn('Failed to record staff payment to financial ledger', {
-          orderId: order.id,
-          error: ledgerErr?.message || ledgerErr,
-        });
+        await awardLoyaltyPointsForPayment('order', order.id, paidAmount);
+      } catch (lErr: any) {
+        logger.warn('Failed awarding loyalty points for staff paid order:', lErr?.message || lErr);
       }
     }
 
-    // Award loyalty points for cash/staff-settled orders (idempotent, safe no-op if loyalty disabled or customer missing)
     try {
-      await awardLoyaltyPointsForPayment('order', order.id, paidAmount);
-    } catch (lErr: any) {
-      logger.warn('Failed awarding loyalty points for staff paid order:', lErr?.message || lErr);
-    }
-
-    try {
-      emitToUnit(req.user?.tenantId || 'default', slug, 'order:updated', {
+      emitToUnit(orderTenantId, slug, 'order:updated', {
         orderId: order.id,
         status: displayStatus,
-        paymentStatus: 'paid',
+        paymentStatus,
+        amountPaid: cumulativePaidCents / 100,
+        remainingAmount: isFullyPaid ? 0 : Math.round(dueCents - cumulativePaidCents) / 100,
       });
     } catch (sErr: any) {
       logger.warn('Failed emitting socket event for paid order:', sErr.message);
@@ -3056,10 +3390,13 @@ export async function payModuleOrder(req: Request, res: Response) {
         id: updatedOrder.id,
         status: displayStatus,
         completionStatus,
-        paymentStatus: 'paid',
+        paymentStatus,
         paymentMethod,
+        paymentId: tenderPaymentId,
         totalAmount: updatedOrder.amount,
         amountPaid: paidAmount,
+        totalPaid: cumulativePaidCents / 100,
+        remainingAmount: isFullyPaid ? 0 : Math.round(dueCents - cumulativePaidCents) / 100,
         changeAmount,
         tipAmount: tip,
       },
@@ -3182,12 +3519,12 @@ interface MenuCustomizationGroup {
 
 /**
  * Batch-fetch customization groups + options for a set of catalog items in a
- * CONSTANT number of queries (links → groups → options), replacing the previous
+ * CONSTANT number of queries (links â†’ groups â†’ options), replacing the previous
  * one get_entity_customizations RPC call per menu item.
  *
  * Mirrors the RPC's logic (explicit entity links + global groups, override
  * fields, time-based availability, option filtering/stock), but scoped to the
- * module's tenant/property — the RPC runs under the service role and returned
+ * module's tenant/property â€” the RPC runs under the service role and returned
  * every tenant's global groups, which is a cross-tenant leak for a per-property
  * menu.
  */
@@ -3385,8 +3722,8 @@ export async function getModuleMenu(req: Request, res: Response) {
 
     // Enrich each item with its customization groups + options so the Quick
     // Order tab can offer modifier selection. Done in a constant number of
-    // queries (links → groups → options) rather than one RPC per item.
-    // Optional by design — a failure to load modifiers must not take down the
+    // queries (links â†’ groups â†’ options) rather than one RPC per item.
+    // Optional by design â€” a failure to load modifiers must not take down the
     // whole menu.
     let customizationsByItem: Map<string, MenuCustomizationGroup[]> = new Map();
     try {
@@ -3507,10 +3844,38 @@ export async function freeServiceLocation(req: Request, res: Response) {
     const { id } = req.params;
     const supabase = getSupabase();
 
+    // P0-5: this route has no module slug, so it never passed through
+    // requireModulePropertyAccess. Without this lookup any tenant's staff
+    // could free any other tenant's table by id â€” unassigning its staff,
+    // completing its open orders, and closing its reservations. Resolve the
+    // location first and fail closed on tenant/property mismatch.
+    const { data: location, error: locationError } = await supabase
+      .from('service_locations')
+      .select('id, tenant_id, property_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (locationError) throw locationError;
+
+    const callerTenantId = req.user?.tenantId;
+    const requestPropertyId =
+      (req as any).property?.id ||
+      (req as any).propertyId ||
+      (req.headers['x-property-id'] as string | undefined);
+
+    if (
+      !location ||
+      !callerTenantId ||
+      location.tenant_id !== callerTenantId ||
+      (requestPropertyId && location.property_id && location.property_id !== requestPropertyId)
+    ) {
+      return res.status(404).json({ success: false, error: 'Service location not found' });
+    }
+
     // 1. Unassign staff
     await reassignStaffToLocation(supabase, id, null);
 
-    // 2. Complete active transactions on this location — routed through the
+    // 2. Complete active transactions on this location â€” routed through the
     // consolidated status-change path (see order-status.service.ts) instead
     // of a raw .update(). That function was deliberately consolidated from
     // two divergent implementations into one; a direct update here would
@@ -3588,49 +3953,97 @@ export async function getCheckedInRooms(req: Request, res: Response) {
     const search = ((req.query.search as string) || '').toLowerCase().trim();
     const supabase = getSupabase();
 
-    // Verify module
-    const { data: module } = await supabase
-      .from('modules')
-      .select('id, engine_type')
-      .eq('slug', slug)
-      .single();
+    // Resolve the module inside the caller's tenant/property. `modules` is
+    // UNIQUE (slug, tenant_id) â€” two tenants may own the same slug â€” so a bare
+    // `.eq('slug', slug).single()` can match multiple rows (PGRST116) and,
+    // even when it does not, it let tenant A open tenant B's module. The route
+    // runs requireModulePropertyAccess, which sets req.propertyId and rejects
+    // cross-tenant staff; super_admin has no homed tenant and is scoped by the
+    // x-property-id header it supplies.
+    const callerTenantId = (req.user as any)?.tenantId as string | undefined;
+    const isSuperAdmin = Boolean(req.user?.roles?.includes('super_admin'));
+    const requestPropertyId =
+      ((req as any).propertyId as string | undefined) ||
+      ((req.headers['x-property-id'] as string | undefined) || undefined);
 
+    let moduleQuery = supabase
+      .from('modules')
+      .select('id, engine_type, slug, tenant_id, property_id')
+      .eq('slug', slug);
+    if (!isSuperAdmin && callerTenantId) moduleQuery = moduleQuery.eq('tenant_id', callerTenantId);
+    if (requestPropertyId) moduleQuery = moduleQuery.eq('property_id', requestPropertyId);
+
+    const { data: module, error: moduleError } = await moduleQuery.limit(1).maybeSingle();
+
+    if (moduleError) throw moduleError;
     if (!module) {
       return res.status(400).json({ success: false, error: 'Module not found' });
     }
 
-    // Get checked-in bookings for time_exclusive_reservation engine
-    const { data: bookings, error } = await supabase
+    const effectiveTenantId = (module.tenant_id as string | null) ?? callerTenantId ?? null;
+    const effectivePropertyId = (module.property_id as string | null) ?? requestPropertyId ?? null;
+    if (!effectiveTenantId) {
+      return res.status(400).json({ success: false, error: 'Module is not tenant-scoped' });
+    }
+
+    // Get checked-in bookings for time_exclusive_reservation engine.
+    //
+    // `transactions` has three FKs to `users` (user_id, staff_id, customer_id),
+    // so `users(...)` was ambiguous (HTTP 300) and the whole request failed
+    // with 500. The guest relationship is hinted by constraint name; the
+    // transactions_customer_id_fkey migration makes that name resolvable.
+    let bookingsQuery = supabase
       .from('transactions')
-      .select('id, metadata, customer_id, created_at, users(full_name, email, phone)')
+      .select('id, metadata, customer_id, created_at, users!transactions_customer_id_fkey(full_name, email, phone)')
       .eq('engine_type', 'time_exclusive_reservation')
       .eq('status', 'checked_in')
-      .order('created_at', { ascending: false });
+      .eq('tenant_id', effectiveTenantId);
+    if (effectivePropertyId) bookingsQuery = bookingsQuery.eq('property_id', effectivePropertyId);
+
+    const { data: bookings, error } = await bookingsQuery.order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    // Get units to enrich unit names/numbers
-    const { data: units } = await supabase
+    // Get units to enrich unit names/numbers (same tenant/property scope as
+    // the bookings, so an id collision can never pull another property's unit).
+    let unitQuery = supabase
       .from('accommodation_units')
-      .select('id, name, unit_number');
+      .select('id, name, unit_number')
+      .eq('tenant_id', effectiveTenantId);
+    if (effectivePropertyId) unitQuery = unitQuery.eq('property_id', effectivePropertyId);
+
+    const { data: units } = await unitQuery;
 
     const unitMap = new Map((units || []).map((u) => [u.id, u]));
 
-    // Fetch ledger balances for all checked-in bookings
+    // Fetch ledger balances for all checked-in bookings. `status` is
+    // 'completed' on rows written by postRoomCharge/settleFolioBalance and
+    // 'success' on legacy Stripe-webhook rows, so both are read. Only charge
+    // and settlement/refund rows move the balance; legacy 'authorized' rows
+    // are ignored rather than treated as a settlement.
     const bookingIds = (bookings || []).map((b) => b.id);
     const ledgerMap = new Map<string, number>();
 
     if (bookingIds.length > 0) {
-      const { data: ledgerRows } = await supabase
+      let ledgerQuery = supabase
         .from('payment_ledger')
         .select('reference_id, event_type, amount')
         .eq('reference_type', 'room_folio')
         .in('reference_id', bookingIds)
-        .eq('status', 'completed');
+        .in('status', ['completed', 'success'])
+        .eq('tenant_id', effectiveTenantId);
+      if (effectivePropertyId) ledgerQuery = ledgerQuery.eq('property_id', effectivePropertyId);
+
+      const { data: ledgerRows } = await ledgerQuery;
 
       (ledgerRows || []).forEach((row) => {
         const current = ledgerMap.get(row.reference_id) || 0;
-        const delta = row.event_type === 'charge' ? Number(row.amount) : -Number(row.amount);
+        const delta =
+          row.event_type === 'charge'
+            ? Number(row.amount)
+            : row.event_type === 'settlement' || row.event_type === 'refund'
+              ? -Number(row.amount)
+              : 0;
         ledgerMap.set(row.reference_id, Math.max(0, current + delta));
       });
     }

@@ -230,7 +230,7 @@ describe('OnboardingController', () => {
           return createChainableMock([{ id: 'group-1' }]);
         }
         if (table === 'properties') {
-          return createChainableMock({ id: 'prop-123', name: 'Alpine AccommodationUnit', slug: 'alpine-accommodation unit' });
+          return createChainableMock({ id: 'prop-123', name: 'Alpine AccommodationUnit', slug: 'alpine-accommodation unit', tenant_id: 'tenant-123' });
         }
         if (table === 'user_property_access') {
           return createChainableMock({});
@@ -378,7 +378,7 @@ describe('OnboardingController', () => {
           return createChainableMock([{ id: 'group-1' }]);
         }
         if (table === 'properties') {
-          return createChainableMock({ id: 'prop-123', name: 'Resort' });
+          return createChainableMock({ id: 'prop-123', name: 'Resort', tenant_id: 'tenant-123' });
         }
         if (table === 'property_settings') {
           return {
@@ -418,11 +418,12 @@ describe('OnboardingController', () => {
 
       expect(settingsInsertSpy).toHaveBeenCalled();
       const insertedSettings = settingsInsertSpy.mock.calls[0][0];
-      const gatewaySettings = insertedSettings.find((s: any) => s.setting_key === 'payment_gateway').setting_value;
+      const gatewaySettings = insertedSettings.find((s: any) => s.setting_key === 'payment_gateway');
       const smtpSettings = insertedSettings.find((s: any) => s.setting_key === 'smtp_config').setting_value;
 
-      expect(gatewaySettings.configured).toBe(true);
-      expect(gatewaySettings.secretKey).toBeUndefined();
+      // Gateway credentials moved to tenant_payment_settings; the legacy
+      // property_settings row must not be written at all.
+      expect(gatewaySettings).toBeUndefined();
       expect(smtpSettings.configured).toBe(true);
       expect(smtpSettings.pass).toBeUndefined();
       expect(smtpSettings.apiKey).toBeUndefined();

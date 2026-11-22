@@ -16,9 +16,23 @@ const SALT_LENGTH = 32;
  * Get encryption key from environment
  */
 function getEncryptionKey(): Buffer {
-  const key = env.ENCRYPTION_KEY || env.JWT_SECRET;
-  if (!key) {
-    throw new Error('ENCRYPTION_KEY or JWT_SECRET must be configured');
+  const explicitKey = process.env.ENCRYPTION_KEY;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (isProduction && !explicitKey) {
+    throw new Error(
+      'FATAL: ENCRYPTION_KEY must be explicitly configured in production; refusing to derive it from JWT_SECRET.'
+    );
+  }
+
+  // The default in config/env.ts is a public placeholder: never encrypt real
+  // data with it, even outside production.
+  const key = explicitKey || (env.ENCRYPTION_KEY !== 'default-encryption-key-change-me'
+    ? env.ENCRYPTION_KEY
+    : env.JWT_SECRET);
+
+  if (!key || key === 'default-secret-key-change-me' || key === 'default-encryption-key-change-me') {
+    throw new Error('ENCRYPTION_KEY must be configured with a real, non-default value');
   }
   
   // Derive a consistent 32-byte key using SHA-256

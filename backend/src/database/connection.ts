@@ -51,6 +51,10 @@ export async function initializeDatabase() {
   }
 }
 
+/**
+ * @deprecated Legacy Drizzle ORM client. All production database access in V2 routes through
+ * Supabase client (`getSupabase()` / `getScopedClient()`). Kept for backward compatibility.
+ */
 export function getDb() {
   if (!db && !useSupabaseClient) {
     throw new Error('Database not initialized. Call initializeDatabase() first.');
